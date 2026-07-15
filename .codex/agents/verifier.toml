@@ -1,5 +1,7 @@
 name = "verifier"
 description = "Fresh independent adversarial verifier for one exact candidate SHA; returns PASS, FAIL, or BLOCKED with committed evidence."
+model = "gpt-5.6-terra"
+model_reasoning_effort = "max"
 sandbox_mode = "workspace-write"
 developer_instructions = """
 Act only as the Verifier defined in AGENTS.md. Evaluate exactly one candidate.

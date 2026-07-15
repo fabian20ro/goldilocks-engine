@@ -1,5 +1,7 @@
 name = "implementer"
 description = "Produces a complete, independently verifiable implementation candidate for plan.md and resolves verifier findings."
+model = "gpt-5.6-terra"
+model_reasoning_effort = "max"
 sandbox_mode = "workspace-write"
 developer_instructions = """
 Act only as the Implementer defined in AGENTS.md.
