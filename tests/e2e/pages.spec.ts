@@ -134,3 +134,62 @@ test("the GitHub Pages build loads and remains worker-backed offline", async ({
 
   expect(errors).toEqual([]);
 });
+
+test("verifier round 006: scoped activation preserves foreign caches", async ({
+  page,
+}) => {
+  const errors = captureErrors(page);
+
+  await page.route("**/cache-seed", async (route) => {
+    await route.fulfill({
+      contentType: "text/html",
+      body: "<!doctype html><title>cache seed</title>",
+    });
+  });
+  await page.goto("http://127.0.0.1:4173/cache-seed");
+  await page.evaluate(async (basePath) => {
+    const stale = await caches.open(`goldilocks-shell:${basePath}:v2`);
+    await stale.put(
+      `${basePath}stale.js`,
+      new Response("stale Goldilocks asset"),
+    );
+    const sibling = await caches.open("goldilocks-shell:/other-app/:v7");
+    await sibling.put(
+      "/other-app/asset.js",
+      new Response("sibling application asset"),
+    );
+    const unrelated = await caches.open("third-party-test-cache");
+    await unrelated.put(
+      "/shared/asset.txt",
+      new Response("unrelated cached data"),
+    );
+  }, pagesPath);
+
+  await page.goto(pagesPath);
+  await page
+    .locator("html[data-offline-ready='true']")
+    .waitFor({ timeout: 15_000 });
+
+  const cacheState = await page.evaluate(async () => {
+    const names = await caches.keys();
+    const sibling = await caches.open("goldilocks-shell:/other-app/:v7");
+    const unrelated = await caches.open("third-party-test-cache");
+    return {
+      names,
+      controllerPath: navigator.serviceWorker.controller
+        ? new URL(navigator.serviceWorker.controller.scriptURL).pathname
+        : null,
+      siblingBody: await (await sibling.match("/other-app/asset.js"))?.text(),
+      unrelatedBody: await (await unrelated.match("/shared/asset.txt"))?.text(),
+    };
+  });
+
+  expect(cacheState.controllerPath).toBe(`${pagesPath}sw.js`);
+  expect(cacheState.names).toContain(`goldilocks-shell:${pagesPath}:v3`);
+  expect(cacheState.names).not.toContain(`goldilocks-shell:${pagesPath}:v2`);
+  expect(cacheState.names).toContain("goldilocks-shell:/other-app/:v7");
+  expect(cacheState.names).toContain("third-party-test-cache");
+  expect(cacheState.siblingBody).toBe("sibling application asset");
+  expect(cacheState.unrelatedBody).toBe("unrelated cached data");
+  expect(errors).toEqual([]);
+});
