@@ -627,6 +627,7 @@ h2 {
 
 .module-library .module-card {
   scroll-snap-align: start;
+  touch-action: pan-x;
 }
 
 .choice-list {
