@@ -1,4 +1,4 @@
-# Round 006 implementation handoff
+# Round 007 implementation handoff
 
 ## Implemented behavior summary
 
@@ -17,6 +17,7 @@ Gate-ready Milestone 0 numeric prototype and Milestone 1 portrait Pipeline Toy:
 - Dual-root production packaging: the normal local build remains rooted at `/`, while `npm run build:pages` scopes HTML, manifest, icon, service worker, offline asset manifest, JavaScript, CSS, and Web Worker chunks to `/goldlocks-engine/`.
 - Scope-derived service-worker registration and cache names prevent the Pages deployment from claiming or deleting unrelated paths/caches on the shared `github.io` origin.
 - GitHub Pages Actions workflow builds and uploads `dist`, then deploys it with the Pages environment on pushes to `agent/implementation` or manual dispatch.
+- The Pages build job defines workspace-local npm and Playwright cache paths before any step, so `actions/setup-node@v6` cache discovery and `npm ci` both avoid the runner's user home.
 
 ## Plan requirements covered
 
@@ -51,6 +52,7 @@ Milestones 2–6 are intentionally not implemented. The Pipeline Toy human exit 
 - **V-008:** both resource-allocation range inputs now render at least 44 CSS px high, so the minimum 320 px viewport has no undersized visible interactive control.
 - **V-009:** app-level reduced-motion state is projected on the root shell; its descendants and pseudo-elements receive no CSS animation and near-zero transition duration even when the OS preference is `no-preference`.
 - **V-010:** drawer module cards now allow native horizontal panning while active-pipeline cards continue reserving touch gestures for custom drag/reorder; a real CDP touch swipe moves the 393 px drawer beyond its first screen, and active touch drag plus tap/snap remain covered.
+- **V-011:** the Pages build job now sets `npm_config_cache` and `PLAYWRIGHT_BROWSERS_PATH` at job scope to ignored `${{ github.workspace }}/.cache/...` paths before `setup-node` cache discovery or dependency installation; a focused configuration regression protects the ordering and values.
 
 ## Reproducible setup, startup, and verification
 
@@ -77,7 +79,7 @@ npm run build:pages
 npm run test:e2e:pages
 ```
 
-Dependency downloads use `.cache/npm`; browser downloads use `.cache/ms-playwright`. Both are repository-local and ignored. `npm run test:e2e` uses `./scripts/run-e2e`, which builds and serves the production PWA on `127.0.0.1:4173`, waits for readiness, and is cleaned up by Playwright.
+Dependency downloads use `.cache/npm`; browser downloads use `.cache/ms-playwright`. Both are repository-local and ignored. The Pages workflow defines both at build-job scope, before `actions/setup-node`, so cache discovery and every later npm command inherit the same workspace-local location. `npm run test:e2e` uses `./scripts/run-e2e`, which builds and serves the production PWA on `127.0.0.1:4173`, waits for readiness, and is cleaned up by Playwright.
 
 `npm run test:e2e:pages` uses `./scripts/run-pages-e2e`, which builds with Vite base `/goldlocks-engine/` and serves the packaged app at `http://127.0.0.1:4173/goldlocks-engine/`. The deployment target is `https://fabian20ro.github.io/goldlocks-engine/`; `.github/workflows/deploy-pages.yml` uses `actions/checkout@v6`, `actions/setup-node@v6` with Node 22 and npm caching, `actions/configure-pages@v5`, `actions/upload-pages-artifact@v4`, and `actions/deploy-pages@v4`.
 
@@ -95,6 +97,7 @@ Dependency downloads use `.cache/npm`; browser downloads use `.cache/ms-playwrig
 - Touch-action is contextual: library cards expose native `pan-x` for drawer discovery, while active-pipeline cards retain `none` for deterministic two-axis pointer drag and capture.
 - PWA scope derives from Vite's `import.meta.env.BASE_URL`; manifest start/scope/icon paths are relative, generated offline assets carry the configured base, and the service worker resolves its shell from its own registration scope.
 - Cache cleanup is namespace- and scope-limited, so one Goldilocks deployment cannot delete caches owned by another repository on the same origin.
+- GitHub Actions cache paths are job-scoped rather than step-scoped because `setup-node` queries `npm config get cache` before the later `npm ci` step.
 
 ## Known limitations and risks
 
@@ -107,10 +110,11 @@ Dependency downloads use `.cache/npm`; browser downloads use `.cache/ms-playwrig
 
 ## Checks executed
 
-- `./scripts/verify`: PASS from a fresh locked install. Format, lint, typecheck, 21 unit/property tests with coverage thresholds, balance validation, root production build, all 20 root packaged-PWA Playwright cases, Pages production build, and the Pages scoped online/cache/offline/worker Playwright case passed.
+- `./scripts/verify`: PASS from a fresh locked install. Format, lint, typecheck, 22 unit/property/configuration tests with coverage thresholds, balance validation, root production build, all 20 root packaged-PWA Playwright cases, Pages production build, and both Pages scoped Playwright cases passed.
 - `./scripts/run`: PASS. The root development server reached ready state at `http://127.0.0.1:4173/`; independent probes returned HTTP 200 for `/` and `/sw.js`; Ctrl-C stopped it.
 - `npm run build:pages`: PASS. Emitted HTML points to `/goldlocks-engine/`; `asset-manifest.json` names the scoped CSS, application JS, and Web Worker chunk.
-- `npm run test:e2e:pages`: PASS independently and inside `./scripts/verify`. The repository-pinned Chromium required the established scoped launch permission in this managed macOS environment.
+- `npx vitest run src/test/pagesWorkflow.test.ts --coverage.enabled=false`: PASS, 1/1 focused workflow-cache regression. An initial `npm test -- --run src/test/pagesWorkflow.test.ts` invocation also passed the selected test but exited nonzero because selecting only this configuration test intentionally left the global simulation coverage thresholds at zero; the canonical full run passed all coverage gates.
+- `npm run test:e2e:pages`: PASS independently and inside `./scripts/verify`, 2/2 including the verifier-authored foreign-cache preservation regression. The repository-pinned Chromium required the established scoped launch permission in this managed macOS environment.
 
 ## Checks not run
 
