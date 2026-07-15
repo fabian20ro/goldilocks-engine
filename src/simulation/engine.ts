@@ -170,9 +170,23 @@ export function calculateMetrics(
     },
     { label: "stage ordering", score: orderWarnings.length ? 1.6 : 0 },
   ];
-  const dominantBottleneck =
-    candidates.sort((left, right) => right.score - left.score)[0]?.label ??
-    "none";
+  const dominantCandidate = candidates.reduce((dominant, candidate) =>
+    candidate.score > dominant.score ? candidate : dominant,
+  );
+  const dominantBottleneck = dominantCandidate.label;
+  const slowestModuleIndex = selectedModules.reduce(
+    (slowest, module, index) =>
+      module.throughput < selectedModules[slowest]!.throughput
+        ? index
+        : slowest,
+    0,
+  );
+  const bottleneckSlotId =
+    dominantBottleneck === "module throughput"
+      ? (state.slots[slowestModuleIndex]?.slotId ?? "runtime")
+      : dominantBottleneck === "stage ordering"
+        ? "prepare"
+        : "runtime";
 
   return {
     throughputPerMinute: round(throughputPerMinute),
@@ -189,6 +203,7 @@ export function calculateMetrics(
     evaluationCoverage: round(evaluationCoverage, 3),
     operatingCost: round(operatingCost, 3),
     dominantBottleneck,
+    bottleneckSlotId,
     orderWarnings,
   };
 }
@@ -197,15 +212,16 @@ function appendEvent(
   state: SimulationState,
   event: Omit<LedgerEvent, "id" | "tick">,
 ): SimulationState {
+  const eventSequence = state.eventSequence + 1;
   const ledger = [
     ...state.ledger,
     {
       ...event,
-      id: `evt-${state.tick}-${state.ledger.length + 1}`,
+      id: `evt-${state.tick}-${eventSequence}`,
       tick: state.tick,
     },
   ].slice(-MAX_LEDGER_EVENTS);
-  return { ...state, ledger };
+  return { ...state, eventSequence, ledger };
 }
 
 function recalculate(state: SimulationState): SimulationState {
@@ -258,6 +274,7 @@ export function createInitialState(seed = 20260715): SimulationState {
     baselineLabel: null,
     failedModuleId: null,
     lastWarning: "",
+    eventSequence: 0,
     ledger: [],
   } satisfies SimulationState;
   return appendEvent(recalculate(base), {
@@ -488,18 +505,25 @@ export function tick(state: SimulationState, seconds: number): SimulationState {
           3_600_000,
     },
   };
-  if (next.jobs.paused || next.jobs.queued === 0) return recalculate(next);
+  if (next.jobs.paused) return recalculate(next);
+  if (next.jobs.queued === 0) {
+    return recalculate({
+      ...next,
+      jobs: { ...next.jobs, processingCarry: 0 },
+    });
+  }
 
   const potential =
     next.jobs.processingCarry +
     (next.metrics.throughputPerMinute * elapsed) / 60;
   const resolved = Math.min(next.jobs.queued, Math.floor(potential));
+  const queued = next.jobs.queued - resolved;
   next = {
     ...next,
     jobs: {
       ...next.jobs,
-      queued: next.jobs.queued - resolved,
-      processingCarry: potential - resolved,
+      queued,
+      processingCarry: queued > 0 ? potential - resolved : 0,
     },
   };
   const workload = getWorkload(next.workloadId);
@@ -572,7 +596,9 @@ export function isStateValid(state: SimulationState): boolean {
     state.metrics.throughputPerMinute,
     state.metrics.latencySeconds,
     state.metrics.memoryPressure,
+    state.eventSequence,
   ];
+  const eventIds = state.ledger.map((event) => event.id);
   return (
     numeric.every((value) => Number.isFinite(value) && value >= 0) &&
     slots.every((slot) =>
@@ -580,6 +606,9 @@ export function isStateValid(state: SimulationState): boolean {
     ) &&
     state.slots.every((slot) =>
       getModule(slot.moduleId).slotTypes.includes(getSlot(slot.slotId).type),
-    )
+    ) &&
+    Number.isInteger(state.eventSequence) &&
+    state.ledger.length <= MAX_LEDGER_EVENTS &&
+    new Set(eventIds).size === eventIds.length
   );
 }

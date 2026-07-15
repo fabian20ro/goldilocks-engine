@@ -420,6 +420,7 @@ h2 {
   border-radius: 0.4rem;
   background: linear-gradient(135deg, #17231c, #111a15);
   text-align: left;
+  touch-action: none;
   cursor: grab;
 }
 

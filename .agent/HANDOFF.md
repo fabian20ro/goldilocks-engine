@@ -1,15 +1,16 @@
-# Round 001 implementation handoff
+# Round 002 implementation handoff
 
 ## Implemented behavior summary
 
 Gate-ready Milestone 0 numeric prototype and Milestone 1 portrait Pipeline Toy:
 
 - Deterministic, headless TypeScript simulation with seeded RNG, explicit command ordering, versioned state, bounded causal ledger, resource invariants, queues, job completion/failure, memory pressure, thermal throttling, latency, throughput, quality uncertainty, reliability, observability, and failure propagation.
+- Drained queues discard unused processing capacity; retained carry is limited to fractional work on a non-empty queue. Bounded event history uses a monotonic sequence, so every retained causal event has a stable unique identifier.
 - Three hardware configurations and four representative workloads with real tradeoffs. Upgrades add capital, energy, heat, reliability, and maintenance constraints.
 - Headless balance runner covering time, money, the three early funding paths, one competition, one product, one aggregate creator event, one aggregate research project, three prototype outcomes, path viability, non-dominance, and upgrade constraints.
 - Portrait React PWA with one objective, one dominant bottleneck, five primary resources, one warning, and one constrained active pipeline.
-- Mouse/touch pointer drag and accessible tap-then-snap placement; compatible process-module swapping/reordering; source/sink replacement; defined shadow-evaluation split/merge; pause; job queueing; compute/memory policies; hardware purchase/selection.
-- Animated flows, bottleneck queue badge, memory/thermal warnings, malformed-output propagation, fault origin/downstream rejection, predicted-versus-observed inspector, baseline deltas, causal event log, and local player-authored configuration presets.
+- Mouse and real touch pointer drag plus accessible tap-then-snap placement; compatible process-module swapping/reordering; source/sink replacement; defined shadow-evaluation split/merge; pause; job queueing; compute/memory policies; hardware purchase/selection.
+- Animated flows, exact-stage bottleneck queue badge, memory/thermal warnings, malformed-output propagation, fault origin/downstream rejection, predicted-versus-observed inspector, baseline deltas, causal event log, and runtime-validated local player-authored configuration presets.
 - Installable portrait manifest and generated production asset manifest. The service worker precaches the exact packaged JS/CSS/worker assets and supports offline reload.
 
 ## Plan requirements covered
@@ -28,13 +29,17 @@ Gate-ready Milestone 0 numeric prototype and Milestone 1 portrait Pipeline Toy:
 - Animated flow, queue visibility, memory and thermal limits, latency, throughput, reliability, malformed-output failure propagation, and configuration comparison.
 - Four workload stress profiles, three hardware profiles, bounded compute/memory allocation, pause, queueing, and live deterministic simulation in a Web Worker.
 - Accessibility: portrait-only operation, no required zoom/rotation, minimum 44 px visible buttons at 320/393 px, screen-reader labels, keyboard/tap alternatives, color-independent text/status markers, scalable text, reduced-motion control/media preference, and no time-critical tapping.
-- Hermetic browser verification covers 320/393 px layouts, pointer drag/reorder, touch-friendly tap placement, branching, queueing, failure/recovery, preset persistence/reload, 150% text scaling, reduced motion, and packaged offline reload.
+- Hermetic browser verification covers 320/393 px layouts, mouse and real touch drag/reorder, touch-friendly tap placement, exact bottleneck queue placement, branching, failure/recovery, valid and malformed preset persistence, 150% text scaling, reduced motion, and packaged offline reload.
 
 Milestones 2–6 are intentionally not implemented. The Pipeline Toy human exit gate has not been demonstrated; later Bedroom, evaluation/replay, research, creator/hype/fear, and local-laboratory systems remain out of scope until it is.
 
 ## Verifier findings resolved
 
-None. This is round 001 and `.agent/verification/` contained no prior reports.
+- **V-001:** queue processing now clears carry when no job remains, preventing later jobs from consuming idle capacity accumulated after a drained queue.
+- **V-002:** schema version 2 adds a monotonic event sequence independent of bounded retained-ledger length; state validity also checks the ledger bound and unique identifiers.
+- **V-003:** simulation metrics now identify the slot containing the actual limiting module, and the queue badge consumes that exact slot projection.
+- **V-004:** persisted presets are accepted only when identifiers, ranges, slot order, catalog membership, and slot/module compatibility pass runtime validation; corrupt entries never cross the worker boundary.
+- **V-005:** draggable module cards reserve touch gestures from browser panning, preserving pointer capture through a real touch drag and compatible-slot swap.
 
 ## Reproducible setup, startup, and verification
 
@@ -61,6 +66,8 @@ Dependency downloads use `.cache/npm`; browser downloads use `.cache/ms-playwrig
 
 - UI sends typed commands to a deterministic simulation isolated from React in a dedicated Web Worker.
 - The update order is command application, metric/resource resolution, job progress, deterministic outcome resolution, then bounded causal-event append/recalculation.
+- Simulation schema version 2 carries a monotonic causal-event sequence; the retained ledger remains capped at 80 events without identity reuse.
+- Bottleneck diagnosis and the affected pipeline slot are calculated together in the deterministic simulation, keeping UI feedback aligned with active configuration constraints.
 - React local state is sufficient for the one-screen toy; Zustand/XState/PixiJS/Dexie are deferred until a gate-approved need exists.
 - Three compatible process positions make ordering a decision: out-of-order roles produce explicit quality/reliability/throughput penalties and warnings.
 - Exact production asset filenames are emitted at build time and precached at service-worker install, avoiding dev-cache and conditional-request races.
@@ -75,7 +82,7 @@ Dependency downloads use `.cache/npm`; browser downloads use `.cache/ms-playwrig
 
 ## Checks not run
 
-- `./scripts/verify` did not complete as one wrapper invocation because its required out-of-sandbox approval was interrupted before the command started. Its constituent commands were exercised separately: setup succeeded; formatting, lint, typecheck, 18 unit/property tests with coverage, balance validation, audit (0 vulnerabilities), and production build succeeded; the complete 8-test Playwright suite passed; after the final asset-manifest cache correction, production build/typecheck and the focused offline Playwright regression passed.
+- `./scripts/verify` was attempted, but its outer approval/tool invocation was interrupted after roughly 420 seconds without returning command output. Every constituent stage was then run as a bounded command after a fresh successful `./scripts/setup`: format, lint, typecheck, 21 unit/property tests with coverage thresholds, balance validation, production build, and all 11 packaged-PWA Playwright cases passed. The approved Playwright command used the repository-local Chromium path required by the wrapper.
 - 30-minute voluntary human Pipeline Toy playtest: no participant/evidence supplied.
 - Physical mobile-device battery and thermal profiling: no device infrastructure supplied; browser CPU behavior is covered only indirectly by deterministic single-worker tests and short E2E sessions.
 - Milestone 2–6 acceptance checks: prohibited until the Pipeline Toy gate passes.

@@ -145,6 +145,21 @@ describe("deterministic simulation engine", () => {
     );
   });
 
+  it("identifies the active module slot that limits throughput", () => {
+    let state = createInitialState();
+    state = applyCommand(state, {
+      type: "BUY_HARDWARE",
+      hardwareId: "workstation-gpu",
+    });
+    state = applyCommand(state, {
+      type: "PLACE_MODULE",
+      moduleId: "robust-eval",
+      slotId: "verify",
+    });
+    expect(state.metrics.dominantBottleneck).toBe("module throughput");
+    expect(state.metrics.bottleneckSlotId).toBe("verify");
+  });
+
   it("bounds queues, allocations, elapsed time, and retained ledger history", () => {
     let state = createInitialState();
     state = applyCommand(state, {

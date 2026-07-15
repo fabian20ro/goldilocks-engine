@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 export const CONTENT_VERSION = "pipeline-toy-1";
 
 export type SlotType = "source" | "process" | "sink";
@@ -77,6 +77,7 @@ export interface PipelineMetrics {
   evaluationCoverage: number;
   operatingCost: number;
   dominantBottleneck: string;
+  bottleneckSlotId: string;
   orderWarnings: readonly string[];
 }
 
@@ -126,6 +127,7 @@ export interface SimulationState {
   baselineLabel: string | null;
   failedModuleId: string | null;
   lastWarning: string;
+  eventSequence: number;
   ledger: readonly LedgerEvent[];
 }
 

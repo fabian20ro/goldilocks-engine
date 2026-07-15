@@ -10,6 +10,7 @@ import {
   getSlot,
   hardware,
   modules,
+  slots as slotSpecs,
   workloads,
 } from "../simulation/catalog";
 import type {
@@ -52,7 +53,55 @@ function loadPresets(): SavedPreset[] {
     const parsed: unknown = JSON.parse(
       localStorage.getItem(PRESET_KEY) ?? "[]",
     );
-    return Array.isArray(parsed) ? (parsed as SavedPreset[]).slice(0, 6) : [];
+    if (!Array.isArray(parsed)) return [];
+    const ids = new Set<string>();
+    return parsed
+      .filter((value): value is SavedPreset => {
+        if (typeof value !== "object" || value === null) return false;
+        const preset = value as Record<string, unknown>;
+        if (
+          typeof preset.id !== "string" ||
+          preset.id.length === 0 ||
+          preset.id.length > 64 ||
+          ids.has(preset.id) ||
+          typeof preset.name !== "string" ||
+          preset.name.trim().length === 0 ||
+          preset.name.length > 64 ||
+          typeof preset.branchEnabled !== "boolean" ||
+          typeof preset.computeAllocation !== "number" ||
+          !Number.isFinite(preset.computeAllocation) ||
+          preset.computeAllocation < 25 ||
+          preset.computeAllocation > 100 ||
+          typeof preset.memoryReserve !== "number" ||
+          !Number.isFinite(preset.memoryReserve) ||
+          preset.memoryReserve < 0 ||
+          preset.memoryReserve > 30 ||
+          typeof preset.workloadId !== "string" ||
+          !workloads.some((workload) => workload.id === preset.workloadId) ||
+          !Array.isArray(preset.slots) ||
+          preset.slots.length !== slotSpecs.length
+        )
+          return false;
+
+        const validSlots = preset.slots.every((value, index) => {
+          if (typeof value !== "object" || value === null) return false;
+          const slotState = value as Record<string, unknown>;
+          const slot = slotSpecs[index];
+          const module = modules.find(
+            (candidate) => candidate.id === slotState.moduleId,
+          );
+          return (
+            typeof slotState.slotId === "string" &&
+            slotState.slotId === slot?.id &&
+            typeof slotState.moduleId === "string" &&
+            module !== undefined &&
+            module.slotTypes.includes(slot.type)
+          );
+        });
+        if (validSlots) ids.add(preset.id);
+        return validSlots;
+      })
+      .slice(0, 6);
   } catch {
     return [];
   }
@@ -194,10 +243,7 @@ function Pipeline({
   const failureIndex = state.failedModuleId
     ? state.slots.findIndex((slot) => slot.moduleId === state.failedModuleId)
     : -1;
-  const queueSlot =
-    state.metrics.dominantBottleneck === "stage ordering"
-      ? "prepare"
-      : "runtime";
+  const queueSlot = state.metrics.bottleneckSlotId;
   return (
     <section className="panel pipeline-panel" aria-labelledby="pipeline-title">
       <div className="section-heading">
