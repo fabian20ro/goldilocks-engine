@@ -94,6 +94,14 @@ button,
   user-select: none;
 }
 
+.app-shell.motion-reduced *,
+.app-shell.motion-reduced *::before,
+.app-shell.motion-reduced *::after {
+  scroll-behavior: auto !important;
+  animation: none !important;
+  transition-duration: 0.01ms !important;
+}
+
 .app-header {
   position: relative;
   z-index: 3;
@@ -721,7 +729,7 @@ h2 {
 
 .range-control input {
   width: 100%;
-  min-height: 2rem;
+  min-height: 2.75rem;
   accent-color: var(--acid);
 }
 

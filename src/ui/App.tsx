@@ -957,7 +957,7 @@ export function App() {
 
   return (
     <div
-      className={`app-shell ${drag ? "dragging" : ""}`}
+      className={`app-shell ${reducedMotion ? "motion-reduced" : ""} ${drag ? "dragging" : ""}`}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={() => setDrag(null)}

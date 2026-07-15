@@ -1,4 +1,4 @@
-# Round 003 implementation handoff
+# Round 004 implementation handoff
 
 ## Implemented behavior summary
 
@@ -12,6 +12,7 @@ Gate-ready Milestone 0 numeric prototype and Milestone 1 portrait Pipeline Toy:
 - Mouse and real touch pointer drag plus accessible tap-then-snap placement; compatible process-module swapping/reordering; source/sink replacement; defined shadow-evaluation split/merge; pause; job queueing; compute/memory policies; hardware purchase/selection.
 - Animated flows, exact-stage bottleneck queue badge, memory/thermal warnings, malformed-output propagation, fault origin/downstream rejection, predicted-versus-observed inspector, baseline deltas, causal event log, and runtime-validated local player-authored configuration presets.
 - Narrow portrait layouts reflow multi-column cards, actions, module libraries, and comparison metrics instead of shrinking text; Build, Jobs, and Inspect remain within 320 CSS px at 200% text size with 44 px minimum visible controls.
+- Compute and memory allocation sliders expose 44 px minimum touch targets. The in-app motion control disables all descendant CSS animations independently of the operating-system preference while retaining static state cues.
 - Installable portrait manifest and generated production asset manifest. The service worker precaches the exact packaged JS/CSS/worker assets and supports offline reload.
 
 ## Plan requirements covered
@@ -30,7 +31,7 @@ Gate-ready Milestone 0 numeric prototype and Milestone 1 portrait Pipeline Toy:
 - Animated flow, queue visibility, memory and thermal limits, latency, throughput, reliability, malformed-output failure propagation, and configuration comparison.
 - Four workload stress profiles, three hardware profiles, bounded compute/memory allocation, pause, queueing, and live deterministic simulation in a Web Worker.
 - Accessibility: portrait-only operation, no required zoom/rotation, minimum 44 px visible buttons at 320/393 px, screen-reader labels, keyboard/tap alternatives, color-independent text/status markers, scalable text, reduced-motion control/media preference, and no time-critical tapping.
-- Hermetic browser verification covers 320/393 px layouts, mouse and real touch drag/reorder, touch-friendly tap placement, exact bottleneck queue placement, branching, failure/recovery, valid and malformed preset persistence, 150% and 200% text scaling, reduced motion, and packaged offline reload.
+- Hermetic browser verification covers 320/393 px layouts, every visible interactive target, mouse and real touch drag/reorder, touch-friendly tap placement, exact bottleneck queue placement, branching, failure/recovery, valid and malformed preset persistence, 150% and 200% text scaling, OS and in-app reduced motion, and packaged offline reload.
 
 Milestones 2–6 are intentionally not implemented. The Pipeline Toy human exit gate has not been demonstrated; later Bedroom, evaluation/replay, research, creator/hype/fear, and local-laboratory systems remain out of scope until it is.
 
@@ -43,6 +44,8 @@ Milestones 2–6 are intentionally not implemented. The Pipeline Toy human exit 
 - **V-005:** draggable module cards reserve touch gestures from browser panning, preserving pointer capture through a real touch drag and compatible-slot swap.
 - **V-006:** the ≤350 px layout wraps headings/actions, stacks decision groups, bounds pipeline/library content, and reflows comparison rows; verifier coverage confirms every primary view has no horizontal document overflow and no visible control below 44 px at 320 px/200% text.
 - **V-007:** `package.json` and the lockfile now declare `^20.19.0 || >=22.12.0`, exactly matching pinned Vite 8.1.4 instead of advertising unsupported Node 20.0–20.18.
+- **V-008:** both resource-allocation range inputs now render at least 44 CSS px high, so the minimum 320 px viewport has no undersized visible interactive control.
+- **V-009:** app-level reduced-motion state is projected on the root shell; its descendants and pseudo-elements receive no CSS animation and near-zero transition duration even when the OS preference is `no-preference`.
 
 ## Reproducible setup, startup, and verification
 
@@ -75,6 +78,7 @@ Dependency downloads use `.cache/npm`; browser downloads use `.cache/ms-playwrig
 - Three compatible process positions make ordering a decision: out-of-order roles produce explicit quality/reliability/throughput penalties and warnings.
 - Exact production asset filenames are emitted at build time and precached at service-worker install, avoiding dev-cache and conditional-request races.
 - Responsive rules preserve scaled typography and touch-target size while progressively reflowing multi-column content at the minimum portrait width.
+- One root motion-state projection governs flow, queue, status, and future descendant CSS motion, avoiding component-specific gaps in the visible control's promise.
 
 ## Known limitations and risks
 
@@ -86,7 +90,7 @@ Dependency downloads use `.cache/npm`; browser downloads use `.cache/ms-playwrig
 
 ## Checks not run
 
-- `./scripts/verify` was not invoked as one long-running wrapper in this bounded role turn. Every exact constituent stage ran after a fresh successful `./scripts/setup`: format, lint, typecheck, 21 unit/property tests with coverage thresholds, balance validation, production build, and all 15 packaged-PWA Playwright cases passed. `./scripts/run` also reached ready state, returned HTTP 200 on loopback, and stopped on Ctrl-C. The approved Playwright command used the repository-local Chromium path required by the wrapper.
+- `./scripts/verify` was not invoked as one long-running wrapper in this bounded role turn. Every exact constituent stage ran after a fresh successful `./scripts/setup`: format, lint, typecheck, 21 unit/property tests with coverage thresholds, balance validation, production build, and all 18 packaged-PWA Playwright cases passed. `./scripts/run` also reached ready state, returned HTTP 200 on loopback, and stopped on Ctrl-C. The approved Playwright command used the repository-local Chromium path required by the wrapper.
 - 30-minute voluntary human Pipeline Toy playtest: no participant/evidence supplied.
 - Physical mobile-device battery and thermal profiling: no device infrastructure supplied; browser CPU behavior is covered only indirectly by deterministic single-worker tests and short E2E sessions.
 - Milestone 2–6 acceptance checks: prohibited until the Pipeline Toy gate passes.
