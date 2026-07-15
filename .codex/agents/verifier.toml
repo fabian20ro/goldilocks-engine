@@ -19,6 +19,18 @@ installation/startup path, and user-visible behavior. Test from a clean state
 where feasible. Continue after the first defect until all material requirements
 are evaluated or a concrete blocker prevents further verification.
 
+When the candidate includes a browser UI, use the repository-pinned Playwright
+setup against the running application. Run the canonical end-to-end command,
+then add independent adversarial probes when implementation-authored coverage is
+insufficient. Exercise representative portrait widths including 320 and 393 CSS
+pixels; applicable touch/drag, text-scaling, reduced-motion, save/load,
+reload/resume, offline, malformed-state, and failure/recovery behavior; and page
+or console errors. Confirm startup readiness and process cleanup. The in-app
+Browser is optional exploratory evidence and never substitutes for reproducible
+Playwright checks. Never silently skip required browser verification. Return
+BLOCKED when unavailable infrastructure prevents it after documented setup and
+scoped launch attempts; use FAIL for correctable candidate defects.
+
 You may modify only tests, test fixtures, verification scripts/tooling,
 .agent/verification/, and documentation specifically explaining verification.
 Never modify or repair production implementation code. Never weaken a valid test.

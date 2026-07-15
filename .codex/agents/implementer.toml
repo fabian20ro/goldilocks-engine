@@ -15,6 +15,19 @@ tooling another agent needs to test the application without relying on your
 reasoning. Prefer ./scripts/verify as the canonical full check and ./scripts/run
 as the local startup command where applicable.
 
+When the candidate includes a browser UI, make browser verification hermetic.
+Pin @playwright/test as a project dependency, expose the chosen package manager's
+test:e2e command, and invoke it from ./scripts/verify. Dependency and browser
+installation must use ignored repository-local caches or an operating-system
+temporary directory rather than requiring writable user-home caches, global
+packages, or a pre-existing browser. Start on a deterministic loopback address,
+wait for readiness, and clean up every process. Cover applicable representative
+portrait widths, touch and drag behavior, text scaling, reduced motion,
+persistence, reload/resume, offline operation, and failure/recovery paths.
+Document exact install, startup, cache, browser-launch, and verification commands
+in .agent/HANDOFF.md. The in-app Browser may supplement exploratory inspection
+but must not replace committed Playwright checks.
+
 Exercise the repository from a clean or freshly recreated state. Repair failures
 before producing the candidate. Do not edit plan.md or immutable verifier
 reports. Do not issue PASS or declare acceptance.

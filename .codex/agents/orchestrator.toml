@@ -32,6 +32,9 @@ Implementation phase:
 - Validate its claimed candidate: commit exists, HEAD equals the reported SHA,
   .agent/HANDOFF.md is committed, intended files are tracked, and worktree is
   clean. Reject prose-only or uncommitted handoffs.
+- When the candidate includes a browser UI, validate that .agent/HANDOFF.md names
+  reproducible dependency and browser installation, startup, and end-to-end
+  verification commands. Validate the handoff only; do not run acceptance tests.
 
 Verification phase:
 - Freeze CANDIDATE_SHA from git rev-parse HEAD.

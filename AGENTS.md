@@ -77,6 +77,30 @@ The canonical verification command should run every applicable check: formatting
 linting, static analysis, compilation, unit tests, integration tests, end-to-end
 tests, and packaging.
 
+### Browser and JavaScript testability
+
+When the candidate includes a browser UI or PWA:
+
+- Pin Playwright as a project dependency; do not rely on a global CLI, an
+  existing browser profile, or the in-app Browser.
+- Expose a canonical package-manager `test:e2e` command and invoke it from
+  `./scripts/verify`.
+- Make dependency and browser installation work without writing to a user home
+  cache. Use ignored repository-local caches or an operating-system temporary
+  directory, and keep every cache and downloaded browser out of Git.
+- Start the application on a deterministic loopback address through
+  `./scripts/run` or Playwright-managed server configuration, wait for readiness,
+  and clean up every process after verification.
+- Exercise representative portrait widths, including 320 and 393 CSS pixels,
+  and the applicable touch/drag, text-scaling, reduced-motion, persistence,
+  reload/resume, offline, and failure/recovery paths.
+- Treat Playwright automation as reproducible acceptance evidence. The in-app
+  Browser may supplement exploratory or visual inspection but never replaces
+  committed checks.
+- Never silently skip required browser checks because installation or launch is
+  unavailable. Record the failure and return BLOCKED when infrastructure, rather
+  than a correctable candidate defect, prevents verification.
+
 ## Orchestrator responsibilities
 
 The Orchestrator owns only the state machine and Git handoffs. It must:
@@ -89,6 +113,8 @@ The Orchestrator owns only the state machine and Git handoffs. It must:
 - Give the Verifier only the role, repository paths, round number, and candidate
   SHA; never pass Implementer reasoning or confidence claims.
 - Validate each child result against repository state rather than trusting prose.
+- For candidates with a browser UI, validate that `.agent/HANDOFF.md` names the
+  reproducible browser install, startup, and end-to-end verification commands.
 - Continue after FAIL; finish only after Verifier PASS.
 - Stop for BLOCKED with concrete evidence and exact user input required.
 
