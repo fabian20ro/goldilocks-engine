@@ -162,6 +162,32 @@ describe("deterministic simulation engine", () => {
     expect(isStateValid(state)).toBe(true);
   });
 
+  it("does not bank unused throughput after a queue drains", () => {
+    let state = applyCommand(createInitialState(1), {
+      type: "QUEUE_JOBS",
+      count: 1,
+    });
+    state = tick(state, 60);
+    expect(state.jobs.queued).toBe(0);
+    expect(state.jobs.processingCarry).toBeLessThan(1);
+
+    const resolvedBefore = state.jobs.completed + state.jobs.failed;
+    state = applyCommand(state, { type: "QUEUE_JOBS", count: 1 });
+    state = tick(state, 0.001);
+    expect(state.jobs.completed + state.jobs.failed).toBe(resolvedBefore);
+    expect(state.jobs.queued).toBe(1);
+  });
+
+  it("keeps bounded ledger event identifiers unique", () => {
+    let state = createInitialState();
+    for (let index = 0; index < 120; index += 1)
+      state = applyCommand(state, { type: "QUEUE_JOBS", count: 1 });
+
+    const ids = state.ledger.map((event) => event.id);
+    expect(ids).toHaveLength(80);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
   it("calculates observed uncertainty without mutating state", () => {
     const state = createInitialState(123);
     const before = structuredClone(state);

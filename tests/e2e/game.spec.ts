@@ -68,6 +68,27 @@ test.describe("portrait pipeline acceptance", () => {
     await expect(page.getByRole("table")).toContainText("Before branch change");
   });
 
+  test("shows a queue above the module that actually limits throughput", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 393, height: 742 });
+    await page.goto("/");
+    await page.getByRole("button", { name: /Robust Evaluation/ }).click();
+    await page
+      .getByTestId("slot-verify")
+      .getByRole("button", { name: "Snap here" })
+      .click();
+    await page.getByRole("button", { name: "Jobs" }).click();
+    await page.getByRole("button", { name: /24 GB Workstation/ }).click();
+    await page.getByRole("button", { name: "Queue 10" }).click();
+    await page.getByRole("button", { name: "Build" }).click();
+
+    await expect(page.getByText("module throughput")).toBeVisible();
+    await expect(
+      page.getByTestId("slot-verify").getByLabel(/jobs queued at bottleneck/),
+    ).toBeVisible();
+  });
+
   test("supports pointer drag and compatible active-module reordering", async ({
     page,
   }) => {
@@ -97,6 +118,55 @@ test.describe("portrait pipeline acceptance", () => {
       "Quantized Model",
     );
     await expect(page.getByText(/Pipeline order anomaly/)).toBeVisible();
+  });
+
+  test("supports touch drag between compatible active slots", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 393, height: 900 });
+    await page.goto("/");
+    const source = page
+      .getByTestId("slot-prepare")
+      .locator('[data-module-id="basic-cleaner"]');
+    const destination = page.getByTestId("slot-runtime");
+    const from = await source.boundingBox();
+    const to = await destination.boundingBox();
+    expect(from).not.toBeNull();
+    expect(to).not.toBeNull();
+
+    const session = await page.context().newCDPSession(page);
+    const start = {
+      x: from!.x + from!.width / 2,
+      y: from!.y + from!.height / 2,
+    };
+    const end = { x: to!.x + to!.width / 2, y: to!.y + to!.height / 2 };
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [{ ...start, id: 1 }],
+    });
+    for (let step = 1; step <= 8; step += 1) {
+      await session.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: [
+          {
+            x: start.x + ((end.x - start.x) * step) / 8,
+            y: start.y + ((end.y - start.y) * step) / 8,
+            id: 1,
+          },
+        ],
+      });
+    }
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [],
+    });
+
+    await expect(page.getByTestId("slot-runtime")).toContainText(
+      "Basic Cleaner",
+    );
+    await expect(page.getByTestId("slot-prepare")).toContainText(
+      "Quantized Model",
+    );
   });
 
   test("makes failure propagation legible and permits recovery", async ({
@@ -138,6 +208,40 @@ test.describe("portrait pipeline acceptance", () => {
     await page.reload();
     await page.getByRole("button", { name: "Inspect", exact: true }).click();
     await expect(page.getByRole("button", { name: /Preset 1/ })).toBeVisible();
+  });
+
+  test("recovers from structurally malformed persisted presets", async ({
+    page,
+  }) => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        "goldilocks-pipeline-presets-v1",
+        JSON.stringify([
+          {
+            id: "corrupt",
+            name: "Corrupt preset",
+            slots: [{ slotId: "runtime", moduleId: "unknown-runtime-module" }],
+            workloadId: "unknown-workload",
+            branchEnabled: false,
+            computeAllocation: null,
+            memoryReserve: null,
+          },
+        ]),
+      );
+    });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Inspect", exact: true }).click();
+    const corruptPreset = page.getByRole("button", {
+      name: /Corrupt preset/,
+    });
+    if (await corruptPreset.isVisible()) await corruptPreset.click();
+    await page.getByRole("button", { name: "Jobs" }).click();
+    await page.getByRole("button", { name: "Queue 10" }).click();
+    await page.getByRole("button", { name: "Build" }).click();
+    await expect(page.getByLabel(/jobs queued at bottleneck/)).toBeVisible();
+    expect(pageErrors).toEqual([]);
   });
 
   test("honors reduced motion and remains usable at 150% text scale", async ({
