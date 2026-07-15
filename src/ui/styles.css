@@ -955,6 +955,34 @@ h2 {
     padding-inline: 0.75rem;
   }
 
+  .brand-row,
+  .section-heading,
+  .choice-card {
+    flex-wrap: wrap;
+  }
+
+  .brand-row > div,
+  .section-heading > div,
+  .warning-banner p,
+  .selection-banner > span,
+  .mission-card > div,
+  .event-log li > div {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .motion-toggle,
+  .text-action,
+  .status-chip,
+  .counter {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .motion-toggle {
+    margin-left: auto;
+  }
+
   .main-content {
     padding-inline: 0.5rem;
   }
@@ -968,15 +996,106 @@ h2 {
   }
 
   .mission-card {
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.5rem;
   }
 
+  .mission-card > div + div {
+    padding-top: 0.5rem;
+    padding-left: 0;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .panel,
+  .pipeline,
+  .pipeline-stage-group,
+  .pipeline-slot {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .module-card {
+    min-width: 0;
+  }
+
+  .slot-meta,
+  .range-control span {
+    flex-wrap: wrap;
+  }
+
   .branch-junction {
-    width: 7.6rem;
+    width: min(7.6rem, 100%);
   }
 
   .module-code {
     flex-basis: 2.8rem;
+  }
+
+  .module-copy strong,
+  .module-copy small {
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .module-library {
+    grid-auto-columns: 82%;
+  }
+
+  .choice-card {
+    align-items: flex-start;
+  }
+
+  .choice-stat {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .job-actions,
+  .pressure-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .metrics-table,
+  .metrics-table thead,
+  .metrics-table tbody,
+  .metrics-table caption {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .metrics-table tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .metrics-table th,
+  .metrics-table td {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .metrics-table thead th:first-child {
+    display: none;
+  }
+
+  .metrics-table tbody th {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+
+  .metrics-table tbody td {
+    border-top: 0;
+  }
+
+  .bottom-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .bottom-nav button {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 
   .metrics-table th,

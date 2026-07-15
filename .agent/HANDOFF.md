@@ -1,4 +1,4 @@
-# Round 002 implementation handoff
+# Round 003 implementation handoff
 
 ## Implemented behavior summary
 
@@ -11,6 +11,7 @@ Gate-ready Milestone 0 numeric prototype and Milestone 1 portrait Pipeline Toy:
 - Portrait React PWA with one objective, one dominant bottleneck, five primary resources, one warning, and one constrained active pipeline.
 - Mouse and real touch pointer drag plus accessible tap-then-snap placement; compatible process-module swapping/reordering; source/sink replacement; defined shadow-evaluation split/merge; pause; job queueing; compute/memory policies; hardware purchase/selection.
 - Animated flows, exact-stage bottleneck queue badge, memory/thermal warnings, malformed-output propagation, fault origin/downstream rejection, predicted-versus-observed inspector, baseline deltas, causal event log, and runtime-validated local player-authored configuration presets.
+- Narrow portrait layouts reflow multi-column cards, actions, module libraries, and comparison metrics instead of shrinking text; Build, Jobs, and Inspect remain within 320 CSS px at 200% text size with 44 px minimum visible controls.
 - Installable portrait manifest and generated production asset manifest. The service worker precaches the exact packaged JS/CSS/worker assets and supports offline reload.
 
 ## Plan requirements covered
@@ -29,7 +30,7 @@ Gate-ready Milestone 0 numeric prototype and Milestone 1 portrait Pipeline Toy:
 - Animated flow, queue visibility, memory and thermal limits, latency, throughput, reliability, malformed-output failure propagation, and configuration comparison.
 - Four workload stress profiles, three hardware profiles, bounded compute/memory allocation, pause, queueing, and live deterministic simulation in a Web Worker.
 - Accessibility: portrait-only operation, no required zoom/rotation, minimum 44 px visible buttons at 320/393 px, screen-reader labels, keyboard/tap alternatives, color-independent text/status markers, scalable text, reduced-motion control/media preference, and no time-critical tapping.
-- Hermetic browser verification covers 320/393 px layouts, mouse and real touch drag/reorder, touch-friendly tap placement, exact bottleneck queue placement, branching, failure/recovery, valid and malformed preset persistence, 150% text scaling, reduced motion, and packaged offline reload.
+- Hermetic browser verification covers 320/393 px layouts, mouse and real touch drag/reorder, touch-friendly tap placement, exact bottleneck queue placement, branching, failure/recovery, valid and malformed preset persistence, 150% and 200% text scaling, reduced motion, and packaged offline reload.
 
 Milestones 2–6 are intentionally not implemented. The Pipeline Toy human exit gate has not been demonstrated; later Bedroom, evaluation/replay, research, creator/hype/fear, and local-laboratory systems remain out of scope until it is.
 
@@ -40,6 +41,8 @@ Milestones 2–6 are intentionally not implemented. The Pipeline Toy human exit 
 - **V-003:** simulation metrics now identify the slot containing the actual limiting module, and the queue badge consumes that exact slot projection.
 - **V-004:** persisted presets are accepted only when identifiers, ranges, slot order, catalog membership, and slot/module compatibility pass runtime validation; corrupt entries never cross the worker boundary.
 - **V-005:** draggable module cards reserve touch gestures from browser panning, preserving pointer capture through a real touch drag and compatible-slot swap.
+- **V-006:** the ≤350 px layout wraps headings/actions, stacks decision groups, bounds pipeline/library content, and reflows comparison rows; verifier coverage confirms every primary view has no horizontal document overflow and no visible control below 44 px at 320 px/200% text.
+- **V-007:** `package.json` and the lockfile now declare `^20.19.0 || >=22.12.0`, exactly matching pinned Vite 8.1.4 instead of advertising unsupported Node 20.0–20.18.
 
 ## Reproducible setup, startup, and verification
 
@@ -71,6 +74,7 @@ Dependency downloads use `.cache/npm`; browser downloads use `.cache/ms-playwrig
 - React local state is sufficient for the one-screen toy; Zustand/XState/PixiJS/Dexie are deferred until a gate-approved need exists.
 - Three compatible process positions make ordering a decision: out-of-order roles produce explicit quality/reliability/throughput penalties and warnings.
 - Exact production asset filenames are emitted at build time and precached at service-worker install, avoiding dev-cache and conditional-request races.
+- Responsive rules preserve scaled typography and touch-target size while progressively reflowing multi-column content at the minimum portrait width.
 
 ## Known limitations and risks
 
@@ -82,7 +86,7 @@ Dependency downloads use `.cache/npm`; browser downloads use `.cache/ms-playwrig
 
 ## Checks not run
 
-- `./scripts/verify` was attempted, but its outer approval/tool invocation was interrupted after roughly 420 seconds without returning command output. Every constituent stage was then run as a bounded command after a fresh successful `./scripts/setup`: format, lint, typecheck, 21 unit/property tests with coverage thresholds, balance validation, production build, and all 11 packaged-PWA Playwright cases passed. The approved Playwright command used the repository-local Chromium path required by the wrapper.
+- `./scripts/verify` was not invoked as one long-running wrapper in this bounded role turn. Every exact constituent stage ran after a fresh successful `./scripts/setup`: format, lint, typecheck, 21 unit/property tests with coverage thresholds, balance validation, production build, and all 15 packaged-PWA Playwright cases passed. `./scripts/run` also reached ready state, returned HTTP 200 on loopback, and stopped on Ctrl-C. The approved Playwright command used the repository-local Chromium path required by the wrapper.
 - 30-minute voluntary human Pipeline Toy playtest: no participant/evidence supplied.
 - Physical mobile-device battery and thermal profiling: no device infrastructure supplied; browser CPU behavior is covered only indirectly by deterministic single-worker tests and short E2E sessions.
 - Milestone 2–6 acceptance checks: prohibited until the Pipeline Toy gate passes.
