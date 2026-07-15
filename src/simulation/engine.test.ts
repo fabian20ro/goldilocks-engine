@@ -8,7 +8,8 @@ import {
   isStateValid,
   tick,
 } from "./engine";
-import type { SimulationCommand } from "./types";
+import { normalizeSeed } from "./rng";
+import type { SimulationCommand, SimulationState } from "./types";
 
 describe("deterministic simulation engine", () => {
   it("creates a valid, operable default pipeline", () => {
@@ -175,6 +176,134 @@ describe("deterministic simulation engine", () => {
     expect(state.jobs.queued).toBeLessThanOrEqual(99);
     expect(state.ledger.length).toBeLessThanOrEqual(80);
     expect(isStateValid(state)).toBe(true);
+  });
+
+  it("rejects malformed operation numerics without changing any state", () => {
+    const initial = createInitialState(73);
+    const malformed = [
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+      "12",
+      null,
+      undefined,
+    ] as const;
+    const commands = [
+      (value: unknown): SimulationCommand => ({
+        type: "SET_COMPUTE_ALLOCATION",
+        percent: value as number,
+      }),
+      (value: unknown): SimulationCommand => ({
+        type: "SET_MEMORY_RESERVE",
+        percent: value as number,
+      }),
+      (value: unknown): SimulationCommand => ({
+        type: "QUEUE_JOBS",
+        count: value as number,
+      }),
+    ];
+
+    for (const value of malformed) {
+      expect(tick(initial, value as number)).toBe(initial);
+      for (const command of commands)
+        expect(applyCommand(initial, command(value))).toBe(initial);
+      if (value !== undefined) {
+        expect(
+          applyCommand(initial, {
+            type: "RESET",
+            seed: value as number,
+          }),
+        ).toBe(initial);
+      }
+    }
+
+    expect(initial).toEqual(createInitialState(73));
+    expect(isStateValid(initial)).toBe(true);
+  });
+
+  it("normalizes finite numeric ranges and malformed standalone seeds safely", () => {
+    const initial = createInitialState(5);
+    const allocation = applyCommand(initial, {
+      type: "SET_COMPUTE_ALLOCATION",
+      percent: Number.MAX_VALUE,
+    });
+    const reserve = applyCommand(initial, {
+      type: "SET_MEMORY_RESERVE",
+      percent: -Number.MAX_VALUE,
+    });
+    const queue = applyCommand(initial, {
+      type: "QUEUE_JOBS",
+      count: 2.9,
+    });
+    const elapsed = tick(initial, Number.MAX_VALUE);
+    const fallbackSeed = normalizeSeed(Number.NaN);
+
+    expect(allocation.computeAllocation).toBe(100);
+    expect(reserve.memoryReserve).toBe(0);
+    expect(queue.jobs.queued).toBe(2);
+    expect(elapsed.tick).toBe(60_000);
+    expect(createInitialState(Number.NaN).seed).toBe(fallbackSeed);
+    expect(createInitialState(Number.POSITIVE_INFINITY).seed).toBe(
+      fallbackSeed,
+    );
+    expect([allocation, reserve, queue, elapsed].every(isStateValid)).toBe(
+      true,
+    );
+  });
+
+  it("rejects a transition when a safe integer invariant would overflow", () => {
+    const initial = createInitialState(19);
+    const maxTick = {
+      ...initial,
+      tick: Number.MAX_SAFE_INTEGER,
+    } satisfies SimulationState;
+    const maxSequence = {
+      ...initial,
+      eventSequence: Number.MAX_SAFE_INTEGER,
+    } satisfies SimulationState;
+
+    expect(isStateValid(maxTick)).toBe(true);
+    expect(isStateValid(maxSequence)).toBe(true);
+    expect(tick(maxTick, 1)).toBe(maxTick);
+    expect(applyCommand(maxSequence, { type: "QUEUE_JOBS", count: 1 })).toBe(
+      maxSequence,
+    );
+  });
+
+  it("validates every versioned numeric state category", () => {
+    const initial = createInitialState(31);
+    const invalidStates = [
+      { ...initial, seed: Number.NaN },
+      { ...initial, rngState: Number.POSITIVE_INFINITY },
+      { ...initial, tick: 0.5 },
+      { ...initial, computeAllocation: Number.NaN },
+      { ...initial, memoryReserve: Number.NEGATIVE_INFINITY },
+      {
+        ...initial,
+        resources: { ...initial.resources, reputation: Number.NaN },
+      },
+      {
+        ...initial,
+        jobs: { ...initial.jobs, processingCarry: Number.NaN },
+      },
+      {
+        ...initial,
+        metrics: { ...initial.metrics, thermalLoad: Number.NaN },
+      },
+      {
+        ...initial,
+        baselineMetrics: {
+          ...initial.metrics,
+          operatingCost: Number.POSITIVE_INFINITY,
+        },
+      },
+      {
+        ...initial,
+        ledger: [{ ...initial.ledger[0]!, tick: Number.NaN }],
+      },
+    ];
+
+    expect(invalidStates.some(isStateValid)).toBe(false);
   });
 
   it("does not bank unused throughput after a queue drains", () => {

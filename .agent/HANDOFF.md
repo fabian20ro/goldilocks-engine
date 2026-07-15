@@ -1,10 +1,11 @@
-# Round 007 implementation handoff
+# Round 008 implementation handoff
 
 ## Implemented behavior summary
 
 Gate-ready Milestone 0 numeric prototype and Milestone 1 portrait Pipeline Toy:
 
 - Deterministic, headless TypeScript simulation with seeded RNG, explicit command ordering, versioned state, bounded causal ledger, resource invariants, queues, job completion/failure, memory pressure, thermal throttling, latency, throughput, quality uncertainty, reliability, observability, and failure propagation.
+- Transactional numeric boundaries reject malformed/non-finite tick, allocation, reserve, queue, reset-seed, and worker-init inputs as exact no-ops. Finite out-of-range inputs retain bounded clamp/truncate behavior; standalone seeds canonicalize to a deterministic fallback. Candidate transitions commit only after version, seed/RNG, tick, resource, queue, complete metric/baseline, event-sequence, and ledger numeric invariants pass.
 - Drained queues discard unused processing capacity; retained carry is limited to fractional work on a non-empty queue. Bounded event history uses a monotonic sequence, so every retained causal event has a stable unique identifier.
 - Three hardware configurations and four representative workloads with real tradeoffs. Upgrades add capital, energy, heat, reliability, and maintenance constraints.
 - Headless balance runner covering time, money, the three early funding paths, one competition, one product, one aggregate creator event, one aggregate research project, three prototype outcomes, path viability, non-dominance, and upgrade constraints.
@@ -53,6 +54,8 @@ Milestones 2–6 are intentionally not implemented. The Pipeline Toy human exit 
 - **V-009:** app-level reduced-motion state is projected on the root shell; its descendants and pseudo-elements receive no CSS animation and near-zero transition duration even when the OS preference is `no-preference`.
 - **V-010:** drawer module cards now allow native horizontal panning while active-pipeline cards continue reserving touch gestures for custom drag/reorder; a real CDP touch swipe moves the 393 px drawer beyond its first screen, and active touch drag plus tap/snap remain covered.
 - **V-011:** the Pages build job now sets `npm_config_cache` and `PLAYWRIGHT_BROWSERS_PATH` at job scope to ignored `${{ github.workspace }}/.cache/...` paths before `setup-node` cache discovery or dependency installation; a focused configuration regression protects the ordering and values.
+- **V-012:** all public simulation and worker numeric operation boundaries reject `NaN`, positive/negative infinity, non-number runtime values, and missing required values without changing object identity or deterministic/versioned state. Finite inputs retain existing bounded normalization, standalone invalid seeds canonicalize safely, and strengthened transactional state validation covers every numeric queue/resource/metric/baseline/ledger category plus safe-integer overflow.
+- **V-013:** repository Pages settings now use GitHub Actions and the `github-pages` environment authorizes both `main` and `agent/implementation` (external Orchestrator configuration). The candidate workflow remains reproducible; exact-candidate publication is intentionally outside this Implementer commit.
 
 ## Reproducible setup, startup, and verification
 
@@ -86,6 +89,7 @@ Dependency downloads use `.cache/npm`; browser downloads use `.cache/ms-playwrig
 ## Important architectural decisions
 
 - UI sends typed commands to a deterministic simulation isolated from React in a dedicated Web Worker.
+- Numeric command reduction is pure and transactional: runtime-malformed operation values return the exact prior state, valid finite values keep documented bounds, and state-wide numeric invariants gate every command/tick result before it can replace worker state.
 - The update order is command application, metric/resource resolution, job progress, deterministic outcome resolution, then bounded causal-event append/recalculation.
 - Simulation schema version 2 carries a monotonic causal-event sequence; the retained ledger remains capped at 80 events without identity reuse.
 - Bottleneck diagnosis and the affected pipeline slot are calculated together in the deterministic simulation, keeping UI feedback aligned with active configuration constraints.
@@ -106,11 +110,13 @@ Dependency downloads use `.cache/npm`; browser downloads use `.cache/ms-playwrig
 - Browser checks use Chromium. Physical-device battery/thermal behavior and optional haptics/audio are not evaluated in this gated candidate.
 - Presets persist locally; complete run save/load and offline policy progression belong to Milestone 2 and are intentionally absent.
 - This environment required the repository-local Chromium launch outside its restrictive macOS agent sandbox. Ordinary local/CI shells run the documented command directly.
-- The workflow and deployment URL are committed but not remotely activated, pushed, or deployed by this Implementer role. Remote enablement and deployment remain with the Orchestrator after independent verification.
+- Pages Actions mode and environment branch authorization were configured externally by the Orchestrator. This exact candidate was not pushed or deployed by the Implementer; remote run and exact-SHA live validation remain outside this handoff.
 
 ## Checks executed
 
-- `./scripts/verify`: PASS from a fresh locked install. Format, lint, typecheck, 22 unit/property/configuration tests with coverage thresholds, balance validation, root production build, all 20 root packaged-PWA Playwright cases, Pages production build, and both Pages scoped Playwright cases passed.
+- `./scripts/verify`: PASS from a fresh locked install. Format, lint, typecheck, 29 unit/property/configuration tests with coverage thresholds, balance validation, root production build, all 20 root packaged-PWA Playwright cases, Pages production build, and both Pages scoped Playwright cases passed.
+- `./node_modules/.bin/vitest run src/simulation/verifierRound007.test.ts src/simulation/engine.test.ts src/simulation/workerProtocol.test.ts`: PASS, 22/22 focused V-012 regression, adversarial engine-boundary, invariant-overflow, and worker-protocol checks.
+- `npm run typecheck`, `npm run lint`, and `npm run format:check`: PASS independently before the canonical clean verification.
 - `./scripts/run`: PASS. The root development server reached ready state at `http://127.0.0.1:4173/`; independent probes returned HTTP 200 for `/` and `/sw.js`; Ctrl-C stopped it.
 - `npm run build:pages`: PASS. Emitted HTML points to `/goldlocks-engine/`; `asset-manifest.json` names the scoped CSS, application JS, and Web Worker chunk.
 - `npx vitest run src/test/pagesWorkflow.test.ts --coverage.enabled=false`: PASS, 1/1 focused workflow-cache regression. An initial `npm test -- --run src/test/pagesWorkflow.test.ts` invocation also passed the selected test but exited nonzero because selecting only this configuration test intentionally left the global simulation coverage thresholds at zero; the canonical full run passed all coverage gates.
@@ -118,7 +124,7 @@ Dependency downloads use `.cache/npm`; browser downloads use `.cache/ms-playwrig
 
 ## Checks not run
 
-- Remote GitHub Actions deployment: intentionally not run; this Implementer role was instructed not to push. The Orchestrator owns Pages enablement, push, workflow observation, and live URL validation after independent verification.
+- Remote GitHub Actions deployment: intentionally not run; this Implementer role was instructed not to push. Pages Actions mode/environment authorization are configured; the Orchestrator owns push, workflow observation, and exact-candidate live URL validation after independent verification.
 - 30-minute voluntary human Pipeline Toy playtest: no participant/evidence supplied.
 - Physical mobile-device battery and thermal profiling: no device infrastructure supplied; browser CPU behavior is covered only indirectly by deterministic single-worker tests and short E2E sessions.
 - Milestone 2–6 acceptance checks: prohibited until the Pipeline Toy gate passes.

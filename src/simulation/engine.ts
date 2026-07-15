@@ -17,6 +17,8 @@ const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
 const round = (value: number, digits = 2): number =>
   Number(value.toFixed(digits));
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value);
 
 function modulesFor(state: Pick<SimulationState, "slots">) {
   return state.slots.map((slot) => getModule(slot.moduleId));
@@ -315,7 +317,21 @@ function updateSlots(
   );
 }
 
-export function applyCommand(
+function hasValidNumericInput(command: SimulationCommand): boolean {
+  switch (command.type) {
+    case "SET_COMPUTE_ALLOCATION":
+    case "SET_MEMORY_RESERVE":
+      return isFiniteNumber(command.percent);
+    case "QUEUE_JOBS":
+      return isFiniteNumber(command.count);
+    case "RESET":
+      return command.seed === undefined || isFiniteNumber(command.seed);
+    default:
+      return true;
+  }
+}
+
+function applyValidCommand(
   state: SimulationState,
   command: SimulationCommand,
 ): SimulationState {
@@ -475,6 +491,15 @@ export function applyCommand(
   }
 }
 
+export function applyCommand(
+  state: SimulationState,
+  command: SimulationCommand,
+): SimulationState {
+  if (!hasValidNumericInput(command)) return state;
+  const next = applyValidCommand(state, command);
+  return isStateValid(next) ? next : state;
+}
+
 function firstFailureModule(
   state: SimulationState,
   randomValue: number,
@@ -488,7 +513,7 @@ function firstFailureModule(
   return selected[0]?.id ?? "request-buffer";
 }
 
-export function tick(state: SimulationState, seconds: number): SimulationState {
+function advanceTick(state: SimulationState, seconds: number): SimulationState {
   const elapsed = clamp(seconds, 0, 60);
   if (elapsed === 0) return state;
   let next: SimulationState = {
@@ -584,31 +609,94 @@ export function tick(state: SimulationState, seconds: number): SimulationState {
   return recalculate(next);
 }
 
+export function tick(state: SimulationState, seconds: number): SimulationState {
+  if (!isFiniteNumber(seconds)) return state;
+  const next = advanceTick(state, seconds);
+  return isStateValid(next) ? next : state;
+}
+
+const metricNumbers = (metrics: PipelineMetrics): readonly number[] => [
+  metrics.throughputPerMinute,
+  metrics.latencySeconds,
+  metrics.memoryUsed,
+  metrics.memoryAvailable,
+  metrics.memoryPressure,
+  metrics.thermalLoad,
+  metrics.thermalPressure,
+  metrics.predictedQuality,
+  metrics.observedQuality,
+  metrics.reliability,
+  metrics.observability,
+  metrics.evaluationCoverage,
+  metrics.operatingCost,
+];
+
+function areMetricsValid(metrics: PipelineMetrics): boolean {
+  return (
+    metricNumbers(metrics).every(
+      (value) => Number.isFinite(value) && value >= 0,
+    ) &&
+    metrics.predictedQuality <= 99 &&
+    metrics.observedQuality <= 99 &&
+    metrics.reliability <= 1 &&
+    metrics.observability <= 1 &&
+    metrics.evaluationCoverage <= 1
+  );
+}
+
 export function isStateValid(state: SimulationState): boolean {
-  const numeric = [
+  const nonnegativeNumbers = [
     state.resources.money,
     state.resources.timeHours,
     state.resources.electricityKwh,
     state.resources.reputation,
+    state.jobs.processingCarry,
+  ];
+  const nonnegativeIntegers = [
+    state.tick,
     state.jobs.queued,
     state.jobs.completed,
     state.jobs.failed,
-    state.metrics.throughputPerMinute,
-    state.metrics.latencySeconds,
-    state.metrics.memoryPressure,
     state.eventSequence,
   ];
   const eventIds = state.ledger.map((event) => event.id);
   return (
-    numeric.every((value) => Number.isFinite(value) && value >= 0) &&
+    state.schemaVersion === SCHEMA_VERSION &&
+    state.contentVersion === CONTENT_VERSION &&
+    Number.isInteger(state.seed) &&
+    state.seed > 0 &&
+    state.seed <= 0xffff_ffff &&
+    Number.isInteger(state.rngState) &&
+    state.rngState > 0 &&
+    state.rngState <= 0xffff_ffff &&
+    nonnegativeNumbers.every((value) => Number.isFinite(value) && value >= 0) &&
+    nonnegativeIntegers.every(
+      (value) => Number.isSafeInteger(value) && value >= 0,
+    ) &&
+    Number.isInteger(state.computeAllocation) &&
+    state.computeAllocation >= 25 &&
+    state.computeAllocation <= 100 &&
+    Number.isInteger(state.memoryReserve) &&
+    state.memoryReserve >= 0 &&
+    state.memoryReserve <= 30 &&
+    state.jobs.queued <= 99 &&
+    state.jobs.processingCarry < 1 &&
+    areMetricsValid(state.metrics) &&
+    (state.baselineMetrics === null ||
+      areMetricsValid(state.baselineMetrics)) &&
     slots.every((slot) =>
       state.slots.some((current) => current.slotId === slot.id),
     ) &&
     state.slots.every((slot) =>
       getModule(slot.moduleId).slotTypes.includes(getSlot(slot.slotId).type),
     ) &&
-    Number.isInteger(state.eventSequence) &&
     state.ledger.length <= MAX_LEDGER_EVENTS &&
+    state.ledger.every(
+      (event) =>
+        Number.isSafeInteger(event.tick) &&
+        event.tick >= 0 &&
+        event.tick <= state.tick,
+    ) &&
     new Set(eventIds).size === eventIds.length
   );
 }

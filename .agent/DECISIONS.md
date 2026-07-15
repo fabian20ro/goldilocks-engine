@@ -17,3 +17,9 @@
 
 - **Decision:** The pipeline has fixed source, three compatible process positions, and sink slots, plus one defined shadow-evaluation junction.
 - **Reason:** This supports touch drag/snap, replacement, compatible reordering, limited split/merge, and observable ordering failures without introducing the explicitly deferred unrestricted factory map.
+
+## D-004 — Transactional numeric command boundaries
+
+- **Decision:** Runtime numeric controls accept only finite JavaScript numbers. Malformed/non-finite tick, allocation, reserve, queue, reset-seed, and worker-init values are exact no-ops: no tick, RNG, resource, queue, metric, event-sequence, or ledger change. Finite values retain the existing bounded clamp/truncate semantics. Standalone seed creation canonicalizes malformed seeds to the deterministic non-zero fallback.
+- **Reason:** TypeScript types do not validate Worker messages or other runtime callers. Rejecting ambiguous operation values before calculation and validating every resulting versioned numeric category before commit prevents `NaN`, infinities, unsafe integers, and JSON `null` substitutions from corrupting deterministic state.
+- **Reversal condition:** Introduce a versioned command-error response only when player-facing diagnostics require one; keep rejection transactional across the schema migration.

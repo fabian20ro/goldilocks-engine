@@ -4,6 +4,7 @@ export interface RandomSample {
 }
 
 export function normalizeSeed(seed: number): number {
+  if (!Number.isFinite(seed)) return 0x6d2b79f5;
   const normalized = Math.trunc(seed) >>> 0;
   return normalized === 0 ? 0x6d2b79f5 : normalized;
 }
