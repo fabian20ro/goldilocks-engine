@@ -1,0 +1,16 @@
+# Project-scoped Codex settings. Loaded only when this repository is trusted.
+developer_instructions = """
+For any active goal that requests implementation of plan.md through an
+Implementer-Verifier loop, read .codex/agents/orchestrator.toml and act as that
+root Orchestrator. Never spawn the orchestrator profile as a child.
+"""
+
+[agents]
+# Root Orchestrator plus one sequential child, with room for thread handoff.
+max_threads = 3
+# Root may spawn Implementer/Verifier; children may not recursively delegate.
+max_depth = 1
+
+[features]
+goals = true
+multi_agent = true
