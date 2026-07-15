@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$ROOT"
+
+export npm_config_cache="$ROOT/.cache/npm"
+export PLAYWRIGHT_BROWSERS_PATH="$ROOT/.cache/ms-playwright"
+
+npm ci --prefer-offline
+npx playwright install chromium

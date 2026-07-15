@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$ROOT"
+
+if [ ! -x node_modules/.bin/vite ]; then
+  echo "Dependencies missing. Run ./scripts/setup first." >&2
+  exit 1
+fi
+
+npm run build
+exec npm run preview -- --host 127.0.0.1 --port 4173 --strictPort

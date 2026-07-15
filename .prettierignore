@@ -1,0 +1,10 @@
+node_modules
+dist
+coverage
+.cache
+playwright-report
+test-results
+package-lock.json
+plan.md
+AGENTS.md
+AGENT_LOOP.md
