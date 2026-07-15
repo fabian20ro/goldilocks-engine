@@ -1,4 +1,4 @@
-# Round 005 implementation handoff
+# Round 006 implementation handoff
 
 ## Implemented behavior summary
 
@@ -14,6 +14,9 @@ Gate-ready Milestone 0 numeric prototype and Milestone 1 portrait Pipeline Toy:
 - Narrow portrait layouts reflow multi-column cards, actions, module libraries, and comparison metrics instead of shrinking text; Build, Jobs, and Inspect remain within 320 CSS px at 200% text size with 44 px minimum visible controls.
 - Compute and memory allocation sliders expose 44 px minimum touch targets. The in-app motion control disables all descendant CSS animations independently of the operating-system preference while retaining static state cues.
 - Installable portrait manifest and generated production asset manifest. The service worker precaches the exact packaged JS/CSS/worker assets and supports offline reload.
+- Dual-root production packaging: the normal local build remains rooted at `/`, while `npm run build:pages` scopes HTML, manifest, icon, service worker, offline asset manifest, JavaScript, CSS, and Web Worker chunks to `/goldlocks-engine/`.
+- Scope-derived service-worker registration and cache names prevent the Pages deployment from claiming or deleting unrelated paths/caches on the shared `github.io` origin.
+- GitHub Pages Actions workflow builds and uploads `dist`, then deploys it with the Pages environment on pushes to `agent/implementation` or manual dispatch.
 
 ## Plan requirements covered
 
@@ -32,6 +35,7 @@ Gate-ready Milestone 0 numeric prototype and Milestone 1 portrait Pipeline Toy:
 - Four workload stress profiles, three hardware profiles, bounded compute/memory allocation, pause, queueing, and live deterministic simulation in a Web Worker.
 - Accessibility: portrait-only operation, no required zoom/rotation, minimum 44 px visible buttons at 320/393 px, screen-reader labels, keyboard/tap alternatives, color-independent text/status markers, scalable text, reduced-motion control/media preference, and no time-critical tapping.
 - Hermetic browser verification covers 320/393 px layouts, every visible interactive target, native drawer panning from a module card, mouse and real touch drag/reorder, touch-friendly tap placement, exact bottleneck queue placement, branching, failure/recovery, valid and malformed preset persistence, 150% and 200% text scaling, OS and in-app reduced motion, and packaged offline reload.
+- Pages-specific browser verification audits every loaded and cached runtime URL under `/goldlocks-engine/`, validates manifest/install scope and worker chunk precaching, then proves worker-backed interaction both before and after an offline reload.
 
 Milestones 2–6 are intentionally not implemented. The Pipeline Toy human exit gate has not been demonstrated; later Bedroom, evaluation/replay, research, creator/hype/fear, and local-laboratory systems remain out of scope until it is.
 
@@ -60,14 +64,22 @@ Requirements: Node.js 20.19+ (or 22.12+) and npm.
 ./scripts/run
 
 # Full clean check: npm ci, browser install, format, lint, typecheck,
-# unit/property tests, balance run, package build, packaged-PWA E2E
+# unit/property tests, balance, root and Pages builds, both packaged E2E modes
 ./scripts/verify
 
 # Packaged-PWA end-to-end check alone
 npm run test:e2e
+
+# GitHub Pages package: /goldlocks-engine/
+npm run build:pages
+
+# Exact Pages-subpath online/cache/offline/worker check
+npm run test:e2e:pages
 ```
 
 Dependency downloads use `.cache/npm`; browser downloads use `.cache/ms-playwright`. Both are repository-local and ignored. `npm run test:e2e` uses `./scripts/run-e2e`, which builds and serves the production PWA on `127.0.0.1:4173`, waits for readiness, and is cleaned up by Playwright.
+
+`npm run test:e2e:pages` uses `./scripts/run-pages-e2e`, which builds with Vite base `/goldlocks-engine/` and serves the packaged app at `http://127.0.0.1:4173/goldlocks-engine/`. The deployment target is `https://fabian20ro.github.io/goldlocks-engine/`; `.github/workflows/deploy-pages.yml` uses `actions/checkout@v6`, `actions/setup-node@v6` with Node 22 and npm caching, `actions/configure-pages@v5`, `actions/upload-pages-artifact@v4`, and `actions/deploy-pages@v4`.
 
 ## Important architectural decisions
 
@@ -81,6 +93,8 @@ Dependency downloads use `.cache/npm`; browser downloads use `.cache/ms-playwrig
 - Responsive rules preserve scaled typography and touch-target size while progressively reflowing multi-column content at the minimum portrait width.
 - One root motion-state projection governs flow, queue, status, and future descendant CSS motion, avoiding component-specific gaps in the visible control's promise.
 - Touch-action is contextual: library cards expose native `pan-x` for drawer discovery, while active-pipeline cards retain `none` for deterministic two-axis pointer drag and capture.
+- PWA scope derives from Vite's `import.meta.env.BASE_URL`; manifest start/scope/icon paths are relative, generated offline assets carry the configured base, and the service worker resolves its shell from its own registration scope.
+- Cache cleanup is namespace- and scope-limited, so one Goldilocks deployment cannot delete caches owned by another repository on the same origin.
 
 ## Known limitations and risks
 
@@ -89,10 +103,18 @@ Dependency downloads use `.cache/npm`; browser downloads use `.cache/ms-playwrig
 - Browser checks use Chromium. Physical-device battery/thermal behavior and optional haptics/audio are not evaluated in this gated candidate.
 - Presets persist locally; complete run save/load and offline policy progression belong to Milestone 2 and are intentionally absent.
 - This environment required the repository-local Chromium launch outside its restrictive macOS agent sandbox. Ordinary local/CI shells run the documented command directly.
+- The workflow and deployment URL are committed but not remotely activated, pushed, or deployed by this Implementer role. Remote enablement and deployment remain with the Orchestrator after independent verification.
+
+## Checks executed
+
+- `./scripts/verify`: PASS from a fresh locked install. Format, lint, typecheck, 21 unit/property tests with coverage thresholds, balance validation, root production build, all 20 root packaged-PWA Playwright cases, Pages production build, and the Pages scoped online/cache/offline/worker Playwright case passed.
+- `./scripts/run`: PASS. The root development server reached ready state at `http://127.0.0.1:4173/`; independent probes returned HTTP 200 for `/` and `/sw.js`; Ctrl-C stopped it.
+- `npm run build:pages`: PASS. Emitted HTML points to `/goldlocks-engine/`; `asset-manifest.json` names the scoped CSS, application JS, and Web Worker chunk.
+- `npm run test:e2e:pages`: PASS independently and inside `./scripts/verify`. The repository-pinned Chromium required the established scoped launch permission in this managed macOS environment.
 
 ## Checks not run
 
-- `./scripts/verify` was not invoked as one long-running wrapper in this bounded role turn. Every exact constituent stage ran after a fresh successful `./scripts/setup`: format, lint, typecheck, 21 unit/property tests with coverage thresholds, balance validation, production build, and all 20 packaged-PWA Playwright cases passed. `./scripts/run` also reached ready state, returned HTTP 200 on loopback, and stopped on Ctrl-C. The approved Playwright command used the repository-local Chromium path required by the wrapper.
+- Remote GitHub Actions deployment: intentionally not run; this Implementer role was instructed not to push. The Orchestrator owns Pages enablement, push, workflow observation, and live URL validation after independent verification.
 - 30-minute voluntary human Pipeline Toy playtest: no participant/evidence supplied.
 - Physical mobile-device battery and thermal profiling: no device infrastructure supplied; browser CPU behavior is covered only indirectly by deterministic single-worker tests and short E2E sessions.
 - Milestone 2–6 acceptance checks: prohibited until the Pipeline Toy gate passes.

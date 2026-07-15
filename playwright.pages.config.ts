@@ -1,15 +1,20 @@
 import { defineConfig } from "@playwright/test";
 
+const pagesUrl = "http://127.0.0.1:4173/goldlocks-engine/";
+
 export default defineConfig({
   testDir: "./tests/e2e",
-  testIgnore: "pages.spec.ts",
+  testMatch: "pages.spec.ts",
   fullyParallel: false,
   forbidOnly: true,
   retries: 0,
   workers: 1,
-  reporter: [["list"], ["html", { open: "never" }]],
+  reporter: [
+    ["list"],
+    ["html", { open: "never", outputFolder: "playwright-pages-report" }],
+  ],
   use: {
-    baseURL: "http://127.0.0.1:4173",
+    baseURL: pagesUrl,
     browserName: "chromium",
     headless: true,
     locale: "en-US",
@@ -19,8 +24,8 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   webServer: {
-    command: "./scripts/run-e2e",
-    url: "http://127.0.0.1:4173",
+    command: "./scripts/run-pages-e2e",
+    url: pagesUrl,
     reuseExistingServer: false,
     timeout: 120_000,
   },
