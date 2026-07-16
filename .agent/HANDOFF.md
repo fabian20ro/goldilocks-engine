@@ -1,4 +1,4 @@
-# Round 017 implementation handoff
+# Round 018 implementation handoff
 
 ## Implemented behavior summary
 
@@ -12,6 +12,7 @@ The bounded Workstation Expansion I / per-task demand slice authorized in D-007 
 - Each workload has deterministic demand saturation, minimum quote, and simulated-time recovery. The live quote always includes all active/waiting same-workload reservations and is the exact quote the next accepted task locks; batch items add their own sequential reservation pressure.
 - Repeated single-workload farming eventually has nonpositive expected margin for every valid graph: a pipeline without a model has zero delivery reliability and always fails for $0 gross, while every productive graph's quote floor is below its unavoidable model/maintenance cost. Offer cards and the money loop use reliability-weighted expected gross/net, so a guaranteed failure never advertises positive profit. Rotation retains a profitable path. Idle time never creates money.
 - A task always incurs its full completion-time configured operating cost, even when current cash cannot cover it. Money remains nonnegative; the aggregate tracks cash actually paid, while the settlement and ledger preserve the configured cost and explicitly identify its paid and unpaid portions.
+- Settlement equations use one shared display precision. Ordinary cent-exact values remain concise at two decimals; if gross, configured cost, paid cost, unpaid cost, or net includes a fraction of a cent, the complete equation uses three decimals and explains the precision. Visible parts therefore remain additive-consistent in both Latest settlement and the ledger.
 - Current warning, pressure, bottleneck, and queue-stage feedback follow the active task's workload. Selecting a future workload changes only its quote and estimated offer information until it becomes active.
 - Waiting tasks can be cleared only after confirmation. The active task, its progress/identity/quote, money, demand, reputation, RNG, and settled history remain unchanged.
 - Fixed 1×/4×/16×/64× controls advance the same 0.5-second simulation quanta. Animation and pause remain separate.
@@ -34,6 +35,7 @@ The source feedback is preserved in `.agent/playtests/2026-07-16-progression-exp
 | Progression bounds                  | First module ≤5 successes; alternate rig ≤15; expansion 8–16h; full catalogue 24–72h                                                                  | Upgrade balance and 41-seed progression balance                                |
 | No dominant farming / no idle money | Every valid graph has nonpositive floor margin; no-model work always fails; expected-value offers stay honest; rotation profitable; idle does not pay | Engine/round-016 verifier tests and deterministic progression sweep            |
 | Incurred-cost accounting            | Full configured cost is settled and reported; collectible cash is paid; unpaid cost is explicit; money remains nonnegative                            | Engine and round-016 verifier settlement regressions; latest-settlement UI     |
+| Additive currency presentation      | One equation-wide 2/3-decimal precision keeps gross − configured = net and paid + unpaid = configured at sub-cent boundaries                          | Exhaustive formatter test; round-017 unit/browser regressions                  |
 | Active-task feedback                | Active work owns pressure, warning, bottleneck, and queue-stage diagnostics; future selection owns offer details                                      | Engine regression and round-015 verifier browser case                          |
 | Fixed fast-forward                  | 1×/4×/16×/64× use identical fixed quanta and preserve settlements/resources/ledger identities                                                         | Schedule-equivalence engine test; browser controls                             |
 | Portrait/accessibility              | 320/393 CSS px, 200% text, ≥44px visible buttons, no document overflow, reduced motion, touch/pointer placement                                       | Root browser suite, retained verifier cases, headed visual inspection          |
@@ -48,6 +50,7 @@ The source feedback is preserved in `.agent/playtests/2026-07-16-progression-exp
 - V-020 resolved: persistent pipeline diagnostics recalculate against the active task's workload. Selected future-work cards and the money-loop offer calculate their own explicit projections, and warning guidance uses the active workload.
 - V-021 resolved: one shared offer estimator applies modeled delivery reliability to gross payout and subtracts configured cost. No-model and memory-overload guarantees produce expected gross $0 and negative expected net in both workload cards and the money loop.
 - V-022 resolved: settlement records the full configured operating cost even when money is $0. Cash collection is separately capped to available money, aggregate operating costs count only what was paid, and the persisted ledger plus latest-settlement UI explicitly distinguish paid and unpaid cost without allowing negative money.
+- V-023 resolved: ledger and Latest settlement select one precision for the complete currency equation. Cent-exact equations use two decimals; any reachable sub-cent member promotes every displayed member to three decimals, preserving both configured = paid + unpaid and net = gross − configured. The UI explicitly explains the extra precision.
 - The previously recorded B-005 human-study blocker is owner-waived for this bounded implementation slice under D-007. That waiver permits implementation; it is not empirical evidence that either original human gate passed.
 - All reports under `.agent/verification/` were read before implementation. Their evidence remains immutable.
 
@@ -84,6 +87,7 @@ On this managed macOS host, a direct browser launch can fail with a Mach-port pe
 - A task locks gross quote and workload at acceptance. Operating cost remains the actual completion-time configuration cost, making reconfiguration an explicit economic choice rather than silently rewriting accepted demand.
 - Offer comparisons are expected-value projections, not guaranteed gross claims: modeled reliability weights the gross quote before configured cost is subtracted, and deterministic failure overrides expected gross to zero.
 - `lastSettlement.operatingCost` is the full incurred configured cost. `lastSettlement.netChange` remains the actual cash delta, so existing cash accounting stays exact; paid cost is derivable as gross minus cash delta and any remainder is explicitly unpaid. `jobs.operatingCostsPaid` intentionally remains a cash-paid aggregate.
+- Currency precision is selected per settlement equation rather than per amount. This prevents independent half-cent rounding from inflating a visible partition while keeping ordinary values at familiar cent precision.
 - The quote function owns reservation counting. Callers cannot accidentally display an unreserved quote while acceptance uses a reserved one; batch acceptance passes only the zero-based count of additional tasks in that batch.
 - Persistent `state.metrics` describes work physically in flight when an active task exists; selected-work projections are computed ephemerally for offer comparison and are not allowed to overwrite active diagnostics.
 - Market-floor safety is structural: no-model graphs cannot deliver, every delivering graph contains at least one model, all other costs are nonnegative, and modeled reliability is capped below one.
@@ -106,13 +110,15 @@ On this managed macOS host, a direct browser launch can fail with a Mach-port pe
 
 ## Checks executed before final candidate
 
-- `npm test`: PASS, 61/61 unit/property/migration/economy tests; final canonical coverage 87.36% statements, 85.64% branches, 94.73% functions, and 90.56% lines.
+- `npm test`: PASS, 70/70 unit/property/migration/economy/currency tests; coverage 87.53% statements, 85.75% branches, 94.87% functions, and 90.70% lines.
 - `npm run balance:progression`: PASS, 41/41 deterministic seeds; expansion 13.14–15.59 simulated hours; full catalogue 40.63–44.40 hours; zero failures.
 - `npx vitest run src/simulation/engine.test.ts src/simulation/verifierRound015.test.ts src/simulation/verifierRound016.test.ts src/simulation/progressionBalance.test.ts --coverage.enabled=false`: PASS, 43/43 focused economy, active-task, and round-016 regressions.
 - `npm run test:e2e -- tests/e2e/verifier-round-016.spec.ts`: PASS, 1/1 exact guaranteed-failure offer regression.
-- `npm run test:e2e`: PASS, 45/45 root browser cases on the final fresh rerun.
+- `npx vitest run src/simulation/currency.test.ts src/simulation/verifierRound017.test.ts --coverage.enabled=false`: PASS, 9/9 focused additive-currency and exact verifier regressions.
+- `npm run test:e2e -- tests/e2e/verifier-round-017.spec.ts`: PASS, 2/2 exact settlement-feedback regressions.
+- `npm run test:e2e`: PASS, 47/47 root browser cases on the final fresh rerun. An earlier run had one transient round-015 offline-preset assertion after 46 other cases passed; the exact round-015 file immediately passed 4/4 and a complete fresh rerun passed 47/47 without a code change.
 - `npm run test:e2e:pages`: PASS, 2/2 GitHub Pages/offline/cache-isolation cases. The first sandboxed launch failed at macOS Mach registration; the exact escalated rerun passed.
-- The canonical `./scripts/verify` passed clean dependency recreation, formatting, lint, typecheck, 61/61 covered tests, the base model, the 20,001-seed upgrade balance, the 41-seed progression balance, and the production build. Its root-browser phase then hit the documented macOS Mach-port sandbox denial. Exact fresh package-manager reruns passed root 45/45 and Pages 2/2, with Pages rerun outside that sandbox boundary.
+- The canonical `./scripts/verify` passed clean dependency recreation, formatting, lint, typecheck, 70/70 covered tests, the base model, the 20,001-seed upgrade balance, the 41-seed progression balance, and production build. Its root-browser phase then hit the documented macOS Mach-port sandbox denial before page creation. Exact fresh package-manager reruns passed root 47/47 and Pages 2/2, with Pages rerun outside that sandbox boundary.
 
 ## Checks not run
 

@@ -1,0 +1,22 @@
+export type CurrencyDisplayPrecision = 2 | 3;
+
+const CENT_EPSILON = 1e-9;
+
+export function currencyDisplayPrecision(
+  amounts: readonly number[],
+): CurrencyDisplayPrecision {
+  return amounts.some((amount) => {
+    const roundedToCents = Math.round(amount * 100) / 100;
+    return Math.abs(amount - roundedToCents) > CENT_EPSILON;
+  })
+    ? 3
+    : 2;
+}
+
+export function formatCurrencyMagnitude(
+  amount: number,
+  precision: CurrencyDisplayPrecision,
+): string {
+  const normalized = Math.abs(amount) < 0.0005 ? 0 : Math.abs(amount);
+  return normalized.toFixed(precision);
+}

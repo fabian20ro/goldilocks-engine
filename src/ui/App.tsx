@@ -23,6 +23,10 @@ import {
   getWorkloadQuote,
   workloadUnlockProgress,
 } from "../simulation/engine";
+import {
+  currencyDisplayPrecision,
+  formatCurrencyMagnitude,
+} from "../simulation/currency";
 import type {
   PipelineMetrics,
   PipelineSlotState,
@@ -836,6 +840,20 @@ function MoneyLoop({ state }: { state: SimulationState }) {
   const settlementUnpaidCost = settlement
     ? Math.max(0, settlement.operatingCost - settlementPaidCost)
     : 0;
+  const settlementCurrencyPrecision = currencyDisplayPrecision(
+    settlement
+      ? [
+          settlement.lockedGrossQuote,
+          settlement.grossPayout,
+          settlement.operatingCost,
+          settlementNet,
+          settlementPaidCost,
+          settlementUnpaidCost,
+        ]
+      : [],
+  );
+  const settlementCurrency = (amount: number) =>
+    formatCurrencyMagnitude(amount, settlementCurrencyPrecision);
   return (
     <section className="money-loop" aria-labelledby="money-loop-title">
       <div className="money-loop-route" aria-label="Money loop">
@@ -875,17 +893,22 @@ function MoneyLoop({ state }: { state: SimulationState }) {
             <>
               <strong className={settlementNet < 0 ? "bad" : "good"}>
                 {settlementNet >= 0 ? "+" : "−"}$
-                {Math.abs(settlementNet).toFixed(2)} net
+                {settlementCurrency(settlementNet)} net
               </strong>
               <small>
                 {getWorkload(settlement.workloadId).name} · task{" "}
-                {settlement.taskId} · ${settlement.lockedGrossQuote.toFixed(2)}{" "}
-                locked gross · {settlement.completed} paid · {settlement.failed}{" "}
-                failed · ${settlement.grossPayout.toFixed(2)} settled gross − $
-                {settlement.operatingCost.toFixed(2)} configured actual costs
+                {settlement.taskId} · $
+                {settlementCurrency(settlement.lockedGrossQuote)} locked gross ·{" "}
+                {settlement.completed} paid · {settlement.failed} failed · $
+                {settlementCurrency(settlement.grossPayout)} settled gross − $
+                {settlementCurrency(settlement.operatingCost)} configured actual
+                costs
                 {settlementUnpaidCost > 0
-                  ? ` · $${settlementPaidCost.toFixed(2)} paid · $${settlementUnpaidCost.toFixed(2)} unpaid because cash cannot go below $0`
+                  ? ` · $${settlementCurrency(settlementPaidCost)} paid · $${settlementCurrency(settlementUnpaidCost)} unpaid because cash cannot go below $0`
                   : " · paid in full"}
+                {settlementCurrencyPrecision === 3
+                  ? " · Three decimals shown to preserve sub-cent accounting."
+                  : ""}
               </small>
             </>
           ) : (
