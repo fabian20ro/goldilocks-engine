@@ -3,6 +3,7 @@ import {
   applyCommand,
   calculateMetrics,
   createInitialState,
+  estimateWorkloadOffer,
   getSimulationAgeHours,
   getWorkloadQuote,
   isStateValid,
@@ -25,11 +26,8 @@ export interface ProgressionBalanceResult {
 
 function expectedMargin(state: SimulationState, workloadId: string): number {
   const metrics = calculateMetrics({ ...state, workloadId });
-  if (metrics.memoryPressure > 1) return Number.NEGATIVE_INFINITY;
-  return (
-    getWorkloadQuote(state, workloadId).grossQuote * metrics.reliability -
-    metrics.operatingCost
-  );
+  return estimateWorkloadOffer(metrics, getWorkloadQuote(state, workloadId))
+    .expectedNet;
 }
 
 function everyValidConfigurationHasASafeDemandFloor(): boolean {

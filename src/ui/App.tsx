@@ -18,6 +18,7 @@ import {
 } from "../simulation/catalog";
 import {
   calculateMetrics,
+  estimateWorkloadOffer,
   getSimulationAgeHours,
   getWorkloadQuote,
   workloadUnlockProgress,
@@ -818,9 +819,23 @@ function MoneyLoop({ state }: { state: SimulationState }) {
     ...state,
     workloadId: workload.id,
   });
-  const estimatedNet = quote.grossQuote - offerMetrics.operatingCost;
+  const offer = estimateWorkloadOffer(offerMetrics, quote);
   const settlement = state.lastSettlement;
-  const netClass = settlement && settlement.netChange < 0 ? "bad" : "good";
+  const settlementNet = settlement
+    ? settlement.grossPayout - settlement.operatingCost
+    : 0;
+  const settlementPaidCost = settlement
+    ? Math.max(
+        0,
+        Math.min(
+          settlement.operatingCost,
+          settlement.grossPayout - settlement.netChange,
+        ),
+      )
+    : 0;
+  const settlementUnpaidCost = settlement
+    ? Math.max(0, settlement.operatingCost - settlementPaidCost)
+    : 0;
   return (
     <section className="money-loop" aria-labelledby="money-loop-title">
       <div className="money-loop-route" aria-label="Money loop">
@@ -841,10 +856,13 @@ function MoneyLoop({ state }: { state: SimulationState }) {
           <p>
             ${quote.grossQuote.toFixed(2)} gross if accepted now · $
             {formatNumber(offerMetrics.operatingCost, 3)} estimated operating
-            cost · {estimatedNet >= 0 ? "+" : "−"}$
-            {Math.abs(estimatedNet).toFixed(2)} estimated net. Demand{" "}
-            {quote.demandPercent}% · {quote.trend}. Failed jobs receive $0
-            gross.
+            cost · {offer.expectedNet >= 0 ? "+" : "−"}$
+            {Math.abs(offer.expectedNet).toFixed(2)} expected net at{" "}
+            {Math.round(offerMetrics.reliability * 100)}% modeled delivery.
+            Demand {quote.demandPercent}% · {quote.trend}.{" "}
+            {offer.guaranteedFailure
+              ? "Guaranteed failure in this configuration: $0 expected gross."
+              : "Failed jobs receive $0 gross."}
           </p>
           <small>
             {quote.reason} Actual cost is locked only by the configuration that
@@ -855,16 +873,19 @@ function MoneyLoop({ state }: { state: SimulationState }) {
           <span className="eyebrow">Latest settlement</span>
           {settlement ? (
             <>
-              <strong className={netClass}>
-                {settlement.netChange >= 0 ? "+" : "−"}$
-                {Math.abs(settlement.netChange).toFixed(2)} net
+              <strong className={settlementNet < 0 ? "bad" : "good"}>
+                {settlementNet >= 0 ? "+" : "−"}$
+                {Math.abs(settlementNet).toFixed(2)} net
               </strong>
               <small>
                 {getWorkload(settlement.workloadId).name} · task{" "}
                 {settlement.taskId} · ${settlement.lockedGrossQuote.toFixed(2)}{" "}
                 locked gross · {settlement.completed} paid · {settlement.failed}{" "}
                 failed · ${settlement.grossPayout.toFixed(2)} settled gross − $
-                {settlement.operatingCost.toFixed(2)} actual costs
+                {settlement.operatingCost.toFixed(2)} configured actual costs
+                {settlementUnpaidCost > 0
+                  ? ` · $${settlementPaidCost.toFixed(2)} paid · $${settlementUnpaidCost.toFixed(2)} unpaid because cash cannot go below $0`
+                  : " · paid in full"}
               </small>
             </>
           ) : (
@@ -1376,7 +1397,8 @@ function JobsView({
               ...state,
               workloadId: workload.id,
             });
-            const estimatedNet = quote.grossQuote - metrics.operatingCost;
+            const offer = estimateWorkloadOffer(metrics, quote);
+            const estimatedNet = offer.expectedNet;
             const risky =
               estimatedNet <= Math.max(0.05, quote.grossQuote * 0.15);
             return (
@@ -1388,7 +1410,7 @@ function JobsView({
                 disabled={!unlock.unlocked}
                 aria-label={
                   unlock.unlocked
-                    ? `${workload.name}. Current quote $${quote.grossQuote.toFixed(2)}. Estimated cost $${metrics.operatingCost.toFixed(3)}. Demand ${quote.demandPercent} percent, ${quote.trend}.`
+                    ? `${workload.name}. Current quote $${quote.grossQuote.toFixed(2)}. Estimated cost $${metrics.operatingCost.toFixed(3)}. ${offer.guaranteedFailure ? "Guaranteed failure; expected gross is $0." : `Expected net ${estimatedNet >= 0 ? "plus" : "minus"} $${Math.abs(estimatedNet).toFixed(2)} at ${Math.round(metrics.reliability * 100)} percent modeled delivery.`} Demand ${quote.demandPercent} percent, ${quote.trend}.`
                     : `${workload.name} locked. ${unlock.requirements.join("; ")}`
                 }
                 onClick={() =>
@@ -1404,7 +1426,7 @@ function JobsView({
                   </strong>
                   <small>
                     {unlock.unlocked
-                      ? `${workload.description} Estimated $${metrics.operatingCost.toFixed(3)} cost · ${estimatedNet >= 0 ? "+" : "−"}$${Math.abs(estimatedNet).toFixed(2)} net · demand ${quote.demandPercent}% ${quote.trend}. ${quote.reason}`
+                      ? `${workload.description} Estimated $${metrics.operatingCost.toFixed(3)} cost · ${estimatedNet >= 0 ? "+" : "−"}$${Math.abs(estimatedNet).toFixed(2)} expected net at ${Math.round(metrics.reliability * 100)}% modeled delivery · demand ${quote.demandPercent}% ${quote.trend}. ${offer.guaranteedFailure ? "Guaranteed failure: this configuration pays $0 gross." : ""} ${quote.reason}`
                       : `Requires ${unlock.requirements.join(" · ")}.`}
                   </small>
                   {unlock.unlocked && risky ? (

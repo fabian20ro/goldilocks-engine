@@ -402,6 +402,27 @@ export function getWorkloadQuote(
   };
 }
 
+export function estimateWorkloadOffer(
+  metrics: PipelineMetrics,
+  quote: WorkloadQuote,
+): {
+  guaranteedFailure: boolean;
+  expectedGrossPayout: number;
+  expectedNet: number;
+} {
+  const guaranteedFailure =
+    metrics.memoryPressure > 1 ||
+    metrics.orderWarnings.includes("no model stage");
+  const expectedGrossPayout = guaranteedFailure
+    ? 0
+    : round(quote.grossQuote * metrics.reliability, 3);
+  return {
+    guaranteedFailure,
+    expectedGrossPayout,
+    expectedNet: round(expectedGrossPayout - metrics.operatingCost, 3),
+  };
+}
+
 export function workloadUnlockProgress(
   state: Pick<
     SimulationState,
@@ -1125,11 +1146,13 @@ function advanceTickQuantum(
   const failed =
     memoryFailure || missingModel || sample.value > taskMetrics.reliability;
   const grossPayout = failed ? 0 : task.lockedGrossQuote;
-  const modelledCost = taskMetrics.operatingCost;
-  const operatingCost = round(
-    Math.min(modelledCost, moneyBeforeSettlement + grossPayout),
+  const operatingCost = taskMetrics.operatingCost;
+  const operatingCostPaid = round(
+    Math.min(operatingCost, moneyBeforeSettlement + grossPayout),
     3,
   );
+  const unpaidOperatingCost = round(operatingCost - operatingCostPaid, 3);
+  const economicNet = round(grossPayout - operatingCost, 3);
   const moneyAfter = round(
     Math.max(0, moneyBeforeSettlement + grossPayout - operatingCost),
     3,
@@ -1155,7 +1178,7 @@ function advanceTickQuantum(
       activeTask: null,
       grossEarned: round(next.jobs.grossEarned + grossPayout, 3),
       operatingCostsPaid: round(
-        next.jobs.operatingCostsPaid + operatingCost,
+        next.jobs.operatingCostsPaid + operatingCostPaid,
         3,
       ),
     },
@@ -1199,16 +1222,16 @@ function advanceTickQuantum(
     };
     next = appendEvent(next, {
       kind: "success",
-      message: `${workload.name} task ${task.id} completed; $${task.lockedGrossQuote.toFixed(2)} gross payout earned before operating cost (locked quote) − $${operatingCost.toFixed(2)} actual cost = ${moneyAfter - moneyBeforeSettlement >= 0 ? "+" : "−"}$${Math.abs(moneyAfter - moneyBeforeSettlement).toFixed(2)} net. Future ${workload.name} demand is lower and recovers with simulated time.`,
+      message: `${workload.name} task ${task.id} completed; $${task.lockedGrossQuote.toFixed(2)} gross payout earned before operating cost (locked quote) − $${operatingCost.toFixed(2)} configured actual cost = ${economicNet >= 0 ? "+" : "−"}$${Math.abs(economicNet).toFixed(2)} net. ${unpaidOperatingCost > 0 ? `$${operatingCostPaid.toFixed(2)} was paid and $${unpaidOperatingCost.toFixed(2)} remains unpaid because cash cannot go below $0.` : "The configured cost was paid in full."} Future ${workload.name} demand is lower and recovers with simulated time.`,
     });
   } else {
     next = appendEvent(next, {
       kind: "failure",
       message: missingModel
-        ? `${workload.name} task ${task.id} failed before delivery: no model stage produced an answer. Locked quote paid $0 gross.`
+        ? `${workload.name} task ${task.id} failed before delivery: no model stage produced an answer. Locked quote paid $0 gross; configured actual cost was $${operatingCost.toFixed(2)}. ${unpaidOperatingCost > 0 ? `$${operatingCostPaid.toFixed(2)} was paid and $${unpaidOperatingCost.toFixed(2)} remains unpaid because cash cannot go below $0.` : "The configured cost was paid in full."}`
         : memoryFailure
-          ? `${workload.name} task ${task.id} failed before delivery: memory capacity exceeded. Locked quote paid $0 gross.`
-          : `${workload.name} task ${task.id} produced unstable output and was rejected. Locked quote paid $0 gross.`,
+          ? `${workload.name} task ${task.id} failed before delivery: memory capacity exceeded. Locked quote paid $0 gross; configured actual cost was $${operatingCost.toFixed(2)}. ${unpaidOperatingCost > 0 ? `$${operatingCostPaid.toFixed(2)} was paid and $${unpaidOperatingCost.toFixed(2)} remains unpaid because cash cannot go below $0.` : "The configured cost was paid in full."}`
+          : `${workload.name} task ${task.id} produced unstable output and was rejected. Locked quote paid $0 gross; configured actual cost was $${operatingCost.toFixed(2)}. ${unpaidOperatingCost > 0 ? `$${operatingCostPaid.toFixed(2)} was paid and $${unpaidOperatingCost.toFixed(2)} remains unpaid because cash cannot go below $0.` : "The configured cost was paid in full."}`,
       directCause: missingModel
         ? "The active pipeline had no model stage."
         : memoryFailure

@@ -11,6 +11,7 @@ import {
   applyCommand,
   calculateMetrics,
   createInitialState,
+  estimateWorkloadOffer,
   getWorkloadQuote,
   hasValidStateIntegrity,
   isStateValid,
@@ -769,6 +770,16 @@ describe("deterministic simulation engine", () => {
 
     expect(state.metrics.orderWarnings).toContain("no model stage");
     expect(state.metrics.reliability).toBe(0);
+    const configuredCost = state.metrics.operatingCost;
+    const offer = estimateWorkloadOffer(
+      state.metrics,
+      getWorkloadQuote(state, "interactive-chat"),
+    );
+    expect(offer).toEqual({
+      guaranteedFailure: true,
+      expectedGrossPayout: 0,
+      expectedNet: -configuredCost,
+    });
     state = applyCommand(state, { type: "QUEUE_JOBS", count: 1 });
     for (let minute = 0; minute < 25 && state.jobs.queued > 0; minute += 1)
       state = tick(state, 60);
@@ -776,8 +787,12 @@ describe("deterministic simulation engine", () => {
     expect(state.jobs.completed).toBe(0);
     expect(state.jobs.failed).toBe(1);
     expect(state.jobs.grossEarned).toBe(0);
+    expect(state.jobs.operatingCostsPaid).toBe(0);
     expect(state.lastSettlement?.grossPayout).toBe(0);
+    expect(state.lastSettlement?.operatingCost).toBe(configuredCost);
+    expect(state.lastSettlement?.netChange).toBe(0);
     expect(state.ledger.at(-1)?.directCause).toMatch(/no model stage/i);
+    expect(state.ledger.at(-1)?.message).toMatch(/unpaid/i);
   });
 
   it("saturates completed work, recovers neglected demand, and never earns by idling", () => {
