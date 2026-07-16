@@ -34,6 +34,12 @@ test.describe("round 009 first-session comprehension", () => {
       "Memory reserve is RAM deliberately held back",
     );
     await expect(tutorial).toContainText(
+      /thermal pressure[^.]*lower the compute budget[^.]*lower CU demand/i,
+    );
+    await expect(tutorial).toContainText(
+      "Animations control changes visuals only and does not affect heat or simulation time",
+    );
+    await expect(tutorial).toContainText(
       "Hardware purchasing is a Milestone 2 feature",
     );
     await expect(tutorial).toContainText(
@@ -156,10 +162,19 @@ test.describe("round 009 first-session comprehension", () => {
     await page.getByRole("button", { name: /Long Document/ }).click();
     const warning = page.getByLabel("Current warning and actions");
     await expect(warning).toContainText("only");
+    await expect(warning).toContainText("Lower the reserve");
     await expect(warning).toContainText("lighter compatible modules");
     await expect(warning).toContainText(
       "the warning does not assume one sole cause",
     );
+
+    await page.getByLabel("Memory reserve percentage").fill("0");
+    await expect(warning).toContainText(
+      "needs 16.7 GB, but only 8 GB is usable of 8 GB total rig capacity; 0 GB (0%) is reserved",
+    );
+    await expect(warning).toContainText("Choose lighter compatible modules");
+    await expect(warning).toContainText("lower-memory workload");
+    await expect(warning).not.toContainText("Lower the reserve");
 
     await page.reload();
     await page
@@ -176,6 +191,9 @@ test.describe("round 009 first-session comprehension", () => {
     await expect(warning).toContainText("Lower compute budget");
     await expect(warning).toContainText(
       "Module swaps mainly change memory, throughput, quality, and reliability in this toy—not heat directly",
+    );
+    await expect(warning).toContainText(
+      "Animations control changes visuals only; it does not affect heat or simulation time",
     );
     await expect(warning).toContainText(
       "Throttling is predicted, not a certain hardware fault",

@@ -54,6 +54,15 @@ function formatNumber(value: number, digits = 0): string {
   }).format(value);
 }
 
+function actionSentence(actions: readonly string[]): string {
+  if (actions.length === 0) return "";
+  const [first, ...rest] = actions;
+  const capitalized = `${first?.charAt(0).toUpperCase()}${first?.slice(1)}`;
+  if (rest.length === 0) return `${capitalized}.`;
+  if (rest.length === 1) return `${capitalized} or ${rest[0]}.`;
+  return `${capitalized}, ${rest.slice(0, -1).join(", ")}, or ${rest.at(-1)}.`;
+}
+
 function loadPresets(): SavedPreset[] {
   try {
     const parsed: unknown = JSON.parse(
@@ -226,7 +235,10 @@ function QuickStart({ onDismiss }: { onDismiss: () => void }) {
             capacity and workload demand, not a claim about physical FLOPS.
             Memory use includes workload plus installed modules. Rig capacity is
             total RAM; Memory reserve is RAM deliberately held back, so only the
-            remainder is usable by this pipeline.
+            remainder is usable by this pipeline. To reduce thermal pressure,
+            lower the compute budget or choose a workload with lower CU demand;
+            the Animations control changes visuals only and does not affect heat
+            or simulation time.
           </p>
         </li>
         <li>
@@ -263,14 +275,52 @@ function WarningBanner({
   onOpenBuild: () => void;
 }) {
   const rig = getHardware(state.hardwareId);
+  const workload = getWorkload(state.workloadId);
   const reserveGb = rig.memory - state.metrics.memoryAvailable;
+  const canLowerReserve = state.memoryReserve > 0;
+  const canUseLighterModule = state.slots.some((slotState) => {
+    const currentModule = getModule(slotState.moduleId);
+    const slot = getSlot(slotState.slotId);
+    return modules.some(
+      (candidate) =>
+        candidate.slotTypes.includes(slot.type) &&
+        candidate.memory < currentModule.memory,
+    );
+  });
+  const canUseLowerMemoryWorkload = workloads.some(
+    (candidate) => candidate.memoryDemand < workload.memoryDemand,
+  );
+  const canLowerCompute = state.computeAllocation > 25;
+  const canUseLowerCuWorkload = workloads.some(
+    (candidate) => candidate.computeDemand < workload.computeDemand,
+  );
   const nominal = state.lastWarning.includes("inside");
   let guidance =
     "Pressure is currently inside the modelled envelope. Queue work, then compare module order, policies, and observed results; this estimate does not prove future jobs will succeed.";
   if (state.metrics.memoryPressure > 1) {
-    guidance = `This configuration needs ${formatNumber(state.metrics.memoryUsed, 1)} GB, but only ${formatNumber(state.metrics.memoryAvailable, 1)} GB is usable after the ${formatNumber(reserveGb, 1)} GB reserve. Lower the reserve, choose lighter compatible modules (drawer cards show GB), or choose a lower-memory workload. Each can reduce pressure; the warning does not assume one sole cause.`;
+    const actions = [
+      canLowerReserve ? "lower the reserve" : null,
+      canUseLighterModule
+        ? "choose lighter compatible modules (drawer cards show GB)"
+        : null,
+      canUseLowerMemoryWorkload ? "choose a lower-memory workload" : null,
+    ].filter((action): action is string => action !== null);
+    const availableActions =
+      actionSentence(actions) ||
+      "Reserve, compatible-module memory, and workload memory demand are already at their current minima; this configuration cannot fit on the current rig.";
+    const effectQualification = actions.length
+      ? "These changes can reduce pressure; the warning does not assume one sole cause."
+      : "The warning identifies a hard fit boundary, not one sole cause.";
+    guidance = `This configuration needs ${formatNumber(state.metrics.memoryUsed, 1)} GB, but only ${formatNumber(state.metrics.memoryAvailable, 1)} GB is usable of ${formatNumber(rig.memory, 1)} GB total rig capacity; ${formatNumber(reserveGb, 1)} GB (${state.memoryReserve}%) is reserved. ${availableActions} ${effectQualification}`;
   } else if (state.metrics.thermalPressure > 1) {
-    guidance = `Estimated thermal load is ${formatNumber(state.metrics.thermalLoad, 1)} against a ${rig.thermalLimit} limit. Lower compute budget or choose a workload with lower CU demand. Module swaps mainly change memory, throughput, quality, and reliability in this toy—not heat directly. Throttling is predicted, not a certain hardware fault.`;
+    const actions = [
+      canLowerCompute ? "lower compute budget" : null,
+      canUseLowerCuWorkload ? "choose a workload with lower CU demand" : null,
+    ].filter((action): action is string => action !== null);
+    const availableActions =
+      actionSentence(actions) ||
+      "Compute budget and workload CU demand are already at their current minima; no current policy can reduce estimated heat further.";
+    guidance = `Estimated thermal load is ${formatNumber(state.metrics.thermalLoad, 1)} against a ${rig.thermalLimit} limit. ${availableActions} Module swaps mainly change memory, throughput, quality, and reliability in this toy—not heat directly. The Animations control changes visuals only; it does not affect heat or simulation time. Throttling is predicted, not a certain hardware fault.`;
   } else if (state.metrics.orderWarnings.length > 0) {
     guidance =
       "Put preparation before model and evaluation after model. Reordering changes throughput, quality, and reliability together; compare the baseline instead of assuming every delta has one cause.";
