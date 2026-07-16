@@ -71,4 +71,44 @@ describe("simulation worker numeric protocol", () => {
     expect(run()).toEqual(run());
     expect(isStateValid(run())).toBe(true);
   });
+
+  it("rejects malformed envelopes and restores persisted ownership safely", () => {
+    const initial = createInitialState(303);
+    const malformed = [
+      null,
+      undefined,
+      "COMMAND",
+      {},
+      { type: "COMMAND" },
+      { type: "COMMAND", command: null },
+      { type: "COMMAND", command: { type: "CAPTURE_BASELINE" } },
+    ];
+    for (const request of malformed)
+      expect(reduceWorkerRequest(initial, request as WorkerRequest)).toEqual(
+        initial,
+      );
+
+    const missingPurchaseId = reduceWorkerRequest(initial, {
+      type: "COMMAND",
+      command: { type: "BUY_MODULE" } as SimulationCommand,
+    });
+    expect(isStateValid(missingPurchaseId)).toBe(true);
+    expect(missingPurchaseId.resources.money).toBe(initial.resources.money);
+    expect(missingPurchaseId.lastUpgradeNotice?.message).toMatch(/unknown/i);
+
+    const purchased = reduceWorkerRequest(
+      { ...initial, resources: { ...initial.resources, money: 4 } },
+      {
+        type: "COMMAND",
+        command: { type: "BUY_MODULE", moduleId: "precision-cleaner" },
+      },
+    );
+    const restored = reduceWorkerRequest(initial, {
+      type: "INIT",
+      savedState: JSON.parse(JSON.stringify(purchased)) as unknown,
+    });
+    expect(restored).toEqual(purchased);
+    expect(restored.ownedModuleIds).toContain("precision-cleaner");
+    expect(isStateValid(restored)).toBe(true);
+  });
 });

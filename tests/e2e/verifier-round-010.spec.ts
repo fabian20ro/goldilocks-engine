@@ -32,6 +32,34 @@ test.describe("verifier round 010 pressure-action boundaries", () => {
     await expect(warning).not.toContainText("Lower the reserve");
     await expect(warning).not.toContainText("lower-memory workload");
 
+    // Schema-v4 intentionally persists the run. Establish the original
+    // minimum-CU thermal boundary explicitly instead of relying on reload to
+    // discard the preceding memory configuration.
+    await page.getByRole("button", { name: "Build" }).click();
+    await page
+      .locator('.module-library [data-module-id="quantized-model"]')
+      .click();
+    await page
+      .getByTestId("slot-runtime")
+      .getByRole("button", { name: "Snap here" })
+      .click();
+    await expect(page.getByTestId("slot-runtime")).toContainText(
+      "Quantized Model",
+    );
+    await page.getByRole("button", { name: "Jobs" }).click();
+    const interactive = page.getByRole("button", { name: /Interactive Chat/ });
+    await interactive.click();
+    await expect(interactive).toHaveAttribute("aria-pressed", "true");
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const state = JSON.parse(
+            localStorage.getItem("goldilocks-simulation-save-v4") ?? "null",
+          ) as { workloadId?: string } | null;
+          return state?.workloadId;
+        }),
+      )
+      .toBe("interactive-chat");
     await page.reload();
     await page.getByRole("button", { name: "Jobs" }).click();
     await page.getByLabel("Compute budget percentage").fill("100");

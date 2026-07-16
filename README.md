@@ -1,8 +1,10 @@
 # The Goldilocks Engine — Pipeline Toy
 
-Gate-ready Milestone 0 numeric prototype and Milestone 1 portrait PWA. Later first-release milestones remain blocked on the plan's 30-minute human Pipeline Toy exit gate.
+Milestone 0 numeric prototype and Milestone 1 portrait PWA with the D-006 bounded purchase-loop redesign. Later first-release milestones remain blocked on the plan's 30-minute human Pipeline Toy exit gate.
 
-The first-run Quick Start explains the queue → run → completion → payout loop, normalized Compute Units (CU), memory use/capacity/reserve, pressure recovery, current rig progression, presets, animation, pause, and bounded 1×/4×/16× simulation time. Dismissal persists; **Help / Quick start** always reopens it. Hardware purchasing remains intentionally unavailable: the Pipeline Toy improves through module choice/order, workload, compute budget, memory reserve, and Shadow evaluation until the human gate authorizes Milestone 2.
+The first-run Quick Start explains the queue → run → completion → payout loop, normalized Compute Units (CU), memory use/capacity/reserve, pressure recovery, upgrades, presets, animation, pause, and bounded 1×/4×/16× simulation time. Dismissal persists; **Help / Quick start** always reopens it.
+
+The **Upgrades** view implements a deliberately bounded kill-gate redesign: earn money from settlements, compare rig/module tradeoffs, pay once for durable ownership, then separately equip a rig or add an owned compatible module. Schema-v4 state preserves the run, purchases, equipment, and pipeline across reload/offline use and safely migrates schema-v3 state. The deterministic balance gate funds a first module by five successful starter jobs and a used rig by fifteen, including that module purchase. Researchers, longer/multiple pipelines, newer-model content, hype/fear, personal scheduling, and the rest of Milestone 2+ remain deferred.
 
 Playtest deployment target: <https://fabian20ro.github.io/goldlocks-engine/>. The GitHub Pages workflow at `.github/workflows/deploy-pages.yml` deploys `dist` after pushes to `agent/implementation` or a manual dispatch.
 
@@ -10,6 +12,9 @@ Playtest deployment target: <https://fabian20ro.github.io/goldlocks-engine/>. Th
 ./scripts/setup
 ./scripts/run       # http://127.0.0.1:4173
 ./scripts/verify    # root + Pages complete reproducible check
+
+# 20,001-seed first-module/first-rig pacing and exact-once checks
+npm run balance:upgrades
 
 # GitHub Pages package and scoped offline/worker browser check
 npm run build:pages

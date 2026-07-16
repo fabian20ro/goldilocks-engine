@@ -1,5 +1,7 @@
 import type { HardwareSpec, ModuleSpec, SlotSpec, WorkloadSpec } from "./types";
 
+export const STARTER_HARDWARE_ID = "bedroom-cpu";
+
 export const slots: readonly SlotSpec[] = [
   { id: "source", name: "Input", type: "source" },
   { id: "prepare", name: "Prepare", type: "process" },
@@ -23,6 +25,7 @@ export const modules: readonly ModuleSpec[] = [
     reliability: 0.997,
     observability: 0.65,
     costPerJob: 0,
+    purchaseCost: 0,
   },
   {
     id: "stream-intake",
@@ -38,6 +41,7 @@ export const modules: readonly ModuleSpec[] = [
     reliability: 0.976,
     observability: 0.35,
     costPerJob: 0,
+    purchaseCost: 0,
   },
   {
     id: "basic-cleaner",
@@ -53,6 +57,7 @@ export const modules: readonly ModuleSpec[] = [
     reliability: 0.991,
     observability: 0.88,
     costPerJob: 0.01,
+    purchaseCost: 0,
   },
   {
     id: "context-packer",
@@ -68,6 +73,7 @@ export const modules: readonly ModuleSpec[] = [
     reliability: 0.982,
     observability: 0.72,
     costPerJob: 0.02,
+    purchaseCost: 0,
   },
   {
     id: "full-model",
@@ -83,6 +89,7 @@ export const modules: readonly ModuleSpec[] = [
     reliability: 0.972,
     observability: 0.66,
     costPerJob: 0.08,
+    purchaseCost: 0,
   },
   {
     id: "quantized-model",
@@ -98,6 +105,7 @@ export const modules: readonly ModuleSpec[] = [
     reliability: 0.963,
     observability: 0.61,
     costPerJob: 0.04,
+    purchaseCost: 0,
   },
   {
     id: "batch-runtime",
@@ -113,6 +121,7 @@ export const modules: readonly ModuleSpec[] = [
     reliability: 0.921,
     observability: 0.42,
     costPerJob: 0.025,
+    purchaseCost: 0,
   },
   {
     id: "smoke-check",
@@ -128,6 +137,7 @@ export const modules: readonly ModuleSpec[] = [
     reliability: 0.989,
     observability: 0.57,
     costPerJob: 0.005,
+    purchaseCost: 0,
   },
   {
     id: "robust-eval",
@@ -143,6 +153,7 @@ export const modules: readonly ModuleSpec[] = [
     reliability: 0.995,
     observability: 0.94,
     costPerJob: 0.07,
+    purchaseCost: 0,
   },
   {
     id: "delivery-gate",
@@ -158,6 +169,7 @@ export const modules: readonly ModuleSpec[] = [
     reliability: 0.997,
     observability: 0.79,
     costPerJob: 0.01,
+    purchaseCost: 0,
   },
   {
     id: "fast-export",
@@ -173,8 +185,115 @@ export const modules: readonly ModuleSpec[] = [
     reliability: 0.958,
     observability: 0.31,
     costPerJob: 0,
+    purchaseCost: 0,
+  },
+  {
+    id: "precision-cleaner",
+    name: "Precision Cleaner",
+    shortName: "CLEAN+",
+    description:
+      "Stronger validation and tracing; lower throughput and higher cost.",
+    slotTypes: ["process"],
+    role: "preparation",
+    throughput: 10.5,
+    latency: 1,
+    memory: 1.3,
+    quality: 14,
+    reliability: 0.997,
+    observability: 0.97,
+    costPerJob: 0.025,
+    purchaseCost: 4,
+  },
+  {
+    id: "adaptive-context",
+    name: "Adaptive Context",
+    shortName: "CTX+",
+    description:
+      "High-quality context routing; fast on short work but memory hungry.",
+    slotTypes: ["process"],
+    role: "preparation",
+    throughput: 15,
+    latency: 1.45,
+    memory: 4,
+    quality: 17,
+    reliability: 0.976,
+    observability: 0.79,
+    costPerJob: 0.04,
+    purchaseCost: 8,
+  },
+  {
+    id: "efficient-runtime",
+    name: "Efficient Runtime",
+    shortName: "ECO-M",
+    description:
+      "Balanced model speed and quality; adds memory and operating cost.",
+    slotTypes: ["process"],
+    role: "model",
+    throughput: 13,
+    latency: 1.25,
+    memory: 3.4,
+    quality: 29,
+    reliability: 0.971,
+    observability: 0.7,
+    costPerJob: 0.065,
+    purchaseCost: 7,
+  },
+  {
+    id: "guarded-batch",
+    name: "Guarded Batch Runtime",
+    shortName: "BATCH+",
+    description:
+      "Large batches with better fault isolation; slow response and high RAM.",
+    slotTypes: ["process"],
+    role: "model",
+    throughput: 20,
+    latency: 4.9,
+    memory: 5.8,
+    quality: 23,
+    reliability: 0.958,
+    observability: 0.67,
+    costPerJob: 0.055,
+    purchaseCost: 10,
+  },
+  {
+    id: "trace-eval",
+    name: "Trace Evaluation",
+    shortName: "TRACE",
+    description:
+      "High-observability evidence; slower and costlier than a smoke check.",
+    slotTypes: ["process"],
+    role: "evaluation",
+    throughput: 8,
+    latency: 1.55,
+    memory: 1.2,
+    quality: 4,
+    reliability: 0.998,
+    observability: 0.99,
+    costPerJob: 0.05,
+    purchaseCost: 5,
+  },
+  {
+    id: "resilient-delivery",
+    name: "Resilient Delivery",
+    shortName: "SHIP+",
+    description:
+      "Near-total failure isolation; lower capacity and higher per-job cost.",
+    slotTypes: ["sink"],
+    role: "delivery",
+    throughput: 16,
+    latency: 0.35,
+    memory: 0.5,
+    quality: 0,
+    reliability: 0.999,
+    observability: 0.96,
+    costPerJob: 0.025,
+    purchaseCost: 4,
   },
 ];
+
+export const starterModuleIds: readonly string[] = modules
+  .filter((module) => module.purchaseCost === 0)
+  .map((module) => module.id);
 
 export const hardware: readonly HardwareSpec[] = [
   {
@@ -193,7 +312,7 @@ export const hardware: readonly HardwareSpec[] = [
     id: "used-gpu",
     name: "Used 12 GB GPU",
     description: "More compute; tighter power, heat, and reliability margins.",
-    purchaseCost: 560,
+    purchaseCost: 14,
     compute: 24,
     memory: 12,
     thermalLimit: 84,
@@ -205,7 +324,7 @@ export const hardware: readonly HardwareSpec[] = [
     id: "workstation-gpu",
     name: "24 GB Workstation",
     description: "Large capacity with a punishing capital and energy cost.",
-    purchaseCost: 1350,
+    purchaseCost: 40,
     compute: 46,
     memory: 24,
     thermalLimit: 112,
@@ -273,10 +392,22 @@ export function getModule(id: string): ModuleSpec {
   return found;
 }
 
+export function findModule(id: unknown): ModuleSpec | undefined {
+  return typeof id === "string"
+    ? modules.find((item) => item.id === id)
+    : undefined;
+}
+
 export function getHardware(id: string): HardwareSpec {
   const found = hardware.find((item) => item.id === id);
   if (!found) throw new Error(`Unknown hardware: ${id}`);
   return found;
+}
+
+export function findHardware(id: unknown): HardwareSpec | undefined {
+  return typeof id === "string"
+    ? hardware.find((item) => item.id === id)
+    : undefined;
 }
 
 export function getWorkload(id: string): WorkloadSpec {
@@ -285,8 +416,20 @@ export function getWorkload(id: string): WorkloadSpec {
   return found;
 }
 
+export function findWorkload(id: unknown): WorkloadSpec | undefined {
+  return typeof id === "string"
+    ? workloads.find((item) => item.id === id)
+    : undefined;
+}
+
 export function getSlot(id: string): SlotSpec {
   const found = slots.find((item) => item.id === id);
   if (!found) throw new Error(`Unknown slot: ${id}`);
   return found;
+}
+
+export function findSlot(id: unknown): SlotSpec | undefined {
+  return typeof id === "string"
+    ? slots.find((item) => item.id === id)
+    : undefined;
 }

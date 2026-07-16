@@ -37,7 +37,7 @@ if ("serviceWorker" in navigator) {
         });
       }
       const cache = await caches.open(
-        `goldilocks-shell:${baseUrl.pathname}:v4`,
+        `goldilocks-shell:${baseUrl.pathname}:v5`,
       );
       const cachedUrls = await cache.keys();
       if (!cachedUrls.length) throw new Error("Offline cache is empty");

@@ -40,7 +40,10 @@ test.describe("round 009 first-session comprehension", () => {
       "Animations control changes visuals only and does not affect heat or simulation time",
     );
     await expect(tutorial).toContainText(
-      "Hardware purchasing is a Milestone 2 feature",
+      "Open Upgrades to compare price, CU, memory, power, reliability",
+    );
+    await expect(tutorial).toContainText(
+      "Buying makes an item owned; it does not silently equip it",
     );
     await expect(tutorial).toContainText(
       "Animations is visual only and never changes simulation time",
@@ -124,7 +127,7 @@ test.describe("round 009 first-session comprehension", () => {
     await expect(loadPreset).toHaveCount(0);
   });
 
-  test("defines CU and memory accounting and keeps hardware purchases honestly locked", async ({
+  test("defines CU and memory accounting and exposes bounded hardware purchases", async ({
     page,
   }) => {
     await page.goto("/");
@@ -139,13 +142,15 @@ test.describe("round 009 first-session comprehension", () => {
     await expect(
       page.getByText(/GB is reserved, leaving .* GB usable/),
     ).toBeVisible();
-    await expect(page.getByText("HARDWARE SHOP LOCKED")).toBeVisible();
     await expect(
-      page.getByText(/Hardware purchasing belongs to Milestone 2/),
+      page.getByText(/Compare and buy alternate rigs in Upgrades/),
     ).toBeVisible();
+    await page.getByRole("button", { name: "Open upgrades" }).click();
+    await expect(page.getByRole("heading", { name: "Rigs" })).toBeVisible();
     await expect(
-      page.getByRole("button", { name: /Used 12 GB GPU|24 GB Workstation/ }),
-    ).toHaveCount(0);
+      page.getByRole("button", { name: "Buy Used 12 GB GPU for $14.00" }),
+    ).toBeDisabled();
+    await expect(page.getByText(/Need \$14\.00 more/)).toBeVisible();
   });
 
   test("gives pressure-specific memory and thermal actions without false certainty", async ({

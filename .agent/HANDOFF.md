@@ -1,64 +1,49 @@
-# Round 010 implementation handoff
+# Round 012 implementation handoff
 
 ## Implemented behavior summary
 
-Gate-limited Milestone 0 numeric prototype and Milestone 1 portrait Pipeline Toy, with round-009 first-session comprehension findings repaired after the dated informal feedback in `.agent/playtests/2026-07-16-informal.md`:
+The Milestone 0/1 Pipeline Toy now includes D-006's bounded purchasing redesign, motivated by the immutable feedback in `.agent/playtests/2026-07-16-purchase-loop.md`:
 
-- First-run Quick Start is visible without blocking the pipeline, answers every reported mechanics question with exact current rules, persists dismissal in local storage, and always reopens from the large **Help / Quick start** control. Its resource explanation now explicitly maps thermal pressure to lower compute budget or lower-CU-demand workload and states that Animations affects neither heat nor simulation time.
-- Money is now an explicit choose → queue → run → complete → payout flow. Each workload shows gross cash and reputation rewards; the UI explains per-attempt operating cost and zero gross payout on failure. Deterministic schema-v3 settlement state records latest paid/failed counts, gross payout, costs, net money change, cumulative gross earned, and cumulative costs. The event ledger records gross payout on clean completion batches.
-- Presets retain runtime validation and malformed/hostile-input safety. Each saved preset has separate labeled Load and Delete controls. Delete requires inline confirmation, persists removal, and offers one-step Undo whose restoration also persists.
-- CU is visibly defined as normalized Compute Units, not physical FLOPS. The resource strip shows allocated CU/current rig CU and memory use/full rig capacity. Jobs shows held-back reserve in GB and the smaller pipeline-usable capacity.
-- The single warning surface now combines current measured pressure with only currently reachable actions. Memory guidance states required, usable, total-capacity, and reserved GB, then conditionally offers lower reserve, a lighter compatible module, and/or a lower-memory workload. An already-zero reserve is never presented as reducible. Thermal guidance likewise checks compute-budget and workload-CU minima before recommending either action, and explicitly states that module swaps and Animations do not directly reduce heat in this toy. Reliability/evidence/order guidance avoids guaranteed or single-cause claims.
-- Player-facing hardware purchasing is removed at both UI and simulation-command boundaries. The three hardware alternatives remain Milestone 0 headless balance inputs. The active Pipeline Toy explains that the shop belongs to Milestone 2 and stays locked until the human gate; current improvement comes from compatible module choice/order, workload, compute budget, memory reserve, and Shadow evaluation.
-- The former Motion control is now **Animations on/off**, visibly labeled “Visual only.” It retains OS and in-app reduced-motion guarantees and does not alter simulation time.
-- Simulation time has separate one-handed 1×, 4×, and 16× controls. The worker receives fixed 0.5-second × selected-speed quanta; only those three speeds are reachable. Pause remains a separate Jobs control. Repeated identical speed/tick schedules produce identical valid resources, settlements, RNG state, and unique ledger identities.
-- Schema/content versions advance to 3 / `pipeline-toy-2`. Service-worker cache advances to scope-local v4 so this UI/schema release installs its new hashed assets and removes only stale caches in the same Goldilocks scope.
-- All prior deterministic numeric, throughput, queue, causal-ledger, touch drag/pan, portrait/text-scale, reduced-motion, persistence, root/Pages PWA, cache-isolation, and offline protections are retained.
+- Successful job settlements start from $0 and fund a persistent equipment economy. The deterministic default path can afford Precision Cleaner after at most four successful jobs and Used 12 GB GPU after at most fourteen, including that module purchase.
+- Schema-v4 simulation state owns the Bedroom CPU and all former starter-catalog modules. Six new paid module choices cover preparation, model, evaluation, and delivery roles. The existing three hardware profiles are visible priced choices.
+- `BUY_MODULE`, `BUY_HARDWARE`, and `EQUIP_HARDWARE` are deterministic worker commands. A successful purchase deducts exactly once and adds durable ownership. Repeated, already-owned, insufficient-funds, exact-funds, unknown/malformed, unowned-equip, and incompatible-place paths preserve nonnegative valid state and produce explicit feedback where applicable.
+- Only owned modules can be placed. Only owned rigs can be equipped. Purchases do not silently equip. Hardware and module changes capture the prior metrics and announce observed throughput, latency, memory, quality, thermal, CU, capacity, or operating-cost deltas.
+- Upgrades is a fourth portrait navigation view. Its labeled route is money → compare → cost → buy → owned → equip/add → observed delta. Rig cards expose price, CU, memory, watts/thermal limit, reliability, maintenance, and comparison with the equipped rig. Module cards expose compatibility/role, throughput, latency, memory, quality, reliability, observability, per-job cost, and comparison with the active same-role module.
+- The Build drawer now labels every card as locked, owned, or equipped. Locked cards open Upgrades. Owned cards support the retained tap/snap and real touch-drag paths. Selecting an owned module names replacement/reorder behavior and highlights only compatible slots; fixed source + three process positions + sink and the Shadow junction remain unchanged.
+- Quick Start explains the complete purchase journey and pacing while keeping later expansion content explicitly deferred. Upgrades opens directly to the store rather than remaining below the long tutorial; Help returns to Build and always reopens the tutorial.
+- Full run state persists through the Worker to local storage: money, ownership, equipped rig, active modules, workload, policies, queue/results, ledger, and metrics survive reload/resume and offline use. Safe schema-v3 states migrate; corrupt/stale/duplicate ownership falls back safely. Legacy preset-v1 records gain the Bedroom CPU while current presets include their rig.
+- Content version is `pipeline-toy-3`; schema version is 4; scope-isolated service-worker cache is v5.
+- Researchers, longer/multiple pipelines, newer-model content, creator/hype/fear systems, personal schedule, and all other Milestone 2+ systems remain absent.
 
-## Plan requirements covered
+## Plan requirements and D-006 coverage
 
-### Milestone 0 — Numeric prototype
+| Requirement                             | Implementation                                                                                                             | Committed evidence                                                                            |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Earned money and settlement loop        | Existing distinct workload payout/cost mechanics now begin at $0 and fund purchases                                        | Engine settlement tests; round-009 money case; round-012 first-purchase browser journey       |
+| Three hardware choices with constraints | Bedroom, used GPU, workstation; price/CU/memory/power/heat/reliability/maintenance tradeoffs                               | Catalog/unit tests; Upgrades rig cards; retained M0 balance; round-012 exact-funds/equip case |
+| Meaningful paid modules                 | Six paid choices with a measured benefit and a throughput/latency/memory/quality/reliability/observability/cost constraint | `upgradeBalance.test.ts`; Store comparisons; first-purchase/add browser case                  |
+| Exact-once transactional ownership      | Worker commands check catalog, ownership, funds, and compatibility before commit; double activation cannot deduct twice    | Engine/worker malformed and purchase tests; round-012 double-click exact-funds case           |
+| ≤5 / ≤15 pacing                         | Default path buys Precision Cleaner, then reaches Used GPU                                                                 | `npm run balance:upgrades`: 20,001 seeds, worst 4 and 14 successful jobs, 0 failures          |
+| Discoverable module addition            | Locked/owned/equipped labels; locked-card Store route; selected compatible highlights; tap/snap and touch-drag             | Round-012 drawer-to-store/paid tap path; retained pointer/touch drag and drawer-pan cases     |
+| Portrait/accessibility UX               | 320/393, 200% text, 44px targets, no horizontal document overflow, text states, accessible names                           | Round-012 two-width Store stress cases plus retained verifier accessibility suites            |
+| Visible observed consequences           | Equip/place captures baseline and reports concrete deltas; Inspector remains available                                     | Engine equip/place tests; round-012 observed-delta assertions                                 |
+| Persistence and migration               | Schema-v4 local run save, schema-v3 migration, preset-v1 rig default, malformed fallback                                   | Engine/worker restore tests; round-012 reload/offline/migration/corruption cases              |
+| Root/Pages PWA and cache isolation      | Root and `/goldlocks-engine/` packages; cache v5 deletes stale same-scope caches only                                      | Root offline cases; Pages 2/2 online/cache/offline/Worker cases                               |
+| Scope boundary                          | D-006 supersedes only D-005 criterion 6; plan unchanged; expansion systems absent                                          | `.agent/DECISIONS.md`, immutable playtest record, source/tree inspection                      |
 
-- Time and money; three headless hardware choices; four workloads; one competition, one product, one aggregate creator event, one aggregate research project, and three prototype outcomes.
-- Automated competition-, product-, and creator-first viability/non-dominance checks; higher hardware capacity retains capital, energy, heat, reliability, and maintenance tradeoffs.
-- Human economy-interest gate remains unproven.
+## Prior verifier findings resolved or preserved
 
-### Milestone 1 — Pipeline Toy
-
-- Constrained portrait pipeline; compatible mouse/touch drag, tap/snap, replacement/reordering, defined Shadow evaluation split/merge, queues, memory, thermal throttling, latency, throughput, reliability, failure propagation, configuration comparison, pause, and bounded resource policies.
-- First-session mechanics communication and feedback repair per D-005, without adding narrative, research characters, investors, labor, creator/hype/fear, hardware purchasing, or other Milestone 2+ content.
-- Accessibility and PWA requirements remain: 320/393 portrait, 200% text, minimum 44 CSS-pixel controls, no horizontal document overflow, screen-reader labels, reduced motion, touch drawer pan/active-slot drag, installable root/Pages packages, scoped caching, worker-backed offline reload, and failure/recovery.
-
-Milestones 2–6 remain intentionally unimplemented. The 2026-07-16 informal feedback is not the required Milestone 0 or uninterrupted 30-minute Milestone 1 gate record.
-
-## D-005 acceptance map
-
-| Accepted criterion                              | Implementation                                                           | Independent committed evidence                                                                                                                     |
-| ----------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| First-run, persisted, reopenable exact tutorial | `QuickStart`, `TUTORIAL_KEY`, Help control in `src/ui/App.tsx`           | `round-009-usability.spec.ts`: exact thermal/control/animation content, dismissal, reload persistence, Help target/reopen; frozen V-014 regression |
-| Legible earnings and payout differences         | schema-v3 `JobSettlement`/engine settlement; `MoneyLoop`; workload cards | engine settlement test; round-009 money-loop/earned-settlement browser case                                                                        |
-| Persistent preset delete + confirmation + undo  | validated preset store and delete/undo callbacks in `App.tsx`            | round-009 delete/cancel/confirm/undo/two reload outcomes; retained malformed/hostile/complete-restore cases                                        |
-| Visible CU/memory/reserve                       | resource strip, concept note, memory accounting in Jobs                  | round-009 CU/accounting case; tutorial exact-content case                                                                                          |
-| Actionable, qualified pressure guidance         | `WarningBanner` derives reachable interventions from current state       | round-009 positive/zero-reserve memory and forced thermal paths; frozen V-015 regression                                                           |
-| Honest pre-gate rig progression/no shop         | locked Rig progression panel; purchase/select worker commands removed    | round-009 locked-copy/no-purchase-control case; unit headless-hardware-alternative coverage                                                        |
-| Animation/time separation                       | header Animations visual-only control; independent time control          | round-009 animation/speed case; retained document-wide reduced-motion cases                                                                        |
-| Bounded deterministic fast-forward              | `TIME_SPEEDS = [1,4,16]`, guarded setter, fixed worker quanta            | engine identical-speed-schedule test; round-009 exact three-button/progress case                                                                   |
-| Existing mobile/accessibility/PWA constraints   | responsive CSS, pinned Playwright, scope-derived SW/cache v4             | retained 320/393, 200%, 44px, touch, root offline; Pages online/cache/offline/worker/cache-isolation suites                                        |
-
-## Verifier findings resolved/preserved
-
-- V-001 through V-013 remain resolved. Their committed regressions remain present and were adapted only where the accepted UI terminology/first-run layout changed: tests now scroll the first-run pipeline into view for pointer/touch drag, target the separate Load preset control, and use Animations on/off labels.
-- V-014 resolved: Quick Start explicitly names thermal pressure, lower compute budget, lower-CU-demand workload, and the non-effect of Animations on heat/simulation time. The verifier-authored `verifier-round-009.spec.ts` regression passes unchanged.
-- V-015 resolved: memory remediation is assembled from reachable state deltas. With reserve at 0%, the warning reports 16.7 GB required, 8 GB usable of 8 GB total, 0 GB reserved, offers lighter compatible modules/lower-memory workload, and omits reserve reduction. Positive nonzero-reserve coverage confirms the action still appears when valid. Thermal remediation received the analogous minimum/reachability audit.
-- No prior immutable verification report was edited.
-- Round-010 work repairs the round-009 D-005 findings without claiming a human-gate verdict.
+- V-001 through V-015 remain covered. No immutable report was changed.
+- The verifier-owned round-010 pressure regression retains all original assertions. Its setup now explicitly restores Quantized Model + Interactive Chat and waits for schema-v4 persistence before reload, because reload intentionally preserves the preceding Full Precision/Batch configuration instead of resetting it.
+- The Pages cache expectations advance from v4 to v5; stale-scope deletion and foreign-cache preservation assertions are unchanged.
+- The prior human blocker B-005 remains honest. The new feedback authorizes redesign and promises a later test; it does not satisfy either human gate.
 
 ## Reproducible setup, startup, and verification
 
 Requirements: Node.js 20.19+ (or 22.12+) and npm.
 
 ```sh
-# Locked dependencies + ignored repository-local Chromium
+# Locked dependencies and ignored repository-local Chromium
 ./scripts/setup
 
 # Deterministic loopback development server
@@ -66,56 +51,60 @@ Requirements: Node.js 20.19+ (or 22.12+) and npm.
 # http://127.0.0.1:4173
 
 # Canonical clean check: setup, format, lint, typecheck, unit/property,
-# balance, root/Pages builds, and both packaged browser suites
+# both balance models, root/Pages builds, and both packaged browser suites
 ./scripts/verify
+
+# Focused deterministic purchase pacing
+npm run balance:upgrades
 
 # Root packaged PWA browser acceptance
 npm run test:e2e
 
-# GitHub Pages /goldlocks-engine/ package and browser acceptance
+# GitHub Pages package and scoped browser acceptance
 npm run build:pages
 npm run test:e2e:pages
 ```
 
-Dependency cache: ignored `.cache/npm`. Browser cache: ignored `.cache/ms-playwright`. `npm run test:e2e` uses `./scripts/run-e2e`; Pages uses `./scripts/run-pages-e2e`. Both bind deterministic `127.0.0.1:4173`, wait for readiness, and let Playwright clean up the managed server. The Pages workflow defines both cache paths before `actions/setup-node` and `npm ci`.
+Dependency cache: ignored `.cache/npm`. Browser cache: ignored `.cache/ms-playwright`. `npm run test:e2e` uses `./scripts/run-e2e`; Pages uses `./scripts/run-pages-e2e`. Both bind deterministic `127.0.0.1:4173`, wait for readiness, and let Playwright clean up the managed server.
+
+The optional Playwright CLI wrapper was not used as evidence: its daemon attempted a user-home cache. All acceptance uses pinned project `@playwright/test` 1.61.1 and the repository-local browser. On this managed macOS host, direct Chromium launches can hit the known Mach-port denial; exact scoped reruns outside that sandbox boundary are the reproducible evidence path.
 
 ## Important architectural decisions
 
-- Typed UI commands enter a deterministic headless simulation in a dedicated Web Worker. Runtime numeric operations remain transactional exact no-ops when malformed/non-finite.
-- Time speed is a presentation scheduler choice over explicit fixed tick requests, not hidden multiplier state inside the engine. Determinism remains defined by seed plus ordered commands/ticks; the accepted speed set is closed and guarded.
-- Settlement facts live in versioned simulation state rather than inferred DOM deltas. This keeps money feedback deterministic, worker-backed, and independently testable.
-- Hardware profiles remain catalog/balance/metric inputs, but no purchase/select player command or shop exists before Milestone 2.
-- React/browser state remains sufficient for tutorial dismissal, presets, animation preference, and scheduler speed. No new state library or persistence database was justified.
-- Pressure guidance describes current modelled conditions and derives interventions only when the relevant state can actually decrease, preserving the plan's causal-uncertainty rule and avoiding impossible actions at reserve/compute/workload/module minima.
-- Service-worker v4 uses generated exact assets and scope-derived namespaces; activation deletes stale caches only for the same app scope.
-- Informal observations are immutable dated `.agent/playtests/` records; accepted product obligations are promoted into `.agent/DECISIONS.md`; `plan.md` remains unchanged without explicit authorization.
+- Purchasing belongs inside the deterministic simulation/Worker boundary, not React/local UI state. Money, ownership, equip, baseline capture, feedback, event IDs, and save state therefore share one ordered command stream.
+- Catalog price 0 defines starter-owned modules. Paid modules are data-driven rather than hard-coded UI products.
+- Buying and equipping are separate commands. This prevents an accidental purchase from silently changing a running pipeline and makes exact-once behavior easy to inspect.
+- Run persistence stores schema-versioned simulation state. Runtime restore validates current state before recalculation; schema-v3 migration accepts only known compatible catalog/slot data and safe numeric values. Unknown/current corrupt states restart safely.
+- The authorized redesign does not alter `plan.md`; D-006 is the scoped exception and explicitly defers the requested longer pipeline, researchers, newer-model content, and hype economy until later evidence.
+- Store UX uses textual state and explanations rather than color or screenshots as the source of truth. Browser assertions check the full journey; visual inspection supplements them.
 
 ## Known limitations and risks
 
-- Human gates remain open. The informal report lacks device, exact duration, uninterrupted 30-minute evidence, reconfiguration timestamps/count, prompting record, two complete tradeoff explanations, and a gate conclusion.
-- Browser acceptance uses pinned Chromium. Physical-device battery/thermal behavior, platform-specific screen-reader output, browsers other than Chromium, optional haptics, and audio remain unverified.
-- Presets and tutorial dismissal persist locally. Full run save/load and offline policy progression belong to Milestone 2.
-- 16× accelerates deterministic simulated time; wall-clock callback frequency can vary under browser throttling. Ordered tick results remain deterministic, but real elapsed time is not a replay input.
-- This Implementer was instructed not to push. Remote workflow/live exact-SHA deployment remains Orchestrator work after fresh verification.
+- The new human session is not yet supplied. Device, exact uninterrupted duration, reconfiguration timestamps/count, prompting, two complete explained tradeoffs, and proceed/redesign conclusions remain unknown.
+- Starter catalog alternatives remain owned to preserve the existing Pipeline Toy repertoire and every retained regression. The six new variants and two alternate rigs form the paid progression layer.
+- No selling/refunds. This is deliberate D-006 scope, not a missing transaction path.
+- The queue remains aggregate rather than workload-tagged; changing workload before resolution changes queued processing/payout basis.
+- Browser acceptance uses pinned Chromium. Physical-device battery/thermal behavior, platform-specific screen-reader output, optional haptics/audio, and non-Chromium browsers remain unverified.
+- localStorage is the bounded persistence mechanism. Storage denial leaves the current session playable but cannot provide cross-reload durability.
+- Wall-clock callback cadence can vary under browser throttling; ordered fixed tick quanta remain deterministic.
+- Implementer does not push or deploy. Exact-SHA remote publication remains Orchestrator work after fresh verification.
 
-## Checks executed
+## Checks executed before final candidate
 
-- `npm run typecheck`: PASS.
-- `npm run lint`: PASS.
-- `npm run format:check`: initial production-file formatting warning; Prettier applied, and canonical rerun PASS.
-- `npm test -- --run`: PASS, 30/30 unit/property/configuration tests with coverage thresholds.
-- `npm run test:e2e -- --grep "verifier round 009|round 009 first-session comprehension"`: initial 7/8 because a new implementer assertion expected the wrong action verb; assertion corrected to the rendered, accurate copy. Final PASS 8/8, including both unchanged verifier regressions and expanded D-005 coverage.
-- `npm run test:e2e`: PASS 28/28, root packaged PWA acceptance.
-- `npm run test:e2e:pages`: first sandboxed attempt could not launch Chromium at the known macOS Mach-port boundary; exact outside-sandbox rerun PASS 2/2, including root-scoped asset/cache/worker offline behavior and foreign-cache preservation.
-- `./scripts/verify`: sandboxed fresh run passed locked install, format, lint, typecheck, 30 unit/property/configuration tests, balance validation, and root build, then Chromium launches were denied at zero runtime by the managed macOS Mach-port sandbox. Exact full outside-sandbox rerun PASS end-to-end: fresh locked install, format, lint, typecheck, 30/30 tests with coverage thresholds, balance, build, root Playwright 28/28, and Pages Playwright 2/2.
+- `./scripts/verify`: final PASS from locked dependency installation through packaged browser acceptance. It includes formatting, lint, typecheck, 42/42 unit/property/configuration/migration/purchase tests with coverage thresholds, both balance models, the root and Pages builds, 34/34 root browser cases, and 2/2 Pages browser cases.
+- `npm run balance:upgrades`: included final PASS, 20,001/20,001 seeds; zero failures; module affordable by successful job 4 worst case; alternate rig by job 14 worst case; maximum 23 attempts to 15 successes.
+- The first canonical attempt exposed formatting in the handoff and an engine test; formatting was corrected. The next full attempt passed every non-browser check and 33/34 root browser cases, exposing a real semantic defect: a locked module was marked disabled even though its action was to navigate to Upgrades. The card is now an enabled navigation control with explicit locked/buy labeling. Focused round-012 rerun passed 5/5 before the final canonical 34/34 result.
+- Focused offline and pressure rerun after cache/persistence setup repair: PASS 3/3.
+- `npm run test:e2e:pages`: initial sandboxed Chromium launch denied at zero runtime by the known macOS Mach-port boundary; exact scoped rerun and final canonical run PASS 2/2.
+- Visual capture at 393 and 320/200% found the tutorial/store hierarchy defect; fixed by showing Quick Start only in Build and making Help reopen it there.
 
 ## Checks not run
 
-- Remote GitHub Actions deployment/live exact-SHA validation: intentionally not run; no push authorized for this role.
-- Required Milestone 0 and Milestone 1 human gate sessions: not supplied; the informal report explicitly does not qualify.
-- Physical mobile device and non-Chromium browser profiling: infrastructure not supplied.
-- Milestones 2–6 acceptance: prohibited until the Pipeline Toy gate passes.
+- GitHub Actions push/deployment/live exact-SHA validation: intentionally not run by the Implementer.
+- Required post-purchase 30-minute human playtest: user promised it after deployment; no result exists yet.
+- Physical mobile device, non-Chromium browser, battery/CPU/thermal profile, and actual assistive-technology output: infrastructure not supplied.
+- Milestones 2–6 and expansion acceptance: explicitly outside D-006.
 
-## Exact input required to clear the human gates
+## Exact remaining human gate input
 
-Provide a dated record tied to the tested candidate SHA and device(s). It must assess whether the Milestone 0 economy creates interesting decisions without narrative spectacle and include at least one uninterrupted 30-minute Milestone 1 session with voluntary pipeline reconfiguration, timestamps/count, prompting status, at least two participant-explained tradeoffs, and an explicit proceed/redesign conclusion.
+After the candidate is committed, pushed, and deployed, record the tested candidate SHA, device, date, and an uninterrupted thirty-minute session. Include voluntary reconfiguration timestamps/count, prompting status, at least two participant-explained tradeoffs involving purchases/pipeline constraints, an explicit assessment of whether the economy is interesting without narrative spectacle, and a proceed/redesign conclusion.

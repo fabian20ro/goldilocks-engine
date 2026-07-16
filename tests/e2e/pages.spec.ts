@@ -66,7 +66,7 @@ test("the GitHub Pages build loads and remains worker-backed offline", async ({
     const registration = registrations.find(
       (entry) => new URL(entry.scope).pathname === basePath,
     );
-    const cacheName = `goldilocks-shell:${basePath}:v4`;
+    const cacheName = `goldilocks-shell:${basePath}:v5`;
     const cache = await caches.open(cacheName);
 
     return {
@@ -99,7 +99,7 @@ test("the GitHub Pages build loads and remains worker-backed offline", async ({
   });
   expect(packageState.registrationScope).toBe(pagesPath);
   expect(packageState.controllerPath).toBe(`${pagesPath}sw.js`);
-  expect(packageState.cacheNames).toContain(`goldilocks-shell:${pagesPath}:v4`);
+  expect(packageState.cacheNames).toContain(`goldilocks-shell:${pagesPath}:v5`);
   expect(
     packageState.assets.some((asset) => /worker-.*\.js$/.test(asset)),
   ).toBe(true);
@@ -196,7 +196,7 @@ test("verifier round 006: scoped activation preserves foreign caches", async ({
   });
 
   expect(cacheState.controllerPath).toBe(`${pagesPath}sw.js`);
-  expect(cacheState.names).toContain(`goldilocks-shell:${pagesPath}:v4`);
+  expect(cacheState.names).toContain(`goldilocks-shell:${pagesPath}:v5`);
   expect(cacheState.names).not.toContain(`goldilocks-shell:${pagesPath}:v3`);
   expect(cacheState.names).toContain("goldilocks-shell:/other-app/:v7");
   expect(cacheState.names).toContain("third-party-test-cache");

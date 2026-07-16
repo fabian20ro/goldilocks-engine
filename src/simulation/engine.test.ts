@@ -6,6 +6,7 @@ import {
   calculateMetrics,
   createInitialState,
   isStateValid,
+  restoreSimulationState,
   tick,
 } from "./engine";
 import { normalizeSeed } from "./rng";
@@ -136,7 +137,7 @@ describe("deterministic simulation engine", () => {
     expect(state.ledger.at(-1)?.directCause).toMatch(/memory/i);
   });
 
-  it("keeps headless hardware alternatives distinct without a player shop", () => {
+  it("keeps hardware alternatives mechanically distinct before purchase", () => {
     const state = applyCommand(createInitialState(), {
       type: "SET_COMPUTE_ALLOCATION",
       percent: 25,
@@ -150,6 +151,149 @@ describe("deterministic simulation engine", () => {
     );
     expect(used.thermalPressure).toBeGreaterThan(state.metrics.thermalPressure);
     expect(getHardware("used-gpu").purchaseCost).toBeGreaterThan(0);
+  });
+
+  it("purchases modules and rigs exactly once before owned-only equip", () => {
+    const initial = createInitialState(17);
+    const lockedPlacement = applyCommand(initial, {
+      type: "PLACE_MODULE",
+      moduleId: "precision-cleaner",
+      slotId: "prepare",
+    });
+    expect(lockedPlacement.slots).toEqual(initial.slots);
+    expect(lockedPlacement.lastUpgradeNotice?.message).toMatch(/not owned/i);
+
+    const insufficient = applyCommand(initial, {
+      type: "BUY_HARDWARE",
+      hardwareId: "used-gpu",
+    });
+    expect(insufficient.resources.money).toBe(0);
+    expect(insufficient.ownedHardwareIds).toEqual(initial.ownedHardwareIds);
+
+    let state = {
+      ...initial,
+      resources: { ...initial.resources, money: 18 },
+    };
+    state = applyCommand(state, {
+      type: "BUY_MODULE",
+      moduleId: "precision-cleaner",
+    });
+    expect(state.resources.money).toBe(14);
+    expect(state.ownedModuleIds).toContain("precision-cleaner");
+    const afterFirstModulePurchase = state;
+    state = applyCommand(state, {
+      type: "BUY_MODULE",
+      moduleId: "precision-cleaner",
+    });
+    expect(state.resources.money).toBe(14);
+    expect(state.ownedModuleIds).toEqual(
+      afterFirstModulePurchase.ownedModuleIds,
+    );
+
+    state = applyCommand(state, {
+      type: "BUY_HARDWARE",
+      hardwareId: "used-gpu",
+    });
+    expect(state.resources.money).toBe(0);
+    expect(state.ownedHardwareIds).toContain("used-gpu");
+    const afterFirstRigPurchase = state;
+    state = applyCommand(state, {
+      type: "BUY_HARDWARE",
+      hardwareId: "used-gpu",
+    });
+    expect(state.resources.money).toBe(0);
+    expect(state.ownedHardwareIds).toEqual(
+      afterFirstRigPurchase.ownedHardwareIds,
+    );
+
+    const beforeEquip = state.metrics;
+    state = applyCommand(state, {
+      type: "EQUIP_HARDWARE",
+      hardwareId: "used-gpu",
+    });
+    expect(state.hardwareId).toBe("used-gpu");
+    expect(state.metrics).not.toEqual(beforeEquip);
+    expect(state.lastUpgradeNotice?.message).toMatch(/observed delta/i);
+    expect(isStateValid(state)).toBe(true);
+  });
+
+  it("rejects malformed, unknown, and incompatible equipment operations safely", () => {
+    const initial = createInitialState(81);
+    const commands = [
+      { type: "BUY_MODULE", moduleId: "missing" },
+      { type: "BUY_HARDWARE", hardwareId: "missing" },
+      { type: "EQUIP_HARDWARE", hardwareId: "used-gpu" },
+      { type: "PLACE_MODULE", moduleId: "missing", slotId: "runtime" },
+      {
+        type: "PLACE_MODULE",
+        moduleId: "request-buffer",
+        slotId: "runtime",
+      },
+    ] satisfies SimulationCommand[];
+    for (const command of commands) {
+      const next = applyCommand(initial, command);
+      expect(next.resources.money).toBe(initial.resources.money);
+      expect(next.slots).toEqual(initial.slots);
+      expect(isStateValid(next)).toBe(true);
+      expect(next.ledger.at(-1)?.kind).toBe("warning");
+    }
+  });
+
+  it("restores current ownership and migrates safe schema-v3 state", () => {
+    let current = {
+      ...createInitialState(23),
+      resources: { ...createInitialState(23).resources, money: 18 },
+    };
+    current = applyCommand(current, {
+      type: "BUY_MODULE",
+      moduleId: "precision-cleaner",
+    });
+    current = applyCommand(current, {
+      type: "BUY_HARDWARE",
+      hardwareId: "used-gpu",
+    });
+    current = applyCommand(current, {
+      type: "EQUIP_HARDWARE",
+      hardwareId: "used-gpu",
+    });
+    expect(restoreSimulationState(JSON.parse(JSON.stringify(current)))).toEqual(
+      current,
+    );
+
+    const legacy = JSON.parse(JSON.stringify(createInitialState(29))) as Record<
+      string,
+      unknown
+    >;
+    legacy.schemaVersion = 3;
+    legacy.contentVersion = "pipeline-toy-2";
+    legacy.hardwareId = "used-gpu";
+    delete legacy.ownedHardwareIds;
+    delete legacy.ownedModuleIds;
+    delete legacy.lastUpgradeNotice;
+    const migrated = restoreSimulationState(legacy);
+    expect(migrated.schemaVersion).toBe(4);
+    expect(migrated.hardwareId).toBe("used-gpu");
+    expect(migrated.ownedHardwareIds).toEqual(["bedroom-cpu", "used-gpu"]);
+    expect(migrated.ownedModuleIds).toEqual(
+      expect.arrayContaining(migrated.slots.map((slot) => slot.moduleId)),
+    );
+    expect(migrated.lastUpgradeNotice?.message).toMatch(/migrated/i);
+    expect(isStateValid(migrated)).toBe(true);
+  });
+
+  it("falls back safely for malformed or stale persisted ownership", () => {
+    const current = createInitialState(37);
+    const malformed = {
+      ...current,
+      ownedHardwareIds: ["bedroom-cpu", "bedroom-cpu"],
+      ownedModuleIds: [...current.ownedModuleIds, "missing"],
+    };
+    const restored = restoreSimulationState(malformed, 37);
+    expect(restored).toEqual(createInitialState(37));
+    expect(isStateValid(restored)).toBe(true);
+    expect(restoreSimulationState({ schemaVersion: 2 }, 37)).toEqual(
+      createInitialState(37),
+    );
   });
 
   it("exposes branch and policy tradeoffs in metrics", () => {
@@ -171,7 +315,18 @@ describe("deterministic simulation engine", () => {
   });
 
   it("identifies the active module slot that limits throughput", () => {
-    let state = { ...createInitialState(), hardwareId: "workstation-gpu" };
+    let state = {
+      ...createInitialState(),
+      resources: { ...createInitialState().resources, money: 40 },
+    };
+    state = applyCommand(state, {
+      type: "BUY_HARDWARE",
+      hardwareId: "workstation-gpu",
+    });
+    state = applyCommand(state, {
+      type: "EQUIP_HARDWARE",
+      hardwareId: "workstation-gpu",
+    });
     state = applyCommand(state, {
       type: "PLACE_MODULE",
       moduleId: "robust-eval",
@@ -388,6 +543,18 @@ describe("simulation properties", () => {
       type: fc.constant("PLACE_MODULE" as const),
       moduleId: fc.constantFrom(...modules.map((item) => item.id)),
       slotId: fc.constantFrom(...slots.map((item) => item.id)),
+    }),
+    fc.record({
+      type: fc.constant("BUY_MODULE" as const),
+      moduleId: fc.constantFrom(...modules.map((item) => item.id)),
+    }),
+    fc.record({
+      type: fc.constant("BUY_HARDWARE" as const),
+      hardwareId: fc.constantFrom("bedroom-cpu", "used-gpu", "workstation-gpu"),
+    }),
+    fc.record({
+      type: fc.constant("EQUIP_HARDWARE" as const),
+      hardwareId: fc.constantFrom("bedroom-cpu", "used-gpu", "workstation-gpu"),
     }),
     fc.record({
       type: fc.constant("QUEUE_JOBS" as const),

@@ -1,5 +1,5 @@
-export const SCHEMA_VERSION = 3;
-export const CONTENT_VERSION = "pipeline-toy-2";
+export const SCHEMA_VERSION = 4;
+export const CONTENT_VERSION = "pipeline-toy-3";
 
 export type SlotType = "source" | "process" | "sink";
 export type ModuleRole =
@@ -23,6 +23,7 @@ export interface ModuleSpec {
   reliability: number;
   observability: number;
   costPerJob: number;
+  purchaseCost: number;
 }
 
 export interface SlotSpec {
@@ -101,6 +102,11 @@ export interface JobSettlement {
   netChange: number;
 }
 
+export interface UpgradeNotice {
+  kind: EventKind;
+  message: string;
+}
+
 export interface Resources {
   money: number;
   timeHours: number;
@@ -126,6 +132,8 @@ export interface SimulationState {
   rngState: number;
   tick: number;
   hardwareId: string;
+  ownedHardwareIds: readonly string[];
+  ownedModuleIds: readonly string[];
   workloadId: string;
   slots: readonly PipelineSlotState[];
   branchEnabled: boolean;
@@ -139,6 +147,7 @@ export interface SimulationState {
   baselineLabel: string | null;
   failedModuleId: string | null;
   lastWarning: string;
+  lastUpgradeNotice: UpgradeNotice | null;
   eventSequence: number;
   ledger: readonly LedgerEvent[];
 }
@@ -151,6 +160,9 @@ export type SimulationCommand =
       fromSlotId?: string;
     }
   | { type: "SET_WORKLOAD"; workloadId: string }
+  | { type: "BUY_HARDWARE"; hardwareId: string }
+  | { type: "EQUIP_HARDWARE"; hardwareId: string }
+  | { type: "BUY_MODULE"; moduleId: string }
   | { type: "SET_COMPUTE_ALLOCATION"; percent: number }
   | { type: "SET_MEMORY_RESERVE"; percent: number }
   | { type: "TOGGLE_BRANCH" }
@@ -160,7 +172,7 @@ export type SimulationCommand =
   | { type: "RESET"; seed?: number };
 
 export type WorkerRequest =
-  | { type: "INIT"; seed?: number }
+  | { type: "INIT"; seed?: number; savedState?: unknown }
   | { type: "COMMAND"; command: SimulationCommand }
   | { type: "TICK"; seconds: number };
 

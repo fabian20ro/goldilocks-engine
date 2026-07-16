@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createInitialState } from "../simulation/engine";
+import {
+  createInitialState,
+  restoreSimulationState,
+} from "../simulation/engine";
 import type {
   SimulationCommand,
   SimulationState,
@@ -9,13 +12,39 @@ import type {
 
 export const TIME_SPEEDS = [1, 4, 16] as const;
 export type TimeSpeed = (typeof TIME_SPEEDS)[number];
+export const SAVE_KEY = "goldilocks-simulation-save-v4";
+export const LEGACY_SAVE_KEY = "goldilocks-simulation-save-v3";
 
 const isTimeSpeed = (value: number): value is TimeSpeed =>
   TIME_SPEEDS.some((speed) => speed === value);
 
+function loadSavedState(): unknown {
+  try {
+    const serialized =
+      localStorage.getItem(SAVE_KEY) ?? localStorage.getItem(LEGACY_SAVE_KEY);
+    return serialized === null
+      ? undefined
+      : (JSON.parse(serialized) as unknown);
+  } catch {
+    return undefined;
+  }
+}
+
+function persistState(state: SimulationState): void {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+    localStorage.removeItem(LEGACY_SAVE_KEY);
+  } catch {
+    // Storage failure leaves the current in-memory run operable.
+  }
+}
+
 export function useSimulation() {
+  const savedStateRef = useRef<unknown>(loadSavedState());
   const [state, setState] = useState<SimulationState>(() =>
-    createInitialState(),
+    savedStateRef.current === undefined
+      ? createInitialState()
+      : restoreSimulationState(savedStateRef.current),
   );
   const workerRef = useRef<Worker | null>(null);
   const speedRef = useRef<TimeSpeed>(1);
@@ -27,10 +56,17 @@ export function useSimulation() {
       { type: "module" },
     );
     workerRef.current = worker;
-    worker.addEventListener("message", (event: MessageEvent<WorkerResponse>) =>
-      setState(event.data.state),
+    worker.addEventListener(
+      "message",
+      (event: MessageEvent<WorkerResponse>) => {
+        setState(event.data.state);
+        persistState(event.data.state);
+      },
     );
-    worker.postMessage({ type: "INIT" } satisfies WorkerRequest);
+    worker.postMessage({
+      type: "INIT",
+      savedState: savedStateRef.current,
+    } satisfies WorkerRequest);
     const interval = window.setInterval(() => {
       worker.postMessage({
         type: "TICK",

@@ -9,6 +9,7 @@ import {
   getModule,
   getSlot,
   getWorkload,
+  hardware,
   modules,
   slots as slotSpecs,
   workloads,
@@ -21,7 +22,7 @@ import type {
 } from "../simulation/types";
 import { TIME_SPEEDS, useSimulation, type TimeSpeed } from "./useSimulation";
 
-type TabId = "build" | "jobs" | "inspect";
+type TabId = "build" | "jobs" | "upgrades" | "inspect";
 
 interface DragState {
   moduleId: string;
@@ -34,6 +35,7 @@ interface SavedPreset {
   id: string;
   name: string;
   slots: readonly PipelineSlotState[];
+  hardwareId: string;
   workloadId: string;
   branchEnabled: boolean;
   computeAllocation: number;
@@ -82,6 +84,9 @@ function loadPresets(): SavedPreset[] {
           typeof preset.name !== "string" ||
           preset.name.trim().length === 0 ||
           preset.name.length > 64 ||
+          (preset.hardwareId !== undefined &&
+            (typeof preset.hardwareId !== "string" ||
+              !hardware.some((item) => item.id === preset.hardwareId))) ||
           typeof preset.branchEnabled !== "boolean" ||
           typeof preset.computeAllocation !== "number" ||
           !Number.isFinite(preset.computeAllocation) ||
@@ -113,7 +118,11 @@ function loadPresets(): SavedPreset[] {
             module.slotTypes.includes(slot.type)
           );
         });
-        if (validSlots) ids.add(preset.id);
+        if (validSlots) {
+          ids.add(preset.id);
+          if (preset.hardwareId === undefined)
+            (preset as Record<string, unknown>).hardwareId = "bedroom-cpu";
+        }
         return validSlots;
       })
       .slice(0, 6);
@@ -228,7 +237,7 @@ function QuickStart({ onDismiss }: { onDismiss: () => void }) {
         </li>
         <li>
           <strong>
-            Read CU, memory, and pressure before changing the rig.
+            Read CU, memory, and pressure before changing equipment.
           </strong>
           <p>
             CU means normalized Compute Units: a stable comparison between rig
@@ -242,13 +251,20 @@ function QuickStart({ onDismiss }: { onDismiss: () => void }) {
           </p>
         </li>
         <li>
-          <strong>Improve this toy with configuration, not purchases.</strong>
+          <strong>Earn, compare, buy, then equip or add.</strong>
           <p>
-            Drag or tap compatible modules, keep preparation → model →
-            evaluation order, adjust compute budget or memory reserve, change
-            workload, and compare Shadow evaluation. Hardware purchasing is a
-            Milestone 2 feature and stays unavailable until the Pipeline Toy
-            human gate passes; there is no upgrade shop in this build.
+            Open Upgrades to compare price, CU, memory, power, reliability,
+            throughput, latency, quality, running cost, and compatibility.
+            Successful jobs fund purchases. Buying makes an item owned; it does
+            not silently equip it. Equip an owned rig there, or choose an owned
+            module and add it to a highlighted compatible Build slot by tap or
+            touch-drag. Every faster or stronger option adds a constraint.
+          </p>
+          <p className="tutorial-detail">
+            The cheapest module is reachable within five successful starter
+            jobs. A used rig is reachable within fifteen even after that first
+            module purchase. Researchers, longer pipelines, newer-model content,
+            and hype remain later gate decisions.
           </p>
         </li>
         <li>
@@ -269,10 +285,12 @@ function WarningBanner({
   state,
   onOpenJobs,
   onOpenBuild,
+  onOpenUpgrades,
 }: {
   state: SimulationState;
   onOpenJobs: () => void;
   onOpenBuild: () => void;
+  onOpenUpgrades: () => void;
 }) {
   const rig = getHardware(state.hardwareId);
   const workload = getWorkload(state.workloadId);
@@ -348,6 +366,9 @@ function WarningBanner({
           <button type="button" onClick={onOpenBuild}>
             Module drawer
           </button>
+          <button type="button" onClick={onOpenUpgrades}>
+            Upgrades
+          </button>
         </div>
       </div>
     </aside>
@@ -383,29 +404,42 @@ function ModuleCard({
   moduleId,
   slotId,
   selected,
+  owned = true,
+  equipped = false,
   onSelect,
   onDragStart,
+  onLocked,
 }: {
   moduleId: string;
   slotId?: string;
   selected: boolean;
+  owned?: boolean;
+  equipped?: boolean;
   onSelect: (moduleId: string, fromSlotId?: string) => void;
   onDragStart: (
     event: ReactPointerEvent,
     moduleId: string,
     fromSlotId?: string,
   ) => void;
+  onLocked?: () => void;
 }) {
   const module = getModule(moduleId);
+  const status = equipped
+    ? "EQUIPPED"
+    : owned
+      ? "OWNED · TAP/DRAG"
+      : `LOCKED · BUY $${module.purchaseCost.toFixed(2)}`;
   return (
     <button
       type="button"
-      className={`module-card ${selected ? "selected" : ""}`}
+      className={`module-card ${selected ? "selected" : ""} ${owned ? "owned" : "locked"}`}
       aria-pressed={selected}
-      aria-label={`${module.name}. ${module.description}`}
+      aria-label={`${module.name}. ${status}. ${module.description}`}
       data-module-id={module.id}
-      onClick={() => onSelect(module.id, slotId)}
-      onPointerDown={(event) => onDragStart(event, module.id, slotId)}
+      onClick={() => (owned ? onSelect(module.id, slotId) : onLocked?.())}
+      onPointerDown={(event) => {
+        if (owned) onDragStart(event, module.id, slotId);
+      }}
     >
       <span className="module-code" aria-hidden="true">
         {module.shortName}
@@ -416,6 +450,7 @@ function ModuleCard({
           {module.throughput}/m · {module.memory} GB ·{" "}
           {formatNumber(module.reliability * 100, 1)}%
         </small>
+        <span className="module-status">{status}</span>
       </span>
       <span className="drag-grip" aria-hidden="true">
         ⠿
@@ -513,6 +548,7 @@ function Pipeline({
                 <ModuleCard
                   moduleId={module.id}
                   slotId={slot.id}
+                  equipped
                   selected={
                     selected?.moduleId === module.id &&
                     selected.fromSlotId === slot.id
@@ -572,10 +608,13 @@ function Pipeline({
 }
 
 function ModuleLibrary({
+  state,
   selected,
   onSelect,
   onDragStart,
+  onOpenUpgrades,
 }: {
+  state: SimulationState;
   selected: { moduleId: string; fromSlotId?: string } | null;
   onSelect: (moduleId: string, fromSlotId?: string) => void;
   onDragStart: (
@@ -583,6 +622,7 @@ function ModuleLibrary({
     moduleId: string,
     fromSlotId?: string,
   ) => void;
+  onOpenUpgrades: () => void;
 }) {
   return (
     <section className="panel library-panel" aria-labelledby="library-title">
@@ -590,6 +630,10 @@ function ModuleLibrary({
         <div>
           <span className="eyebrow">Module drawer</span>
           <h2 id="library-title">Drag or tap, then choose a slot</h2>
+          <p className="section-note">
+            Text labels show locked, owned, and equipped state. Locked cards
+            open Upgrades; owned cards can be tapped or touch-dragged.
+          </p>
         </div>
       </div>
       <div className="module-library">
@@ -598,8 +642,11 @@ function ModuleLibrary({
             key={module.id}
             moduleId={module.id}
             selected={selected?.moduleId === module.id && !selected.fromSlotId}
+            owned={state.ownedModuleIds.includes(module.id)}
+            equipped={state.slots.some((slot) => slot.moduleId === module.id)}
             onSelect={onSelect}
             onDragStart={onDragStart}
+            onLocked={onOpenUpgrades}
           />
         ))}
       </div>
@@ -614,6 +661,7 @@ function BuildView({
   onSelect,
   onDragStart,
   onInstall,
+  onOpenUpgrades,
   reducedMotion,
 }: {
   state: SimulationState;
@@ -626,6 +674,7 @@ function BuildView({
     fromSlotId?: string,
   ) => void;
   onInstall: (slotId: string) => void;
+  onOpenUpgrades: () => void;
   reducedMotion: boolean;
 }) {
   return (
@@ -665,9 +714,11 @@ function BuildView({
         reducedMotion={reducedMotion}
       />
       <ModuleLibrary
+        state={state}
         selected={selected}
         onSelect={onSelect}
         onDragStart={onDragStart}
+        onOpenUpgrades={onOpenUpgrades}
       />
     </>
   );
@@ -727,12 +778,356 @@ function MoneyLoop({ state }: { state: SimulationState }) {
   );
 }
 
-function JobsView({
+function UpgradeFeedback({ state }: { state: SimulationState }) {
+  if (!state.lastUpgradeNotice) return null;
+  return (
+    <div
+      className={`upgrade-feedback ${state.lastUpgradeNotice.kind}`}
+      role="status"
+      aria-label="Latest upgrade action"
+    >
+      <strong>Upgrade result</strong>
+      <span>{state.lastUpgradeNotice.message}</span>
+    </div>
+  );
+}
+
+function UpgradeRoute() {
+  return (
+    <div className="upgrade-route" aria-label="Upgrade journey">
+      <span>Money</span>
+      <span aria-hidden="true">→</span>
+      <span>Compare</span>
+      <span aria-hidden="true">→</span>
+      <span>Cost</span>
+      <span aria-hidden="true">→</span>
+      <span>Buy</span>
+      <span aria-hidden="true">→</span>
+      <span>Owned</span>
+      <span aria-hidden="true">→</span>
+      <span>Equip / add</span>
+      <span aria-hidden="true">→</span>
+      <span>Observe Δ</span>
+    </div>
+  );
+}
+
+function RigUpgradeCard({
   state,
+  hardwareId,
   command,
 }: {
   state: SimulationState;
+  hardwareId: string;
   command: (command: SimulationCommand) => void;
+}) {
+  const item = getHardware(hardwareId);
+  const equipped = state.hardwareId === item.id;
+  const owned = state.ownedHardwareIds.includes(item.id);
+  const affordable = state.resources.money >= item.purchaseCost;
+  const current = getHardware(state.hardwareId);
+  const reasonId = `rig-reason-${item.id}`;
+  return (
+    <article
+      className={`upgrade-card ${equipped ? "equipped" : owned ? "owned" : "locked"}`}
+      aria-labelledby={`rig-title-${item.id}`}
+    >
+      <div className="upgrade-card-heading">
+        <div>
+          <span className="equipment-state">
+            {equipped
+              ? "EQUIPPED"
+              : owned
+                ? "OWNED"
+                : affordable
+                  ? "AFFORDABLE"
+                  : "LOCKED · INSUFFICIENT FUNDS"}
+          </span>
+          <h3 id={`rig-title-${item.id}`}>{item.name}</h3>
+        </div>
+        <strong className="upgrade-price">
+          {item.purchaseCost === 0
+            ? "STARTER"
+            : `$${item.purchaseCost.toFixed(2)}`}
+        </strong>
+      </div>
+      <p>{item.description}</p>
+      <dl className="stat-grid">
+        <div>
+          <dt>Compute</dt>
+          <dd>{item.compute} CU</dd>
+        </div>
+        <div>
+          <dt>Memory</dt>
+          <dd>{item.memory} GB</dd>
+        </div>
+        <div>
+          <dt>Power / heat</dt>
+          <dd>
+            {item.watts} W · {item.thermalLimit} limit
+          </dd>
+        </div>
+        <div>
+          <dt>Reliability</dt>
+          <dd>{formatNumber(item.reliability * 100, 1)}%</dd>
+        </div>
+        <div>
+          <dt>Maintenance</dt>
+          <dd>${item.maintenance.toFixed(2)}</dd>
+        </div>
+        <div>
+          <dt>Versus equipped</dt>
+          <dd>
+            {item.compute - current.compute >= 0 ? "+" : ""}
+            {item.compute - current.compute} CU ·{" "}
+            {item.memory - current.memory >= 0 ? "+" : ""}
+            {item.memory - current.memory} GB ·{" "}
+            {item.watts - current.watts >= 0 ? "+" : ""}
+            {item.watts - current.watts} W
+          </dd>
+        </div>
+      </dl>
+      {!owned ? (
+        <button
+          type="button"
+          className="purchase-action"
+          disabled={!affordable}
+          aria-describedby={reasonId}
+          onClick={() => command({ type: "BUY_HARDWARE", hardwareId: item.id })}
+        >
+          Buy {item.name} for ${item.purchaseCost.toFixed(2)}
+        </button>
+      ) : equipped ? (
+        <button type="button" className="owned-action" disabled>
+          Equipped now
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="equip-action"
+          onClick={() =>
+            command({ type: "EQUIP_HARDWARE", hardwareId: item.id })
+          }
+        >
+          Equip {item.name}
+        </button>
+      )}
+      <p id={reasonId} className="purchase-reason">
+        {owned
+          ? equipped
+            ? "Its CU, memory, power, reliability, and running cost are active."
+            : "Owned permanently for this run; equipping does not charge again."
+          : affordable
+            ? "Affordable now. Buying creates ownership; equipping is a separate choice."
+            : `Need $${(item.purchaseCost - state.resources.money).toFixed(2)} more. Queue successful jobs; no partial or duplicate deduction occurs.`}
+      </p>
+    </article>
+  );
+}
+
+function ModuleUpgradeCard({
+  state,
+  moduleId,
+  command,
+  onChoose,
+}: {
+  state: SimulationState;
+  moduleId: string;
+  command: (command: SimulationCommand) => void;
+  onChoose: (moduleId: string) => void;
+}) {
+  const item = getModule(moduleId);
+  const owned = state.ownedModuleIds.includes(item.id);
+  const equipped = state.slots.some((slot) => slot.moduleId === item.id);
+  const affordable = state.resources.money >= item.purchaseCost;
+  const comparison = state.slots
+    .map((slot) => getModule(slot.moduleId))
+    .find((candidate) => candidate.role === item.role);
+  const reasonId = `module-reason-${item.id}`;
+  return (
+    <article
+      className={`upgrade-card ${equipped ? "equipped" : owned ? "owned" : "locked"}`}
+      aria-labelledby={`module-title-${item.id}`}
+    >
+      <div className="upgrade-card-heading">
+        <div>
+          <span className="equipment-state">
+            {equipped
+              ? "EQUIPPED"
+              : owned
+                ? "OWNED"
+                : affordable
+                  ? "AFFORDABLE"
+                  : "LOCKED · INSUFFICIENT FUNDS"}
+          </span>
+          <h3 id={`module-title-${item.id}`}>{item.name}</h3>
+        </div>
+        <strong className="upgrade-price">
+          ${item.purchaseCost.toFixed(2)}
+        </strong>
+      </div>
+      <p>{item.description}</p>
+      <dl className="stat-grid module-stats">
+        <div>
+          <dt>Compatibility</dt>
+          <dd>
+            {item.role} · {item.slotTypes.join("/")}
+          </dd>
+        </div>
+        <div>
+          <dt>Throughput</dt>
+          <dd>{item.throughput}/m</dd>
+        </div>
+        <div>
+          <dt>Latency</dt>
+          <dd>{item.latency}s</dd>
+        </div>
+        <div>
+          <dt>Memory</dt>
+          <dd>{item.memory} GB</dd>
+        </div>
+        <div>
+          <dt>Quality</dt>
+          <dd>+{item.quality}</dd>
+        </div>
+        <div>
+          <dt>Reliability</dt>
+          <dd>{formatNumber(item.reliability * 100, 1)}%</dd>
+        </div>
+        <div>
+          <dt>Observability</dt>
+          <dd>{formatNumber(item.observability * 100)}%</dd>
+        </div>
+        <div>
+          <dt>Operating cost</dt>
+          <dd>${item.costPerJob.toFixed(3)}/job</dd>
+        </div>
+      </dl>
+      {comparison ? (
+        <p className="comparison-copy">
+          Versus equipped {comparison.name}:{" "}
+          {item.throughput - comparison.throughput >= 0 ? "+" : ""}
+          {formatNumber(item.throughput - comparison.throughput, 1)}/m
+          throughput · {item.memory - comparison.memory >= 0 ? "+" : ""}
+          {formatNumber(item.memory - comparison.memory, 1)} GB ·{" "}
+          {item.quality - comparison.quality >= 0 ? "+" : ""}
+          {item.quality - comparison.quality} quality ·{" "}
+          {item.costPerJob - comparison.costPerJob >= 0 ? "+" : ""}$
+          {formatNumber(item.costPerJob - comparison.costPerJob, 3)}/job.
+        </p>
+      ) : null}
+      {!owned ? (
+        <button
+          type="button"
+          className="purchase-action"
+          disabled={!affordable}
+          aria-describedby={reasonId}
+          onClick={() => command({ type: "BUY_MODULE", moduleId: item.id })}
+        >
+          Buy {item.name} for ${item.purchaseCost.toFixed(2)}
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="equip-action"
+          onClick={() => onChoose(item.id)}
+        >
+          {equipped
+            ? `Reposition ${item.name} in Build`
+            : `Add ${item.name} in Build`}
+        </button>
+      )}
+      <p id={reasonId} className="purchase-reason">
+        {owned
+          ? "Owned permanently for this run. Choose it, then Build highlights compatible replacement/reorder targets."
+          : affordable
+            ? "Affordable now. Buy once, then add it from Build."
+            : `Need $${(item.purchaseCost - state.resources.money).toFixed(2)} more. Its cost and tradeoffs remain visible while locked.`}
+      </p>
+    </article>
+  );
+}
+
+function UpgradesView({
+  state,
+  command,
+  onChooseModule,
+}: {
+  state: SimulationState;
+  command: (command: SimulationCommand) => void;
+  onChooseModule: (moduleId: string) => void;
+}) {
+  return (
+    <>
+      <section className="panel store-intro" aria-labelledby="upgrades-title">
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">Persistent equipment economy</span>
+            <h2 id="upgrades-title">Upgrades</h2>
+          </div>
+          <strong className="store-money">
+            ${state.resources.money.toFixed(2)} available
+          </strong>
+        </div>
+        <UpgradeRoute />
+        <p>
+          Successful settlements fund equipment. Prices deduct exactly once;
+          ownership survives reload and offline play. Compare the equipped item
+          before buying: every option trades capability for power, memory,
+          latency, reliability, observability, or operating cost.
+        </p>
+      </section>
+      <section className="panel" aria-labelledby="rig-store-title">
+        <div className="section-heading compact">
+          <div>
+            <span className="eyebrow">Capacity with consequences</span>
+            <h2 id="rig-store-title">Rigs</h2>
+          </div>
+        </div>
+        <div className="upgrade-list">
+          {hardware.map((item) => (
+            <RigUpgradeCard
+              key={item.id}
+              state={state}
+              hardwareId={item.id}
+              command={command}
+            />
+          ))}
+        </div>
+      </section>
+      <section className="panel" aria-labelledby="module-store-title">
+        <div className="section-heading compact">
+          <div>
+            <span className="eyebrow">Pipeline tradeoffs</span>
+            <h2 id="module-store-title">Module upgrades</h2>
+          </div>
+        </div>
+        <div className="upgrade-list">
+          {modules
+            .filter((item) => item.purchaseCost > 0)
+            .map((item) => (
+              <ModuleUpgradeCard
+                key={item.id}
+                state={state}
+                moduleId={item.id}
+                command={command}
+                onChoose={onChooseModule}
+              />
+            ))}
+        </div>
+      </section>
+    </>
+  );
+}
+
+function JobsView({
+  state,
+  command,
+  onOpenUpgrades,
+}: {
+  state: SimulationState;
+  command: (command: SimulationCommand) => void;
+  onOpenUpgrades: () => void;
 }) {
   return (
     <>
@@ -868,12 +1263,12 @@ function JobsView({
       <section className="panel" aria-labelledby="hardware-title">
         <div className="section-heading compact">
           <div>
-            <span className="eyebrow">Current milestone boundary</span>
-            <h2 id="hardware-title">Rig progression</h2>
+            <span className="eyebrow">Equipped capacity</span>
+            <h2 id="hardware-title">Current rig</h2>
           </div>
         </div>
-        <div className="locked-rig">
-          <span className="lock-badge">HARDWARE SHOP LOCKED</span>
+        <div className="current-rig">
+          <span className="equipment-state">EQUIPPED</span>
           <strong>{getHardware(state.hardwareId).name}</strong>
           <p>
             {getHardware(state.hardwareId).compute} normalized CU ·{" "}
@@ -881,12 +1276,17 @@ function JobsView({
             {getHardware(state.hardwareId).watts} W modelled draw.
           </p>
           <p>
-            Hardware purchasing belongs to Milestone 2 and remains unavailable
-            until the Pipeline Toy human gate passes. Improve the current toy
-            now through compatible module choice, preparation → model →
-            evaluation order, compute budget, memory reserve, workload, and
-            Shadow evaluation policy.
+            Compare and buy alternate rigs in Upgrades. Higher CU and memory
+            also change power, heat, reliability, maintenance, and per-attempt
+            cost; purchases do not automatically equip.
           </p>
+          <button
+            type="button"
+            className="equip-action"
+            onClick={onOpenUpgrades}
+          >
+            Open upgrades
+          </button>
         </div>
       </section>
     </>
@@ -1212,6 +1612,10 @@ export function App() {
   );
 
   const onSelect = (moduleId: string, fromSlotId?: string) => {
+    if (!state.ownedModuleIds.includes(moduleId)) {
+      setTab("upgrades");
+      return;
+    }
     setSelected((current) =>
       current?.moduleId === moduleId && current.fromSlotId === fromSlotId
         ? null
@@ -1236,6 +1640,7 @@ export function App() {
     fromSlotId?: string,
   ) => {
     if (event.pointerType === "mouse" && event.button !== 0) return;
+    if (!state.ownedModuleIds.includes(moduleId)) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     setDrag({ moduleId, fromSlotId, x: event.clientX, y: event.clientY });
   };
@@ -1267,6 +1672,7 @@ export function App() {
       id: `${Date.now()}`,
       name: `Preset ${presets.length + 1}`,
       slots: state.slots,
+      hardwareId: state.hardwareId,
       workloadId: state.workloadId,
       branchEnabled: state.branchEnabled,
       computeAllocation: state.computeAllocation,
@@ -1325,6 +1731,7 @@ export function App() {
   };
 
   const loadPreset = (preset: SavedPreset) => {
+    command({ type: "EQUIP_HARDWARE", hardwareId: preset.hardwareId });
     for (const slot of preset.slots)
       command({
         type: "PLACE_MODULE",
@@ -1362,9 +1769,12 @@ export function App() {
             <button
               type="button"
               className="help-toggle"
-              aria-expanded={showTutorial}
+              aria-expanded={showTutorial && tab === "build"}
               aria-controls="quick-start-title"
-              onClick={() => setShowTutorial(true)}
+              onClick={() => {
+                setShowTutorial(true);
+                setTab("build");
+              }}
             >
               Help / Quick start
             </button>
@@ -1386,15 +1796,22 @@ export function App() {
       </header>
 
       <main id="main-content" className="main-content">
-        {showTutorial ? <QuickStart onDismiss={dismissTutorial} /> : null}
+        {showTutorial && tab === "build" ? (
+          <QuickStart onDismiss={dismissTutorial} />
+        ) : null}
         <WarningBanner
           state={state}
           onOpenJobs={() => setTab("jobs")}
           onOpenBuild={() => setTab("build")}
+          onOpenUpgrades={() => setTab("upgrades")}
         />
+        <UpgradeFeedback state={state} />
         {selectedName ? (
           <div className="selection-banner" role="status">
-            <span>{selectedName} selected</span>
+            <span>
+              {selectedName} selected · compatible slots are highlighted; tap
+              Snap here or drag to replace/reorder.
+            </span>
             <button type="button" onClick={() => setSelected(null)}>
               Cancel
             </button>
@@ -1409,10 +1826,24 @@ export function App() {
             onSelect={onSelect}
             onDragStart={onDragStart}
             onInstall={onInstall}
+            onOpenUpgrades={() => setTab("upgrades")}
             reducedMotion={reducedMotion}
           />
         ) : tab === "jobs" ? (
-          <JobsView state={state} command={command} />
+          <JobsView
+            state={state}
+            command={command}
+            onOpenUpgrades={() => setTab("upgrades")}
+          />
+        ) : tab === "upgrades" ? (
+          <UpgradesView
+            state={state}
+            command={command}
+            onChooseModule={(moduleId) => {
+              setSelected({ moduleId });
+              setTab("build");
+            }}
+          />
         ) : (
           <InspectView
             state={state}
@@ -1435,6 +1866,7 @@ export function App() {
           [
             ["build", "⌁", "Build"],
             ["jobs", "▤", "Jobs"],
+            ["upgrades", "⬡", "Upgrades"],
             ["inspect", "⌕", "Inspect"],
           ] as const
         ).map(([id, icon, label]) => (

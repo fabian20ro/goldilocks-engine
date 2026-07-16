@@ -508,6 +508,14 @@ h2 {
   padding-bottom: 0.7rem;
 }
 
+.section-note {
+  max-width: 28rem;
+  margin-top: 0.3rem;
+  color: var(--muted);
+  font-size: 0.62rem;
+  line-height: 1.45;
+}
+
 .status-chip,
 .counter {
   flex: 0 0 auto;
@@ -619,6 +627,19 @@ h2 {
   background: linear-gradient(135deg, #1d2e20, #142019);
 }
 
+.module-card.locked {
+  border-style: dashed;
+  background: #111713;
+  color: #b5c0b9;
+  cursor: pointer;
+}
+
+.module-card.locked .module-code {
+  border-color: #705f3c;
+  background: #241f14;
+  color: #e7c784;
+}
+
 .module-code {
   display: grid;
   flex: 0 0 3.3rem;
@@ -655,6 +676,21 @@ h2 {
   font-size: 0.58rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.module-copy .module-status {
+  overflow: hidden;
+  color: var(--acid);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.52rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.module-card.locked .module-status {
+  color: #e7c784;
 }
 
 .drag-grip {
@@ -1009,31 +1045,222 @@ h2 {
   border-bottom: 0;
 }
 
-.locked-rig {
+.current-rig {
   display: grid;
   gap: 0.48rem;
   padding: 0.85rem;
 }
 
-.locked-rig > strong {
+.current-rig > strong {
   color: #e6eee8;
   font-size: 0.82rem;
 }
 
-.locked-rig p {
+.current-rig p {
   color: var(--muted);
   font-size: 0.68rem;
   line-height: 1.5;
 }
 
-.lock-badge {
+.equipment-state {
   width: fit-content;
   padding: 0.25rem 0.42rem;
-  border: 1px solid #745f3b;
+  border: 1px solid var(--acid-dim);
   border-radius: 0.3rem;
-  color: #e7c784;
+  color: var(--acid);
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.58rem;
+  font-weight: 700;
+}
+
+.upgrade-feedback {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.72rem 0.8rem;
+  border: 1px solid #4c6656;
+  border-radius: 0.55rem;
+  background: #142019;
+  color: #c7d8cd;
+  font-size: 0.67rem;
+  line-height: 1.45;
+}
+
+.upgrade-feedback strong {
+  color: var(--acid);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.upgrade-feedback.warning,
+.upgrade-feedback.failure {
+  border-color: #76512d;
+  background: #2c2115;
+}
+
+.upgrade-feedback.warning strong,
+.upgrade-feedback.failure strong {
+  color: #ffd18c;
+}
+
+.store-intro > p {
+  padding: 0.75rem 0.8rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+
+.store-money {
+  color: var(--acid);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.7rem;
+  text-align: right;
+}
+
+.upgrade-route {
+  display: flex;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.65rem 0.8rem;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line);
+  color: var(--acid);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.57rem;
+  white-space: nowrap;
+  scrollbar-width: thin;
+}
+
+.upgrade-list {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.75rem;
+}
+
+.upgrade-card {
+  display: grid;
+  min-width: 0;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.52rem;
+  background: #0d1511;
+}
+
+.upgrade-card.owned {
+  border-color: #47613e;
+}
+
+.upgrade-card.equipped {
+  border-color: var(--acid-dim);
+  background: #142019;
+}
+
+.upgrade-card.locked .equipment-state {
+  border-color: #745f3b;
+  color: #e7c784;
+}
+
+.upgrade-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.upgrade-card-heading > div {
+  display: grid;
+  min-width: 0;
+  gap: 0.35rem;
+}
+
+.upgrade-card h3 {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.3;
+}
+
+.upgrade-card > p,
+.comparison-copy,
+.purchase-reason {
+  color: var(--muted);
+  font-size: 0.64rem;
+  line-height: 1.5;
+}
+
+.upgrade-price {
+  flex: 0 0 auto;
+  color: var(--acid);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.72rem;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 0.42rem;
+  background: var(--line);
+}
+
+.stat-grid > div {
+  display: grid;
+  min-width: 0;
+  gap: 0.18rem;
+  padding: 0.5rem;
+  background: #101914;
+}
+
+.stat-grid dt {
+  color: var(--muted);
+  font-size: 0.53rem;
+  text-transform: uppercase;
+}
+
+.stat-grid dd {
+  overflow-wrap: anywhere;
+  color: #d9e3dc;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.6rem;
+  line-height: 1.4;
+}
+
+.purchase-action,
+.equip-action,
+.owned-action {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--acid-dim);
+  border-radius: 0.44rem;
+  background: #263b1c;
+  color: var(--acid);
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.purchase-action:disabled,
+.owned-action:disabled {
+  border-color: #574a32;
+  background: #1d1912;
+  color: #b6a57e;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.upgrade-card.equipped .owned-action:disabled {
+  border-color: var(--acid-dim);
+  background: #1b2918;
+  color: var(--acid);
+}
+
+.purchase-reason {
+  padding-top: 0.1rem;
+  border: 0;
 }
 
 .preset-list {
@@ -1261,7 +1488,7 @@ h2 {
   bottom: 0;
   left: max(0px, calc((100vw - 31rem) / 2));
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   padding: 0.4rem max(0.4rem, env(safe-area-inset-right))
     max(0.4rem, env(safe-area-inset-bottom))
     max(0.4rem, env(safe-area-inset-left));
@@ -1534,7 +1761,11 @@ h2 {
   }
 
   .bottom-nav {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .stat-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .bottom-nav button {
