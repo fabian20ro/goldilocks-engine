@@ -332,7 +332,9 @@ function QuickStart({ onDismiss }: { onDismiss: () => void }) {
 
 function WarningBanner({ state }: { state: SimulationState }) {
   const rig = getHardware(state.hardwareId);
-  const workload = getWorkload(state.workloadId);
+  const workload = getWorkload(
+    state.jobs.activeTask?.workloadId ?? state.workloadId,
+  );
   const reserveGb = rig.memory - state.metrics.memoryAvailable;
   const canLowerReserve = state.memoryReserve > 0;
   const canUseLighterModule = state.slots.some((slotState) => {
@@ -379,6 +381,9 @@ function WarningBanner({ state }: { state: SimulationState }) {
       actionSentence(actions) ||
       "Compute budget and workload CU demand are already at their current minima; no current policy can reduce estimated heat further.";
     guidance = `Estimated thermal load is ${formatNumber(state.metrics.thermalLoad, 1)} against a ${rig.thermalLimit} limit. ${availableActions} Module swaps mainly change memory, throughput, quality, and reliability in this toy—not heat directly. The Animations control changes visuals only; it does not affect heat or simulation time. Throttling is predicted, not a certain hardware fault.`;
+  } else if (state.metrics.orderWarnings.includes("no model stage")) {
+    guidance =
+      "Add an owned model module to an empty compatible process position, or move one back into the active graph. A pipeline without a model cannot produce an answer: accepted tasks fail and pay $0 gross.";
   } else if (state.metrics.orderWarnings.length > 0) {
     guidance =
       "Put preparation before model and evaluation after model. Reordering changes throughput, quality, and reliability together; compare the baseline instead of assuming every delta has one cause.";
@@ -809,7 +814,11 @@ function BuildView({
 function MoneyLoop({ state }: { state: SimulationState }) {
   const workload = getWorkload(state.workloadId);
   const quote = getWorkloadQuote(state, workload.id);
-  const estimatedNet = quote.grossQuote - state.metrics.operatingCost;
+  const offerMetrics = calculateMetrics({
+    ...state,
+    workloadId: workload.id,
+  });
+  const estimatedNet = quote.grossQuote - offerMetrics.operatingCost;
   const settlement = state.lastSettlement;
   const netClass = settlement && settlement.netChange < 0 ? "bad" : "good";
   return (
@@ -831,7 +840,7 @@ function MoneyLoop({ state }: { state: SimulationState }) {
           <h3 id="money-loop-title">{workload.name}</h3>
           <p>
             ${quote.grossQuote.toFixed(2)} gross if accepted now · $
-            {formatNumber(state.metrics.operatingCost, 3)} estimated operating
+            {formatNumber(offerMetrics.operatingCost, 3)} estimated operating
             cost · {estimatedNet >= 0 ? "+" : "−"}$
             {Math.abs(estimatedNet).toFixed(2)} estimated net. Demand{" "}
             {quote.demandPercent}% · {quote.trend}. Failed jobs receive $0

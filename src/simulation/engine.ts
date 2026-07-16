@@ -214,14 +214,17 @@ export function calculateMetrics(
     (product, item) => product * item.reliability,
     1,
   );
-  const reliability = clamp(
-    moduleReliability *
-      selectedHardware.reliability *
-      orderFactor *
-      (memoryPressure > 1 ? 1 / memoryPressure : 1),
-    0.01,
-    0.999,
-  );
+  const hasModelStage = selectedModules.some((item) => item.role === "model");
+  const reliability = hasModelStage
+    ? clamp(
+        moduleReliability *
+          selectedHardware.reliability *
+          orderFactor *
+          (memoryPressure > 1 ? 1 / memoryPressure : 1),
+        0.01,
+        0.999,
+      )
+    : 0;
   const observability = clamp(
     selectedModules.reduce((total, item) => total + item.observability, 0) /
       selectedModules.length +
@@ -319,7 +322,10 @@ function withUpgradeNotice(
 }
 
 function recalculate(state: SimulationState): SimulationState {
-  const metrics = calculateMetrics(state);
+  const metrics = calculateMetrics({
+    ...state,
+    workloadId: state.jobs.activeTask?.workloadId ?? state.workloadId,
+  });
   let lastWarning = "System operating inside predicted limits.";
   if (metrics.memoryPressure > 1)
     lastWarning = "Memory limit exceeded — failures will propagate.";
@@ -349,12 +355,21 @@ function demandFor(
 }
 
 export function getWorkloadQuote(
-  state: Pick<SimulationState, "workloadDemand">,
+  state: Pick<SimulationState, "jobs" | "workloadDemand">,
   workloadId: string,
-  pendingReservations = 0,
+  additionalReservations = 0,
 ): WorkloadQuote {
   const workload = getWorkload(workloadId);
   const demand = demandFor(state, workloadId);
+  const acceptedReservations = [
+    ...(state.jobs.activeTask ? [state.jobs.activeTask] : []),
+    ...state.jobs.waitingTasks,
+  ].filter((task) => task.workloadId === workloadId).length;
+  const pendingReservations =
+    acceptedReservations +
+    (isFiniteNumber(additionalReservations)
+      ? Math.max(0, Math.trunc(additionalReservations))
+      : 0);
   const reservationPressure =
     Math.max(0, Math.trunc(pendingReservations)) *
     workload.saturationPerSuccess *
@@ -915,20 +930,13 @@ function applyValidCommand(
       const requested = clamp(Math.trunc(command.count), 1, 50);
       const count = Math.min(requested, MAX_QUEUED_TASKS - state.jobs.queued);
       if (count <= 0) return state;
-      const pendingSameWorkload = [
-        ...(state.jobs.activeTask ? [state.jobs.activeTask] : []),
-        ...state.jobs.waitingTasks,
-      ].filter((task) => task.workloadId === state.workloadId).length;
       const tasks: QueuedTask[] = Array.from({ length: count }, (_, index) => {
         const sequence = state.jobs.nextTaskSequence + index;
         return {
           id: `task-${state.tick}-${sequence}`,
           workloadId: state.workloadId,
-          lockedGrossQuote: getWorkloadQuote(
-            state,
-            state.workloadId,
-            pendingSameWorkload + index,
-          ).grossQuote,
+          lockedGrossQuote: getWorkloadQuote(state, state.workloadId, index)
+            .grossQuote,
           acceptedAtTick: state.tick,
           progress: 0,
         };
@@ -1113,7 +1121,9 @@ function advanceTickQuantum(
   const moneyBeforeSettlement = next.resources.money;
   const sample = nextRandom(next.rngState);
   const memoryFailure = taskMetrics.memoryPressure > 1;
-  const failed = memoryFailure || sample.value > taskMetrics.reliability;
+  const missingModel = taskMetrics.orderWarnings.includes("no model stage");
+  const failed =
+    memoryFailure || missingModel || sample.value > taskMetrics.reliability;
   const grossPayout = failed ? 0 : task.lockedGrossQuote;
   const modelledCost = taskMetrics.operatingCost;
   const operatingCost = round(
@@ -1194,12 +1204,16 @@ function advanceTickQuantum(
   } else {
     next = appendEvent(next, {
       kind: "failure",
-      message: memoryFailure
-        ? `${workload.name} task ${task.id} failed before delivery: memory capacity exceeded. Locked quote paid $0 gross.`
-        : `${workload.name} task ${task.id} produced unstable output and was rejected. Locked quote paid $0 gross.`,
-      directCause: memoryFailure
-        ? "Required memory exceeded available memory."
-        : "A processor emitted malformed output.",
+      message: missingModel
+        ? `${workload.name} task ${task.id} failed before delivery: no model stage produced an answer. Locked quote paid $0 gross.`
+        : memoryFailure
+          ? `${workload.name} task ${task.id} failed before delivery: memory capacity exceeded. Locked quote paid $0 gross.`
+          : `${workload.name} task ${task.id} produced unstable output and was rejected. Locked quote paid $0 gross.`,
+      directCause: missingModel
+        ? "The active pipeline had no model stage."
+        : memoryFailure
+          ? "Required memory exceeded available memory."
+          : "A processor emitted malformed output.",
       contributingCondition:
         taskMetrics.observability < 0.6
           ? "Low observability delayed isolation."

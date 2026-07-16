@@ -1,4 +1,4 @@
-# Round 015 implementation handoff
+# Round 016 implementation handoff
 
 ## Implemented behavior summary
 
@@ -9,7 +9,9 @@ The bounded Workstation Expansion I / per-task demand slice authorized in D-007 
 - Pipeline topology, empty positions, active expansion, module placement, hardware, policies, and workload persist through schema-5 saves, offline reload, and presets. Presets retain honest starter/expanded topology.
 - Eight workload cards are visible from the start. Four are initially unlocked; four show exact job/reputation/equipment requirements and unlock in order without a second currency.
 - Accepted work is a per-task FIFO queue. Each task receives an immutable ID, workload, queue-time gross quote, and progress. Changing the selected workload affects new tasks only. Completion shows locked gross, actual configuration cost, and net; failed work receives no gross payout.
-- Each workload has deterministic demand saturation, minimum quote, and simulated-time recovery. Pending reservations reduce later quotes. Repeated single-workload farming eventually has nonpositive expected margin, while rotation retains a profitable path. Idle time never creates money.
+- Each workload has deterministic demand saturation, minimum quote, and simulated-time recovery. The live quote always includes all active/waiting same-workload reservations and is the exact quote the next accepted task locks; batch items add their own sequential reservation pressure.
+- Repeated single-workload farming eventually has nonpositive expected margin for every valid graph: a pipeline without a model has zero delivery reliability and always fails for $0 gross, while every productive graph's quote floor is below its unavoidable model/maintenance cost. Rotation retains a profitable path. Idle time never creates money.
+- Current warning, pressure, bottleneck, and queue-stage feedback follow the active task's workload. Selecting a future workload changes only its quote and estimated offer information until it becomes active.
 - Waiting tasks can be cleared only after confirmation. The active task, its progress/identity/quote, money, demand, reputation, RNG, and settled history remain unchanged.
 - Fixed 1×/4×/16×/64× controls advance the same 0.5-second simulation quanta. Animation and pause remain separate.
 - Global page changes use only the four bottom tabs. Warning and module copy point to those tabs rather than duplicating page-opening actions. Rig/module detail is progressively disclosed.
@@ -20,24 +22,28 @@ The source feedback is preserved in `.agent/playtests/2026-07-16-progression-exp
 
 ## Plan requirements covered
 
-| Requirement                         | Implementation                                                                                                    | Evidence                                                                       |
-| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Expansion purchase and topology     | Exact-once $45 purchase; explicit activation; 3→6 process positions; new slots empty; no module duplication       | Engine command tests; round-015 browser purchase/topology case                 |
-| Honest pipeline composition         | Nullable process modules; empty/bypass behavior; owned compatible movement; added-stage scroll cue                | Engine invariants/property tests; round-015 placement and 320/393 visual cases |
-| Per-task FIFO identity              | Immutable task ID/workload/locked quote/progress; active + waiting UI; selected workload applies only to new work | Engine queue/settlement tests; round-015 task-market case                      |
-| Clear waiting only                  | Confirmation; active task preserved; no payout/refund/demand/RNG mutation                                         | Engine exact-state assertions; round-015 browser case                          |
-| Demand economy                      | Saturation, pending reservation pressure, quote floor, simulated-time recovery, trend/reason copy                 | Engine demand tests; progression balance gate; Jobs UI                         |
-| Eight staged workloads              | Four initial plus four requirement-locked cards; deterministic ordered unlocks                                    | Catalog/engine unlock tests; eight-card browser assertion                      |
-| Progression bounds                  | First module ≤5 successes; alternate rig ≤15; expansion 8–16h; full catalogue 24–72h                              | Upgrade balance and 41-seed progression balance                                |
-| No dominant farming / no idle money | Single-workload expected margin eventually ≤0; rotation profitable; idle ticks do not pay                         | Progression unit and deterministic sweep                                       |
-| Fixed fast-forward                  | 1×/4×/16×/64× use identical fixed quanta and preserve settlements/resources/ledger identities                     | Schedule-equivalence engine test; browser controls                             |
-| Portrait/accessibility              | 320/393 CSS px, 200% text, ≥44px visible buttons, no document overflow, reduced motion, touch/pointer placement   | Root browser suite, retained verifier cases, headed visual inspection          |
-| Bottom-tab routing / disclosure     | No duplicate global page-opening CTAs; upgrade details use native disclosure                                      | Browser assertions and source inspection                                       |
-| Persistence/migration/offline       | Schema-5 integrity; schema-3/4 migration; expanded preset/save/offline resume; cache v7                           | Unit migration tests; root and Pages browser suites                            |
+| Requirement                         | Implementation                                                                                                     | Evidence                                                                       |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| Expansion purchase and topology     | Exact-once $45 purchase; explicit activation; 3→6 process positions; new slots empty; no module duplication        | Engine command tests; round-015 browser purchase/topology case                 |
+| Honest pipeline composition         | Nullable process modules; empty/bypass behavior; owned compatible movement; added-stage scroll cue                 | Engine invariants/property tests; round-015 placement and 320/393 visual cases |
+| Per-task FIFO identity              | Immutable task ID/workload/locked quote/progress; active + waiting UI; selected workload applies only to new work  | Engine queue/settlement tests; round-015 task-market case                      |
+| Clear waiting only                  | Confirmation; active task preserved; no payout/refund/demand/RNG mutation                                          | Engine exact-state assertions; round-015 browser case                          |
+| Demand economy                      | Saturation, accepted-reservation pressure, exact next-acceptance quote, safe floor, simulated-time recovery        | Engine/round-015 verifier tests; progression balance gate; Jobs UI             |
+| Eight staged workloads              | Four initial plus four requirement-locked cards; deterministic ordered unlocks                                     | Catalog/engine unlock tests; eight-card browser assertion                      |
+| Progression bounds                  | First module ≤5 successes; alternate rig ≤15; expansion 8–16h; full catalogue 24–72h                               | Upgrade balance and 41-seed progression balance                                |
+| No dominant farming / no idle money | Every valid graph has nonpositive floor margin; no-model work always fails; rotation profitable; idle does not pay | Engine/verifier unit tests and deterministic progression sweep                 |
+| Active-task feedback                | Active work owns pressure, warning, bottleneck, and queue-stage diagnostics; future selection owns offer details   | Engine regression and round-015 verifier browser case                          |
+| Fixed fast-forward                  | 1×/4×/16×/64× use identical fixed quanta and preserve settlements/resources/ledger identities                      | Schedule-equivalence engine test; browser controls                             |
+| Portrait/accessibility              | 320/393 CSS px, 200% text, ≥44px visible buttons, no document overflow, reduced motion, touch/pointer placement    | Root browser suite, retained verifier cases, headed visual inspection          |
+| Bottom-tab routing / disclosure     | No duplicate global page-opening CTAs; upgrade details use native disclosure                                       | Browser assertions and source inspection                                       |
+| Persistence/migration/offline       | Schema-5 integrity; schema-3/4 migration; expanded preset/save/offline resume; cache v7                            | Unit migration tests; root and Pages browser suites                            |
 
 ## Prior verifier findings
 
 - V-001 through V-017 remain resolved and their retained regression tests pass. No immutable verifier report was changed.
+- V-018 resolved: `getWorkloadQuote` now derives accepted same-workload reservations from state, and `QUEUE_JOBS` uses the same function with only each new batch offset. The displayed next quote and newly locked task quote are identical.
+- V-019 resolved: no-model graphs have zero modeled reliability, deterministically fail before delivery, and pay $0 gross. All workload floors are $0.02, below the current cheapest productive model-plus-maintenance cost; the progression gate checks this all-configuration lower-bound proof instead of only the starter graph.
+- V-020 resolved: persistent pipeline diagnostics recalculate against the active task's workload. Selected future-work cards and the money-loop offer calculate their own explicit projections, and warning guidance uses the active workload.
 - The previously recorded B-005 human-study blocker is owner-waived for this bounded implementation slice under D-007. That waiver permits implementation; it is not empirical evidence that either original human gate passed.
 - All reports under `.agent/verification/` were read before implementation. Their evidence remains immutable.
 
@@ -72,6 +78,9 @@ On this managed macOS host, a direct browser launch can fail with a Mach-port pe
 
 - Expansion, task acceptance, quotes, demand, purchases, unlocks, and clearing live inside the deterministic simulation/Worker command stream. React only renders state and submits commands.
 - A task locks gross quote and workload at acceptance. Operating cost remains the actual completion-time configuration cost, making reconfiguration an explicit economic choice rather than silently rewriting accepted demand.
+- The quote function owns reservation counting. Callers cannot accidentally display an unreserved quote while acceptance uses a reserved one; batch acceptance passes only the zero-based count of additional tasks in that batch.
+- Persistent `state.metrics` describes work physically in flight when an active task exists; selected-work projections are computed ephemerally for offer comparison and are not allowed to overwrite active diagnostics.
+- Market-floor safety is structural: no-model graphs cannot deliver, every delivering graph contains at least one model, all other costs are nonnegative, and modeled reliability is capped below one.
 - Demand recovery uses simulated time, including paused/idle time; it never pays money. Fixed 0.5-second quanta make speed schedules equivalent.
 - Workstation Expansion I is topology, not inventory. Activation only adds nullable positions; module ownership remains independent.
 - The 24 GB Workstation has a data-driven hour-24 catalogue gate. This proves money alone cannot complete the entire catalogue before 24 simulated hours while leaving representative completion below 72 hours.
@@ -82,7 +91,7 @@ On this managed macOS host, a direct browser launch can fail with a Mach-port pe
 
 - D-007's owner feedback did not provide device, exact duration, reconfiguration timestamps/count, or structured telemetry. The source record states those fields are unknown rather than inferring them.
 - Researcher teams, hype/creator/fear economy, parallel pipelines, automation, newer-model content, deeper maintenance, and social systems remain deferred Milestone 2+ work. This slice keeps one workstation and one ordered pipeline.
-- Demand and progression values are deterministic toy-economy tuning, not a calibrated real marketplace. The 41-seed gate establishes stated bounds, not long-term human fun.
+- Demand and progression values are deterministic toy-economy tuning, not a calibrated real marketplace. The $0.02 floors guarantee eventual exhaustion but are not calibrated real prices. The 41-seed gate establishes stated bounds, not long-term human fun.
 - No selling, refunds, queue repricing, cancellation payout, or module auto-purchase. Clear waiting is intentionally lossless only in state mutation, not a refund mechanism, because acceptance spends no money.
 - Browser acceptance uses pinned Chromium. Physical-device thermal/battery behavior, non-Chromium engines, platform screen readers, haptics, and audio remain unverified.
 - localStorage denial leaves the in-memory session playable but cannot provide cross-reload durability.
@@ -90,14 +99,13 @@ On this managed macOS host, a direct browser launch can fail with a Mach-port pe
 
 ## Checks executed before final candidate
 
-- `npm test`: PASS, 56/56 unit/property/migration/economy tests with coverage thresholds.
-- `npm run balance:progression`: PASS, 41/41 deterministic seeds; expansion 13.03–15.63 simulated hours; full catalogue 40.61–43.98 hours; zero failures.
-- `npm run test:e2e`: PASS, 42/42 root browser cases after repair.
+- `npm test`: PASS, 60/60 unit/property/migration/economy tests; coverage 87.32% statements, 85.67% branches, 94.70% functions, and 90.51% lines.
+- `npm run balance:progression`: PASS, 41/41 deterministic seeds; expansion 13.14–15.59 simulated hours; full catalogue 40.63–44.40 hours; zero failures.
+- `npm run test:e2e -- tests/e2e/verifier-round-015.spec.ts`: PASS, 2/2 exact verifier regressions for acceptance quotes and active-task feedback.
+- `npm run test:e2e`: PASS, 44/44 root browser cases on the final fresh rerun.
 - `npm run test:e2e:pages`: PASS, 2/2 GitHub Pages/offline/cache-isolation cases. The first sandboxed launch failed at macOS Mach registration; the exact escalated rerun passed.
-- `npm run test:e2e -- tests/e2e/round-015-expansion.spec.ts`: PASS, 4/4 after the final added-stage discoverability cue.
-- `npm run format:check`, `npm run lint`, and `npm run typecheck`: PASS before final cue; rerun by the final canonical gate.
-- Headed Playwright CLI at 393 px inspected starter Build and the exact purchase → owned → activate → expanded Build journey. Hierarchy, text states, fixed navigation, drawer affordance, controls, and spacing were legible. It found the initially below-fold expanded stages; the added scroll cue is the resulting UX repair. No unresolved visual overlap/cutoff remained.
-- `./scripts/verify`: PASS as one uninterrupted elevated run: clean dependency recreation, format, lint, typecheck, 56/56 covered tests, base model, 20,001-seed upgrade balance, 41-seed progression balance, production build, 42/42 root browser cases, and 2/2 Pages/offline/cache-isolation cases. The preceding sandboxed attempt passed every non-browser stage, then all Chromium launches were denied at macOS Mach registration before page creation; no product assertion failed.
+- The canonical `./scripts/verify` passed clean dependency recreation, format, lint, typecheck, 60/60 covered tests, base model, 20,001-seed upgrade balance, 41-seed progression balance, and production build. Its browser launch then hit the documented macOS Mach-port sandbox denial. Exact elevated package-manager reruns passed root 44/44 and Pages 2/2.
+- One first elevated root run had a transient offline-preset assertion after 43 other cases passed. The exact focused case immediately passed, and a complete fresh root rerun passed 44/44; no code or test was changed between those runs.
 
 ## Checks not run
 

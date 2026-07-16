@@ -32,6 +32,32 @@ function expectedMargin(state: SimulationState, workloadId: string): number {
   );
 }
 
+function everyValidConfigurationHasASafeDemandFloor(): boolean {
+  const noModelState = ["prepare", "runtime", "verify"].reduce(
+    (state, slotId) => applyCommand(state, { type: "REMOVE_MODULE", slotId }),
+    createInitialState(1),
+  );
+  const lowestModelCost = Math.min(
+    ...modules
+      .filter((module) => module.role === "model")
+      .map((module) => module.costPerJob),
+  );
+  const lowestMaintenance = Math.min(
+    ...hardware.map((item) => item.maintenance / 100),
+  );
+  const lowestProductiveCost = lowestModelCost + lowestMaintenance;
+
+  // A graph without a model has zero delivery reliability. Every productive
+  // graph must pay at least one model plus rig maintenance; all other module
+  // and energy costs are nonnegative, while reliability is capped below one.
+  return (
+    calculateMetrics(noModelState).reliability === 0 &&
+    workloads.every(
+      (workload) => workload.minimumQuote * 0.999 <= lowestProductiveCost,
+    )
+  );
+}
+
 function runOneAcceptedTask(state: SimulationState): SimulationState {
   const before = state.jobs.completed + state.jobs.failed;
   let next = applyCommand(state, { type: "QUEUE_JOBS", count: 1 });
@@ -151,14 +177,8 @@ export function validateProgressionEconomy(
   }
 
   const farm = createInitialState(seed);
-  const farmWorkload = workloads.find(
-    (workload) => workload.id === "interactive-chat",
-  )!;
-  const farmMetrics = calculateMetrics(farm);
   const singleWorkloadEventuallyNonpositive =
-    farmWorkload.minimumQuote * farmMetrics.reliability -
-      farmMetrics.operatingCost <=
-    0;
+    everyValidConfigurationHasASafeDemandFloor();
   const rotationRestoresProfit = workloads
     .filter((workload) => workload.id !== "interactive-chat")
     .some(

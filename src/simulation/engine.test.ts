@@ -706,6 +706,80 @@ describe("deterministic simulation engine", () => {
     expect(emptyClear).toBe(state);
   });
 
+  it("shows the exact next quote after accepted same-workload reservations", () => {
+    let state = createInitialState(74);
+    state = applyCommand(state, { type: "QUEUE_JOBS", count: 10 });
+
+    const visibleNextQuote = getWorkloadQuote(
+      state,
+      "interactive-chat",
+    ).grossQuote;
+    const unrelatedQuote = getWorkloadQuote(
+      state,
+      "batch-classification",
+    ).grossQuote;
+    expect(
+      getWorkloadQuote(state, "interactive-chat", Number.NaN).grossQuote,
+    ).toBe(visibleNextQuote);
+    state = applyCommand(state, { type: "QUEUE_JOBS", count: 1 });
+
+    expect(state.jobs.waitingTasks.at(-1)?.lockedGrossQuote).toBe(
+      visibleNextQuote,
+    );
+    expect(unrelatedQuote).toBe(
+      workloads.find((item) => item.id === "batch-classification")!.rewardMoney,
+    );
+  });
+
+  it("keeps current diagnostics on active work while selecting a future offer", () => {
+    let state = createInitialState(75);
+    state = applyCommand(state, {
+      type: "SET_WORKLOAD",
+      workloadId: "long-document",
+    });
+    state = applyCommand(state, { type: "QUEUE_JOBS", count: 1 });
+    state = tick(state, 0.5);
+    state = applyCommand(state, { type: "TOGGLE_PAUSE" });
+    const activeMetrics = calculateMetrics({
+      ...state,
+      workloadId: "long-document",
+    });
+    const futureMetrics = calculateMetrics({
+      ...state,
+      workloadId: "interactive-chat",
+    });
+
+    state = applyCommand(state, {
+      type: "SET_WORKLOAD",
+      workloadId: "interactive-chat",
+    });
+
+    expect(state.jobs.activeTask?.workloadId).toBe("long-document");
+    expect(state.workloadId).toBe("interactive-chat");
+    expect(state.metrics).toEqual(activeMetrics);
+    expect(state.metrics.memoryPressure).toBeGreaterThan(1);
+    expect(futureMetrics.memoryPressure).toBeLessThan(1);
+    expect(state.lastWarning).toMatch(/memory limit exceeded/i);
+  });
+
+  it("never delivers or pays normally without a model stage", () => {
+    let state = createInitialState(76);
+    for (const slotId of ["prepare", "runtime", "verify"])
+      state = applyCommand(state, { type: "REMOVE_MODULE", slotId });
+
+    expect(state.metrics.orderWarnings).toContain("no model stage");
+    expect(state.metrics.reliability).toBe(0);
+    state = applyCommand(state, { type: "QUEUE_JOBS", count: 1 });
+    for (let minute = 0; minute < 25 && state.jobs.queued > 0; minute += 1)
+      state = tick(state, 60);
+
+    expect(state.jobs.completed).toBe(0);
+    expect(state.jobs.failed).toBe(1);
+    expect(state.jobs.grossEarned).toBe(0);
+    expect(state.lastSettlement?.grossPayout).toBe(0);
+    expect(state.ledger.at(-1)?.directCause).toMatch(/no model stage/i);
+  });
+
   it("saturates completed work, recovers neglected demand, and never earns by idling", () => {
     let state = createInitialState(79);
     const initialQuote = getWorkloadQuote(state, "interactive-chat").grossQuote;
