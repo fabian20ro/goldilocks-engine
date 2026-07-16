@@ -1,4 +1,11 @@
-import { getHardware, getModule, getSlot, getWorkload, slots } from "./catalog";
+import {
+  getHardware,
+  getModule,
+  getSlot,
+  getWorkload,
+  slots,
+  workloads,
+} from "./catalog";
 import { nextRandom, normalizeSeed } from "./rng";
 import {
   CONTENT_VERSION,
@@ -251,7 +258,6 @@ export function createInitialState(seed = 20260715): SimulationState {
     rngState: normalizedSeed,
     tick: 0,
     hardwareId: "bedroom-cpu",
-    ownedHardwareIds: ["bedroom-cpu"],
     workloadId: "interactive-chat",
     slots: [
       { slotId: "source", moduleId: "request-buffer" },
@@ -270,7 +276,10 @@ export function createInitialState(seed = 20260715): SimulationState {
       failed: 0,
       processingCarry: 0,
       paused: false,
+      grossEarned: 0,
+      operatingCostsPaid: 0,
     },
+    lastSettlement: null,
     metrics: {} as PipelineMetrics,
     baselineMetrics: null,
     baselineLabel: null,
@@ -376,54 +385,6 @@ function applyValidCommand(
       return appendEvent(next, {
         kind: "info",
         message: `Workload changed to ${getWorkload(command.workloadId).name}.`,
-      });
-    }
-    case "BUY_HARDWARE": {
-      const nextHardware = getHardware(command.hardwareId);
-      if (state.ownedHardwareIds.includes(command.hardwareId)) {
-        return applyCommand(state, {
-          type: "SELECT_HARDWARE",
-          hardwareId: command.hardwareId,
-        });
-      }
-      if (state.resources.money < nextHardware.purchaseCost) {
-        return appendEvent(state, {
-          kind: "warning",
-          message: `Purchase blocked: need $${nextHardware.purchaseCost}.`,
-        });
-      }
-      const next = recalculate({
-        ...state,
-        hardwareId: command.hardwareId,
-        ownedHardwareIds: [...state.ownedHardwareIds, command.hardwareId],
-        resources: {
-          ...state.resources,
-          money: state.resources.money - nextHardware.purchaseCost,
-        },
-        baselineMetrics: state.metrics,
-        baselineLabel: "Previous hardware",
-      });
-      return appendEvent(next, {
-        kind: "success",
-        message: `${nextHardware.name} purchased. New constraints: power, heat, and maintenance.`,
-      });
-    }
-    case "SELECT_HARDWARE": {
-      if (!state.ownedHardwareIds.includes(command.hardwareId)) {
-        return appendEvent(state, {
-          kind: "warning",
-          message: "Hardware must be purchased before selection.",
-        });
-      }
-      const next = recalculate({
-        ...state,
-        hardwareId: command.hardwareId,
-        baselineMetrics: state.metrics,
-        baselineLabel: "Previous hardware",
-      });
-      return appendEvent(next, {
-        kind: "info",
-        message: `${getHardware(command.hardwareId).name} selected.`,
       });
     }
     case "SET_COMPUTE_ALLOCATION":
@@ -552,6 +513,9 @@ function advanceTick(state: SimulationState, seconds: number): SimulationState {
     },
   };
   const workload = getWorkload(next.workloadId);
+  const moneyBeforeSettlement = next.resources.money;
+  const completedBeforeSettlement = next.jobs.completed;
+  const failedBeforeSettlement = next.jobs.failed;
   for (let index = 0; index < resolved; index += 1) {
     const sample = nextRandom(next.rngState);
     const memoryFailure = next.metrics.memoryPressure > 1;
@@ -600,10 +564,37 @@ function advanceTick(state: SimulationState, seconds: number): SimulationState {
       });
     }
   }
-  if (resolved > 0 && next.jobs.failed === state.jobs.failed) {
+  const completedNow = next.jobs.completed - completedBeforeSettlement;
+  const failedNow = next.jobs.failed - failedBeforeSettlement;
+  if (resolved > 0) {
+    const grossPayout = round(completedNow * workload.rewardMoney, 3);
+    const operatingCost = round(resolved * next.metrics.operatingCost, 3);
+    const netChange = round(next.resources.money - moneyBeforeSettlement, 3);
+    next = {
+      ...next,
+      jobs: {
+        ...next.jobs,
+        grossEarned: round(next.jobs.grossEarned + grossPayout, 3),
+        operatingCostsPaid: round(
+          next.jobs.operatingCostsPaid + operatingCost,
+          3,
+        ),
+      },
+      lastSettlement: {
+        tick: next.tick,
+        workloadId: next.workloadId,
+        completed: completedNow,
+        failed: failedNow,
+        grossPayout,
+        operatingCost,
+        netChange,
+      },
+    };
+  }
+  if (resolved > 0 && failedNow === 0) {
     next = appendEvent(next, {
       kind: "success",
-      message: `${resolved} job${resolved === 1 ? "" : "s"} completed inside policy limits.`,
+      message: `${completedNow} job${completedNow === 1 ? "" : "s"} completed; $${round(completedNow * workload.rewardMoney, 2).toFixed(2)} gross payout earned before operating cost.`,
     });
   }
   return recalculate(next);
@@ -651,6 +642,8 @@ export function isStateValid(state: SimulationState): boolean {
     state.resources.electricityKwh,
     state.resources.reputation,
     state.jobs.processingCarry,
+    state.jobs.grossEarned,
+    state.jobs.operatingCostsPaid,
   ];
   const nonnegativeIntegers = [
     state.tick,
@@ -681,6 +674,24 @@ export function isStateValid(state: SimulationState): boolean {
     state.memoryReserve <= 30 &&
     state.jobs.queued <= 99 &&
     state.jobs.processingCarry < 1 &&
+    (state.lastSettlement === null ||
+      (Number.isSafeInteger(state.lastSettlement.tick) &&
+        state.lastSettlement.tick >= 0 &&
+        state.lastSettlement.tick <= state.tick &&
+        workloads.some(
+          (workload) => workload.id === state.lastSettlement?.workloadId,
+        ) &&
+        Number.isSafeInteger(state.lastSettlement.completed) &&
+        state.lastSettlement.completed >= 0 &&
+        Number.isSafeInteger(state.lastSettlement.failed) &&
+        state.lastSettlement.failed >= 0 &&
+        [
+          state.lastSettlement.grossPayout,
+          state.lastSettlement.operatingCost,
+          state.lastSettlement.netChange,
+        ].every(Number.isFinite) &&
+        state.lastSettlement.grossPayout >= 0 &&
+        state.lastSettlement.operatingCost >= 0)) &&
     areMetricsValid(state.metrics) &&
     (state.baselineMetrics === null ||
       areMetricsValid(state.baselineMetrics)) &&

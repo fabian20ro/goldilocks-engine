@@ -8,7 +8,7 @@ import {
   getHardware,
   getModule,
   getSlot,
-  hardware,
+  getWorkload,
   modules,
   slots as slotSpecs,
   workloads,
@@ -19,7 +19,7 @@ import type {
   SimulationCommand,
   SimulationState,
 } from "../simulation/types";
-import { useSimulation } from "./useSimulation";
+import { TIME_SPEEDS, useSimulation, type TimeSpeed } from "./useSimulation";
 
 type TabId = "build" | "jobs" | "inspect";
 
@@ -41,6 +41,12 @@ interface SavedPreset {
 }
 
 const PRESET_KEY = "goldilocks-pipeline-presets-v1";
+const TUTORIAL_KEY = "goldilocks-quick-start-dismissed-v1";
+
+interface DeletedPreset {
+  preset: SavedPreset;
+  index: number;
+}
 
 function formatNumber(value: number, digits = 0): string {
   return new Intl.NumberFormat("en-US", {
@@ -107,14 +113,35 @@ function loadPresets(): SavedPreset[] {
   }
 }
 
+function persistPresets(presets: readonly SavedPreset[]): boolean {
+  try {
+    localStorage.setItem(PRESET_KEY, JSON.stringify(presets));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function shouldShowTutorial(): boolean {
+  try {
+    return localStorage.getItem(TUTORIAL_KEY) !== "true";
+  } catch {
+    return true;
+  }
+}
+
 function ResourceStrip({ state }: { state: SimulationState }) {
+  const rig = getHardware(state.hardwareId);
   const values = [
     { label: "Money", value: `$${formatNumber(state.resources.money)}` },
     { label: "Time", value: `${formatNumber(state.resources.timeHours, 1)}h` },
-    { label: "Compute", value: `${state.computeAllocation}%` },
     {
-      label: "Memory",
-      value: `${formatNumber(state.metrics.memoryUsed, 1)}/${formatNumber(state.metrics.memoryAvailable, 1)}`,
+      label: "Compute CU",
+      value: `${formatNumber((rig.compute * state.computeAllocation) / 100, 1)}/${rig.compute}`,
+    },
+    {
+      label: "Memory use",
+      value: `${formatNumber(state.metrics.memoryUsed, 1)}/${formatNumber(rig.memory, 1)}GB`,
     },
     { label: "Rep", value: formatNumber(state.resources.reputation, 1) },
   ];
@@ -127,6 +154,153 @@ function ResourceStrip({ state }: { state: SimulationState }) {
         </div>
       ))}
     </dl>
+  );
+}
+
+function TimeSpeedControl({
+  value,
+  onChange,
+}: {
+  value: TimeSpeed;
+  onChange: (speed: number) => void;
+}) {
+  return (
+    <section className="time-controls" aria-labelledby="time-speed-title">
+      <div>
+        <strong id="time-speed-title">Simulation time</strong>
+        <small>Runs queued work; separate from animation and pause.</small>
+      </div>
+      <div className="speed-options" role="group" aria-label="Time speed">
+        {TIME_SPEEDS.map((speed) => (
+          <button
+            key={speed}
+            type="button"
+            aria-pressed={value === speed}
+            onClick={() => onChange(speed)}
+          >
+            {speed}×
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function QuickStart({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <section
+      className="quick-start"
+      aria-labelledby="quick-start-title"
+      data-testid="quick-start"
+    >
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow">First run / always reopenable</span>
+          <h2 id="quick-start-title">Quick start: earn, diagnose, improve</h2>
+        </div>
+        <button type="button" className="text-action" onClick={onDismiss}>
+          Dismiss tutorial
+        </button>
+      </div>
+      <ol className="tutorial-steps">
+        <li>
+          <strong>Earn money through completed work.</strong>
+          <p>
+            Open Jobs, choose a workload, then queue it. While processing is not
+            paused, queued work runs through every stage. A successful
+            completion pays its listed gross reward; every attempt also pays the
+            current operating cost. A failed job earns no gross payout.
+          </p>
+          <p className="tutorial-detail">
+            Gross per success: Interactive Chat $1.40 · Batch Classification
+            $1.10 · Long Document $2.20 · Competition Training $0.20.
+            Competition work trades cash for the highest reputation reward.
+          </p>
+        </li>
+        <li>
+          <strong>
+            Read CU, memory, and pressure before changing the rig.
+          </strong>
+          <p>
+            CU means normalized Compute Units: a stable comparison between rig
+            capacity and workload demand, not a claim about physical FLOPS.
+            Memory use includes workload plus installed modules. Rig capacity is
+            total RAM; Memory reserve is RAM deliberately held back, so only the
+            remainder is usable by this pipeline.
+          </p>
+        </li>
+        <li>
+          <strong>Improve this toy with configuration, not purchases.</strong>
+          <p>
+            Drag or tap compatible modules, keep preparation → model →
+            evaluation order, adjust compute budget or memory reserve, change
+            workload, and compare Shadow evaluation. Hardware purchasing is a
+            Milestone 2 feature and stays unavailable until the Pipeline Toy
+            human gate passes; there is no upgrade shop in this build.
+          </p>
+        </li>
+        <li>
+          <strong>Separate time, animation, pause, and presets.</strong>
+          <p>
+            Simulation time 1×/4×/16× changes how quickly work advances.
+            Animations is visual only and never changes simulation time. Pause
+            retains the queue. In Inspect, Save current creates a preset; use
+            its labeled Delete button, confirm, then Undo if needed.
+          </p>
+        </li>
+      </ol>
+    </section>
+  );
+}
+
+function WarningBanner({
+  state,
+  onOpenJobs,
+  onOpenBuild,
+}: {
+  state: SimulationState;
+  onOpenJobs: () => void;
+  onOpenBuild: () => void;
+}) {
+  const rig = getHardware(state.hardwareId);
+  const reserveGb = rig.memory - state.metrics.memoryAvailable;
+  const nominal = state.lastWarning.includes("inside");
+  let guidance =
+    "Pressure is currently inside the modelled envelope. Queue work, then compare module order, policies, and observed results; this estimate does not prove future jobs will succeed.";
+  if (state.metrics.memoryPressure > 1) {
+    guidance = `This configuration needs ${formatNumber(state.metrics.memoryUsed, 1)} GB, but only ${formatNumber(state.metrics.memoryAvailable, 1)} GB is usable after the ${formatNumber(reserveGb, 1)} GB reserve. Lower the reserve, choose lighter compatible modules (drawer cards show GB), or choose a lower-memory workload. Each can reduce pressure; the warning does not assume one sole cause.`;
+  } else if (state.metrics.thermalPressure > 1) {
+    guidance = `Estimated thermal load is ${formatNumber(state.metrics.thermalLoad, 1)} against a ${rig.thermalLimit} limit. Lower compute budget or choose a workload with lower CU demand. Module swaps mainly change memory, throughput, quality, and reliability in this toy—not heat directly. Throttling is predicted, not a certain hardware fault.`;
+  } else if (state.metrics.orderWarnings.length > 0) {
+    guidance =
+      "Put preparation before model and evaluation after model. Reordering changes throughput, quality, and reliability together; compare the baseline instead of assuming every delta has one cause.";
+  } else if (state.metrics.reliability < 0.82) {
+    guidance =
+      "Choose a more reliable compatible module or stronger evaluation. Low reliability raises failure risk, but the event log distinguishes a direct failure cause from contributing conditions.";
+  } else if (state.metrics.evaluationCoverage < 0.4) {
+    guidance =
+      "Try Robust Evaluation or Shadow evaluation for more evidence. Both can reduce throughput, and more evidence narrows blind spots without guaranteeing correctness.";
+  }
+  return (
+    <aside
+      className={`warning-banner ${nominal ? "nominal" : ""}`}
+      aria-live="polite"
+      aria-label="Current warning and actions"
+    >
+      <span aria-hidden="true">{nominal ? "✓" : "!"}</span>
+      <div>
+        <strong>{state.lastWarning}</strong>
+        <p>{guidance}</p>
+        <div className="guidance-actions">
+          <button type="button" onClick={onOpenJobs}>
+            Policies &amp; workload
+          </button>
+          <button type="button" onClick={onOpenBuild}>
+            Module drawer
+          </button>
+        </div>
+      </div>
+    </aside>
   );
 }
 
@@ -449,6 +623,60 @@ function BuildView({
   );
 }
 
+function MoneyLoop({ state }: { state: SimulationState }) {
+  const workload = getWorkload(state.workloadId);
+  const settlement = state.lastSettlement;
+  const netClass = settlement && settlement.netChange < 0 ? "bad" : "good";
+  return (
+    <section className="money-loop" aria-labelledby="money-loop-title">
+      <div className="money-loop-route" aria-label="Money loop">
+        <span>1 Choose</span>
+        <span aria-hidden="true">→</span>
+        <span>2 Queue</span>
+        <span aria-hidden="true">→</span>
+        <span>3 Run</span>
+        <span aria-hidden="true">→</span>
+        <span>4 Complete</span>
+        <span aria-hidden="true">→</span>
+        <span>5 Payout</span>
+      </div>
+      <div className="money-loop-copy">
+        <div>
+          <span className="eyebrow">Selected-work payout</span>
+          <h3 id="money-loop-title">{workload.name}</h3>
+          <p>
+            ${workload.rewardMoney.toFixed(2)} gross per successful completion ·
+            ${formatNumber(state.metrics.operatingCost, 3)} operating cost per
+            attempt · failed jobs receive $0 gross.
+          </p>
+        </div>
+        <div className="settlement" aria-live="polite">
+          <span className="eyebrow">Latest settlement</span>
+          {settlement ? (
+            <>
+              <strong className={netClass}>
+                {settlement.netChange >= 0 ? "+" : "−"}$
+                {Math.abs(settlement.netChange).toFixed(2)} net
+              </strong>
+              <small>
+                {settlement.completed} paid · {settlement.failed} failed · $
+                {settlement.grossPayout.toFixed(2)} gross − $
+                {settlement.operatingCost.toFixed(2)} costs
+              </small>
+            </>
+          ) : (
+            <strong>No payout yet — queue a job.</strong>
+          )}
+        </div>
+      </div>
+      <p className="earnings-total">
+        Run totals: ${state.jobs.grossEarned.toFixed(2)} gross earned · $
+        {state.jobs.operatingCostsPaid.toFixed(2)} operating costs paid.
+      </p>
+    </section>
+  );
+}
+
 function JobsView({
   state,
   command,
@@ -466,6 +694,12 @@ function JobsView({
           </div>
           <span className="counter">{state.jobs.queued} queued</span>
         </div>
+        <MoneyLoop state={state} />
+        <p className="concept-note">
+          <strong>CU = normalized Compute Units.</strong> Use CU to compare this
+          rig's capacity with workload demand; CU is not a physical FLOPS
+          measurement.
+        </p>
         <div className="choice-list">
           {workloads.map((workload) => (
             <button
@@ -483,9 +717,16 @@ function JobsView({
             >
               <span>
                 <strong>{workload.name}</strong>
-                <small>{workload.description}</small>
+                <small>
+                  {workload.description} ${workload.rewardMoney.toFixed(2)}
+                  gross on success ·{" "}
+                  {formatNumber(workload.rewardReputation, 2)}
+                  rep.
+                </small>
               </span>
-              <span className="choice-stat">{workload.computeDemand} CU</span>
+              <span className="choice-stat">
+                {workload.computeDemand} CU · {workload.memoryDemand} GB
+              </span>
             </button>
           ))}
         </div>
@@ -542,7 +783,7 @@ function JobsView({
         </label>
         <label className="range-control">
           <span>
-            Memory reserve <strong>{state.memoryReserve}%</strong>
+            Memory reserve (held back) <strong>{state.memoryReserve}%</strong>
           </span>
           <input
             type="range"
@@ -559,51 +800,43 @@ function JobsView({
             }
           />
         </label>
+        <p className="memory-accounting">
+          Current memory: {formatNumber(state.metrics.memoryUsed, 1)} GB used /{" "}
+          {formatNumber(getHardware(state.hardwareId).memory, 1)} GB rig
+          capacity.{" "}
+          {formatNumber(
+            getHardware(state.hardwareId).memory -
+              state.metrics.memoryAvailable,
+            1,
+          )}{" "}
+          GB is reserved, leaving{" "}
+          {formatNumber(state.metrics.memoryAvailable, 1)} GB usable by the
+          pipeline.
+        </p>
       </section>
 
       <section className="panel" aria-labelledby="hardware-title">
         <div className="section-heading compact">
           <div>
-            <span className="eyebrow">Capacity has consequences</span>
-            <h2 id="hardware-title">Hardware</h2>
+            <span className="eyebrow">Current milestone boundary</span>
+            <h2 id="hardware-title">Rig progression</h2>
           </div>
         </div>
-        <div className="choice-list">
-          {hardware.map((item) => {
-            const owned = state.ownedHardwareIds.includes(item.id);
-            return (
-              <button
-                type="button"
-                key={item.id}
-                className={
-                  state.hardwareId === item.id
-                    ? "choice-card selected"
-                    : "choice-card"
-                }
-                aria-pressed={state.hardwareId === item.id}
-                onClick={() =>
-                  command({
-                    type: owned ? "SELECT_HARDWARE" : "BUY_HARDWARE",
-                    hardwareId: item.id,
-                  })
-                }
-              >
-                <span>
-                  <strong>{item.name}</strong>
-                  <small>
-                    {item.memory} GB · {item.compute} CU · {item.watts} W
-                  </small>
-                </span>
-                <span className="choice-stat">
-                  {owned
-                    ? state.hardwareId === item.id
-                      ? "ACTIVE"
-                      : "OWNED"
-                    : `$${item.purchaseCost}`}
-                </span>
-              </button>
-            );
-          })}
+        <div className="locked-rig">
+          <span className="lock-badge">HARDWARE SHOP LOCKED</span>
+          <strong>{getHardware(state.hardwareId).name}</strong>
+          <p>
+            {getHardware(state.hardwareId).compute} normalized CU ·{" "}
+            {getHardware(state.hardwareId).memory} GB total memory ·{" "}
+            {getHardware(state.hardwareId).watts} W modelled draw.
+          </p>
+          <p>
+            Hardware purchasing belongs to Milestone 2 and remains unavailable
+            until the Pipeline Toy human gate passes. Improve the current toy
+            now through compatible module choice, preparation → model →
+            evaluation order, compute budget, memory reserve, workload, and
+            Shadow evaluation policy.
+          </p>
         </div>
       </section>
     </>
@@ -719,12 +952,24 @@ function InspectView({
   presets,
   onSavePreset,
   onLoadPreset,
+  pendingDeleteId,
+  deletedPreset,
+  onRequestDelete,
+  onCancelDelete,
+  onConfirmDelete,
+  onUndoDelete,
 }: {
   state: SimulationState;
   command: (command: SimulationCommand) => void;
   presets: readonly SavedPreset[];
   onSavePreset: () => void;
   onLoadPreset: (preset: SavedPreset) => void;
+  pendingDeleteId: string | null;
+  deletedPreset: DeletedPreset | null;
+  onRequestDelete: (id: string) => void;
+  onCancelDelete: () => void;
+  onConfirmDelete: () => void;
+  onUndoDelete: () => void;
 }) {
   return (
     <>
@@ -786,26 +1031,58 @@ function InspectView({
           </button>
         </div>
         {presets.length ? (
-          <div className="choice-list">
+          <div className="preset-list">
             {presets.map((preset) => (
-              <button
-                type="button"
-                key={preset.id}
-                className="choice-card"
-                onClick={() => onLoadPreset(preset)}
-              >
-                <span>
-                  <strong>{preset.name}</strong>
-                  <small>
-                    {getHardware(state.hardwareId).name} ·{" "}
-                    {
-                      getModule(preset.slots[2]?.moduleId ?? "quantized-model")
-                        .name
-                    }
-                  </small>
-                </span>
-                <span className="choice-stat">LOAD</span>
-              </button>
+              <div className="preset-item" key={preset.id}>
+                <div className="preset-row">
+                  <button
+                    type="button"
+                    className="choice-card preset-load"
+                    onClick={() => onLoadPreset(preset)}
+                    aria-label={`Load ${preset.name}`}
+                  >
+                    <span>
+                      <strong>{preset.name}</strong>
+                      <small>
+                        {getHardware(state.hardwareId).name} ·{" "}
+                        {
+                          getModule(
+                            preset.slots[2]?.moduleId ?? "quantized-model",
+                          ).name
+                        }
+                      </small>
+                    </span>
+                    <span className="choice-stat">LOAD</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="delete-action"
+                    onClick={() => onRequestDelete(preset.id)}
+                    aria-label={`Delete ${preset.name}`}
+                  >
+                    Delete
+                  </button>
+                </div>
+                {pendingDeleteId === preset.id ? (
+                  <div
+                    className="delete-confirmation"
+                    role="group"
+                    aria-label={`Confirm deletion of ${preset.name}`}
+                  >
+                    <p>Delete {preset.name}? This removes its local copy.</p>
+                    <button type="button" onClick={onCancelDelete}>
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="danger-action"
+                      onClick={onConfirmDelete}
+                    >
+                      Confirm delete
+                    </button>
+                  </div>
+                ) : null}
+              </div>
             ))}
           </div>
         ) : (
@@ -813,6 +1090,14 @@ function InspectView({
             No presets yet. Save a configuration before experimenting.
           </p>
         )}
+        {deletedPreset ? (
+          <div className="undo-banner" role="status">
+            <span>{deletedPreset.preset.name} deleted from local presets.</span>
+            <button type="button" onClick={onUndoDelete}>
+              Undo delete
+            </button>
+          </div>
+        ) : null}
       </section>
 
       <section className="panel" aria-labelledby="ledger-title">
@@ -847,7 +1132,7 @@ function InspectView({
 }
 
 export function App() {
-  const { state, command } = useSimulation();
+  const { state, command, timeSpeed, setTimeSpeed } = useSimulation();
   const [tab, setTab] = useState<TabId>("build");
   const [selected, setSelected] = useState<{
     moduleId: string;
@@ -855,6 +1140,11 @@ export function App() {
   } | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [presets, setPresets] = useState<SavedPreset[]>(loadPresets);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deletedPreset, setDeletedPreset] = useState<DeletedPreset | null>(
+    null,
+  );
+  const [showTutorial, setShowTutorial] = useState(shouldShowTutorial);
   const [reducedMotion, setReducedMotion] = useState(
     () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
@@ -933,8 +1223,55 @@ export function App() {
       memoryReserve: state.memoryReserve,
     };
     const next = [preset, ...presets].slice(0, 6);
-    localStorage.setItem(PRESET_KEY, JSON.stringify(next));
-    setPresets(next);
+    if (persistPresets(next)) {
+      setPresets(next);
+      setDeletedPreset(null);
+    }
+  };
+
+  const dismissTutorial = () => {
+    try {
+      localStorage.setItem(TUTORIAL_KEY, "true");
+    } catch {
+      // The tutorial still closes for this session when storage is unavailable.
+    }
+    setShowTutorial(false);
+  };
+
+  const requestPresetDelete = (id: string) => {
+    setPendingDeleteId(id);
+  };
+
+  const confirmPresetDelete = () => {
+    if (!pendingDeleteId) return;
+    const index = presets.findIndex((preset) => preset.id === pendingDeleteId);
+    if (index < 0) {
+      setPendingDeleteId(null);
+      return;
+    }
+    const preset = presets[index];
+    if (!preset) return;
+    const next = presets.filter((item) => item.id !== pendingDeleteId);
+    if (persistPresets(next)) {
+      setPresets(next);
+      setDeletedPreset({ preset, index });
+      setPendingDeleteId(null);
+    }
+  };
+
+  const undoPresetDelete = () => {
+    if (!deletedPreset) return;
+    const next = [...presets];
+    next.splice(
+      Math.min(deletedPreset.index, next.length),
+      0,
+      deletedPreset.preset,
+    );
+    const bounded = next.slice(0, 6);
+    if (persistPresets(bounded)) {
+      setPresets(bounded);
+      setDeletedPreset(null);
+    }
   };
 
   const loadPreset = (preset: SavedPreset) => {
@@ -971,28 +1308,40 @@ export function App() {
             <span className="brand-kicker">BEDROOM NODE / 01</span>
             <h1>Goldilocks Engine</h1>
           </div>
-          <button
-            type="button"
-            className="motion-toggle"
-            aria-pressed={reducedMotion}
-            onClick={() => setReducedMotion((value) => !value)}
-          >
-            {reducedMotion ? "Motion off" : "Motion on"}
-          </button>
+          <div className="header-actions">
+            <button
+              type="button"
+              className="help-toggle"
+              aria-expanded={showTutorial}
+              aria-controls="quick-start-title"
+              onClick={() => setShowTutorial(true)}
+            >
+              Help / Quick start
+            </button>
+            <div className="animation-control">
+              <button
+                type="button"
+                className="motion-toggle"
+                aria-pressed={reducedMotion}
+                onClick={() => setReducedMotion((value) => !value)}
+              >
+                {reducedMotion ? "Animations off" : "Animations on"}
+              </button>
+              <small>Visual only</small>
+            </div>
+          </div>
         </div>
         <ResourceStrip state={state} />
+        <TimeSpeedControl value={timeSpeed} onChange={setTimeSpeed} />
       </header>
 
       <main id="main-content" className="main-content">
-        <aside
-          className={`warning-banner ${state.lastWarning.includes("inside") ? "nominal" : ""}`}
-          aria-live="polite"
-        >
-          <span aria-hidden="true">
-            {state.lastWarning.includes("inside") ? "✓" : "!"}
-          </span>
-          <p>{state.lastWarning}</p>
-        </aside>
+        {showTutorial ? <QuickStart onDismiss={dismissTutorial} /> : null}
+        <WarningBanner
+          state={state}
+          onOpenJobs={() => setTab("jobs")}
+          onOpenBuild={() => setTab("build")}
+        />
         {selectedName ? (
           <div className="selection-banner" role="status">
             <span>{selectedName} selected</span>
@@ -1021,6 +1370,12 @@ export function App() {
             presets={presets}
             onSavePreset={savePreset}
             onLoadPreset={loadPreset}
+            pendingDeleteId={pendingDeleteId}
+            deletedPreset={deletedPreset}
+            onRequestDelete={requestPresetDelete}
+            onCancelDelete={() => setPendingDeleteId(null)}
+            onConfirmDelete={confirmPresetDelete}
+            onUndoDelete={undoPresetDelete}
           />
         )}
       </main>

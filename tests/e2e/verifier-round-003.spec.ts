@@ -49,7 +49,7 @@ test.describe("verifier round 003 adversarial accessibility", () => {
     expect(undersized).toEqual([]);
   });
 
-  test("the in-app Motion off mode disables every active animation", async ({
+  test("the in-app Animations off mode disables every active animation", async ({
     page,
   }) => {
     await page.emulateMedia({ reducedMotion: "no-preference" });
@@ -58,9 +58,9 @@ test.describe("verifier round 003 adversarial accessibility", () => {
     await page.getByRole("button", { name: "Jobs" }).click();
     await page.getByRole("button", { name: "Queue 10" }).click();
     await page.getByRole("button", { name: "Build" }).click();
-    await page.getByRole("button", { name: "Motion on" }).click();
+    await page.getByRole("button", { name: "Animations on" }).click();
     await expect(
-      page.getByRole("button", { name: "Motion off" }),
+      page.getByRole("button", { name: "Animations off" }),
     ).toBeVisible();
 
     const activeAnimations = await page

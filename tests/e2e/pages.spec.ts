@@ -35,6 +35,13 @@ test("the GitHub Pages build loads and remains worker-backed offline", async ({
   await expect(
     page.getByRole("heading", { name: "Goldilocks Engine" }),
   ).toBeVisible();
+  await expect(page.getByTestId("quick-start")).toContainText(
+    "CU means normalized Compute Units",
+  );
+  await expect(
+    page.getByRole("button", { name: "Help / Quick start" }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "16×" })).toBeVisible();
   await page
     .locator("html[data-offline-ready='true']")
     .waitFor({ timeout: 15_000 });
@@ -59,7 +66,7 @@ test("the GitHub Pages build loads and remains worker-backed offline", async ({
     const registration = registrations.find(
       (entry) => new URL(entry.scope).pathname === basePath,
     );
-    const cacheName = `goldilocks-shell:${basePath}:v3`;
+    const cacheName = `goldilocks-shell:${basePath}:v4`;
     const cache = await caches.open(cacheName);
 
     return {
@@ -92,7 +99,7 @@ test("the GitHub Pages build loads and remains worker-backed offline", async ({
   });
   expect(packageState.registrationScope).toBe(pagesPath);
   expect(packageState.controllerPath).toBe(`${pagesPath}sw.js`);
-  expect(packageState.cacheNames).toContain(`goldilocks-shell:${pagesPath}:v3`);
+  expect(packageState.cacheNames).toContain(`goldilocks-shell:${pagesPath}:v4`);
   expect(
     packageState.assets.some((asset) => /worker-.*\.js$/.test(asset)),
   ).toBe(true);
@@ -126,6 +133,10 @@ test("the GitHub Pages build loads and remains worker-backed offline", async ({
   await expect(
     page.getByRole("heading", { name: "Goldilocks Engine" }),
   ).toBeVisible();
+  await expect(page.getByRole("button", { name: "16×" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Animations (on|off)/ }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Jobs" }).click();
   await page.getByRole("button", { name: "Queue 10" }).click();
   await page.getByRole("button", { name: "Build" }).click();
@@ -148,7 +159,7 @@ test("verifier round 006: scoped activation preserves foreign caches", async ({
   });
   await page.goto("http://127.0.0.1:4173/cache-seed");
   await page.evaluate(async (basePath) => {
-    const stale = await caches.open(`goldilocks-shell:${basePath}:v2`);
+    const stale = await caches.open(`goldilocks-shell:${basePath}:v3`);
     await stale.put(
       `${basePath}stale.js`,
       new Response("stale Goldilocks asset"),
@@ -185,8 +196,8 @@ test("verifier round 006: scoped activation preserves foreign caches", async ({
   });
 
   expect(cacheState.controllerPath).toBe(`${pagesPath}sw.js`);
-  expect(cacheState.names).toContain(`goldilocks-shell:${pagesPath}:v3`);
-  expect(cacheState.names).not.toContain(`goldilocks-shell:${pagesPath}:v2`);
+  expect(cacheState.names).toContain(`goldilocks-shell:${pagesPath}:v4`);
+  expect(cacheState.names).not.toContain(`goldilocks-shell:${pagesPath}:v3`);
   expect(cacheState.names).toContain("goldilocks-shell:/other-app/:v7");
   expect(cacheState.names).toContain("third-party-test-cache");
   expect(cacheState.siblingBody).toBe("sibling application asset");

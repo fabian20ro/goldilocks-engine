@@ -79,7 +79,6 @@ test.describe("portrait pipeline acceptance", () => {
       .getByRole("button", { name: "Snap here" })
       .click();
     await page.getByRole("button", { name: "Jobs" }).click();
-    await page.getByRole("button", { name: /24 GB Workstation/ }).click();
     await page.getByRole("button", { name: "Queue 10" }).click();
     await page.getByRole("button", { name: "Build" }).click();
 
@@ -98,6 +97,7 @@ test.describe("portrait pipeline acceptance", () => {
       .getByTestId("slot-prepare")
       .locator('[data-module-id="basic-cleaner"]');
     const destination = page.getByTestId("slot-runtime");
+    await source.scrollIntoViewIfNeeded();
     const from = await source.boundingBox();
     const to = await destination.boundingBox();
     expect(from).not.toBeNull();
@@ -129,6 +129,7 @@ test.describe("portrait pipeline acceptance", () => {
       .getByTestId("slot-prepare")
       .locator('[data-module-id="basic-cleaner"]');
     const destination = page.getByTestId("slot-runtime");
+    await source.scrollIntoViewIfNeeded();
     const from = await source.boundingBox();
     const to = await destination.boundingBox();
     expect(from).not.toBeNull();
@@ -181,6 +182,7 @@ test.describe("portrait pipeline acceptance", () => {
       .click();
     await page.getByRole("button", { name: "Jobs" }).click();
     await page.getByRole("button", { name: /Long Document/ }).click();
+    await page.getByRole("button", { name: "16×" }).click();
     await page.getByRole("button", { name: "Queue 1", exact: true }).click();
     await page.getByRole("button", { name: "Build" }).click();
     await expect(page.getByText(/Memory limit exceeded/)).toBeVisible();
@@ -204,10 +206,14 @@ test.describe("portrait pipeline acceptance", () => {
     await page.goto("/");
     await page.getByRole("button", { name: "Inspect", exact: true }).click();
     await page.getByRole("button", { name: "Save current" }).click();
-    await expect(page.getByRole("button", { name: /Preset 1/ })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Load Preset 1" }),
+    ).toBeVisible();
     await page.reload();
     await page.getByRole("button", { name: "Inspect", exact: true }).click();
-    await expect(page.getByRole("button", { name: /Preset 1/ })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Load Preset 1" }),
+    ).toBeVisible();
   });
 
   test("recovers from structurally malformed persisted presets", async ({
@@ -251,7 +257,7 @@ test.describe("portrait pipeline acceptance", () => {
     await page.setViewportSize({ width: 320, height: 742 });
     await page.goto("/");
     await expect(
-      page.getByRole("button", { name: "Motion off" }),
+      page.getByRole("button", { name: "Animations off" }),
     ).toBeVisible();
     await page.evaluate(() => {
       document.documentElement.style.fontSize = "24px";

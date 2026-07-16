@@ -56,16 +56,16 @@ test.describe("verifier round 004 adversarial mobile behavior", () => {
       .toBeGreaterThan(initialScroll + 40);
   });
 
-  test("Motion off removes every document animation", async ({ page }) => {
+  test("Animations off removes every document animation", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "no-preference" });
     await page.setViewportSize({ width: 393, height: 742 });
     await page.goto("/");
     await page.getByRole("button", { name: "Jobs" }).click();
     await page.getByRole("button", { name: "Queue 10" }).click();
     await page.getByRole("button", { name: "Build" }).click();
-    await page.getByRole("button", { name: "Motion on" }).click();
+    await page.getByRole("button", { name: "Animations on" }).click();
     await expect(
-      page.getByRole("button", { name: "Motion off" }),
+      page.getByRole("button", { name: "Animations off" }),
     ).toBeVisible();
     await page.waitForTimeout(50);
 

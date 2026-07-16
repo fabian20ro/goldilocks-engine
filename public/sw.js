@@ -1,6 +1,6 @@
 const SCOPE_URL = new URL(self.registration.scope);
 const CACHE_NAMESPACE = `goldilocks-shell:${SCOPE_URL.pathname}:`;
-const CACHE = `${CACHE_NAMESPACE}v3`;
+const CACHE = `${CACHE_NAMESPACE}v4`;
 
 function scopedUrl(path = "") {
   return new URL(path, SCOPE_URL).toString();

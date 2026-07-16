@@ -1,5 +1,5 @@
-export const SCHEMA_VERSION = 2;
-export const CONTENT_VERSION = "pipeline-toy-1";
+export const SCHEMA_VERSION = 3;
+export const CONTENT_VERSION = "pipeline-toy-2";
 
 export type SlotType = "source" | "process" | "sink";
 export type ModuleRole =
@@ -87,6 +87,18 @@ export interface JobState {
   failed: number;
   processingCarry: number;
   paused: boolean;
+  grossEarned: number;
+  operatingCostsPaid: number;
+}
+
+export interface JobSettlement {
+  tick: number;
+  workloadId: string;
+  completed: number;
+  failed: number;
+  grossPayout: number;
+  operatingCost: number;
+  netChange: number;
 }
 
 export interface Resources {
@@ -114,7 +126,6 @@ export interface SimulationState {
   rngState: number;
   tick: number;
   hardwareId: string;
-  ownedHardwareIds: readonly string[];
   workloadId: string;
   slots: readonly PipelineSlotState[];
   branchEnabled: boolean;
@@ -122,6 +133,7 @@ export interface SimulationState {
   memoryReserve: number;
   resources: Resources;
   jobs: JobState;
+  lastSettlement: JobSettlement | null;
   metrics: PipelineMetrics;
   baselineMetrics: PipelineMetrics | null;
   baselineLabel: string | null;
@@ -139,8 +151,6 @@ export type SimulationCommand =
       fromSlotId?: string;
     }
   | { type: "SET_WORKLOAD"; workloadId: string }
-  | { type: "BUY_HARDWARE"; hardwareId: string }
-  | { type: "SELECT_HARDWARE"; hardwareId: string }
   | { type: "SET_COMPUTE_ALLOCATION"; percent: number }
   | { type: "SET_MEMORY_RESERVE"; percent: number }
   | { type: "TOGGLE_BRANCH" }

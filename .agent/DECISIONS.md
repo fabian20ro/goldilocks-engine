@@ -23,3 +23,20 @@
 - **Decision:** Runtime numeric controls accept only finite JavaScript numbers. Malformed/non-finite tick, allocation, reserve, queue, reset-seed, and worker-init values are exact no-ops: no tick, RNG, resource, queue, metric, event-sequence, or ledger change. Finite values retain the existing bounded clamp/truncate semantics. Standalone seed creation canonicalizes malformed seeds to the deterministic non-zero fallback.
 - **Reason:** TypeScript types do not validate Worker messages or other runtime callers. Rejecting ambiguous operation values before calculation and validating every resulting versioned numeric category before commit prevents `NaN`, infinities, unsafe integers, and JSON `null` substitutions from corrupting deterministic state.
 - **Reversal condition:** Introduce a versioned command-error response only when player-facing diagnostics require one; keep rejection transactional across the schema migration.
+
+## D-005 — Playtest-derived first-session comprehension contract
+
+- **Decision:** The 2026-07-16 informal usability feedback is accepted as authoritative round-009 redesign scope within Milestones 0–1. Acceptance requires all of the following to be independently executable and measurable:
+  1. A first-run tutorial that precisely answers the observed questions, can be dismissed, persists dismissal across reload, and always reopens from a large labeled Help control.
+  2. A legible choose → queue → run → complete → payout loop, workload-specific gross rewards, operating costs, failed-job payout behavior, and visible earned-money settlement feedback.
+  3. Runtime-validated local presets with labeled deletion, explicit confirmation, persistent removal, and one-step undo that also persists when used.
+  4. Visible definition of CU as normalized Compute Units, current memory use versus full rig capacity, and an explicit distinction between held-back reserve and pipeline-usable memory.
+  5. Current-pressure guidance that names mechanically valid actions involving compute budget, reserve, compatible modules, or workload while avoiding unsupported single-cause or guaranteed-outcome claims.
+  6. Honest progression copy: hardware purchasing belongs to Milestone 2 and is unavailable before the Pipeline Toy gate; the current toy improves through module choice/order, workload, compute/memory policies, and Shadow evaluation. No pre-gate upgrade shop.
+  7. Animation framed and tested as visual-only, with all reduced-motion guarantees retained and no effect on simulation time.
+  8. A one-handed, bounded 1×/4×/16× simulation-time control, visibly separate from animation and pause, whose fixed tick quanta preserve deterministic valid resources, settlements, and ledger identities.
+  9. Existing 320/393 portrait, 200% text, 44 CSS-pixel controls, no-horizontal-overflow, touch drag/pan, screen-reader labeling, root/Pages subpath, installable PWA, service-worker cache isolation, and offline reload requirements remain regression gates.
+- **Evidence:** `.agent/playtests/2026-07-16-informal.md` records the feedback without upgrading it into Milestone 0 or Milestone 1 gate evidence. Unit/property and pinned Playwright checks map directly to each criterion in `.agent/HANDOFF.md`.
+- **Experiment-record policy:** Every future playtest or experimental observation gets a new immutable `.agent/playtests/YYYY-MM-DD-*.md` record. Accepted implementation changes are promoted into this decision log. `plan.md` changes still require explicit user authorization.
+- **Reason:** The feedback showed a comprehension failure despite positive visual reception. Durable, testable mechanics communication is required before another sustained playtest can meaningfully evaluate the pipeline toy.
+- **Reversal condition:** Supersede only through a later explicit product decision grounded in a new immutable playtest record; do not erase the original observation.

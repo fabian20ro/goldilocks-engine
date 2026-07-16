@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { hardware, modules, slots, workloads } from "./catalog";
+import { getHardware, modules, slots, workloads } from "./catalog";
 import {
   applyCommand,
   calculateMetrics,
@@ -36,6 +36,55 @@ describe("deterministic simulation engine", () => {
     const left = tick(run(), 60);
     const right = tick(run(), 60);
     expect(right).toEqual(left);
+  });
+
+  it("settles successful workload payouts and operating costs visibly", () => {
+    const initial = createInitialState(7);
+    const queued = applyCommand(initial, { type: "QUEUE_JOBS", count: 5 });
+    const settled = tick(queued, 60);
+    const settlement = settled.lastSettlement;
+
+    expect(settlement).not.toBeNull();
+    expect(settlement?.completed).toBe(settled.jobs.completed);
+    expect(settlement?.failed).toBe(settled.jobs.failed);
+    expect(settlement?.grossPayout).toBe(
+      Number((settled.jobs.completed * 1.4).toFixed(3)),
+    );
+    expect(settled.jobs.grossEarned).toBe(settlement?.grossPayout);
+    expect(settled.jobs.operatingCostsPaid).toBe(settlement?.operatingCost);
+    expect(settlement?.netChange).toBeCloseTo(
+      settled.resources.money - queued.resources.money,
+      3,
+    );
+    expect(
+      settled.ledger.some((event) => /gross payout/i.test(event.message)),
+    ).toBe(true);
+    expect(isStateValid(settled)).toBe(true);
+  });
+
+  it("keeps bounded time-speed tick schedules deterministic", () => {
+    const run = (speed: 1 | 4 | 16) => {
+      let state = applyCommand(createInitialState(91), {
+        type: "QUEUE_JOBS",
+        count: 40,
+      });
+      for (let step = 0; step < 24; step += 1) state = tick(state, 0.5 * speed);
+      return state;
+    };
+
+    for (const speed of [1, 4, 16] as const) {
+      const left = run(speed);
+      const right = run(speed);
+      expect(right).toEqual(left);
+      expect(isStateValid(left)).toBe(true);
+      expect(left.tick).toBe(12_000 * speed);
+      expect(new Set(left.ledger.map((event) => event.id)).size).toBe(
+        left.ledger.length,
+      );
+    }
+    expect(run(16).jobs.completed + run(16).jobs.failed).toBeGreaterThan(
+      run(1).jobs.completed + run(1).jobs.failed,
+    );
   });
 
   it("rejects incompatible placement without corrupting the graph", () => {
@@ -87,45 +136,20 @@ describe("deterministic simulation engine", () => {
     expect(state.ledger.at(-1)?.directCause).toMatch(/memory/i);
   });
 
-  it("makes upgrades improve capacity while introducing cost and heat", () => {
+  it("keeps headless hardware alternatives distinct without a player shop", () => {
     const state = applyCommand(createInitialState(), {
       type: "SET_COMPUTE_ALLOCATION",
       percent: 25,
     });
-    const used = applyCommand(state, {
-      type: "BUY_HARDWARE",
+    const used = calculateMetrics({
+      ...state,
       hardwareId: "used-gpu",
     });
-    expect(used.resources.money).toBe(state.resources.money - 560);
-    expect(used.metrics.throughputPerMinute).toBeGreaterThan(
+    expect(used.throughputPerMinute).toBeGreaterThan(
       state.metrics.throughputPerMinute,
     );
-    expect(used.metrics.thermalPressure).toBeGreaterThan(
-      state.metrics.thermalPressure,
-    );
-    expect(used.ledger.at(-1)?.message).toMatch(/constraints/i);
-  });
-
-  it("blocks unavailable purchases and supports owned hardware switching", () => {
-    const poor = {
-      ...createInitialState(),
-      resources: { ...createInitialState().resources, money: 10 },
-    };
-    const blocked = applyCommand(poor, {
-      type: "BUY_HARDWARE",
-      hardwareId: "workstation-gpu",
-    });
-    expect(blocked.hardwareId).toBe("bedroom-cpu");
-    expect(blocked.ledger.at(-1)?.message).toMatch(/blocked/i);
-    const bought = applyCommand(createInitialState(), {
-      type: "BUY_HARDWARE",
-      hardwareId: "used-gpu",
-    });
-    const switched = applyCommand(bought, {
-      type: "SELECT_HARDWARE",
-      hardwareId: "bedroom-cpu",
-    });
-    expect(switched.hardwareId).toBe("bedroom-cpu");
+    expect(used.thermalPressure).toBeGreaterThan(state.metrics.thermalPressure);
+    expect(getHardware("used-gpu").purchaseCost).toBeGreaterThan(0);
   });
 
   it("exposes branch and policy tradeoffs in metrics", () => {
@@ -147,11 +171,7 @@ describe("deterministic simulation engine", () => {
   });
 
   it("identifies the active module slot that limits throughput", () => {
-    let state = createInitialState();
-    state = applyCommand(state, {
-      type: "BUY_HARDWARE",
-      hardwareId: "workstation-gpu",
-    });
+    let state = { ...createInitialState(), hardwareId: "workstation-gpu" };
     state = applyCommand(state, {
       type: "PLACE_MODULE",
       moduleId: "robust-eval",
@@ -288,6 +308,22 @@ describe("deterministic simulation engine", () => {
       },
       {
         ...initial,
+        jobs: { ...initial.jobs, grossEarned: Number.NaN },
+      },
+      {
+        ...initial,
+        lastSettlement: {
+          tick: 0,
+          workloadId: "interactive-chat",
+          completed: 1,
+          failed: 0,
+          grossPayout: 1.4,
+          operatingCost: 0.1,
+          netChange: Number.NaN,
+        },
+      },
+      {
+        ...initial,
         metrics: { ...initial.metrics, thermalLoad: Number.NaN },
       },
       {
@@ -364,10 +400,6 @@ describe("simulation properties", () => {
     fc.record({
       type: fc.constant("SET_MEMORY_RESERVE" as const),
       percent: fc.integer({ min: -100, max: 100 }),
-    }),
-    fc.record({
-      type: fc.constant("SELECT_HARDWARE" as const),
-      hardwareId: fc.constantFrom(...hardware.map((item) => item.id)),
     }),
     fc.constant({ type: "TOGGLE_BRANCH" as const }),
     fc.constant({ type: "TOGGLE_PAUSE" as const }),

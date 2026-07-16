@@ -46,7 +46,7 @@ test.describe("verifier round 002 adversarial flows", () => {
     await page.getByLabel("Memory reserve percentage").fill("0");
 
     await page.getByRole("button", { name: "Inspect", exact: true }).click();
-    await page.getByRole("button", { name: /Preset 1/ }).click();
+    await page.getByRole("button", { name: "Load Preset 1" }).click();
     await expect(page.getByTestId("slot-verify")).toContainText(
       "Robust Evaluation",
     );
