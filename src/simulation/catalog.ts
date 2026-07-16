@@ -1,13 +1,44 @@
-import type { HardwareSpec, ModuleSpec, SlotSpec, WorkloadSpec } from "./types";
+import type {
+  HardwareSpec,
+  ModuleSpec,
+  PipelineExpansionSpec,
+  SlotSpec,
+  WorkloadSpec,
+} from "./types";
 
 export const STARTER_HARDWARE_ID = "bedroom-cpu";
 
-export const slots: readonly SlotSpec[] = [
+export const starterSlots: readonly SlotSpec[] = [
   { id: "source", name: "Input", type: "source" },
   { id: "prepare", name: "Prepare", type: "process" },
   { id: "runtime", name: "Runtime", type: "process" },
   { id: "verify", name: "Verify", type: "process" },
   { id: "sink", name: "Output", type: "sink" },
+];
+
+export const expansionSlots: readonly SlotSpec[] = [
+  { id: "process-4", name: "Process 4", type: "process" },
+  { id: "process-5", name: "Process 5", type: "process" },
+  { id: "process-6", name: "Process 6", type: "process" },
+];
+
+export const slots: readonly SlotSpec[] = [
+  ...starterSlots.slice(0, -1),
+  ...expansionSlots,
+  starterSlots.at(-1)!,
+];
+
+export const pipelineExpansions: readonly PipelineExpansionSpec[] = [
+  {
+    id: "workstation-expansion-i",
+    name: "Workstation Expansion I",
+    description:
+      "Adds three empty process positions to this workstation's single ordered pipeline.",
+    purchaseCost: 45,
+    processSlots: 6,
+    tradeoff:
+      "More positions create flexibility, but every installed module adds memory, latency, failure exposure, and operating cost.",
+  },
 ];
 
 export const modules: readonly ModuleSpec[] = [
@@ -331,6 +362,7 @@ export const hardware: readonly HardwareSpec[] = [
     watts: 420,
     reliability: 0.985,
     maintenance: 0.18,
+    availableAfterHour: 24,
   },
 ];
 
@@ -346,6 +378,10 @@ export const workloads: readonly WorkloadSpec[] = [
     throughputSensitivity: 0.2,
     rewardMoney: 1.4,
     rewardReputation: 0.05,
+    minimumQuote: 0.04,
+    saturationPerSuccess: 0.012,
+    recoveryPerHour: 0.008,
+    unlock: { completedJobs: 0, reputation: 0 },
   },
   {
     id: "batch-classification",
@@ -358,6 +394,10 @@ export const workloads: readonly WorkloadSpec[] = [
     throughputSensitivity: 1,
     rewardMoney: 1.1,
     rewardReputation: 0.03,
+    minimumQuote: 0.035,
+    saturationPerSuccess: 0.03,
+    recoveryPerHour: 0.018,
+    unlock: { completedJobs: 0, reputation: 0 },
   },
   {
     id: "long-document",
@@ -370,6 +410,10 @@ export const workloads: readonly WorkloadSpec[] = [
     throughputSensitivity: 0.4,
     rewardMoney: 2.2,
     rewardReputation: 0.08,
+    minimumQuote: 0.06,
+    saturationPerSuccess: 0.06,
+    recoveryPerHour: 0.025,
+    unlock: { completedJobs: 0, reputation: 0 },
   },
   {
     id: "competition-run",
@@ -378,11 +422,89 @@ export const workloads: readonly WorkloadSpec[] = [
       "Compute-intensive experiments with quality-sensitive results.",
     baseQuality: 20,
     computeDemand: 28,
-    memoryDemand: 5,
+    memoryDemand: 3,
     latencySensitivity: 0,
     throughputSensitivity: 0.85,
     rewardMoney: 0.2,
     rewardReputation: 0.2,
+    minimumQuote: 0.02,
+    saturationPerSuccess: 0.03,
+    recoveryPerHour: 0.018,
+    unlock: { completedJobs: 0, reputation: 0 },
+  },
+  {
+    id: "code-generation",
+    name: "Code Generation",
+    description: "Quality-sensitive code tasks punish weak evaluation.",
+    baseQuality: 34,
+    computeDemand: 16,
+    memoryDemand: 4,
+    latencySensitivity: 0.7,
+    throughputSensitivity: 0.35,
+    rewardMoney: 2.6,
+    rewardReputation: 0.09,
+    minimumQuote: 0.07,
+    saturationPerSuccess: 0.105,
+    recoveryPerHour: 0.045,
+    unlock: { completedJobs: 12, reputation: 0.3 },
+  },
+  {
+    id: "evaluation-audit",
+    name: "Evaluation Audit",
+    description: "Evidence-heavy audits reward observability over raw speed.",
+    baseQuality: 38,
+    computeDemand: 14,
+    memoryDemand: 3.5,
+    latencySensitivity: 0.25,
+    throughputSensitivity: 0.55,
+    rewardMoney: 2.9,
+    rewardReputation: 0.14,
+    minimumQuote: 0.08,
+    saturationPerSuccess: 0.12,
+    recoveryPerHour: 0.05,
+    unlock: { completedJobs: 22, reputation: 0.8 },
+  },
+  {
+    id: "small-finetune",
+    name: "Small Fine-tune",
+    description:
+      "Long, memory-heavy adaptation with valuable but fragile output.",
+    baseQuality: 42,
+    computeDemand: 34,
+    memoryDemand: 9,
+    latencySensitivity: 0.05,
+    throughputSensitivity: 0.9,
+    rewardMoney: 4.8,
+    rewardReputation: 0.18,
+    minimumQuote: 0.12,
+    saturationPerSuccess: 0.15,
+    recoveryPerHour: 0.06,
+    unlock: {
+      completedJobs: 32,
+      reputation: 1.5,
+      expansionId: "workstation-expansion-i",
+    },
+  },
+  {
+    id: "tool-agent",
+    name: "Tool-use Agent",
+    description:
+      "Multi-step tool work values reliability, evaluation, and memory together.",
+    baseQuality: 36,
+    computeDemand: 30,
+    memoryDemand: 8,
+    latencySensitivity: 0.45,
+    throughputSensitivity: 0.45,
+    rewardMoney: 5.2,
+    rewardReputation: 0.22,
+    minimumQuote: 0.14,
+    saturationPerSuccess: 0.16,
+    recoveryPerHour: 0.065,
+    unlock: {
+      completedJobs: 44,
+      reputation: 2.2,
+      hardwareId: "used-gpu",
+    },
   },
 ];
 
@@ -431,5 +553,19 @@ export function getSlot(id: string): SlotSpec {
 export function findSlot(id: unknown): SlotSpec | undefined {
   return typeof id === "string"
     ? slots.find((item) => item.id === id)
+    : undefined;
+}
+
+export function getPipelineExpansion(id: string): PipelineExpansionSpec {
+  const found = pipelineExpansions.find((item) => item.id === id);
+  if (!found) throw new Error(`Unknown pipeline expansion: ${id}`);
+  return found;
+}
+
+export function findPipelineExpansion(
+  id: unknown,
+): PipelineExpansionSpec | undefined {
+  return typeof id === "string"
+    ? pipelineExpansions.find((item) => item.id === id)
     : undefined;
 }

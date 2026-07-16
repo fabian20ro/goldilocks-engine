@@ -1,15 +1,23 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { getHardware, modules, slots, workloads } from "./catalog";
+import {
+  getHardware,
+  modules,
+  pipelineExpansions,
+  slots,
+  workloads,
+} from "./catalog";
 import {
   applyCommand,
   calculateMetrics,
   createInitialState,
+  getWorkloadQuote,
   hasValidStateIntegrity,
   isStateValid,
   restoreSimulationState,
   sealSimulationState,
   tick,
+  workloadUnlockProgress,
 } from "./engine";
 import { normalizeSeed } from "./rng";
 import type { SimulationCommand, SimulationState } from "./types";
@@ -48,16 +56,23 @@ describe("deterministic simulation engine", () => {
     const settlement = settled.lastSettlement;
 
     expect(settlement).not.toBeNull();
-    expect(settlement?.completed).toBe(settled.jobs.completed);
-    expect(settlement?.failed).toBe(settled.jobs.failed);
-    expect(settlement?.grossPayout).toBe(
-      Number((settled.jobs.completed * 1.4).toFixed(3)),
-    );
-    expect(settled.jobs.grossEarned).toBe(settlement?.grossPayout);
-    expect(settled.jobs.operatingCostsPaid).toBe(settlement?.operatingCost);
-    expect(settlement?.netChange).toBeCloseTo(
-      settled.resources.money - queued.resources.money,
+    expect(settled.jobs.completed + settled.jobs.failed).toBe(5);
+    expect((settlement?.completed ?? 0) + (settlement?.failed ?? 0)).toBe(1);
+    expect(settlement?.taskId).toMatch(/^task-/);
+    expect(settlement?.lockedGrossQuote).toBeGreaterThan(0);
+    expect(settled.jobs.grossEarned).toBeGreaterThan(0);
+    expect(settled.jobs.grossEarned).toBeLessThanOrEqual(7);
+    expect(settled.resources.money - queued.resources.money).toBeCloseTo(
+      settled.jobs.grossEarned - settled.jobs.operatingCostsPaid,
       3,
+    );
+    expect(settlement?.netChange).toBeCloseTo(
+      (settlement?.grossPayout ?? 0) - (settlement?.operatingCost ?? 0),
+      3,
+    );
+    expect(settled.resources.money).toBeCloseTo(
+      settled.resources.money - queued.resources.money,
+      6,
     );
     expect(
       settled.ledger.some((event) => /gross payout/i.test(event.message)),
@@ -66,7 +81,7 @@ describe("deterministic simulation engine", () => {
   });
 
   it("keeps bounded time-speed tick schedules deterministic", () => {
-    const run = (speed: 1 | 4 | 16) => {
+    const run = (speed: 1 | 4 | 16 | 64) => {
       let state = applyCommand(createInitialState(91), {
         type: "QUEUE_JOBS",
         count: 40,
@@ -75,7 +90,7 @@ describe("deterministic simulation engine", () => {
       return state;
     };
 
-    for (const speed of [1, 4, 16] as const) {
+    for (const speed of [1, 4, 16, 64] as const) {
       const left = run(speed);
       const right = run(speed);
       expect(right).toEqual(left);
@@ -273,11 +288,15 @@ describe("deterministic simulation engine", () => {
     delete legacy.ownedModuleIds;
     delete legacy.lastUpgradeNotice;
     const migrated = restoreSimulationState(legacy);
-    expect(migrated.schemaVersion).toBe(4);
+    expect(migrated.schemaVersion).toBe(5);
     expect(migrated.hardwareId).toBe("used-gpu");
     expect(migrated.ownedHardwareIds).toEqual(["bedroom-cpu", "used-gpu"]);
     expect(migrated.ownedModuleIds).toEqual(
-      expect.arrayContaining(migrated.slots.map((slot) => slot.moduleId)),
+      expect.arrayContaining(
+        migrated.slots.flatMap((slot) =>
+          slot.moduleId === null ? [] : [slot.moduleId],
+        ),
+      ),
     );
     expect(migrated.lastUpgradeNotice?.message).toMatch(/migrated/i);
     expect(isStateValid(migrated)).toBe(true);
@@ -301,7 +320,7 @@ describe("deterministic simulation engine", () => {
   it("checks full snapshot integrity and safely reseals valid local recovery", () => {
     const initial = createInitialState(41);
     expect(initial.migration).toEqual({
-      sourceSchemaVersion: 4,
+      sourceSchemaVersion: 5,
       steps: [],
     });
     expect(initial.integrity.algorithm).toBe("fnv1a-32-json-v1");
@@ -577,6 +596,8 @@ describe("deterministic simulation engine", () => {
           grossPayout: 1.4,
           operatingCost: 0.1,
           netChange: Number.NaN,
+          taskId: "invalid-settlement",
+          lockedGrossQuote: 1.4,
         },
       },
       {
@@ -615,6 +636,171 @@ describe("deterministic simulation engine", () => {
     expect(state.jobs.queued).toBe(1);
   });
 
+  it("owns and activates Workstation Expansion I exactly once without auto-filling", () => {
+    const spec = pipelineExpansions[0]!;
+    let state = sealSimulationState({
+      ...createInitialState(71),
+      resources: {
+        ...createInitialState(71).resources,
+        money: spec.purchaseCost,
+      },
+    });
+    const moneyBefore = state.resources.money;
+    state = applyCommand(state, {
+      type: "BUY_EXPANSION",
+      expansionId: spec.id,
+    });
+    expect(state.resources.money).toBe(moneyBefore - spec.purchaseCost);
+    expect(state.ownedExpansionIds).toEqual([spec.id]);
+    const repeated = applyCommand(state, {
+      type: "BUY_EXPANSION",
+      expansionId: spec.id,
+    });
+    expect(repeated.resources.money).toBe(state.resources.money);
+    state = applyCommand(repeated, {
+      type: "SET_EXPANSION_ACTIVE",
+      active: true,
+    });
+    expect(state.activeExpansionId).toBe(spec.id);
+    expect(
+      state.slots.filter(
+        (slot) =>
+          slots.find((item) => item.id === slot.slotId)?.type === "process",
+      ),
+    ).toHaveLength(6);
+    expect(
+      state.slots.filter((slot) => slot.slotId.startsWith("process-")),
+    ).toEqual([
+      { slotId: "process-4", moduleId: null },
+      { slotId: "process-5", moduleId: null },
+      { slotId: "process-6", moduleId: null },
+    ]);
+    expect(isStateValid(state)).toBe(true);
+  });
+
+  it("keeps per-task workload identity and queue-time quotes, then clears waiting only", () => {
+    let state = createInitialState(73);
+    state = applyCommand(state, { type: "QUEUE_JOBS", count: 3 });
+    const accepted = [...state.jobs.waitingTasks];
+    expect(accepted).toHaveLength(3);
+    expect(
+      accepted.every((task) => task.workloadId === "interactive-chat"),
+    ).toBe(true);
+    expect(accepted.map((task) => task.lockedGrossQuote)).toEqual(
+      [...accepted.map((task) => task.lockedGrossQuote)].sort((a, b) => b - a),
+    );
+    state = tick(state, 0.5);
+    const active = state.jobs.activeTask;
+    const demandBefore = state.workloadDemand;
+    const moneyBefore = state.resources.money;
+    const rngBefore = state.rngState;
+    expect(active?.progress).toBeGreaterThan(0);
+    state = applyCommand(state, { type: "CLEAR_WAITING_TASKS" });
+    expect(state.jobs.activeTask).toEqual(active);
+    expect(state.jobs.waitingTasks).toEqual([]);
+    expect(state.jobs.queued).toBe(1);
+    expect(state.workloadDemand).toEqual(demandBefore);
+    expect(state.resources.money).toBe(moneyBefore);
+    expect(state.rngState).toBe(rngBefore);
+    const emptyClear = applyCommand(state, { type: "CLEAR_WAITING_TASKS" });
+    expect(emptyClear).toBe(state);
+  });
+
+  it("saturates completed work, recovers neglected demand, and never earns by idling", () => {
+    let state = createInitialState(79);
+    const initialQuote = getWorkloadQuote(state, "interactive-chat").grossQuote;
+    const initialMoney = state.resources.money;
+    state = tick(state, 60);
+    expect(state.resources.money).toBe(initialMoney);
+    for (let index = 0; index < 12; index += 1) {
+      state = applyCommand(state, { type: "QUEUE_JOBS", count: 1 });
+      state = tick(state, 60);
+    }
+    const saturated = getWorkloadQuote(state, "interactive-chat").grossQuote;
+    expect(saturated).toBeLessThan(initialQuote);
+    const batchBefore = getWorkloadQuote(
+      state,
+      "batch-classification",
+    ).grossQuote;
+    state = tick(state, 60);
+    expect(
+      getWorkloadQuote(state, "interactive-chat").grossQuote,
+    ).toBeGreaterThan(saturated);
+    expect(getWorkloadQuote(state, "batch-classification").grossQuote).toBe(
+      batchBefore,
+    );
+    expect(state.resources.money).toBeGreaterThanOrEqual(0);
+  });
+
+  it("uses schedule-equivalent fixed quanta through 64x", () => {
+    const queued = applyCommand(createInitialState(83), {
+      type: "QUEUE_JOBS",
+      count: 20,
+    });
+    const batched = tick(queued, 32);
+    let stepped = queued;
+    for (let index = 0; index < 64; index += 1) stepped = tick(stepped, 0.5);
+    expect(stepped).toEqual(batched);
+  });
+
+  it("stages four initial and four deterministic later workload unlocks", () => {
+    let state = createInitialState(89);
+    expect(state.unlockedWorkloadIds).toHaveLength(4);
+    expect(workloads).toHaveLength(8);
+    expect(workloadUnlockProgress(state, "code-generation").unlocked).toBe(
+      false,
+    );
+    state = sealSimulationState({
+      ...state,
+      jobs: { ...state.jobs, completed: 12 },
+      resources: { ...state.resources, reputation: 0.3 },
+    });
+    state = applyCommand(state, {
+      type: "SET_COMPUTE_ALLOCATION",
+      percent: 75,
+    });
+    expect(state.unlockedWorkloadIds).toContain("code-generation");
+    expect(workloadUnlockProgress(state, "code-generation").unlocked).toBe(
+      true,
+    );
+  });
+
+  it("migrates schema-v4 aggregate queued work into bounded task identities", () => {
+    const source = applyCommand(createInitialState(97), {
+      type: "QUEUE_JOBS",
+      count: 3,
+    });
+    const legacy = JSON.parse(JSON.stringify(source)) as Record<
+      string,
+      unknown
+    >;
+    legacy.schemaVersion = 4;
+    legacy.contentVersion = "pipeline-toy-3";
+    delete legacy.ownedExpansionIds;
+    delete legacy.activeExpansionId;
+    delete legacy.unlockedWorkloadIds;
+    delete legacy.workloadDemand;
+    const jobs = legacy.jobs as Record<string, unknown>;
+    delete jobs.activeTask;
+    delete jobs.waitingTasks;
+    delete jobs.nextTaskSequence;
+    const migrated = restoreSimulationState(legacy, 97);
+    expect(migrated.schemaVersion).toBe(5);
+    expect(migrated.jobs.queued).toBe(3);
+    expect(migrated.jobs.waitingTasks).toHaveLength(3);
+    expect(
+      migrated.jobs.waitingTasks.every(
+        (task) =>
+          task.workloadId === "interactive-chat" &&
+          task.lockedGrossQuote === 1.4,
+      ),
+    ).toBe(true);
+    expect(migrated.migration.steps).toContain(
+      "schema-4-to-5-task-market-expansion",
+    );
+    expect(isStateValid(migrated)).toBe(true);
+  });
+
   it("keeps bounded ledger event identifiers unique", () => {
     let state = createInitialState();
     for (let index = 0; index < 120; index += 1)
@@ -640,6 +826,20 @@ describe("simulation properties", () => {
     fc.record({
       type: fc.constant("SET_WORKLOAD" as const),
       workloadId: fc.constantFrom(...workloads.map((item) => item.id)),
+    }),
+    fc.record({
+      type: fc.constant("BUY_EXPANSION" as const),
+      expansionId: fc.constantFrom(
+        ...pipelineExpansions.map((item) => item.id),
+      ),
+    }),
+    fc.record({
+      type: fc.constant("SET_EXPANSION_ACTIVE" as const),
+      active: fc.boolean(),
+    }),
+    fc.record({
+      type: fc.constant("REMOVE_MODULE" as const),
+      slotId: fc.constantFrom(...slots.map((item) => item.id)),
     }),
     fc.record({
       type: fc.constant("PLACE_MODULE" as const),
@@ -672,6 +872,7 @@ describe("simulation properties", () => {
     }),
     fc.constant({ type: "TOGGLE_BRANCH" as const }),
     fc.constant({ type: "TOGGLE_PAUSE" as const }),
+    fc.constant({ type: "CLEAR_WAITING_TASKS" as const }),
   );
 
   it("same seeds and commands always produce identical state", () => {

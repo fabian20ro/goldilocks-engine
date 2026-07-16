@@ -1,115 +1,107 @@
-# Round 012 implementation handoff
+# Round 015 implementation handoff
 
 ## Implemented behavior summary
 
-The Milestone 0/1 Pipeline Toy now includes D-006's bounded purchasing redesign, motivated by the immutable feedback in `.agent/playtests/2026-07-16-purchase-loop.md`:
+The bounded Workstation Expansion I / per-task demand slice authorized in D-007 and the targeted `plan.md` Milestone 2 update is implemented:
 
-- Successful job settlements start from $0 and fund a persistent equipment economy. The deterministic default path can afford Precision Cleaner after at most four successful jobs and Used 12 GB GPU after at most fourteen, including that module purchase.
-- Schema-v4 simulation state owns the Bedroom CPU and all former starter-catalog modules. Six new paid module choices cover preparation, model, evaluation, and delivery roles. The existing three hardware profiles are visible priced choices.
-- `BUY_MODULE`, `BUY_HARDWARE`, and `EQUIP_HARDWARE` are deterministic worker commands. A successful purchase deducts exactly once and adds durable ownership. Repeated, already-owned, insufficient-funds, exact-funds, unknown/malformed, unowned-equip, and incompatible-place paths preserve nonnegative valid state and produce explicit feedback where applicable.
-- Only owned modules can be placed. Only owned rigs can be equipped. Purchases do not silently equip. Hardware and module changes capture the prior metrics and announce observed throughput, latency, memory, quality, thermal, CU, capacity, or operating-cost deltas.
-- Upgrades is a fourth portrait navigation view. Its labeled route is money → compare → cost → buy → owned → equip/add → observed delta. Rig cards expose price, CU, memory, watts/thermal limit, reliability, maintenance, and comparison with the equipped rig. Module cards expose compatibility/role, throughput, latency, memory, quality, reliability, observability, per-job cost, and comparison with the active same-role module.
-- The Build drawer now labels every card as locked, owned, or equipped. Locked cards open Upgrades. Owned cards support the retained tap/snap and real touch-drag paths. Selecting an owned module names replacement/reorder behavior and highlights only compatible slots; fixed source + three process positions + sink and the Shadow junction remain unchanged.
-- Quick Start explains the complete purchase journey and pacing while keeping later expansion content explicitly deferred. Upgrades opens directly to the store rather than remaining below the long tutorial; Help returns to Build and always reopens the tutorial.
-- Full run state persists through the Worker to local storage: money, ownership, equipped rig, active modules, workload, policies, queue/results, ledger, and metrics survive reload/resume and offline use. Schema-v4 snapshots carry explicit migration metadata and a deterministic full-snapshot integrity digest that is resealed on every engine transition. Restore validates all catalog, numeric, boolean, label, warning, notice, metric, settlement, and ledger fields before recalculation. Structurally valid older/local edits are annotated and resealed; malformed render-bound values fall back safely. Safe schema-v3 states migrate.
-- Saved preset cards read their own stored `hardwareId`, so later live equipment changes cannot mislabel the configuration they will load. Legacy preset-v1 records still gain the Bedroom CPU.
-- Content version is `pipeline-toy-3`; schema version is 4; scope-isolated service-worker cache is v6.
-- Researchers, longer/multiple pipelines, newer-model content, creator/hype/fear systems, personal schedule, and all other Milestone 2+ systems remain absent.
+- Workstation Expansion I costs $45, is purchased exactly once, and is activated separately. It expands the single ordered pipeline from three to six process positions. Process 4–6 start empty/bypassed; purchase never buys, clones, equips, or auto-fills modules.
+- Every process position can be emptied or filled with one owned compatible module. Empty positions have no memory, latency, cost, or processing effect. An expanded-stage cue names the internal pipeline scroll and the initially below-fold Process 4–6/Output stages.
+- Pipeline topology, empty positions, active expansion, module placement, hardware, policies, and workload persist through schema-5 saves, offline reload, and presets. Presets retain honest starter/expanded topology.
+- Eight workload cards are visible from the start. Four are initially unlocked; four show exact job/reputation/equipment requirements and unlock in order without a second currency.
+- Accepted work is a per-task FIFO queue. Each task receives an immutable ID, workload, queue-time gross quote, and progress. Changing the selected workload affects new tasks only. Completion shows locked gross, actual configuration cost, and net; failed work receives no gross payout.
+- Each workload has deterministic demand saturation, minimum quote, and simulated-time recovery. Pending reservations reduce later quotes. Repeated single-workload farming eventually has nonpositive expected margin, while rotation retains a profitable path. Idle time never creates money.
+- Waiting tasks can be cleared only after confirmation. The active task, its progress/identity/quote, money, demand, reputation, RNG, and settled history remain unchanged.
+- Fixed 1×/4×/16×/64× controls advance the same 0.5-second simulation quanta. Animation and pause remain separate.
+- Global page changes use only the four bottom tabs. Warning and module copy point to those tabs rather than duplicating page-opening actions. Rig/module detail is progressively disclosed.
+- The tutorial explains earning, CU/memory/thermal pressure, task quotes/costs, demand, expansion purchase/activation/empty slots, 64× time, waiting-task clearing, and honest presets.
+- Schema version is 5; content version is `pipeline-toy-4`; scope-isolated service-worker cache is v7. Schema-3 and schema-4 saves migrate safely. Aggregate legacy queues become deterministic task records without losing the queue count or current workload identity.
 
-## Plan requirements and D-006 coverage
+The source feedback is preserved in `.agent/playtests/2026-07-16-progression-expansion.md`. D-007 records the owner's process waiver and the bounded scope. The original human-study gates remain visible in `plan.md`; this implementation does not claim they passed.
 
-| Requirement                             | Implementation                                                                                                             | Committed evidence                                                                            |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Earned money and settlement loop        | Existing distinct workload payout/cost mechanics now begin at $0 and fund purchases                                        | Engine settlement tests; round-009 money case; round-012 first-purchase browser journey       |
-| Three hardware choices with constraints | Bedroom, used GPU, workstation; price/CU/memory/power/heat/reliability/maintenance tradeoffs                               | Catalog/unit tests; Upgrades rig cards; retained M0 balance; round-012 exact-funds/equip case |
-| Meaningful paid modules                 | Six paid choices with a measured benefit and a throughput/latency/memory/quality/reliability/observability/cost constraint | `upgradeBalance.test.ts`; Store comparisons; first-purchase/add browser case                  |
-| Exact-once transactional ownership      | Worker commands check catalog, ownership, funds, and compatibility before commit; double activation cannot deduct twice    | Engine/worker malformed and purchase tests; round-012 double-click exact-funds case           |
-| ≤5 / ≤15 pacing                         | Default path buys Precision Cleaner, then reaches Used GPU                                                                 | `npm run balance:upgrades`: 20,001 seeds, worst 4 and 14 successful jobs, 0 failures          |
-| Discoverable module addition            | Locked/owned/equipped labels; locked-card Store route; selected compatible highlights; tap/snap and touch-drag             | Round-012 drawer-to-store/paid tap path; retained pointer/touch drag and drawer-pan cases     |
-| Portrait/accessibility UX               | 320/393, 200% text, 44px targets, no horizontal document overflow, text states, accessible names                           | Round-012 two-width Store stress cases plus retained verifier accessibility suites            |
-| Visible observed consequences           | Equip/place captures baseline and reports concrete deltas; Inspector remains available                                     | Engine equip/place tests; round-012 observed-delta assertions                                 |
-| Persistence and migration               | Schema-v4 integrity/migration metadata, exhaustive restore validation, schema-v3 migration, preset-v1 rig default          | Engine/worker restore tests; unchanged verifier round-012 persistence-boundary cases          |
-| Saved configuration identity            | Preset description and load action both use the preset's stored rig, independent of live equipment                         | V-016 Playwright regression                                                                   |
-| Root/Pages PWA and cache isolation      | Root and `/goldlocks-engine/` packages; cache v6 deletes stale same-scope caches only                                      | Root offline cases; Pages online/cache/offline/Worker cases                                   |
-| Scope boundary                          | D-006 supersedes only D-005 criterion 6; plan unchanged; expansion systems absent                                          | `.agent/DECISIONS.md`, immutable playtest record, source/tree inspection                      |
+## Plan requirements covered
 
-## Prior verifier findings resolved or preserved
+| Requirement                         | Implementation                                                                                                    | Evidence                                                                       |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Expansion purchase and topology     | Exact-once $45 purchase; explicit activation; 3→6 process positions; new slots empty; no module duplication       | Engine command tests; round-015 browser purchase/topology case                 |
+| Honest pipeline composition         | Nullable process modules; empty/bypass behavior; owned compatible movement; added-stage scroll cue                | Engine invariants/property tests; round-015 placement and 320/393 visual cases |
+| Per-task FIFO identity              | Immutable task ID/workload/locked quote/progress; active + waiting UI; selected workload applies only to new work | Engine queue/settlement tests; round-015 task-market case                      |
+| Clear waiting only                  | Confirmation; active task preserved; no payout/refund/demand/RNG mutation                                         | Engine exact-state assertions; round-015 browser case                          |
+| Demand economy                      | Saturation, pending reservation pressure, quote floor, simulated-time recovery, trend/reason copy                 | Engine demand tests; progression balance gate; Jobs UI                         |
+| Eight staged workloads              | Four initial plus four requirement-locked cards; deterministic ordered unlocks                                    | Catalog/engine unlock tests; eight-card browser assertion                      |
+| Progression bounds                  | First module ≤5 successes; alternate rig ≤15; expansion 8–16h; full catalogue 24–72h                              | Upgrade balance and 41-seed progression balance                                |
+| No dominant farming / no idle money | Single-workload expected margin eventually ≤0; rotation profitable; idle ticks do not pay                         | Progression unit and deterministic sweep                                       |
+| Fixed fast-forward                  | 1×/4×/16×/64× use identical fixed quanta and preserve settlements/resources/ledger identities                     | Schedule-equivalence engine test; browser controls                             |
+| Portrait/accessibility              | 320/393 CSS px, 200% text, ≥44px visible buttons, no document overflow, reduced motion, touch/pointer placement   | Root browser suite, retained verifier cases, headed visual inspection          |
+| Bottom-tab routing / disclosure     | No duplicate global page-opening CTAs; upgrade details use native disclosure                                      | Browser assertions and source inspection                                       |
+| Persistence/migration/offline       | Schema-5 integrity; schema-3/4 migration; expanded preset/save/offline resume; cache v7                           | Unit migration tests; root and Pages browser suites                            |
 
-- V-001 through V-015 remain covered. No immutable report was changed.
-- V-016 is resolved: configuration cards render `preset.hardwareId` rather than the current `state.hardwareId`; the unchanged verifier reproduction passes.
-- V-017 is resolved: schema-v4 state now contains migration metadata and a deterministic full-state integrity digest; exhaustive restoration validation rejects malformed event text and every other UI-bound field before React receives it. Structurally valid integrity mismatches are recorded as `integrity-resealed` and preserved, while invalid content restarts safely. The unchanged verifier crash regression passes.
-- The verifier-owned round-010 pressure regression retains all original assertions. Its setup now explicitly restores Quantized Model + Interactive Chat and waits for schema-v4 persistence before reload, because reload intentionally preserves the preceding Full Precision/Batch configuration instead of resetting it.
-- The Pages cache expectations advance to v6; stale-scope deletion and foreign-cache preservation assertions are unchanged.
-- The prior human blocker B-005 remains honest. The new feedback authorizes redesign and promises a later test; it does not satisfy either human gate.
+## Prior verifier findings
+
+- V-001 through V-017 remain resolved and their retained regression tests pass. No immutable verifier report was changed.
+- The previously recorded B-005 human-study blocker is owner-waived for this bounded implementation slice under D-007. That waiver permits implementation; it is not empirical evidence that either original human gate passed.
+- All reports under `.agent/verification/` were read before implementation. Their evidence remains immutable.
 
 ## Reproducible setup, startup, and verification
 
 Requirements: Node.js 20.19+ (or 22.12+) and npm.
 
 ```sh
-# Locked dependencies and ignored repository-local Chromium
+# Locked dependencies plus ignored repository-local Chromium
 ./scripts/setup
 
 # Deterministic loopback development server
 ./scripts/run
 # http://127.0.0.1:4173
 
-# Canonical clean check: setup, format, lint, typecheck, unit/property,
-# both balance models, root/Pages builds, and both packaged browser suites
+# Canonical full gate: setup, formatting, lint, typecheck, coverage,
+# all balance models, root/Pages builds, root E2E, and Pages/offline E2E
 ./scripts/verify
 
-# Focused deterministic purchase pacing
-npm run balance:upgrades
-
-# Root packaged PWA browser acceptance
+# Focused gates
+npm run balance:progression
+npm run test:e2e -- tests/e2e/round-015-expansion.spec.ts
 npm run test:e2e
-
-# GitHub Pages package and scoped browser acceptance
-npm run build:pages
 npm run test:e2e:pages
 ```
 
-Dependency cache: ignored `.cache/npm`. Browser cache: ignored `.cache/ms-playwright`. `npm run test:e2e` uses `./scripts/run-e2e`; Pages uses `./scripts/run-pages-e2e`. Both bind deterministic `127.0.0.1:4173`, wait for readiness, and let Playwright clean up the managed server.
+Dependency cache: ignored `.cache/npm`. Browser cache: ignored `.cache/ms-playwright`. Playwright CLI daemon cache: ignored `.cache/pwcli-daemon`; optional visual artifacts: ignored `output/playwright/`. Root and Pages servers bind `127.0.0.1:4173`, wait for readiness, and are cleaned up by Playwright.
 
-The optional Playwright CLI wrapper was not used as evidence: its daemon attempted a user-home cache. All acceptance uses pinned project `@playwright/test` 1.61.1 and the repository-local browser. On this managed macOS host, direct Chromium launches can hit the known Mach-port denial; exact scoped reruns outside that sandbox boundary are the reproducible evidence path.
+On this managed macOS host, a direct browser launch can fail with a Mach-port permission denial inside the filesystem sandbox. The exact same repository-local command succeeds outside that boundary; this is an environment constraint, not a skipped test or product workaround.
 
 ## Important architectural decisions
 
-- Purchasing belongs inside the deterministic simulation/Worker boundary, not React/local UI state. Money, ownership, equip, baseline capture, feedback, event IDs, and save state therefore share one ordered command stream.
-- Catalog price 0 defines starter-owned modules. Paid modules are data-driven rather than hard-coded UI products.
-- Buying and equipping are separate commands. This prevents an accidental purchase from silently changing a running pipeline and makes exact-once behavior easy to inspect.
-- Run persistence stores schema-versioned simulation state, migration history, and a deterministic FNV-1a digest over the complete snapshot excluding the digest itself. Runtime transitions update the digest. Restore treats it as corruption evidence: structurally valid mismatches are explicitly annotated and resealed to preserve recoverable local progress; invalid fields never cross into rendering and restart safely. Schema-v3 migration accepts only known compatible catalog/slot data and safe numeric values.
-- The authorized redesign does not alter `plan.md`; D-006 is the scoped exception and explicitly defers the requested longer pipeline, researchers, newer-model content, and hype economy until later evidence.
-- Store UX uses textual state and explanations rather than color or screenshots as the source of truth. Browser assertions check the full journey; visual inspection supplements them.
+- Expansion, task acceptance, quotes, demand, purchases, unlocks, and clearing live inside the deterministic simulation/Worker command stream. React only renders state and submits commands.
+- A task locks gross quote and workload at acceptance. Operating cost remains the actual completion-time configuration cost, making reconfiguration an explicit economic choice rather than silently rewriting accepted demand.
+- Demand recovery uses simulated time, including paused/idle time; it never pays money. Fixed 0.5-second quanta make speed schedules equivalent.
+- Workstation Expansion I is topology, not inventory. Activation only adds nullable positions; module ownership remains independent.
+- The 24 GB Workstation has a data-driven hour-24 catalogue gate. This proves money alone cannot complete the entire catalogue before 24 simulated hours while leaving representative completion below 72 hours.
+- The established `goldilocks-simulation-save-v4` localStorage address is intentionally retained while the payload advances to schema 5. Existing runs and verifier-owned browser probes therefore exercise migration in place; `schemaVersion` is the save-format contract.
+- Harmless storage integrity mismatches are resealed only after full structural validation. Malformed render-bound values still restart safely.
 
 ## Known limitations and risks
 
-- The new human session is not yet supplied. Device, exact uninterrupted duration, reconfiguration timestamps/count, prompting, two complete explained tradeoffs, and proceed/redesign conclusions remain unknown.
-- Starter catalog alternatives remain owned to preserve the existing Pipeline Toy repertoire and every retained regression. The six new variants and two alternate rigs form the paid progression layer.
-- No selling/refunds. This is deliberate D-006 scope, not a missing transaction path.
-- The queue remains aggregate rather than workload-tagged; changing workload before resolution changes queued processing/payout basis.
-- Browser acceptance uses pinned Chromium. Physical-device battery/thermal behavior, platform-specific screen-reader output, optional haptics/audio, and non-Chromium browsers remain unverified.
-- localStorage is the bounded persistence mechanism. Storage denial leaves the current session playable but cannot provide cross-reload durability.
-- Wall-clock callback cadence can vary under browser throttling; ordered fixed tick quanta remain deterministic.
-- Implementer does not push or deploy. Exact-SHA remote publication remains Orchestrator work after fresh verification.
+- D-007's owner feedback did not provide device, exact duration, reconfiguration timestamps/count, or structured telemetry. The source record states those fields are unknown rather than inferring them.
+- Researcher teams, hype/creator/fear economy, parallel pipelines, automation, newer-model content, deeper maintenance, and social systems remain deferred Milestone 2+ work. This slice keeps one workstation and one ordered pipeline.
+- Demand and progression values are deterministic toy-economy tuning, not a calibrated real marketplace. The 41-seed gate establishes stated bounds, not long-term human fun.
+- No selling, refunds, queue repricing, cancellation payout, or module auto-purchase. Clear waiting is intentionally lossless only in state mutation, not a refund mechanism, because acceptance spends no money.
+- Browser acceptance uses pinned Chromium. Physical-device thermal/battery behavior, non-Chromium engines, platform screen readers, haptics, and audio remain unverified.
+- localStorage denial leaves the in-memory session playable but cannot provide cross-reload durability.
+- Implementer does not push, deploy, or issue acceptance. Exact-SHA publication and fresh independent PASS remain Orchestrator/Verifier work.
 
 ## Checks executed before final candidate
 
-- `./scripts/verify`: final PASS from locked dependency recreation through packaged browser acceptance. It includes formatting, lint, typecheck, 44/44 unit/property/configuration/migration/purchase/integrity tests with coverage thresholds, both balance models, the root and Pages builds, 36/36 root browser cases, and 2/2 Pages browser cases.
-- Unchanged verifier reproduction `npm run test:e2e -- --grep "verifier round 012 persistence boundaries"`: PASS 2/2 for V-016 stored-rig identity and V-017 malformed-ledger recovery.
-- `npm run balance:upgrades`: included final PASS, 20,001/20,001 seeds; zero failures; module affordable by successful job 4 worst case; alternate rig by job 14 worst case; maximum 23 attempts to 15 successes.
-- Repair development's first unit run exposed that two direct overflow fixtures needed resealing under the new integrity invariant; the next exposed an over-specific implementation-test expectation for safe migration-metadata repair. The fixtures were updated to exercise the new invariant without changing any verifier-owned test. Subsequent unit runs passed 44/44.
-- The first repair canonical attempt stopped at `.agent/HANDOFF.md` formatting before lint or behavior checks. Formatting was corrected; the complete rerun passed every stage.
-- The original purchase candidate's canonical/browser gate had already found and corrected the locked-card disabled semantics and tutorial/store hierarchy defects. Those retained regressions remain in the final 36-case root result.
-- Visual capture at 393 and 320/200% found the tutorial/store hierarchy defect; fixed by showing Quick Start only in Build and making Help reopen it there.
+- `npm test`: PASS, 56/56 unit/property/migration/economy tests with coverage thresholds.
+- `npm run balance:progression`: PASS, 41/41 deterministic seeds; expansion 13.03–15.63 simulated hours; full catalogue 40.61–43.98 hours; zero failures.
+- `npm run test:e2e`: PASS, 42/42 root browser cases after repair.
+- `npm run test:e2e:pages`: PASS, 2/2 GitHub Pages/offline/cache-isolation cases. The first sandboxed launch failed at macOS Mach registration; the exact escalated rerun passed.
+- `npm run test:e2e -- tests/e2e/round-015-expansion.spec.ts`: PASS, 4/4 after the final added-stage discoverability cue.
+- `npm run format:check`, `npm run lint`, and `npm run typecheck`: PASS before final cue; rerun by the final canonical gate.
+- Headed Playwright CLI at 393 px inspected starter Build and the exact purchase → owned → activate → expanded Build journey. Hierarchy, text states, fixed navigation, drawer affordance, controls, and spacing were legible. It found the initially below-fold expanded stages; the added scroll cue is the resulting UX repair. No unresolved visual overlap/cutoff remained.
+- `./scripts/verify`: PASS as one uninterrupted elevated run: clean dependency recreation, format, lint, typecheck, 56/56 covered tests, base model, 20,001-seed upgrade balance, 41-seed progression balance, production build, 42/42 root browser cases, and 2/2 Pages/offline/cache-isolation cases. The preceding sandboxed attempt passed every non-browser stage, then all Chromium launches were denied at macOS Mach registration before page creation; no product assertion failed.
 
 ## Checks not run
 
-- GitHub Actions push/deployment/live exact-SHA validation: intentionally not run by the Implementer.
-- Required post-purchase 30-minute human playtest: user promised it after deployment; no result exists yet.
+- Git push, GitHub Actions, deployment, and live exact-candidate-SHA URL validation: intentionally left to the Orchestrator after fresh verification.
+- The owner's promised post-step-two 30-minute play session: not yet performed; this candidate exists to make that session meaningful.
 - Physical mobile device, non-Chromium browser, battery/CPU/thermal profile, and actual assistive-technology output: infrastructure not supplied.
-- Milestones 2–6 and expansion acceptance: explicitly outside D-006.
-
-## Exact remaining human gate input
-
-After the candidate is committed, pushed, and deployed, record the tested candidate SHA, device, date, and an uninterrupted thirty-minute session. Include voluntary reconfiguration timestamps/count, prompting status, at least two participant-explained tradeoffs involving purchases/pipeline constraints, an explicit assessment of whether the economy is interesting without narrative spectacle, and a proceed/redesign conclusion.
+- Deferred researcher/hype/parallel-pipeline/new-model systems: outside this authorized bounded slice.

@@ -1,6 +1,7 @@
 import {
   findHardware,
   findModule,
+  findPipelineExpansion,
   findSlot,
   findWorkload,
   getHardware,
@@ -8,7 +9,9 @@ import {
   getWorkload,
   hardware,
   modules,
+  pipelineExpansions,
   slots,
+  starterSlots,
   starterModuleIds,
   STARTER_HARDWARE_ID,
   workloads,
@@ -22,13 +25,25 @@ import {
   type MigrationMetadata,
   type PipelineMetrics,
   type PipelineSlotState,
+  type QueuedTask,
   type SaveIntegrity,
   type SimulationCommand,
   type SimulationState,
   type UpgradeNotice,
+  type WorkloadDemandState,
+  type WorkloadQuote,
 } from "./types";
 
 const MAX_LEDGER_EVENTS = 80;
+const MAX_QUEUED_TASKS = 99;
+const FIXED_TICK_SECONDS = 0.5;
+export const SIMULATION_TIME_SCALE = 70;
+
+export function getSimulationAgeHours(
+  state: Pick<SimulationState, "tick">,
+): number {
+  return (state.tick * SIMULATION_TIME_SCALE) / 3_600_000;
+}
 const ROLE_ORDER = ["preparation", "model", "evaluation"] as const;
 const EVENT_KINDS = ["info", "success", "warning", "failure"] as const;
 const BOTTLENECKS = [
@@ -86,14 +101,16 @@ export function hasValidStateIntegrity(state: SimulationState): boolean {
 }
 
 function modulesFor(state: Pick<SimulationState, "slots">) {
-  return state.slots.map((slot) => getModule(slot.moduleId));
+  return state.slots.flatMap((slot) =>
+    slot.moduleId ? [getModule(slot.moduleId)] : [],
+  );
 }
 
 function calculateOrderWarnings(
   state: Pick<SimulationState, "slots">,
 ): string[] {
   const processRoles = state.slots
-    .map((slot) => getModule(slot.moduleId).role)
+    .flatMap((slot) => (slot.moduleId ? [getModule(slot.moduleId).role] : []))
     .filter((role): role is (typeof ROLE_ORDER)[number] =>
       ROLE_ORDER.includes(role as (typeof ROLE_ORDER)[number]),
     );
@@ -127,7 +144,10 @@ export function calculateMetrics(
     | "rngState"
   >,
 ): PipelineMetrics {
-  const selectedModules = modulesFor(state);
+  const selectedSlots = state.slots.flatMap((slot) =>
+    slot.moduleId ? [{ slot, module: getModule(slot.moduleId) }] : [],
+  );
+  const selectedModules = selectedSlots.map((entry) => entry.module);
   const selectedHardware = getHardware(state.hardwareId);
   const workload = getWorkload(state.workloadId);
   const allocation = clamp(state.computeAllocation, 25, 100) / 100;
@@ -250,7 +270,7 @@ export function calculateMetrics(
   );
   const bottleneckSlotId =
     dominantBottleneck === "module throughput"
-      ? (state.slots[slowestModuleIndex]?.slotId ?? "runtime")
+      ? (selectedSlots[slowestModuleIndex]?.slot.slotId ?? "runtime")
       : dominantBottleneck === "stage ordering"
         ? "prepare"
         : "runtime";
@@ -314,6 +334,126 @@ function recalculate(state: SimulationState): SimulationState {
   return { ...state, metrics, lastWarning };
 }
 
+function demandFor(
+  state: Pick<SimulationState, "workloadDemand">,
+  workloadId: string,
+): WorkloadDemandState {
+  return (
+    state.workloadDemand.find((item) => item.workloadId === workloadId) ?? {
+      workloadId,
+      level: 1,
+      previousQuote: getWorkload(workloadId).rewardMoney,
+      successfulCompletions: 0,
+    }
+  );
+}
+
+export function getWorkloadQuote(
+  state: Pick<SimulationState, "workloadDemand">,
+  workloadId: string,
+  pendingReservations = 0,
+): WorkloadQuote {
+  const workload = getWorkload(workloadId);
+  const demand = demandFor(state, workloadId);
+  const reservationPressure =
+    Math.max(0, Math.trunc(pendingReservations)) *
+    workload.saturationPerSuccess *
+    0.45;
+  const effectiveLevel = clamp(demand.level - reservationPressure, 0, 1);
+  const grossQuote = round(
+    workload.minimumQuote +
+      (workload.rewardMoney - workload.minimumQuote) * effectiveLevel,
+    3,
+  );
+  const difference = grossQuote - demand.previousQuote;
+  const trend =
+    difference > 0.004 ? "rising" : difference < -0.004 ? "falling" : "steady";
+  const reason =
+    pendingReservations > 0
+      ? `${pendingReservations} accepted ${pendingReservations === 1 ? "task reserves" : "tasks reserve"} nearby demand; every task keeps its own quote.`
+      : trend === "falling"
+        ? "Recent successful completions saturated this workload."
+        : trend === "rising"
+          ? "Time without a completion is restoring demand."
+          : demand.successfulCompletions === 0
+            ? "Fresh demand; no successful completion has saturated it yet."
+            : "Demand is stable between saturation and time recovery.";
+  return {
+    workloadId,
+    grossQuote,
+    demandPercent: Math.round(effectiveLevel * 100),
+    trend,
+    reason,
+  };
+}
+
+export function workloadUnlockProgress(
+  state: Pick<
+    SimulationState,
+    | "jobs"
+    | "resources"
+    | "ownedHardwareIds"
+    | "ownedExpansionIds"
+    | "unlockedWorkloadIds"
+  >,
+  workloadId: string,
+): { unlocked: boolean; requirements: readonly string[] } {
+  const workload = getWorkload(workloadId);
+  const requirement = workload.unlock;
+  const requirements: string[] = [];
+  if (requirement.completedJobs > 0)
+    requirements.push(
+      `${Math.min(state.jobs.completed, requirement.completedJobs)}/${requirement.completedJobs} successful jobs`,
+    );
+  if (requirement.reputation > 0)
+    requirements.push(
+      `${Math.min(state.resources.reputation, requirement.reputation).toFixed(1)}/${requirement.reputation.toFixed(1)} reputation`,
+    );
+  if (requirement.hardwareId) {
+    const rig = getHardware(requirement.hardwareId);
+    requirements.push(
+      `${state.ownedHardwareIds.includes(rig.id) ? "Owned" : "Need"} ${rig.name}`,
+    );
+  }
+  if (requirement.expansionId) {
+    const expansion = findPipelineExpansion(requirement.expansionId);
+    if (expansion)
+      requirements.push(
+        `${state.ownedExpansionIds.includes(expansion.id) ? "Owned" : "Need"} ${expansion.name}`,
+      );
+  }
+  const met =
+    state.jobs.completed >= requirement.completedJobs &&
+    state.resources.reputation >= requirement.reputation &&
+    (!requirement.hardwareId ||
+      state.ownedHardwareIds.includes(requirement.hardwareId)) &&
+    (!requirement.expansionId ||
+      state.ownedExpansionIds.includes(requirement.expansionId));
+  return {
+    unlocked: met || state.unlockedWorkloadIds.includes(workloadId),
+    requirements,
+  };
+}
+
+function refreshWorkloadUnlocks(state: SimulationState): SimulationState {
+  let next = state;
+  for (const workload of workloads) {
+    if (next.unlockedWorkloadIds.includes(workload.id)) continue;
+    if (!workloadUnlockProgress(next, workload.id).unlocked) continue;
+    next = appendEvent(
+      {
+        ...next,
+        unlockedWorkloadIds: [...next.unlockedWorkloadIds, workload.id],
+      },
+      {
+        kind: "success",
+        message: `${workload.name} unlocked. Its demand, quote, and operating tradeoffs are now available.`,
+      },
+    );
+  }
+  return next;
+}
+
 export function createInitialState(seed = 20260715): SimulationState {
   const normalizedSeed = normalizeSeed(seed);
   const base = {
@@ -330,6 +470,23 @@ export function createInitialState(seed = 20260715): SimulationState {
     hardwareId: STARTER_HARDWARE_ID,
     ownedHardwareIds: [STARTER_HARDWARE_ID],
     ownedModuleIds: starterModuleIds,
+    ownedExpansionIds: [],
+    activeExpansionId: null,
+    unlockedWorkloadIds: workloads
+      .filter(
+        (workload) =>
+          workload.unlock.completedJobs === 0 &&
+          workload.unlock.reputation === 0 &&
+          !workload.unlock.hardwareId &&
+          !workload.unlock.expansionId,
+      )
+      .map((workload) => workload.id),
+    workloadDemand: workloads.map((workload) => ({
+      workloadId: workload.id,
+      level: 1,
+      previousQuote: workload.rewardMoney,
+      successfulCompletions: 0,
+    })),
     workloadId: "interactive-chat",
     slots: [
       { slotId: "source", moduleId: "request-buffer" },
@@ -350,6 +507,9 @@ export function createInitialState(seed = 20260715): SimulationState {
       paused: false,
       grossEarned: 0,
       operatingCostsPaid: 0,
+      activeTask: null,
+      waitingTasks: [],
+      nextTaskSequence: 1,
     },
     lastSettlement: null,
     metrics: {} as PipelineMetrics,
@@ -385,14 +545,38 @@ function updateSlots(
 
   if (fromSlotId && fromSlotId !== slotId) {
     const sourceState = state.slots.find((item) => item.slotId === fromSlotId);
-    if (!sourceState) return null;
+    if (!sourceState || sourceState.moduleId !== moduleId) return null;
     const sourceSlot = findSlot(fromSlotId);
     const destinationModule = findModule(destinationState.moduleId);
-    if (!sourceSlot || !destinationModule) return null;
-    if (!destinationModule.slotTypes.includes(sourceSlot.type)) return null;
+    if (!sourceSlot) return null;
+    if (
+      destinationModule &&
+      !destinationModule.slotTypes.includes(sourceSlot.type)
+    )
+      return null;
     return state.slots.map((item) => {
       if (item.slotId === slotId) return { ...item, moduleId };
       if (item.slotId === fromSlotId)
+        return { ...item, moduleId: destinationState.moduleId };
+      return item;
+    });
+  }
+
+  const equippedSource = state.slots.find(
+    (item) => item.moduleId === moduleId && item.slotId !== slotId,
+  );
+  if (equippedSource) {
+    const sourceSlot = findSlot(equippedSource.slotId);
+    const destinationModule = findModule(destinationState.moduleId);
+    if (
+      !sourceSlot ||
+      (destinationModule &&
+        !destinationModule.slotTypes.includes(sourceSlot.type))
+    )
+      return null;
+    return state.slots.map((item) => {
+      if (item.slotId === slotId) return { ...item, moduleId };
+      if (item.slotId === equippedSource.slotId)
         return { ...item, moduleId: destinationState.moduleId };
       return item;
     });
@@ -473,6 +657,11 @@ function applyValidCommand(
           kind: "warning",
           message: "Workload change rejected: unknown workload.",
         });
+      if (!workloadUnlockProgress(state, workload.id).unlocked)
+        return appendEvent(state, {
+          kind: "warning",
+          message: `${workload.name} is locked. Complete its listed progression requirements first.`,
+        });
       const next = recalculate({
         ...state,
         workloadId: command.workloadId,
@@ -496,6 +685,11 @@ function applyValidCommand(
         return withUpgradeNotice(state, {
           kind: "info",
           message: `${item.name} is already owned. No money was deducted.`,
+        });
+      if (getSimulationAgeHours(state) < (item.availableAfterHour ?? 0))
+        return withUpgradeNotice(state, {
+          kind: "warning",
+          message: `${item.name} becomes orderable at simulated hour ${item.availableAfterHour}. Current age: ${getSimulationAgeHours(state).toFixed(1)}h. No money was deducted.`,
         });
       if (state.resources.money < item.purchaseCost)
         return withUpgradeNotice(state, {
@@ -585,6 +779,114 @@ function applyValidCommand(
         },
       );
     }
+    case "BUY_EXPANSION": {
+      const item = findPipelineExpansion(command.expansionId);
+      if (!item)
+        return withUpgradeNotice(state, {
+          kind: "warning",
+          message: "Pipeline expansion purchase rejected: unknown item.",
+        });
+      if (state.ownedExpansionIds.includes(item.id))
+        return withUpgradeNotice(state, {
+          kind: "info",
+          message: `${item.name} is already owned. No money was deducted.`,
+        });
+      if (state.resources.money < item.purchaseCost)
+        return withUpgradeNotice(state, {
+          kind: "warning",
+          message: `${item.name} costs $${item.purchaseCost.toFixed(2)}; $${(item.purchaseCost - state.resources.money).toFixed(2)} more is required. No money was deducted.`,
+        });
+      return withUpgradeNotice(
+        {
+          ...state,
+          ownedExpansionIds: [...state.ownedExpansionIds, item.id],
+          resources: {
+            ...state.resources,
+            money: round(state.resources.money - item.purchaseCost, 3),
+          },
+        },
+        {
+          kind: "success",
+          message: `${item.name} purchased for $${item.purchaseCost.toFixed(2)} and is now owned. Activate it explicitly; its three new positions start empty and no module was bought or filled automatically.`,
+        },
+      );
+    }
+    case "SET_EXPANSION_ACTIVE": {
+      const item = pipelineExpansions[0];
+      if (!item) return state;
+      if (command.active) {
+        if (!state.ownedExpansionIds.includes(item.id))
+          return withUpgradeNotice(state, {
+            kind: "warning",
+            message: `${item.name} is not owned. Buy it before activating it.`,
+          });
+        if (state.activeExpansionId === item.id) return state;
+        const sink = state.slots.find((slot) => slot.slotId === "sink");
+        const beforeSink = state.slots.filter((slot) => slot.slotId !== "sink");
+        const next = recalculate({
+          ...state,
+          activeExpansionId: item.id,
+          slots: [
+            ...beforeSink,
+            { slotId: "process-4", moduleId: null },
+            { slotId: "process-5", moduleId: null },
+            { slotId: "process-6", moduleId: null },
+            ...(sink ? [sink] : []),
+          ],
+          baselineMetrics: state.metrics,
+          baselineLabel: "Before pipeline expansion",
+        });
+        return withUpgradeNotice(next, {
+          kind: "success",
+          message: `${item.name} activated: six usable process positions in one ordered pipeline. Three new positions are empty/bypassed.`,
+        });
+      }
+      if (state.activeExpansionId === null) return state;
+      const occupiedExtra = state.slots.some(
+        (slot) => slot.slotId.startsWith("process-") && slot.moduleId !== null,
+      );
+      if (occupiedExtra)
+        return withUpgradeNotice(state, {
+          kind: "warning",
+          message:
+            "Expansion remains active. Remove modules from Process 4–6 before returning to starter capacity.",
+        });
+      const next = recalculate({
+        ...state,
+        activeExpansionId: null,
+        slots: starterSlots.map((slot) => {
+          const current = state.slots.find((item) => item.slotId === slot.id);
+          return current ?? { slotId: slot.id, moduleId: null };
+        }),
+      });
+      return withUpgradeNotice(next, {
+        kind: "info",
+        message: "Starter three-position process capacity restored.",
+      });
+    }
+    case "REMOVE_MODULE": {
+      const slot = findSlot(command.slotId);
+      const current = state.slots.find(
+        (item) => item.slotId === command.slotId,
+      );
+      if (!slot || slot.type !== "process" || !current?.moduleId) return state;
+      const item = getModule(current.moduleId);
+      const next = recalculate({
+        ...state,
+        slots: state.slots.map((entry) =>
+          entry.slotId === current.slotId
+            ? { ...entry, moduleId: null }
+            : entry,
+        ),
+        baselineMetrics: state.metrics,
+        baselineLabel: "Before module bypass",
+        failedModuleId: null,
+      });
+      return withUpgradeNotice(next, {
+        kind: "info",
+        message: `${item.name} removed from ${slot.name}; the empty position is bypassed and the owned module remains in inventory.`,
+      });
+    }
     case "SET_COMPUTE_ALLOCATION":
       return recalculate({
         ...state,
@@ -610,18 +912,58 @@ function applyValidCommand(
       });
     }
     case "QUEUE_JOBS": {
-      const count = clamp(Math.trunc(command.count), 1, 50);
+      const requested = clamp(Math.trunc(command.count), 1, 50);
+      const count = Math.min(requested, MAX_QUEUED_TASKS - state.jobs.queued);
+      if (count <= 0) return state;
+      const pendingSameWorkload = [
+        ...(state.jobs.activeTask ? [state.jobs.activeTask] : []),
+        ...state.jobs.waitingTasks,
+      ].filter((task) => task.workloadId === state.workloadId).length;
+      const tasks: QueuedTask[] = Array.from({ length: count }, (_, index) => {
+        const sequence = state.jobs.nextTaskSequence + index;
+        return {
+          id: `task-${state.tick}-${sequence}`,
+          workloadId: state.workloadId,
+          lockedGrossQuote: getWorkloadQuote(
+            state,
+            state.workloadId,
+            pendingSameWorkload + index,
+          ).grossQuote,
+          acceptedAtTick: state.tick,
+          progress: 0,
+        };
+      });
       return appendEvent(
         {
           ...state,
           jobs: {
             ...state.jobs,
-            queued: Math.min(99, state.jobs.queued + count),
+            queued: state.jobs.queued + count,
+            waitingTasks: [...state.jobs.waitingTasks, ...tasks],
+            nextTaskSequence: state.jobs.nextTaskSequence + count,
           },
         },
         {
           kind: "info",
           message: `${count} ${getWorkload(state.workloadId).name.toLowerCase()} job${count === 1 ? "" : "s"} queued.`,
+        },
+      );
+    }
+    case "CLEAR_WAITING_TASKS": {
+      const count = state.jobs.waitingTasks.length;
+      if (count === 0) return state;
+      return appendEvent(
+        {
+          ...state,
+          jobs: {
+            ...state.jobs,
+            queued: state.jobs.activeTask ? 1 : 0,
+            waitingTasks: [],
+          },
+        },
+        {
+          kind: "info",
+          message: `${count} waiting task${count === 1 ? "" : "s"} cleared. Active work, accepted demand, money, and payouts were unchanged; no refund or settlement occurred.`,
         },
       );
     }
@@ -656,7 +998,9 @@ export function applyCommand(
 ): SimulationState {
   if (typeof command !== "object" || command === null) return state;
   if (!hasValidNumericInput(command)) return state;
-  const next = sealSimulationState(applyValidCommand(state, command));
+  const applied = applyValidCommand(state, command);
+  if (applied === state) return state;
+  const next = sealSimulationState(refreshWorkloadUnlocks(applied));
   return isStateValid(next) ? next : state;
 }
 
@@ -673,15 +1017,63 @@ function firstFailureModule(
   return selected[0]?.id ?? "request-buffer";
 }
 
-function advanceTick(state: SimulationState, seconds: number): SimulationState {
-  const elapsed = clamp(seconds, 0, 60);
-  if (elapsed === 0) return state;
-  let next: SimulationState = {
+function recoverWorkloadDemand(
+  state: SimulationState,
+  elapsedSeconds: number,
+): SimulationState {
+  const elapsedHours = (elapsedSeconds * SIMULATION_TIME_SCALE) / 3600;
+  if (elapsedHours <= 0) return state;
+  return {
     ...state,
+    workloadDemand: state.workloadDemand.map((demand) => {
+      if (demand.level >= 1) return demand;
+      const workload = getWorkload(demand.workloadId);
+      const previousQuote = getWorkloadQuote(
+        state,
+        demand.workloadId,
+      ).grossQuote;
+      return {
+        ...demand,
+        level: round(
+          Math.min(1, demand.level + workload.recoveryPerHour * elapsedHours),
+          6,
+        ),
+        previousQuote,
+      };
+    }),
+  };
+}
+
+function startNextTask(state: SimulationState): SimulationState {
+  if (state.jobs.activeTask || state.jobs.waitingTasks.length === 0)
+    return state;
+  const [first, ...rest] = state.jobs.waitingTasks;
+  if (!first) return state;
+  return {
+    ...state,
+    jobs: {
+      ...state.jobs,
+      activeTask: first,
+      waitingTasks: rest,
+      processingCarry: first.progress,
+    },
+  };
+}
+
+function advanceTickQuantum(
+  state: SimulationState,
+  elapsed: number,
+): SimulationState {
+  if (elapsed <= 0) return state;
+  let next: SimulationState = {
+    ...recoverWorkloadDemand(state, elapsed),
     tick: state.tick + Math.round(elapsed * 1000),
     resources: {
       ...state.resources,
-      timeHours: Math.max(0, state.resources.timeHours - elapsed / 3600),
+      timeHours: Math.max(
+        0,
+        state.resources.timeHours - (elapsed * SIMULATION_TIME_SCALE) / 3600,
+      ),
       electricityKwh:
         state.resources.electricityKwh +
         (getHardware(state.hardwareId).watts *
@@ -691,117 +1083,146 @@ function advanceTick(state: SimulationState, seconds: number): SimulationState {
     },
   };
   if (next.jobs.paused) return recalculate(next);
-  if (next.jobs.queued === 0) {
+  next = startNextTask(next);
+  if (!next.jobs.activeTask) {
     return recalculate({
       ...next,
       jobs: { ...next.jobs, processingCarry: 0 },
     });
   }
 
-  const potential =
-    next.jobs.processingCarry +
-    (next.metrics.throughputPerMinute * elapsed) / 60;
-  const resolved = Math.min(next.jobs.queued, Math.floor(potential));
-  const queued = next.jobs.queued - resolved;
-  next = {
+  const task = next.jobs.activeTask;
+  const workload = getWorkload(task.workloadId);
+  const taskMetrics = calculateMetrics({
     ...next,
-    jobs: {
-      ...next.jobs,
-      queued,
-      processingCarry: queued > 0 ? potential - resolved : 0,
-    },
-  };
-  const workload = getWorkload(next.workloadId);
-  const moneyBeforeSettlement = next.resources.money;
-  const completedBeforeSettlement = next.jobs.completed;
-  const failedBeforeSettlement = next.jobs.failed;
-  for (let index = 0; index < resolved; index += 1) {
-    const sample = nextRandom(next.rngState);
-    const memoryFailure = next.metrics.memoryPressure > 1;
-    const failed = memoryFailure || sample.value > next.metrics.reliability;
-    const cost = next.metrics.operatingCost;
-    next = {
-      ...next,
-      rngState: sample.state,
-      resources: {
-        ...next.resources,
-        money: Math.max(
-          0,
-          next.resources.money - cost + (failed ? 0 : workload.rewardMoney),
-        ),
-        reputation: Math.max(
-          0,
-          next.resources.reputation +
-            (failed ? -0.03 : workload.rewardReputation),
-        ),
-      },
-      jobs: {
-        ...next.jobs,
-        completed: next.jobs.completed + (failed ? 0 : 1),
-        failed: next.jobs.failed + (failed ? 1 : 0),
-      },
-      failedModuleId: failed
-        ? firstFailureModule(
-            next,
-            sample.value * (1 - next.metrics.reliability + 0.001),
-          )
-        : null,
-    };
-    if (failed) {
-      next = appendEvent(next, {
-        kind: "failure",
-        message: memoryFailure
-          ? "Job failed before delivery: memory capacity exceeded."
-          : "Unstable output rejected at delivery.",
-        directCause: memoryFailure
-          ? "Required memory exceeded available memory."
-          : "A processor emitted malformed output.",
-        contributingCondition:
-          next.metrics.observability < 0.6
-            ? "Low observability delayed isolation."
-            : undefined,
-      });
-    }
-  }
-  const completedNow = next.jobs.completed - completedBeforeSettlement;
-  const failedNow = next.jobs.failed - failedBeforeSettlement;
-  if (resolved > 0) {
-    const grossPayout = round(completedNow * workload.rewardMoney, 3);
-    const operatingCost = round(resolved * next.metrics.operatingCost, 3);
-    const netChange = round(next.resources.money - moneyBeforeSettlement, 3);
-    next = {
+    workloadId: task.workloadId,
+  });
+  const progress =
+    task.progress + (taskMetrics.throughputPerMinute * elapsed) / 60;
+  if (progress < 1) {
+    return recalculate({
       ...next,
       jobs: {
         ...next.jobs,
-        grossEarned: round(next.jobs.grossEarned + grossPayout, 3),
-        operatingCostsPaid: round(
-          next.jobs.operatingCostsPaid + operatingCost,
-          3,
-        ),
+        activeTask: { ...task, progress: round(progress, 8) },
+        processingCarry: round(progress, 8),
       },
-      lastSettlement: {
-        tick: next.tick,
-        workloadId: next.workloadId,
-        completed: completedNow,
-        failed: failedNow,
-        grossPayout,
-        operatingCost,
-        netChange,
-      },
-    };
-  }
-  if (resolved > 0 && failedNow === 0) {
-    next = appendEvent(next, {
-      kind: "success",
-      message: `${completedNow} job${completedNow === 1 ? "" : "s"} completed; $${round(completedNow * workload.rewardMoney, 2).toFixed(2)} gross payout earned before operating cost.`,
     });
   }
-  return recalculate(next);
+
+  const moneyBeforeSettlement = next.resources.money;
+  const sample = nextRandom(next.rngState);
+  const memoryFailure = taskMetrics.memoryPressure > 1;
+  const failed = memoryFailure || sample.value > taskMetrics.reliability;
+  const grossPayout = failed ? 0 : task.lockedGrossQuote;
+  const modelledCost = taskMetrics.operatingCost;
+  const operatingCost = round(
+    Math.min(modelledCost, moneyBeforeSettlement + grossPayout),
+    3,
+  );
+  const moneyAfter = round(
+    Math.max(0, moneyBeforeSettlement + grossPayout - operatingCost),
+    3,
+  );
+  next = {
+    ...next,
+    rngState: sample.state,
+    resources: {
+      ...next.resources,
+      money: moneyAfter,
+      reputation: Math.max(
+        0,
+        next.resources.reputation +
+          (failed ? -0.03 : workload.rewardReputation),
+      ),
+    },
+    jobs: {
+      ...next.jobs,
+      queued: Math.max(0, next.jobs.queued - 1),
+      completed: next.jobs.completed + (failed ? 0 : 1),
+      failed: next.jobs.failed + (failed ? 1 : 0),
+      processingCarry: 0,
+      activeTask: null,
+      grossEarned: round(next.jobs.grossEarned + grossPayout, 3),
+      operatingCostsPaid: round(
+        next.jobs.operatingCostsPaid + operatingCost,
+        3,
+      ),
+    },
+    failedModuleId: failed
+      ? firstFailureModule(
+          next,
+          sample.value * (1 - taskMetrics.reliability + 0.001),
+        )
+      : null,
+    lastSettlement: {
+      tick: next.tick,
+      workloadId: task.workloadId,
+      completed: failed ? 0 : 1,
+      failed: failed ? 1 : 0,
+      grossPayout,
+      operatingCost,
+      netChange: round(moneyAfter - moneyBeforeSettlement, 3),
+      taskId: task.id,
+      lockedGrossQuote: task.lockedGrossQuote,
+    },
+  };
+
+  if (!failed) {
+    const demand = demandFor(next, task.workloadId);
+    const previousQuote = getWorkloadQuote(next, task.workloadId).grossQuote;
+    next = {
+      ...next,
+      workloadDemand: next.workloadDemand.map((item) =>
+        item.workloadId === task.workloadId
+          ? {
+              ...item,
+              level: round(
+                Math.max(0, demand.level - workload.saturationPerSuccess),
+                6,
+              ),
+              previousQuote,
+              successfulCompletions: item.successfulCompletions + 1,
+            }
+          : item,
+      ),
+    };
+    next = appendEvent(next, {
+      kind: "success",
+      message: `${workload.name} task ${task.id} completed; $${task.lockedGrossQuote.toFixed(2)} gross payout earned before operating cost (locked quote) − $${operatingCost.toFixed(2)} actual cost = ${moneyAfter - moneyBeforeSettlement >= 0 ? "+" : "−"}$${Math.abs(moneyAfter - moneyBeforeSettlement).toFixed(2)} net. Future ${workload.name} demand is lower and recovers with simulated time.`,
+    });
+  } else {
+    next = appendEvent(next, {
+      kind: "failure",
+      message: memoryFailure
+        ? `${workload.name} task ${task.id} failed before delivery: memory capacity exceeded. Locked quote paid $0 gross.`
+        : `${workload.name} task ${task.id} produced unstable output and was rejected. Locked quote paid $0 gross.`,
+      directCause: memoryFailure
+        ? "Required memory exceeded available memory."
+        : "A processor emitted malformed output.",
+      contributingCondition:
+        taskMetrics.observability < 0.6
+          ? "Low observability delayed isolation."
+          : undefined,
+    });
+  }
+  return recalculate(refreshWorkloadUnlocks(next));
 }
 
 export function tick(state: SimulationState, seconds: number): SimulationState {
   if (!isFiniteNumber(seconds)) return state;
-  const next = sealSimulationState(advanceTick(state, seconds));
+  const elapsed = clamp(seconds, 0, 60);
+  if (elapsed === 0) return state;
+  if (state.tick + Math.round(elapsed * 1000) > Number.MAX_SAFE_INTEGER)
+    return state;
+  let next = state;
+  let remaining = elapsed;
+  while (remaining > 0) {
+    const quantum = Math.min(FIXED_TICK_SECONDS, remaining);
+    next = advanceTickQuantum(next, quantum);
+    remaining = round(remaining - quantum, 6);
+  }
+  next = sealSimulationState(next);
   return isStateValid(next) ? next : state;
 }
 
@@ -873,6 +1294,30 @@ function areMetricsValid(value: unknown): value is PipelineMetrics {
   );
 }
 
+function isQueuedTaskValid(
+  value: unknown,
+  tick: number,
+  waiting: boolean,
+): value is QueuedTask {
+  if (typeof value !== "object" || value === null) return false;
+  const task = value as QueuedTask;
+  return (
+    isText(task.id, 128) &&
+    task.id.length > 0 &&
+    findWorkload(task.workloadId) !== undefined &&
+    Number.isFinite(task.lockedGrossQuote) &&
+    task.lockedGrossQuote >= 0 &&
+    task.lockedGrossQuote <= getWorkload(task.workloadId).rewardMoney &&
+    Number.isSafeInteger(task.acceptedAtTick) &&
+    task.acceptedAtTick >= 0 &&
+    task.acceptedAtTick <= tick &&
+    Number.isFinite(task.progress) &&
+    task.progress >= 0 &&
+    task.progress < 1 &&
+    (!waiting || task.progress === 0)
+  );
+}
+
 function isStateStructurallyValid(value: unknown): value is SimulationState {
   if (typeof value !== "object" || value === null) return false;
   const state = value as SimulationState;
@@ -896,6 +1341,13 @@ function isStateStructurallyValid(value: unknown): value is SimulationState {
     const eventIds = state.ledger.map((event) => event.id);
     const hardwareIds = hardware.map((item) => item.id);
     const moduleIds = modules.map((item) => item.id);
+    const expansionIds = pipelineExpansions.map((item) => item.id);
+    const workloadIds = workloads.map((item) => item.id);
+    const expectedSlots = state.activeExpansionId ? slots : starterSlots;
+    const taskIds = [
+      ...(state.jobs.activeTask ? [state.jobs.activeTask.id] : []),
+      ...state.jobs.waitingTasks.map((task) => task.id),
+    ];
     return (
       state.schemaVersion === SCHEMA_VERSION &&
       state.contentVersion === CONTENT_VERSION &&
@@ -921,8 +1373,52 @@ function isStateStructurallyValid(value: unknown): value is SimulationState {
         (id) => typeof id === "string" && moduleIds.includes(id),
       ) &&
       new Set(state.ownedModuleIds).size === state.ownedModuleIds.length &&
+      Array.isArray(state.ownedExpansionIds) &&
+      state.ownedExpansionIds.every(
+        (id) => typeof id === "string" && expansionIds.includes(id),
+      ) &&
+      new Set(state.ownedExpansionIds).size ===
+        state.ownedExpansionIds.length &&
+      (state.activeExpansionId === null ||
+        (typeof state.activeExpansionId === "string" &&
+          state.ownedExpansionIds.includes(state.activeExpansionId))) &&
+      Array.isArray(state.unlockedWorkloadIds) &&
+      state.unlockedWorkloadIds.length >= 4 &&
+      state.unlockedWorkloadIds.every(
+        (id) => typeof id === "string" && workloadIds.includes(id),
+      ) &&
+      new Set(state.unlockedWorkloadIds).size ===
+        state.unlockedWorkloadIds.length &&
+      workloads
+        .filter(
+          (workload) =>
+            workload.unlock.completedJobs === 0 &&
+            workload.unlock.reputation === 0 &&
+            !workload.unlock.hardwareId &&
+            !workload.unlock.expansionId,
+        )
+        .every((workload) => state.unlockedWorkloadIds.includes(workload.id)) &&
+      Array.isArray(state.workloadDemand) &&
+      state.workloadDemand.length === workloads.length &&
+      workloads.every((workload) =>
+        state.workloadDemand.some(
+          (demand) => demand.workloadId === workload.id,
+        ),
+      ) &&
+      state.workloadDemand.every(
+        (demand) =>
+          workloadIds.includes(demand.workloadId) &&
+          Number.isFinite(demand.level) &&
+          demand.level >= 0 &&
+          demand.level <= 1 &&
+          Number.isFinite(demand.previousQuote) &&
+          demand.previousQuote >= 0 &&
+          demand.previousQuote <= getWorkload(demand.workloadId).rewardMoney &&
+          Number.isSafeInteger(demand.successfulCompletions) &&
+          demand.successfulCompletions >= 0,
+      ) &&
       typeof state.workloadId === "string" &&
-      findWorkload(state.workloadId) !== undefined &&
+      state.unlockedWorkloadIds.includes(state.workloadId) &&
       typeof state.branchEnabled === "boolean" &&
       nonnegativeNumbers.every(
         (value) => Number.isFinite(value) && value >= 0,
@@ -939,6 +1435,18 @@ function isStateStructurallyValid(value: unknown): value is SimulationState {
       state.jobs.queued <= 99 &&
       state.jobs.processingCarry < 1 &&
       typeof state.jobs.paused === "boolean" &&
+      Array.isArray(state.jobs.waitingTasks) &&
+      state.jobs.waitingTasks.every((task) =>
+        isQueuedTaskValid(task, state.tick, true),
+      ) &&
+      (state.jobs.activeTask === null ||
+        isQueuedTaskValid(state.jobs.activeTask, state.tick, false)) &&
+      state.jobs.queued ===
+        state.jobs.waitingTasks.length + (state.jobs.activeTask ? 1 : 0) &&
+      state.jobs.processingCarry === (state.jobs.activeTask?.progress ?? 0) &&
+      Number.isSafeInteger(state.jobs.nextTaskSequence) &&
+      state.jobs.nextTaskSequence >= 1 &&
+      new Set(taskIds).size === taskIds.length &&
       (state.baselineLabel === null || isText(state.baselineLabel, 64)) &&
       (state.failedModuleId === null ||
         (typeof state.failedModuleId === "string" &&
@@ -965,29 +1473,40 @@ function isStateStructurallyValid(value: unknown): value is SimulationState {
           ].every(Number.isFinite) &&
           state.lastSettlement.grossPayout >= 0 &&
           state.lastSettlement.operatingCost >= 0)) &&
+      (state.lastSettlement === null ||
+        (isText(state.lastSettlement.taskId, 128) &&
+          state.lastSettlement.taskId.length > 0 &&
+          Number.isFinite(state.lastSettlement.lockedGrossQuote) &&
+          state.lastSettlement.lockedGrossQuote >= 0 &&
+          state.lastSettlement.lockedGrossQuote <=
+            getWorkload(state.lastSettlement.workloadId).rewardMoney)) &&
       areMetricsValid(state.metrics) &&
       (state.baselineMetrics === null ||
         areMetricsValid(state.baselineMetrics)) &&
       Array.isArray(state.slots) &&
-      state.slots.length === slots.length &&
-      slots.every((slot) =>
+      state.slots.length === expectedSlots.length &&
+      expectedSlots.every((slot) =>
         state.slots.some((current) => current.slotId === slot.id),
       ) &&
       state.slots.every((slotState) => {
-        if (
-          typeof slotState.slotId !== "string" ||
-          typeof slotState.moduleId !== "string"
-        )
-          return false;
-        const module = findModule(slotState.moduleId);
+        if (typeof slotState.slotId !== "string") return false;
         const slot = findSlot(slotState.slotId);
+        if (!slot || !expectedSlots.some((item) => item.id === slot.id))
+          return false;
+        if (slotState.moduleId === null) return slot.type === "process";
+        if (typeof slotState.moduleId !== "string") return false;
+        const module = findModule(slotState.moduleId);
         return (
           module !== undefined &&
-          slot !== undefined &&
           state.ownedModuleIds.includes(module.id) &&
           module.slotTypes.includes(slot.type)
         );
       }) &&
+      new Set(
+        state.slots.flatMap((slot) =>
+          slot.moduleId === null ? [] : [slot.moduleId],
+        ),
+      ).size === state.slots.filter((slot) => slot.moduleId !== null).length &&
       state.ledger.length <= MAX_LEDGER_EVENTS &&
       state.ledger.every(
         (event) =>
@@ -1021,7 +1540,8 @@ function finiteOr(value: unknown, fallback: number): number {
 }
 
 function safeLegacySlots(value: unknown): readonly PipelineSlotState[] | null {
-  if (!Array.isArray(value) || value.length !== slots.length) return null;
+  if (!Array.isArray(value) || value.length !== starterSlots.length)
+    return null;
   const candidate = value.map((entry) => {
     if (typeof entry !== "object" || entry === null) return null;
     const record = entry as Record<string, unknown>;
@@ -1032,7 +1552,9 @@ function safeLegacySlots(value: unknown): readonly PipelineSlotState[] | null {
   });
   if (candidate.some((entry) => entry === null)) return null;
   if (
-    !slots.every((slot) => candidate.some((entry) => entry?.slotId === slot.id))
+    !starterSlots.every((slot) =>
+      candidate.some((entry) => entry?.slotId === slot.id),
+    )
   )
     return null;
   return candidate as readonly PipelineSlotState[];
@@ -1051,7 +1573,7 @@ function withMigrationStep(
   };
 }
 
-/** Restores current saves or migrates the former schema-v3 Pipeline Toy state. */
+/** Restores current saves or migrates schema-v3/v4 Pipeline Toy state. */
 export function restoreSimulationState(
   value: unknown,
   fallbackSeed = 20260715,
@@ -1083,7 +1605,7 @@ export function restoreSimulationState(
     );
     return isStateValid(restored) ? restored : fallback;
   }
-  if (record.schemaVersion !== 3) return fallback;
+  if (record.schemaVersion !== 3 && record.schemaVersion !== 4) return fallback;
 
   const legacySlots = safeLegacySlots(record.slots);
   const legacyHardware = findHardware(record.hardwareId);
@@ -1098,11 +1620,50 @@ export function restoreSimulationState(
       ? (record.jobs as Record<string, unknown>)
       : {};
   const seed = normalizeSeed(finiteOr(record.seed, fallback.seed));
+  const legacySchema = record.schemaVersion;
+  const safeHardwareIds =
+    legacySchema === 4 && Array.isArray(record.ownedHardwareIds)
+      ? record.ownedHardwareIds.flatMap((id) =>
+          findHardware(id) ? [String(id)] : [],
+        )
+      : [];
+  const safeModuleIds =
+    legacySchema === 4 && Array.isArray(record.ownedModuleIds)
+      ? record.ownedModuleIds.flatMap((id) =>
+          findModule(id) ? [String(id)] : [],
+        )
+      : [];
+  const queuedCount = clamp(
+    Math.trunc(finiteOr(legacyJobs.queued, 0)),
+    0,
+    MAX_QUEUED_TASKS,
+  );
+  const legacyCarry =
+    queuedCount > 0
+      ? clamp(finiteOr(legacyJobs.processingCarry, 0), 0, 0.999)
+      : 0;
+  const migratedTasks: QueuedTask[] = Array.from(
+    { length: queuedCount },
+    (_, index) => ({
+      id: `migration-task-${index + 1}`,
+      workloadId: legacyWorkload.id,
+      lockedGrossQuote: legacyWorkload.rewardMoney,
+      acceptedAtTick: Math.min(
+        Number.MAX_SAFE_INTEGER,
+        Math.trunc(finiteOr(record.tick, 0)),
+      ),
+      progress: index === 0 ? legacyCarry : 0,
+    }),
+  );
+  const migratedActive = legacyCarry > 0 ? (migratedTasks[0] ?? null) : null;
+  const migratedWaiting = migratedActive
+    ? migratedTasks.slice(1)
+    : migratedTasks;
   const migratedBase: SimulationState = {
     ...createInitialState(seed),
     migration: {
-      sourceSchemaVersion: 3,
-      steps: ["schema-3-to-4"],
+      sourceSchemaVersion: legacySchema,
+      steps: [`schema-${legacySchema}-to-5-task-market-expansion`],
     },
     rngState: normalizeSeed(finiteOr(record.rngState, seed)),
     tick: Math.min(
@@ -1110,13 +1671,33 @@ export function restoreSimulationState(
       Math.trunc(finiteOr(record.tick, 0)),
     ),
     hardwareId: legacyHardware.id,
-    ownedHardwareIds: [...new Set([STARTER_HARDWARE_ID, legacyHardware.id])],
+    ownedHardwareIds: [
+      ...new Set([STARTER_HARDWARE_ID, legacyHardware.id, ...safeHardwareIds]),
+    ],
     ownedModuleIds: [
       ...new Set([
         ...starterModuleIds,
         ...legacySlots.map((slot) => slot.moduleId),
+        ...safeModuleIds,
       ]),
-    ],
+    ].filter((id): id is string => id !== null),
+    ownedExpansionIds: [],
+    activeExpansionId: null,
+    unlockedWorkloadIds: workloads
+      .filter(
+        (workload) =>
+          workload.unlock.completedJobs === 0 &&
+          workload.unlock.reputation === 0 &&
+          !workload.unlock.hardwareId &&
+          !workload.unlock.expansionId,
+      )
+      .map((workload) => workload.id),
+    workloadDemand: workloads.map((workload) => ({
+      workloadId: workload.id,
+      level: 1,
+      previousQuote: workload.rewardMoney,
+      successfulCompletions: 0,
+    })),
     workloadId: legacyWorkload.id,
     slots: legacySlots,
     branchEnabled:
@@ -1134,7 +1715,7 @@ export function restoreSimulationState(
       reputation: finiteOr(legacyResources.reputation, 0),
     },
     jobs: {
-      queued: clamp(Math.trunc(finiteOr(legacyJobs.queued, 0)), 0, 99),
+      queued: queuedCount,
       completed: Math.min(
         Number.MAX_SAFE_INTEGER,
         Math.trunc(finiteOr(legacyJobs.completed, 0)),
@@ -1143,10 +1724,13 @@ export function restoreSimulationState(
         Number.MAX_SAFE_INTEGER,
         Math.trunc(finiteOr(legacyJobs.failed, 0)),
       ),
-      processingCarry: clamp(finiteOr(legacyJobs.processingCarry, 0), 0, 0.999),
+      processingCarry: migratedActive?.progress ?? 0,
       paused: typeof legacyJobs.paused === "boolean" && legacyJobs.paused,
       grossEarned: finiteOr(legacyJobs.grossEarned, 0),
       operatingCostsPaid: finiteOr(legacyJobs.operatingCostsPaid, 0),
+      activeTask: migratedActive,
+      waitingTasks: migratedWaiting,
+      nextTaskSequence: queuedCount + 1,
     },
     lastSettlement: null,
     baselineMetrics: null,
@@ -1155,7 +1739,7 @@ export function restoreSimulationState(
     lastUpgradeNotice: {
       kind: "info",
       message:
-        "Existing Pipeline Toy state migrated to the ownership economy; active starter equipment remains owned.",
+        "Existing Pipeline Toy state migrated to the ownership economy, per-task quotes, staged demand, and expandable topology; queued work retained its current workload identity.",
     },
   };
   const migrated = sealSimulationState(recalculate(migratedBase));

@@ -2,8 +2,10 @@ node_modules/
 dist/
 coverage/
 .cache/
+.playwright-cli/
 playwright-report/
 playwright-pages-report/
 test-results/
+output/playwright/
 *.log
 .DS_Store

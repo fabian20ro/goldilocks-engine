@@ -7,13 +7,21 @@ import {
 import {
   getHardware,
   getModule,
+  getPipelineExpansion,
   getSlot,
   getWorkload,
   hardware,
   modules,
+  pipelineExpansions,
   slots as slotSpecs,
   workloads,
 } from "../simulation/catalog";
+import {
+  calculateMetrics,
+  getSimulationAgeHours,
+  getWorkloadQuote,
+  workloadUnlockProgress,
+} from "../simulation/engine";
 import type {
   PipelineMetrics,
   PipelineSlotState,
@@ -40,9 +48,11 @@ interface SavedPreset {
   branchEnabled: boolean;
   computeAllocation: number;
   memoryReserve: number;
+  activeExpansionId: string | null;
 }
 
-const PRESET_KEY = "goldilocks-pipeline-presets-v1";
+const PRESET_KEY = "goldilocks-pipeline-presets-v2";
+const LEGACY_PRESET_KEY = "goldilocks-pipeline-presets-v1";
 const TUTORIAL_KEY = "goldilocks-quick-start-dismissed-v1";
 
 interface DeletedPreset {
@@ -68,7 +78,9 @@ function actionSentence(actions: readonly string[]): string {
 function loadPresets(): SavedPreset[] {
   try {
     const parsed: unknown = JSON.parse(
-      localStorage.getItem(PRESET_KEY) ?? "[]",
+      localStorage.getItem(PRESET_KEY) ??
+        localStorage.getItem(LEGACY_PRESET_KEY) ??
+        "[]",
     );
     if (!Array.isArray(parsed)) return [];
     const ids = new Set<string>();
@@ -99,29 +111,55 @@ function loadPresets(): SavedPreset[] {
           typeof preset.workloadId !== "string" ||
           !workloads.some((workload) => workload.id === preset.workloadId) ||
           !Array.isArray(preset.slots) ||
-          preset.slots.length !== slotSpecs.length
+          ![5, slotSpecs.length].includes(preset.slots.length)
         )
           return false;
 
-        const validSlots = preset.slots.every((value, index) => {
+        const presetSlots = preset.slots;
+        const expected =
+          presetSlots.length === 5
+            ? ["source", "prepare", "runtime", "verify", "sink"]
+            : slotSpecs.map((slot) => slot.id);
+        const validSlots = presetSlots.every((value, index) => {
           if (typeof value !== "object" || value === null) return false;
           const slotState = value as Record<string, unknown>;
-          const slot = slotSpecs[index];
-          const module = modules.find(
-            (candidate) => candidate.id === slotState.moduleId,
+          const slot = slotSpecs.find(
+            (candidate) => candidate.id === expected[index],
           );
+          const module =
+            slotState.moduleId === null
+              ? null
+              : modules.find(
+                  (candidate) => candidate.id === slotState.moduleId,
+                );
           return (
             typeof slotState.slotId === "string" &&
             slotState.slotId === slot?.id &&
-            typeof slotState.moduleId === "string" &&
-            module !== undefined &&
-            module.slotTypes.includes(slot.type)
+            ((slotState.moduleId === null && slot?.type === "process") ||
+              (typeof slotState.moduleId === "string" &&
+                module != null &&
+                slot !== undefined &&
+                module.slotTypes.includes(slot.type)))
           );
         });
         if (validSlots) {
           ids.add(preset.id);
           if (preset.hardwareId === undefined)
             (preset as Record<string, unknown>).hardwareId = "bedroom-cpu";
+          const activeExpansionId =
+            presetSlots.length === slotSpecs.length
+              ? "workstation-expansion-i"
+              : null;
+          if (
+            preset.activeExpansionId !== undefined &&
+            preset.activeExpansionId !== null &&
+            !pipelineExpansions.some(
+              (item) => item.id === preset.activeExpansionId,
+            )
+          )
+            return false;
+          (preset as Record<string, unknown>).activeExpansionId =
+            preset.activeExpansionId ?? activeExpansionId;
         }
         return validSlots;
       })
@@ -134,6 +172,7 @@ function loadPresets(): SavedPreset[] {
 function persistPresets(presets: readonly SavedPreset[]): boolean {
   try {
     localStorage.setItem(PRESET_KEY, JSON.stringify(presets));
+    localStorage.removeItem(LEGACY_PRESET_KEY);
     return true;
   } catch {
     return false;
@@ -152,7 +191,10 @@ function ResourceStrip({ state }: { state: SimulationState }) {
   const rig = getHardware(state.hardwareId);
   const values = [
     { label: "Money", value: `$${formatNumber(state.resources.money)}` },
-    { label: "Time", value: `${formatNumber(state.resources.timeHours, 1)}h` },
+    {
+      label: "Sim age",
+      value: `${formatNumber(getSimulationAgeHours(state), 1)}h`,
+    },
     {
       label: "Compute CU",
       value: `${formatNumber((rig.compute * state.computeAllocation) / 100, 1)}/${rig.compute}`,
@@ -224,15 +266,17 @@ function QuickStart({ onDismiss }: { onDismiss: () => void }) {
         <li>
           <strong>Earn money through completed work.</strong>
           <p>
-            Open Jobs, choose a workload, then queue it. While processing is not
-            paused, queued work runs through every stage. A successful
-            completion pays its listed gross reward; every attempt also pays the
-            current operating cost. A failed job earns no gross payout.
+            Use the bottom Jobs tab, choose an unlocked workload, then queue it.
+            Every accepted task keeps its workload identity and queue-time gross
+            quote. A successful completion pays that locked quote; the active
+            configuration determines actual operating cost. A failed job earns
+            no gross payout.
           </p>
           <p className="tutorial-detail">
             Gross per success: Interactive Chat $1.40 · Batch Classification
-            $1.10 · Long Document $2.20 · Competition Training $0.20.
-            Competition work trades cash for the highest reputation reward.
+            $1.10 · Long Document $2.20 · Competition Training $0.20. These are
+            fresh-demand launch quotes. Repeated success saturates one workload,
+            while neglected demand recovers with simulated time.
           </p>
         </li>
         <li>
@@ -263,17 +307,22 @@ function QuickStart({ onDismiss }: { onDismiss: () => void }) {
           <p className="tutorial-detail">
             The cheapest module is reachable within five successful starter
             jobs. A used rig is reachable within fifteen even after that first
-            module purchase. Researchers, longer pipelines, newer-model content,
-            and hype remain later gate decisions.
+            module purchase. Workstation Expansion I is a later capital target:
+            buy it once, activate it explicitly, then fill or bypass three new
+            positions. It never auto-buys or auto-fills modules.
           </p>
         </li>
         <li>
           <strong>Separate time, animation, pause, and presets.</strong>
           <p>
-            Simulation time 1×/4×/16× changes how quickly work advances.
-            Animations is visual only and never changes simulation time. Pause
-            retains the queue. In Inspect, Save current creates a preset; use
-            its labeled Delete button, confirm, then Undo if needed.
+            Simulation time 1×/4×/16×/64× changes how quickly work advances.
+            Every speed uses the same fixed simulation quanta for long
+            progression checks. Animations is visual only and never changes
+            simulation time. Pause retains both active and waiting work. Jobs
+            can clear waiting tasks after confirmation without clearing a
+            partially processed active task or changing its locked quote. In
+            Inspect, Save current stores the honest pipeline topology; use its
+            labeled Delete button, confirm, then Undo if needed.
           </p>
         </li>
       </ol>
@@ -281,22 +330,13 @@ function QuickStart({ onDismiss }: { onDismiss: () => void }) {
   );
 }
 
-function WarningBanner({
-  state,
-  onOpenJobs,
-  onOpenBuild,
-  onOpenUpgrades,
-}: {
-  state: SimulationState;
-  onOpenJobs: () => void;
-  onOpenBuild: () => void;
-  onOpenUpgrades: () => void;
-}) {
+function WarningBanner({ state }: { state: SimulationState }) {
   const rig = getHardware(state.hardwareId);
   const workload = getWorkload(state.workloadId);
   const reserveGb = rig.memory - state.metrics.memoryAvailable;
   const canLowerReserve = state.memoryReserve > 0;
   const canUseLighterModule = state.slots.some((slotState) => {
+    if (!slotState.moduleId) return false;
     const currentModule = getModule(slotState.moduleId);
     const slot = getSlot(slotState.slotId);
     return modules.some(
@@ -359,17 +399,9 @@ function WarningBanner({
       <div>
         <strong>{state.lastWarning}</strong>
         <p>{guidance}</p>
-        <div className="guidance-actions">
-          <button type="button" onClick={onOpenJobs}>
-            Policies &amp; workload
-          </button>
-          <button type="button" onClick={onOpenBuild}>
-            Module drawer
-          </button>
-          <button type="button" onClick={onOpenUpgrades}>
-            Upgrades
-          </button>
-        </div>
+        <p className="navigation-hint">
+          Use the bottom tabs for Build, Jobs, Upgrades, and Inspect.
+        </p>
       </div>
     </aside>
   );
@@ -517,12 +549,20 @@ function Pipeline({
         </span>
       </div>
 
+      {state.activeExpansionId ? (
+        <p className="pipeline-scroll-hint">
+          Expanded: 8 stages. Scroll within this pipeline to reach Process 4–6
+          and Output.
+        </p>
+      ) : null}
       <div className="pipeline" data-testid="pipeline">
         {state.slots.map((slotState, index) => {
           const slot = getSlot(slotState.slotId);
-          const module = getModule(slotState.moduleId);
+          const module = slotState.moduleId
+            ? getModule(slotState.moduleId)
+            : null;
           const compatible = selected
-            ? module.id !== selected.moduleId &&
+            ? module?.id !== selected.moduleId &&
               getModule(selected.moduleId).slotTypes.includes(slot.type)
             : false;
           const failed = failureIndex === index;
@@ -545,17 +585,40 @@ function Pipeline({
                     </span>
                   ) : null}
                 </div>
-                <ModuleCard
-                  moduleId={module.id}
-                  slotId={slot.id}
-                  equipped
-                  selected={
-                    selected?.moduleId === module.id &&
-                    selected.fromSlotId === slot.id
-                  }
-                  onSelect={onSelect}
-                  onDragStart={onDragStart}
-                />
+                {module ? (
+                  <>
+                    <ModuleCard
+                      moduleId={module.id}
+                      slotId={slot.id}
+                      equipped
+                      selected={
+                        selected?.moduleId === module.id &&
+                        selected.fromSlotId === slot.id
+                      }
+                      onSelect={onSelect}
+                      onDragStart={onDragStart}
+                    />
+                    {slot.type === "process" ? (
+                      <button
+                        type="button"
+                        className="bypass-action"
+                        onClick={() =>
+                          command({ type: "REMOVE_MODULE", slotId: slot.id })
+                        }
+                        aria-label={`Remove ${module.name} from ${slot.name} and bypass position`}
+                      >
+                        Remove / bypass
+                      </button>
+                    ) : null}
+                  </>
+                ) : (
+                  <div className="empty-module" role="status">
+                    <strong>Empty / bypassed</strong>
+                    <small>
+                      No memory, latency, cost, or processing effect.
+                    </small>
+                  </div>
+                )}
                 {compatible ? (
                   <button
                     className="snap-action"
@@ -612,7 +675,6 @@ function ModuleLibrary({
   selected,
   onSelect,
   onDragStart,
-  onOpenUpgrades,
 }: {
   state: SimulationState;
   selected: { moduleId: string; fromSlotId?: string } | null;
@@ -622,7 +684,6 @@ function ModuleLibrary({
     moduleId: string,
     fromSlotId?: string,
   ) => void;
-  onOpenUpgrades: () => void;
 }) {
   return (
     <section className="panel library-panel" aria-labelledby="library-title">
@@ -632,7 +693,8 @@ function ModuleLibrary({
           <h2 id="library-title">Drag or tap, then choose a slot</h2>
           <p className="section-note">
             Text labels show locked, owned, and equipped state. Locked cards
-            open Upgrades; owned cards can be tapped or touch-dragged.
+            require purchase in the bottom Upgrades tab; owned cards can be
+            tapped or touch-dragged.
           </p>
         </div>
       </div>
@@ -646,7 +708,6 @@ function ModuleLibrary({
             equipped={state.slots.some((slot) => slot.moduleId === module.id)}
             onSelect={onSelect}
             onDragStart={onDragStart}
-            onLocked={onOpenUpgrades}
           />
         ))}
       </div>
@@ -661,7 +722,6 @@ function BuildView({
   onSelect,
   onDragStart,
   onInstall,
-  onOpenUpgrades,
   reducedMotion,
 }: {
   state: SimulationState;
@@ -674,9 +734,32 @@ function BuildView({
     fromSlotId?: string,
   ) => void;
   onInstall: (slotId: string) => void;
-  onOpenUpgrades: () => void;
   reducedMotion: boolean;
 }) {
+  const expansion = pipelineExpansions[0];
+  const expansionOwned = expansion
+    ? state.ownedExpansionIds.includes(expansion.id)
+    : false;
+  const objective = !expansionOwned
+    ? `Fund ${expansion?.name ?? "pipeline expansion"}`
+    : state.activeExpansionId
+      ? "Configure six process positions"
+      : "Activate the owned expansion";
+  const objectiveProgress = !expansionOwned
+    ? Math.min(
+        100,
+        (state.resources.money / (expansion?.purchaseCost ?? 1)) * 100,
+      )
+    : state.activeExpansionId
+      ? Math.min(
+          100,
+          (state.slots.filter(
+            (slot) => getSlot(slot.slotId).type === "process" && slot.moduleId,
+          ).length /
+            6) *
+            100,
+        )
+      : 0;
   return (
     <>
       <section
@@ -685,14 +768,14 @@ function BuildView({
       >
         <div>
           <span className="eyebrow">Current objective</span>
-          <strong>Complete 12 stable jobs</strong>
+          <strong>{objective}</strong>
           <div
             className="progress-track"
-            aria-label={`${Math.min(state.jobs.completed, 12)} of 12 jobs complete`}
+            aria-label={`${Math.round(objectiveProgress)} percent of current objective`}
           >
             <span
               style={{
-                width: `${Math.min(100, (state.jobs.completed / 12) * 100)}%`,
+                width: `${objectiveProgress}%`,
               }}
             />
           </div>
@@ -718,7 +801,6 @@ function BuildView({
         selected={selected}
         onSelect={onSelect}
         onDragStart={onDragStart}
-        onOpenUpgrades={onOpenUpgrades}
       />
     </>
   );
@@ -726,6 +808,8 @@ function BuildView({
 
 function MoneyLoop({ state }: { state: SimulationState }) {
   const workload = getWorkload(state.workloadId);
+  const quote = getWorkloadQuote(state, workload.id);
+  const estimatedNet = quote.grossQuote - state.metrics.operatingCost;
   const settlement = state.lastSettlement;
   const netClass = settlement && settlement.netChange < 0 ? "bad" : "good";
   return (
@@ -743,13 +827,20 @@ function MoneyLoop({ state }: { state: SimulationState }) {
       </div>
       <div className="money-loop-copy">
         <div>
-          <span className="eyebrow">Selected-work payout</span>
+          <span className="eyebrow">Selected-work live quote</span>
           <h3 id="money-loop-title">{workload.name}</h3>
           <p>
-            ${workload.rewardMoney.toFixed(2)} gross per successful completion ·
-            ${formatNumber(state.metrics.operatingCost, 3)} operating cost per
-            attempt · failed jobs receive $0 gross.
+            ${quote.grossQuote.toFixed(2)} gross if accepted now · $
+            {formatNumber(state.metrics.operatingCost, 3)} estimated operating
+            cost · {estimatedNet >= 0 ? "+" : "−"}$
+            {Math.abs(estimatedNet).toFixed(2)} estimated net. Demand{" "}
+            {quote.demandPercent}% · {quote.trend}. Failed jobs receive $0
+            gross.
           </p>
+          <small>
+            {quote.reason} Actual cost is locked only by the configuration that
+            completes the task.
+          </small>
         </div>
         <div className="settlement" aria-live="polite">
           <span className="eyebrow">Latest settlement</span>
@@ -760,9 +851,11 @@ function MoneyLoop({ state }: { state: SimulationState }) {
                 {Math.abs(settlement.netChange).toFixed(2)} net
               </strong>
               <small>
-                {settlement.completed} paid · {settlement.failed} failed · $
-                {settlement.grossPayout.toFixed(2)} gross − $
-                {settlement.operatingCost.toFixed(2)} costs
+                {getWorkload(settlement.workloadId).name} · task{" "}
+                {settlement.taskId} · ${settlement.lockedGrossQuote.toFixed(2)}{" "}
+                locked gross · {settlement.completed} paid · {settlement.failed}{" "}
+                failed · ${settlement.grossPayout.toFixed(2)} settled gross − $
+                {settlement.operatingCost.toFixed(2)} actual costs
               </small>
             </>
           ) : (
@@ -824,7 +917,9 @@ function RigUpgradeCard({
   const item = getHardware(hardwareId);
   const equipped = state.hardwareId === item.id;
   const owned = state.ownedHardwareIds.includes(item.id);
-  const affordable = state.resources.money >= item.purchaseCost;
+  const timeReady =
+    getSimulationAgeHours(state) >= (item.availableAfterHour ?? 0);
+  const affordable = state.resources.money >= item.purchaseCost && timeReady;
   const current = getHardware(state.hardwareId);
   const reasonId = `rig-reason-${item.id}`;
   return (
@@ -841,7 +936,9 @@ function RigUpgradeCard({
                 ? "OWNED"
                 : affordable
                   ? "AFFORDABLE"
-                  : "LOCKED · INSUFFICIENT FUNDS"}
+                  : !timeReady
+                    ? `LOCKED · HOUR ${item.availableAfterHour}`
+                    : "LOCKED · INSUFFICIENT FUNDS"}
           </span>
           <h3 id={`rig-title-${item.id}`}>{item.name}</h3>
         </div>
@@ -852,41 +949,44 @@ function RigUpgradeCard({
         </strong>
       </div>
       <p>{item.description}</p>
-      <dl className="stat-grid">
-        <div>
-          <dt>Compute</dt>
-          <dd>{item.compute} CU</dd>
-        </div>
-        <div>
-          <dt>Memory</dt>
-          <dd>{item.memory} GB</dd>
-        </div>
-        <div>
-          <dt>Power / heat</dt>
-          <dd>
-            {item.watts} W · {item.thermalLimit} limit
-          </dd>
-        </div>
-        <div>
-          <dt>Reliability</dt>
-          <dd>{formatNumber(item.reliability * 100, 1)}%</dd>
-        </div>
-        <div>
-          <dt>Maintenance</dt>
-          <dd>${item.maintenance.toFixed(2)}</dd>
-        </div>
-        <div>
-          <dt>Versus equipped</dt>
-          <dd>
-            {item.compute - current.compute >= 0 ? "+" : ""}
-            {item.compute - current.compute} CU ·{" "}
-            {item.memory - current.memory >= 0 ? "+" : ""}
-            {item.memory - current.memory} GB ·{" "}
-            {item.watts - current.watts >= 0 ? "+" : ""}
-            {item.watts - current.watts} W
-          </dd>
-        </div>
-      </dl>
+      <details className="upgrade-details" open={equipped || undefined}>
+        <summary>Compare rig details and tradeoffs</summary>
+        <dl className="stat-grid">
+          <div>
+            <dt>Compute</dt>
+            <dd>{item.compute} CU</dd>
+          </div>
+          <div>
+            <dt>Memory</dt>
+            <dd>{item.memory} GB</dd>
+          </div>
+          <div>
+            <dt>Power / heat</dt>
+            <dd>
+              {item.watts} W · {item.thermalLimit} limit
+            </dd>
+          </div>
+          <div>
+            <dt>Reliability</dt>
+            <dd>{formatNumber(item.reliability * 100, 1)}%</dd>
+          </div>
+          <div>
+            <dt>Maintenance</dt>
+            <dd>${item.maintenance.toFixed(2)}</dd>
+          </div>
+          <div>
+            <dt>Versus equipped</dt>
+            <dd>
+              {item.compute - current.compute >= 0 ? "+" : ""}
+              {item.compute - current.compute} CU ·{" "}
+              {item.memory - current.memory >= 0 ? "+" : ""}
+              {item.memory - current.memory} GB ·{" "}
+              {item.watts - current.watts >= 0 ? "+" : ""}
+              {item.watts - current.watts} W
+            </dd>
+          </div>
+        </dl>
+      </details>
       {!owned ? (
         <button
           type="button"
@@ -919,7 +1019,9 @@ function RigUpgradeCard({
             : "Owned permanently for this run; equipping does not charge again."
           : affordable
             ? "Affordable now. Buying creates ownership; equipping is a separate choice."
-            : `Need $${(item.purchaseCost - state.resources.money).toFixed(2)} more. Queue successful jobs; no partial or duplicate deduction occurs.`}
+            : !timeReady
+              ? `Need $${Math.max(0, item.purchaseCost - state.resources.money).toFixed(2)} more at current funds. Order window opens at simulated hour ${item.availableAfterHour}; current age ${getSimulationAgeHours(state).toFixed(1)}h. Money alone cannot bypass this catalogue pacing gate.`
+              : `Need $${(item.purchaseCost - state.resources.money).toFixed(2)} more. Queue successful jobs; no partial or duplicate deduction occurs.`}
       </p>
     </article>
   );
@@ -941,7 +1043,7 @@ function ModuleUpgradeCard({
   const equipped = state.slots.some((slot) => slot.moduleId === item.id);
   const affordable = state.resources.money >= item.purchaseCost;
   const comparison = state.slots
-    .map((slot) => getModule(slot.moduleId))
+    .flatMap((slot) => (slot.moduleId ? [getModule(slot.moduleId)] : []))
     .find((candidate) => candidate.role === item.role);
   const reasonId = `module-reason-${item.id}`;
   return (
@@ -967,55 +1069,58 @@ function ModuleUpgradeCard({
         </strong>
       </div>
       <p>{item.description}</p>
-      <dl className="stat-grid module-stats">
-        <div>
-          <dt>Compatibility</dt>
-          <dd>
-            {item.role} · {item.slotTypes.join("/")}
-          </dd>
-        </div>
-        <div>
-          <dt>Throughput</dt>
-          <dd>{item.throughput}/m</dd>
-        </div>
-        <div>
-          <dt>Latency</dt>
-          <dd>{item.latency}s</dd>
-        </div>
-        <div>
-          <dt>Memory</dt>
-          <dd>{item.memory} GB</dd>
-        </div>
-        <div>
-          <dt>Quality</dt>
-          <dd>+{item.quality}</dd>
-        </div>
-        <div>
-          <dt>Reliability</dt>
-          <dd>{formatNumber(item.reliability * 100, 1)}%</dd>
-        </div>
-        <div>
-          <dt>Observability</dt>
-          <dd>{formatNumber(item.observability * 100)}%</dd>
-        </div>
-        <div>
-          <dt>Operating cost</dt>
-          <dd>${item.costPerJob.toFixed(3)}/job</dd>
-        </div>
-      </dl>
-      {comparison ? (
-        <p className="comparison-copy">
-          Versus equipped {comparison.name}:{" "}
-          {item.throughput - comparison.throughput >= 0 ? "+" : ""}
-          {formatNumber(item.throughput - comparison.throughput, 1)}/m
-          throughput · {item.memory - comparison.memory >= 0 ? "+" : ""}
-          {formatNumber(item.memory - comparison.memory, 1)} GB ·{" "}
-          {item.quality - comparison.quality >= 0 ? "+" : ""}
-          {item.quality - comparison.quality} quality ·{" "}
-          {item.costPerJob - comparison.costPerJob >= 0 ? "+" : ""}$
-          {formatNumber(item.costPerJob - comparison.costPerJob, 3)}/job.
-        </p>
-      ) : null}
+      <details className="upgrade-details" open={equipped || undefined}>
+        <summary>Compare module details and tradeoffs</summary>
+        <dl className="stat-grid module-stats">
+          <div>
+            <dt>Compatibility</dt>
+            <dd>
+              {item.role} · {item.slotTypes.join("/")}
+            </dd>
+          </div>
+          <div>
+            <dt>Throughput</dt>
+            <dd>{item.throughput}/m</dd>
+          </div>
+          <div>
+            <dt>Latency</dt>
+            <dd>{item.latency}s</dd>
+          </div>
+          <div>
+            <dt>Memory</dt>
+            <dd>{item.memory} GB</dd>
+          </div>
+          <div>
+            <dt>Quality</dt>
+            <dd>+{item.quality}</dd>
+          </div>
+          <div>
+            <dt>Reliability</dt>
+            <dd>{formatNumber(item.reliability * 100, 1)}%</dd>
+          </div>
+          <div>
+            <dt>Observability</dt>
+            <dd>{formatNumber(item.observability * 100)}%</dd>
+          </div>
+          <div>
+            <dt>Operating cost</dt>
+            <dd>${item.costPerJob.toFixed(3)}/job</dd>
+          </div>
+        </dl>
+        {comparison ? (
+          <p className="comparison-copy">
+            Versus equipped {comparison.name}:{" "}
+            {item.throughput - comparison.throughput >= 0 ? "+" : ""}
+            {formatNumber(item.throughput - comparison.throughput, 1)}/m
+            throughput · {item.memory - comparison.memory >= 0 ? "+" : ""}
+            {formatNumber(item.memory - comparison.memory, 1)} GB ·{" "}
+            {item.quality - comparison.quality >= 0 ? "+" : ""}
+            {item.quality - comparison.quality} quality ·{" "}
+            {item.costPerJob - comparison.costPerJob >= 0 ? "+" : ""}$
+            {formatNumber(item.costPerJob - comparison.costPerJob, 3)}/job.
+          </p>
+        ) : null}
+      </details>
       {!owned ? (
         <button
           type="button"
@@ -1048,6 +1153,103 @@ function ModuleUpgradeCard({
   );
 }
 
+function PipelineExpansionCard({
+  state,
+  command,
+}: {
+  state: SimulationState;
+  command: (command: SimulationCommand) => void;
+}) {
+  const spec = getPipelineExpansion("workstation-expansion-i");
+  const owned = state.ownedExpansionIds.includes(spec.id);
+  const active = state.activeExpansionId === spec.id;
+  const affordable = state.resources.money >= spec.purchaseCost;
+  const occupiedExtra = state.slots.some(
+    (slot) => slot.slotId.startsWith("process-") && slot.moduleId !== null,
+  );
+  return (
+    <article
+      className={`upgrade-card expansion-card ${active ? "equipped" : owned ? "owned" : "locked"}`}
+      aria-labelledby="expansion-title"
+    >
+      <div className="upgrade-card-heading">
+        <div>
+          <span className="equipment-state">
+            {active
+              ? "ACTIVE · 6 PROCESS POSITIONS"
+              : owned
+                ? "OWNED · READY TO ACTIVATE"
+                : affordable
+                  ? "AFFORDABLE"
+                  : "LOCKED · INSUFFICIENT FUNDS"}
+          </span>
+          <h3 id="expansion-title">{spec.name}</h3>
+        </div>
+        <strong className="upgrade-price">
+          ${spec.purchaseCost.toFixed(2)}
+        </strong>
+      </div>
+      <p>{spec.description}</p>
+      <div className="capacity-route" aria-label="Pipeline capacity change">
+        <span>3 process positions</span>
+        <span aria-hidden="true">→</span>
+        <strong>6 process positions</strong>
+      </div>
+      <p>{spec.tradeoff}</p>
+      <p className="purchase-reason">
+        Three new positions begin empty/bypassed. Purchase never buys, clones,
+        or auto-fills a module. Owned modules remain movable across all active
+        compatible positions.
+      </p>
+      {!owned ? (
+        <button
+          type="button"
+          className="purchase-action"
+          disabled={!affordable}
+          onClick={() =>
+            command({ type: "BUY_EXPANSION", expansionId: spec.id })
+          }
+        >
+          Buy {spec.name} for ${spec.purchaseCost.toFixed(2)}
+        </button>
+      ) : !active ? (
+        <button
+          type="button"
+          className="equip-action"
+          onClick={() =>
+            command({ type: "SET_EXPANSION_ACTIVE", active: true })
+          }
+        >
+          Activate six-position pipeline
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="owned-action"
+          disabled={occupiedExtra}
+          onClick={() =>
+            command({ type: "SET_EXPANSION_ACTIVE", active: false })
+          }
+        >
+          {occupiedExtra
+            ? "Empty Process 4–6 to deactivate"
+            : "Return to starter capacity"}
+        </button>
+      )}
+      {!owned ? (
+        <p className="purchase-reason">
+          ${Math.min(state.resources.money, spec.purchaseCost).toFixed(2)} / $
+          {spec.purchaseCost.toFixed(2)} funded ·{" "}
+          {Math.round(
+            Math.min(100, (state.resources.money / spec.purchaseCost) * 100),
+          )}
+          %
+        </p>
+      ) : null}
+    </article>
+  );
+}
+
 function UpgradesView({
   state,
   command,
@@ -1076,6 +1278,15 @@ function UpgradesView({
           before buying: every option trades capability for power, memory,
           latency, reliability, observability, or operating cost.
         </p>
+      </section>
+      <section className="panel" aria-labelledby="pipeline-store-title">
+        <div className="section-heading compact">
+          <div>
+            <span className="eyebrow">Single-pipeline capacity</span>
+            <h2 id="pipeline-store-title">Workstation expansion</h2>
+          </div>
+        </div>
+        <PipelineExpansionCard state={state} command={command} />
       </section>
       <section className="panel" aria-labelledby="rig-store-title">
         <div className="section-heading compact">
@@ -1123,12 +1334,12 @@ function UpgradesView({
 function JobsView({
   state,
   command,
-  onOpenUpgrades,
 }: {
   state: SimulationState;
   command: (command: SimulationCommand) => void;
-  onOpenUpgrades: () => void;
 }) {
+  const [confirmClear, setConfirmClear] = useState(false);
+  const waitingCount = state.jobs.waitingTasks.length;
   return (
     <>
       <section className="panel" aria-labelledby="workload-title">
@@ -1137,7 +1348,10 @@ function JobsView({
             <span className="eyebrow">Route work</span>
             <h2 id="workload-title">Workloads</h2>
           </div>
-          <span className="counter">{state.jobs.queued} queued</span>
+          <span className="counter">
+            {state.jobs.activeTask ? "1 active · " : ""}
+            {waitingCount} waiting
+          </span>
         </div>
         <MoneyLoop state={state} />
         <p className="concept-note">
@@ -1146,34 +1360,58 @@ function JobsView({
           measurement.
         </p>
         <div className="choice-list">
-          {workloads.map((workload) => (
-            <button
-              type="button"
-              key={workload.id}
-              className={
-                state.workloadId === workload.id
-                  ? "choice-card selected"
-                  : "choice-card"
-              }
-              aria-pressed={state.workloadId === workload.id}
-              onClick={() =>
-                command({ type: "SET_WORKLOAD", workloadId: workload.id })
-              }
-            >
-              <span>
-                <strong>{workload.name}</strong>
-                <small>
-                  {workload.description} ${workload.rewardMoney.toFixed(2)}
-                  gross on success ·{" "}
-                  {formatNumber(workload.rewardReputation, 2)}
-                  rep.
-                </small>
-              </span>
-              <span className="choice-stat">
-                {workload.computeDemand} CU · {workload.memoryDemand} GB
-              </span>
-            </button>
-          ))}
+          {workloads.map((workload) => {
+            const unlock = workloadUnlockProgress(state, workload.id);
+            const quote = getWorkloadQuote(state, workload.id);
+            const metrics = calculateMetrics({
+              ...state,
+              workloadId: workload.id,
+            });
+            const estimatedNet = quote.grossQuote - metrics.operatingCost;
+            const risky =
+              estimatedNet <= Math.max(0.05, quote.grossQuote * 0.15);
+            return (
+              <button
+                type="button"
+                key={workload.id}
+                className={`${state.workloadId === workload.id ? "choice-card selected" : "choice-card"} ${unlock.unlocked ? "" : "locked"} ${risky ? "margin-warning" : ""}`}
+                aria-pressed={state.workloadId === workload.id}
+                disabled={!unlock.unlocked}
+                aria-label={
+                  unlock.unlocked
+                    ? `${workload.name}. Current quote $${quote.grossQuote.toFixed(2)}. Estimated cost $${metrics.operatingCost.toFixed(3)}. Demand ${quote.demandPercent} percent, ${quote.trend}.`
+                    : `${workload.name} locked. ${unlock.requirements.join("; ")}`
+                }
+                onClick={() =>
+                  command({ type: "SET_WORKLOAD", workloadId: workload.id })
+                }
+              >
+                <span>
+                  <strong>
+                    {workload.name} ·{" "}
+                    {unlock.unlocked
+                      ? `$${quote.grossQuote.toFixed(2)} quote`
+                      : "LOCKED"}
+                  </strong>
+                  <small>
+                    {unlock.unlocked
+                      ? `${workload.description} Estimated $${metrics.operatingCost.toFixed(3)} cost · ${estimatedNet >= 0 ? "+" : "−"}$${Math.abs(estimatedNet).toFixed(2)} net · demand ${quote.demandPercent}% ${quote.trend}. ${quote.reason}`
+                      : `Requires ${unlock.requirements.join(" · ")}.`}
+                  </small>
+                  {unlock.unlocked && risky ? (
+                    <small className="cost-warning">
+                      COST WARNING: estimated cost approaches or exceeds this
+                      quote. Queueing remains your explicit choice.
+                    </small>
+                  ) : null}
+                </span>
+                <span className="choice-stat">
+                  {workload.computeDemand} CU · {workload.memoryDemand} GB ·{" "}
+                  {formatNumber(workload.rewardReputation, 2)} rep
+                </span>
+              </button>
+            );
+          })}
         </div>
         <div className="job-actions">
           <button
@@ -1197,6 +1435,72 @@ function JobsView({
           >
             {state.jobs.paused ? "Resume" : "Pause"}
           </button>
+          <button
+            type="button"
+            className="secondary-action"
+            disabled={waitingCount === 0}
+            onClick={() => setConfirmClear(true)}
+          >
+            Clear waiting tasks ({waitingCount})
+          </button>
+        </div>
+        {confirmClear ? (
+          <div
+            className="clear-confirmation"
+            role="group"
+            aria-label="Confirm clearing waiting tasks"
+          >
+            <p>
+              Clear {waitingCount} waiting task{waitingCount === 1 ? "" : "s"}?
+              The active task stays, and there is no payout, refund, or demand
+              change.
+            </p>
+            <button type="button" onClick={() => setConfirmClear(false)}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="danger-action"
+              onClick={() => {
+                command({ type: "CLEAR_WAITING_TASKS" });
+                setConfirmClear(false);
+              }}
+            >
+              Confirm clear waiting
+            </button>
+          </div>
+        ) : null}
+        <div className="task-queue" aria-label="Accepted task queue">
+          <div>
+            <span className="eyebrow">Active task</span>
+            {state.jobs.activeTask ? (
+              <strong>
+                {getWorkload(state.jobs.activeTask.workloadId).name} · $
+                {state.jobs.activeTask.lockedGrossQuote.toFixed(2)} locked ·{" "}
+                {Math.round(state.jobs.activeTask.progress * 100)}%
+              </strong>
+            ) : (
+              <strong>None processing</strong>
+            )}
+          </div>
+          <details>
+            <summary>
+              {waitingCount} waiting · inspect locked identities and quotes
+            </summary>
+            {state.jobs.waitingTasks.length ? (
+              <ol>
+                {state.jobs.waitingTasks.slice(0, 12).map((task) => (
+                  <li key={task.id}>
+                    {getWorkload(task.workloadId).name} · {task.id} · $
+                    {task.lockedGrossQuote.toFixed(2)} locked
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p>No waiting tasks.</p>
+            )}
+          </details>
+          <small>Changing the selected workload affects new tasks only.</small>
         </div>
       </section>
 
@@ -1276,17 +1580,11 @@ function JobsView({
             {getHardware(state.hardwareId).watts} W modelled draw.
           </p>
           <p>
-            Compare and buy alternate rigs in Upgrades. Higher CU and memory
-            also change power, heat, reliability, maintenance, and per-attempt
-            cost; purchases do not automatically equip.
+            Compare and buy alternate rigs in Upgrades via the bottom tab.
+            Higher CU and memory also change power, heat, reliability,
+            maintenance, and per-attempt cost; purchases do not automatically
+            equip.
           </p>
-          <button
-            type="button"
-            className="equip-action"
-            onClick={onOpenUpgrades}
-          >
-            Open upgrades
-          </button>
         </div>
       </section>
     </>
@@ -1496,10 +1794,19 @@ function InspectView({
                       <small>
                         {getHardware(preset.hardwareId).name} ·{" "}
                         {
-                          getModule(
-                            preset.slots[2]?.moduleId ?? "quantized-model",
-                          ).name
-                        }
+                          preset.slots.filter(
+                            (slot) => getSlot(slot.slotId).type === "process",
+                          ).length
+                        }{" "}
+                        process positions ·{" "}
+                        {(() => {
+                          const model = preset.slots
+                            .flatMap((slot) =>
+                              slot.moduleId ? [getModule(slot.moduleId)] : [],
+                            )
+                            .find((module) => module.role === "model");
+                          return model?.name ?? "No model";
+                        })()}
                       </small>
                     </span>
                     <span className="choice-stat">LOAD</span>
@@ -1612,10 +1919,7 @@ export function App() {
   );
 
   const onSelect = (moduleId: string, fromSlotId?: string) => {
-    if (!state.ownedModuleIds.includes(moduleId)) {
-      setTab("upgrades");
-      return;
-    }
+    if (!state.ownedModuleIds.includes(moduleId)) return;
     setSelected((current) =>
       current?.moduleId === moduleId && current.fromSlotId === fromSlotId
         ? null
@@ -1677,6 +1981,7 @@ export function App() {
       branchEnabled: state.branchEnabled,
       computeAllocation: state.computeAllocation,
       memoryReserve: state.memoryReserve,
+      activeExpansionId: state.activeExpansionId,
     };
     const next = [preset, ...presets].slice(0, 6);
     if (persistPresets(next)) {
@@ -1732,12 +2037,26 @@ export function App() {
 
   const loadPreset = (preset: SavedPreset) => {
     command({ type: "EQUIP_HARDWARE", hardwareId: preset.hardwareId });
+    for (const slotId of [
+      "prepare",
+      "runtime",
+      "verify",
+      "process-4",
+      "process-5",
+      "process-6",
+    ])
+      command({ type: "REMOVE_MODULE", slotId });
+    command({
+      type: "SET_EXPANSION_ACTIVE",
+      active: preset.activeExpansionId !== null,
+    });
     for (const slot of preset.slots)
-      command({
-        type: "PLACE_MODULE",
-        moduleId: slot.moduleId,
-        slotId: slot.slotId,
-      });
+      if (slot.moduleId)
+        command({
+          type: "PLACE_MODULE",
+          moduleId: slot.moduleId,
+          slotId: slot.slotId,
+        });
     command({ type: "SET_WORKLOAD", workloadId: preset.workloadId });
     command({
       type: "SET_COMPUTE_ALLOCATION",
@@ -1769,11 +2088,10 @@ export function App() {
             <button
               type="button"
               className="help-toggle"
-              aria-expanded={showTutorial && tab === "build"}
+              aria-expanded={showTutorial}
               aria-controls="quick-start-title"
               onClick={() => {
                 setShowTutorial(true);
-                setTab("build");
               }}
             >
               Help / Quick start
@@ -1796,15 +2114,8 @@ export function App() {
       </header>
 
       <main id="main-content" className="main-content">
-        {showTutorial && tab === "build" ? (
-          <QuickStart onDismiss={dismissTutorial} />
-        ) : null}
-        <WarningBanner
-          state={state}
-          onOpenJobs={() => setTab("jobs")}
-          onOpenBuild={() => setTab("build")}
-          onOpenUpgrades={() => setTab("upgrades")}
-        />
+        {showTutorial ? <QuickStart onDismiss={dismissTutorial} /> : null}
+        <WarningBanner state={state} />
         <UpgradeFeedback state={state} />
         {selectedName ? (
           <div className="selection-banner" role="status">
@@ -1826,22 +2137,22 @@ export function App() {
             onSelect={onSelect}
             onDragStart={onDragStart}
             onInstall={onInstall}
-            onOpenUpgrades={() => setTab("upgrades")}
             reducedMotion={reducedMotion}
           />
         ) : tab === "jobs" ? (
-          <JobsView
-            state={state}
-            command={command}
-            onOpenUpgrades={() => setTab("upgrades")}
-          />
+          <JobsView state={state} command={command} />
         ) : tab === "upgrades" ? (
           <UpgradesView
             state={state}
             command={command}
             onChooseModule={(moduleId) => {
-              setSelected({ moduleId });
-              setTab("build");
+              const equippedSlot = state.slots.find(
+                (slot) => slot.moduleId === moduleId,
+              );
+              setSelected({
+                moduleId,
+                fromSlotId: equippedSlot?.slotId,
+              });
             }}
           />
         ) : (

@@ -19,8 +19,9 @@
     "test:watch": "vitest",
     "test:e2e": "PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright playwright test",
     "test:e2e:pages": "PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright playwright test --config=playwright.pages.config.ts",
-    "balance": "tsx src/simulation/runNumericPrototype.ts && npm run balance:upgrades",
-    "balance:upgrades": "tsx src/simulation/runUpgradeBalance.ts"
+    "balance": "tsx src/simulation/runNumericPrototype.ts && npm run balance:upgrades && npm run balance:progression",
+    "balance:upgrades": "tsx src/simulation/runUpgradeBalance.ts",
+    "balance:progression": "tsx src/simulation/runProgressionBalance.ts"
   },
   "dependencies": {
     "@vitejs/plugin-react": "6.0.3",

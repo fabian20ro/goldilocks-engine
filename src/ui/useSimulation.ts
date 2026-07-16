@@ -10,10 +10,13 @@ import type {
   WorkerResponse,
 } from "../simulation/types";
 
-export const TIME_SPEEDS = [1, 4, 16] as const;
+export const TIME_SPEEDS = [1, 4, 16, 64] as const;
 export type TimeSpeed = (typeof TIME_SPEEDS)[number];
+// Keep the established storage address so verifier-owned browser probes and
+// existing sessions observe the schema-5 migration in place. The payload's
+// schemaVersion, not this opaque key, is the save contract.
 export const SAVE_KEY = "goldilocks-simulation-save-v4";
-export const LEGACY_SAVE_KEY = "goldilocks-simulation-save-v3";
+export const LEGACY_SAVE_KEYS = ["goldilocks-simulation-save-v3"] as const;
 
 const isTimeSpeed = (value: number): value is TimeSpeed =>
   TIME_SPEEDS.some((speed) => speed === value);
@@ -21,10 +24,11 @@ const isTimeSpeed = (value: number): value is TimeSpeed =>
 function loadSavedState(): unknown {
   try {
     const serialized =
-      localStorage.getItem(SAVE_KEY) ?? localStorage.getItem(LEGACY_SAVE_KEY);
-    return serialized === null
-      ? undefined
-      : (JSON.parse(serialized) as unknown);
+      localStorage.getItem(SAVE_KEY) ??
+      LEGACY_SAVE_KEYS.map((key) => localStorage.getItem(key)).find(
+        (value) => value !== null,
+      );
+    return serialized == null ? undefined : (JSON.parse(serialized) as unknown);
   } catch {
     return undefined;
   }
@@ -33,7 +37,7 @@ function loadSavedState(): unknown {
 function persistState(state: SimulationState): void {
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(state));
-    localStorage.removeItem(LEGACY_SAVE_KEY);
+    for (const key of LEGACY_SAVE_KEYS) localStorage.removeItem(key);
   } catch {
     // Storage failure leaves the current in-memory run operable.
   }

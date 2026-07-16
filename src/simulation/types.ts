@@ -1,5 +1,5 @@
-export const SCHEMA_VERSION = 4;
-export const CONTENT_VERSION = "pipeline-toy-3";
+export const SCHEMA_VERSION = 5;
+export const CONTENT_VERSION = "pipeline-toy-4";
 export const SAVE_INTEGRITY_ALGORITHM = "fnv1a-32-json-v1";
 
 export type SlotType = "source" | "process" | "sink";
@@ -44,6 +44,7 @@ export interface HardwareSpec {
   watts: number;
   reliability: number;
   maintenance: number;
+  availableAfterHour?: number;
 }
 
 export interface WorkloadSpec {
@@ -57,11 +58,31 @@ export interface WorkloadSpec {
   throughputSensitivity: number;
   rewardMoney: number;
   rewardReputation: number;
+  minimumQuote: number;
+  saturationPerSuccess: number;
+  recoveryPerHour: number;
+  unlock: WorkloadUnlockRequirement;
+}
+
+export interface WorkloadUnlockRequirement {
+  completedJobs: number;
+  reputation: number;
+  hardwareId?: string;
+  expansionId?: string;
+}
+
+export interface PipelineExpansionSpec {
+  id: string;
+  name: string;
+  description: string;
+  purchaseCost: number;
+  processSlots: number;
+  tradeoff: string;
 }
 
 export interface PipelineSlotState {
   slotId: string;
-  moduleId: string;
+  moduleId: string | null;
 }
 
 export interface PipelineMetrics {
@@ -91,6 +112,32 @@ export interface JobState {
   paused: boolean;
   grossEarned: number;
   operatingCostsPaid: number;
+  activeTask: QueuedTask | null;
+  waitingTasks: readonly QueuedTask[];
+  nextTaskSequence: number;
+}
+
+export interface QueuedTask {
+  id: string;
+  workloadId: string;
+  lockedGrossQuote: number;
+  acceptedAtTick: number;
+  progress: number;
+}
+
+export interface WorkloadDemandState {
+  workloadId: string;
+  level: number;
+  previousQuote: number;
+  successfulCompletions: number;
+}
+
+export interface WorkloadQuote {
+  workloadId: string;
+  grossQuote: number;
+  demandPercent: number;
+  trend: "rising" | "steady" | "falling";
+  reason: string;
 }
 
 export interface JobSettlement {
@@ -101,6 +148,8 @@ export interface JobSettlement {
   grossPayout: number;
   operatingCost: number;
   netChange: number;
+  taskId: string;
+  lockedGrossQuote: number;
 }
 
 export interface UpgradeNotice {
@@ -147,6 +196,10 @@ export interface SimulationState {
   hardwareId: string;
   ownedHardwareIds: readonly string[];
   ownedModuleIds: readonly string[];
+  ownedExpansionIds: readonly string[];
+  activeExpansionId: string | null;
+  unlockedWorkloadIds: readonly string[];
+  workloadDemand: readonly WorkloadDemandState[];
   workloadId: string;
   slots: readonly PipelineSlotState[];
   branchEnabled: boolean;
@@ -176,10 +229,14 @@ export type SimulationCommand =
   | { type: "BUY_HARDWARE"; hardwareId: string }
   | { type: "EQUIP_HARDWARE"; hardwareId: string }
   | { type: "BUY_MODULE"; moduleId: string }
+  | { type: "BUY_EXPANSION"; expansionId: string }
+  | { type: "SET_EXPANSION_ACTIVE"; active: boolean }
+  | { type: "REMOVE_MODULE"; slotId: string }
   | { type: "SET_COMPUTE_ALLOCATION"; percent: number }
   | { type: "SET_MEMORY_RESERVE"; percent: number }
   | { type: "TOGGLE_BRANCH" }
   | { type: "QUEUE_JOBS"; count: number }
+  | { type: "CLEAR_WAITING_TASKS" }
   | { type: "TOGGLE_PAUSE" }
   | { type: "CAPTURE_BASELINE"; label: string }
   | { type: "RESET"; seed?: number };

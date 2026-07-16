@@ -61,6 +61,7 @@ test.describe("round 012 persistent upgrade economy and UX", () => {
       /LOCKED · BUY \$4\.00/,
     );
     await lockedDrawerUpgrade.click();
+    await openUpgrades(page);
     await expect(
       page.getByRole("heading", { name: "Upgrades", exact: true }),
     ).toBeVisible();
@@ -113,6 +114,10 @@ test.describe("round 012 persistent upgrade economy and UX", () => {
         hasText: "Precision Cleaner selected",
       }),
     ).toContainText("compatible slots are highlighted");
+    await page
+      .getByRole("navigation", { name: "Primary" })
+      .getByRole("button", { name: "Build", exact: true })
+      .click();
     await expect(page.locator(".pipeline-slot.compatible")).toHaveCount(3);
     await page
       .getByTestId("slot-prepare")

@@ -145,7 +145,12 @@ test.describe("round 009 first-session comprehension", () => {
     await expect(
       page.getByText(/Compare and buy alternate rigs in Upgrades/),
     ).toBeVisible();
-    await page.getByRole("button", { name: "Open upgrades" }).click();
+    await page
+      .getByRole("navigation", { name: "Primary" })
+      .getByRole("button", {
+        name: "Upgrades",
+      })
+      .click();
     await expect(page.getByRole("heading", { name: "Rigs" })).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Buy Used 12 GB GPU for $14.00" }),
@@ -183,7 +188,7 @@ test.describe("round 009 first-session comprehension", () => {
 
     await page.reload();
     await page
-      .locator('.module-library [data-module-id="smoke-check"]')
+      .locator('.module-library [data-module-id="quantized-model"]')
       .click();
     await page
       .getByTestId("slot-runtime")
@@ -240,6 +245,6 @@ test.describe("round 009 first-session comprehension", () => {
         .getByRole("group", { name: "Time speed" })
         .getByRole("button")
         .allTextContents(),
-    ).toEqual(["1×", "4×", "16×"]);
+    ).toEqual(["1×", "4×", "16×", "64×"]);
   });
 });

@@ -76,6 +76,8 @@ The first release ends at the founding of a local laboratory. Startup department
 
 Each milestone is independently gated. A later milestone may not be used to compensate for a failed earlier gate.
 
+Owner-directed experiment note (2026-07-16): the original human gates and their evidence history remain unchanged, but the owner has authorized the bounded **Workstation Expansion I** progression slice defined under Milestone 2 and D-007 without structured telemetry. This waiver permits implementation and independent automated verification; it is not a claim that either human gate passed.
+
 ---
 
 ## 3. Non-negotiable design constraints
@@ -253,6 +255,8 @@ The short loop lasts thirty seconds to several minutes.
 5. **Automate** — delegate understood work through bounded policies.
 6. **Escalate** — encounter a new bottleneck one abstraction level higher.
 
+For accepted work, the choice is durable at queue time: each task records its workload identity and gross quote, while actual operating cost remains a consequence of the configuration that processes it. Current demand and quote must be visible before queuing. Repeating one workload saturates its demand and lowers later quotes; simulated time recovers neglected demand. This creates a rotate-or-specialize decision without opaque payout changes.
+
 A useful five-minute phone session:
 
 1. Read the offline report.
@@ -424,6 +428,15 @@ Player interactions:
 - Pause jobs
 - Save configurations as policies or presets
 
+Workstation Expansion I capacity rules:
+
+- Begin with source, three process positions, sink, and the defined shadow branch.
+- A data-driven, exact-once purchase expands the same active pipeline to at least six usable process positions.
+- Purchased positions begin empty/bypassed; purchasing never auto-buys, auto-fills, or duplicates modules.
+- Empty/bypassed positions are valid. All unlocked positions accept compatible owned modules through tap, keyboard selection, replacement/reorder, and touch drag.
+- Pipeline metrics and bottleneck feedback use the complete ordered active graph.
+- Presets save and restore their honest topology/capacity; old or malformed topology recovers safely.
+
 ### 8.2 Module properties
 
 - Throughput
@@ -468,6 +481,18 @@ Initial workloads:
 - Evaluation
 - Small fine-tune
 - Agent tool use
+
+Workstation Expansion I stages these as at least eight durable, data-driven workload concepts. Four are initially available; at least four later workloads unlock through deterministic progress or capability requirements. A locked card names the exact requirement and current progress. Unlock progress persists and migrates without loss.
+
+Each workload exposes before acceptance:
+
+- Current gross quote and bounded deterministic demand/trend
+- Queue-time quote locking
+- Estimated operating cost and estimated net, or an honest uncertainty range
+- A mechanical explanation for saturation/recovery
+- An explicit warning when cost approaches, equals, or exceeds quote
+
+Successful completions saturate only that workload and lower future quotes. Unrun demand recovers gradually with simulated time; no workload remains permanently dead. Accepted tasks keep their locked quote even if later demand changes. Negative-margin work remains an explicit player choice and is never auto-queued.
 
 Different workloads stress different properties:
 
@@ -516,6 +541,8 @@ Growth engines create new constraints:
 - More specialization -> less flexibility.
 
 Prefer bottlenecks, uncertainty, maintenance, trust, and opportunity cost over arbitrary walls.
+
+The bounded early market must not generate money from waiting alone. Repeated single-workload farming eventually reaches nonpositive expected margin; rotating work and allowing time recovery restore viable alternatives. There is no universally dominant workload, and at least one profitable path remains available in early and midgame play.
 
 ---
 
@@ -975,6 +1002,8 @@ At any moment, show:
 
 If information cannot change the next two decisions, keep it in a report.
 
+Bottom tabs are the sole global page navigation in the portrait toy. Do not duplicate page-opening buttons inside warnings, cards, or reports. Contextual actions may select, buy, clear, confirm, undo, or change the current object without opening another global page. Use compact summaries and progressive disclosure for workload, store, queue, and pipeline detail; never achieve density by shrinking text or touch targets.
+
 ### 20.3 Interface evolution
 
 - Bedroom terminal
@@ -1158,6 +1187,8 @@ Hybrid simulation:
 
 Do not simulate every offline second.
 
+Workstation Expansion I exposes exact 1×, 4×, 16×, and 64× controls. They advance the same fixed bounded simulation quanta and must be outcome-equivalent for the same elapsed simulated time and ordered commands. Time speed remains separate from animation and processing pause.
+
 ### 24.3 Update order
 
 Proposed initial order:
@@ -1189,6 +1220,9 @@ State includes:
 - Event references
 - RNG state
 - Schema/content versions
+- Purchased/active pipeline capacity and complete topology
+- Per-task workload identity and locked gross quote
+- Workload unlock progress and deterministic demand state
 
 ### 24.5 Event ledger
 
@@ -1264,6 +1298,11 @@ memoryDemand
 qualityRequirements
 failureModes
 rewards
+demandBounds
+saturationPerSuccess
+recoveryPerHour
+unlockRequirement
+quoteRule
 ```
 
 ### Research project
@@ -1488,6 +1527,29 @@ Add:
 - Save/load
 - Basic offline policies
 
+Owner-authorized bounded first slice — **Workstation Expansion I**:
+
+- Purchasable expansion from three to at least six process positions in one active pipeline
+- At least eight staged workloads: four initial, at least four deterministic later unlocks with visible requirement/progress
+- Per-task workload identity, queue-time locked gross quote, configuration-dependent actual cost, and visible settlement net
+- Bounded deterministic demand/quote fluctuation, completion saturation, and simulated-time recovery
+- Clear waiting tasks without clearing a partially processed active task, payout, refund, or demand mutation
+- Fixed deterministic 1×/4×/16×/64× time
+- Bottom-navigation-only global routing and progressive disclosure for portrait density
+- Versioned migration from schema-v4/content-v3 saves and existing presets
+
+This slice explicitly excludes researchers/characters, newer transient model brands, hype/fear/attention/reputation economy expansion, multiple or parallel pipelines, narrative, startup, labor, and later systems.
+
+Executable acceptance for this slice:
+
+- Preserve first meaningful module by five successful starter jobs and first alternate rig by fifteen successful jobs including that module purchase.
+- Competent default expansion purchase: about 8–16 simulated hours.
+- Fastest valid strategy cannot own every rig, module, and expansion before 24 simulated hours; representative competent play can complete that catalogue by 72 hours.
+- Repeated single-workload farming eventually becomes nonpositive expected margin; rotation/recovery restores profit; no workload is universally dominant; no idle-only money exploit.
+- Clear-waiting is exact, transactional, and active-task preserving, including malformed, empty, reload, and offline cases.
+- Unit/property/balance plus repository-pinned Playwright cover 320/393 CSS pixels, 200% text, 44 CSS-pixel controls, starter/expanded pipeline, keyboard/tap/real-touch drag, locks, queue identity, quote locking, demand, clear, time equivalence, migration, offline, reduced motion, screen-reader labels, no color-only meaning, bottom-nav-only routing, no duplicate page CTAs, recovery, and double activation.
+- Real visual inspection at both portrait widths supplements, but does not replace, committed browser checks.
+
 Exit gate:
 
 > The stage feels like a complete small game rather than a tutorial for later content.
@@ -1602,6 +1664,16 @@ Execute only after Milestone 0 rules and numbers are specified.
 15. Add memory, latency, throughput, and failure propagation.
 16. Add an inspector showing predicted versus observed performance.
 17. Run the Pipeline Toy kill-gate playtest.
+
+Owner-authorized Workstation Expansion I follow-up:
+
+18. Version/migrate pipeline capacity, per-task queue identity/quotes, workload unlocks, demand, and presets.
+19. Implement exact-once 3→6+ process-capacity purchase with empty/bypass slots.
+20. Stage eight workloads and deterministic visible unlock progress.
+21. Implement bounded demand saturation/recovery and locked-quote settlement.
+22. Add clear-waiting-only semantics and fixed 64× time.
+23. Remove duplicate global page CTAs and add compact progressive disclosure.
+24. Run deterministic pacing/market sweeps and pinned portrait/accessibility/offline browser acceptance.
 
 Do not implement research, creators, fear, workforce, or endgame before the pipeline gate passes.
 
