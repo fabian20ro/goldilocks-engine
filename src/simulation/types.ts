@@ -1,5 +1,6 @@
 export const SCHEMA_VERSION = 4;
 export const CONTENT_VERSION = "pipeline-toy-3";
+export const SAVE_INTEGRITY_ALGORITHM = "fnv1a-32-json-v1";
 
 export type SlotType = "source" | "process" | "sink";
 export type ModuleRole =
@@ -125,9 +126,21 @@ export interface LedgerEvent {
   contributingCondition?: string;
 }
 
+export interface MigrationMetadata {
+  sourceSchemaVersion: number;
+  steps: readonly string[];
+}
+
+export interface SaveIntegrity {
+  algorithm: typeof SAVE_INTEGRITY_ALGORITHM;
+  digest: string;
+}
+
 export interface SimulationState {
   schemaVersion: typeof SCHEMA_VERSION;
   contentVersion: typeof CONTENT_VERSION;
+  migration: MigrationMetadata;
+  integrity: SaveIntegrity;
   seed: number;
   rngState: number;
   tick: number;

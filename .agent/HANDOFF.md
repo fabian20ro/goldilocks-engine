@@ -11,8 +11,9 @@ The Milestone 0/1 Pipeline Toy now includes D-006's bounded purchasing redesign,
 - Upgrades is a fourth portrait navigation view. Its labeled route is money → compare → cost → buy → owned → equip/add → observed delta. Rig cards expose price, CU, memory, watts/thermal limit, reliability, maintenance, and comparison with the equipped rig. Module cards expose compatibility/role, throughput, latency, memory, quality, reliability, observability, per-job cost, and comparison with the active same-role module.
 - The Build drawer now labels every card as locked, owned, or equipped. Locked cards open Upgrades. Owned cards support the retained tap/snap and real touch-drag paths. Selecting an owned module names replacement/reorder behavior and highlights only compatible slots; fixed source + three process positions + sink and the Shadow junction remain unchanged.
 - Quick Start explains the complete purchase journey and pacing while keeping later expansion content explicitly deferred. Upgrades opens directly to the store rather than remaining below the long tutorial; Help returns to Build and always reopens the tutorial.
-- Full run state persists through the Worker to local storage: money, ownership, equipped rig, active modules, workload, policies, queue/results, ledger, and metrics survive reload/resume and offline use. Safe schema-v3 states migrate; corrupt/stale/duplicate ownership falls back safely. Legacy preset-v1 records gain the Bedroom CPU while current presets include their rig.
-- Content version is `pipeline-toy-3`; schema version is 4; scope-isolated service-worker cache is v5.
+- Full run state persists through the Worker to local storage: money, ownership, equipped rig, active modules, workload, policies, queue/results, ledger, and metrics survive reload/resume and offline use. Schema-v4 snapshots carry explicit migration metadata and a deterministic full-snapshot integrity digest that is resealed on every engine transition. Restore validates all catalog, numeric, boolean, label, warning, notice, metric, settlement, and ledger fields before recalculation. Structurally valid older/local edits are annotated and resealed; malformed render-bound values fall back safely. Safe schema-v3 states migrate.
+- Saved preset cards read their own stored `hardwareId`, so later live equipment changes cannot mislabel the configuration they will load. Legacy preset-v1 records still gain the Bedroom CPU.
+- Content version is `pipeline-toy-3`; schema version is 4; scope-isolated service-worker cache is v6.
 - Researchers, longer/multiple pipelines, newer-model content, creator/hype/fear systems, personal schedule, and all other Milestone 2+ systems remain absent.
 
 ## Plan requirements and D-006 coverage
@@ -27,15 +28,18 @@ The Milestone 0/1 Pipeline Toy now includes D-006's bounded purchasing redesign,
 | Discoverable module addition            | Locked/owned/equipped labels; locked-card Store route; selected compatible highlights; tap/snap and touch-drag             | Round-012 drawer-to-store/paid tap path; retained pointer/touch drag and drawer-pan cases     |
 | Portrait/accessibility UX               | 320/393, 200% text, 44px targets, no horizontal document overflow, text states, accessible names                           | Round-012 two-width Store stress cases plus retained verifier accessibility suites            |
 | Visible observed consequences           | Equip/place captures baseline and reports concrete deltas; Inspector remains available                                     | Engine equip/place tests; round-012 observed-delta assertions                                 |
-| Persistence and migration               | Schema-v4 local run save, schema-v3 migration, preset-v1 rig default, malformed fallback                                   | Engine/worker restore tests; round-012 reload/offline/migration/corruption cases              |
-| Root/Pages PWA and cache isolation      | Root and `/goldlocks-engine/` packages; cache v5 deletes stale same-scope caches only                                      | Root offline cases; Pages 2/2 online/cache/offline/Worker cases                               |
+| Persistence and migration               | Schema-v4 integrity/migration metadata, exhaustive restore validation, schema-v3 migration, preset-v1 rig default          | Engine/worker restore tests; unchanged verifier round-012 persistence-boundary cases          |
+| Saved configuration identity            | Preset description and load action both use the preset's stored rig, independent of live equipment                         | V-016 Playwright regression                                                                   |
+| Root/Pages PWA and cache isolation      | Root and `/goldlocks-engine/` packages; cache v6 deletes stale same-scope caches only                                      | Root offline cases; Pages online/cache/offline/Worker cases                                   |
 | Scope boundary                          | D-006 supersedes only D-005 criterion 6; plan unchanged; expansion systems absent                                          | `.agent/DECISIONS.md`, immutable playtest record, source/tree inspection                      |
 
 ## Prior verifier findings resolved or preserved
 
 - V-001 through V-015 remain covered. No immutable report was changed.
+- V-016 is resolved: configuration cards render `preset.hardwareId` rather than the current `state.hardwareId`; the unchanged verifier reproduction passes.
+- V-017 is resolved: schema-v4 state now contains migration metadata and a deterministic full-state integrity digest; exhaustive restoration validation rejects malformed event text and every other UI-bound field before React receives it. Structurally valid integrity mismatches are recorded as `integrity-resealed` and preserved, while invalid content restarts safely. The unchanged verifier crash regression passes.
 - The verifier-owned round-010 pressure regression retains all original assertions. Its setup now explicitly restores Quantized Model + Interactive Chat and waits for schema-v4 persistence before reload, because reload intentionally preserves the preceding Full Precision/Batch configuration instead of resetting it.
-- The Pages cache expectations advance from v4 to v5; stale-scope deletion and foreign-cache preservation assertions are unchanged.
+- The Pages cache expectations advance to v6; stale-scope deletion and foreign-cache preservation assertions are unchanged.
 - The prior human blocker B-005 remains honest. The new feedback authorizes redesign and promises a later test; it does not satisfy either human gate.
 
 ## Reproducible setup, startup, and verification
@@ -74,7 +78,7 @@ The optional Playwright CLI wrapper was not used as evidence: its daemon attempt
 - Purchasing belongs inside the deterministic simulation/Worker boundary, not React/local UI state. Money, ownership, equip, baseline capture, feedback, event IDs, and save state therefore share one ordered command stream.
 - Catalog price 0 defines starter-owned modules. Paid modules are data-driven rather than hard-coded UI products.
 - Buying and equipping are separate commands. This prevents an accidental purchase from silently changing a running pipeline and makes exact-once behavior easy to inspect.
-- Run persistence stores schema-versioned simulation state. Runtime restore validates current state before recalculation; schema-v3 migration accepts only known compatible catalog/slot data and safe numeric values. Unknown/current corrupt states restart safely.
+- Run persistence stores schema-versioned simulation state, migration history, and a deterministic FNV-1a digest over the complete snapshot excluding the digest itself. Runtime transitions update the digest. Restore treats it as corruption evidence: structurally valid mismatches are explicitly annotated and resealed to preserve recoverable local progress; invalid fields never cross into rendering and restart safely. Schema-v3 migration accepts only known compatible catalog/slot data and safe numeric values.
 - The authorized redesign does not alter `plan.md`; D-006 is the scoped exception and explicitly defers the requested longer pipeline, researchers, newer-model content, and hype economy until later evidence.
 - Store UX uses textual state and explanations rather than color or screenshots as the source of truth. Browser assertions check the full journey; visual inspection supplements them.
 
@@ -91,11 +95,12 @@ The optional Playwright CLI wrapper was not used as evidence: its daemon attempt
 
 ## Checks executed before final candidate
 
-- `./scripts/verify`: final PASS from locked dependency installation through packaged browser acceptance. It includes formatting, lint, typecheck, 42/42 unit/property/configuration/migration/purchase tests with coverage thresholds, both balance models, the root and Pages builds, 34/34 root browser cases, and 2/2 Pages browser cases.
+- `./scripts/verify`: final PASS from locked dependency recreation through packaged browser acceptance. It includes formatting, lint, typecheck, 44/44 unit/property/configuration/migration/purchase/integrity tests with coverage thresholds, both balance models, the root and Pages builds, 36/36 root browser cases, and 2/2 Pages browser cases.
+- Unchanged verifier reproduction `npm run test:e2e -- --grep "verifier round 012 persistence boundaries"`: PASS 2/2 for V-016 stored-rig identity and V-017 malformed-ledger recovery.
 - `npm run balance:upgrades`: included final PASS, 20,001/20,001 seeds; zero failures; module affordable by successful job 4 worst case; alternate rig by job 14 worst case; maximum 23 attempts to 15 successes.
-- The first canonical attempt exposed formatting in the handoff and an engine test; formatting was corrected. The next full attempt passed every non-browser check and 33/34 root browser cases, exposing a real semantic defect: a locked module was marked disabled even though its action was to navigate to Upgrades. The card is now an enabled navigation control with explicit locked/buy labeling. Focused round-012 rerun passed 5/5 before the final canonical 34/34 result.
-- Focused offline and pressure rerun after cache/persistence setup repair: PASS 3/3.
-- `npm run test:e2e:pages`: initial sandboxed Chromium launch denied at zero runtime by the known macOS Mach-port boundary; exact scoped rerun and final canonical run PASS 2/2.
+- Repair development's first unit run exposed that two direct overflow fixtures needed resealing under the new integrity invariant; the next exposed an over-specific implementation-test expectation for safe migration-metadata repair. The fixtures were updated to exercise the new invariant without changing any verifier-owned test. Subsequent unit runs passed 44/44.
+- The first repair canonical attempt stopped at `.agent/HANDOFF.md` formatting before lint or behavior checks. Formatting was corrected; the complete rerun passed every stage.
+- The original purchase candidate's canonical/browser gate had already found and corrected the locked-card disabled semantics and tutorial/store hierarchy defects. Those retained regressions remain in the final 36-case root result.
 - Visual capture at 393 and 320/200% found the tutorial/store hierarchy defect; fixed by showing Quick Start only in Build and making Help reopen it there.
 
 ## Checks not run

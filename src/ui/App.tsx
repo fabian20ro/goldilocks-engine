@@ -1494,7 +1494,7 @@ function InspectView({
                     <span>
                       <strong>{preset.name}</strong>
                       <small>
-                        {getHardware(state.hardwareId).name} ·{" "}
+                        {getHardware(preset.hardwareId).name} ·{" "}
                         {
                           getModule(
                             preset.slots[2]?.moduleId ?? "quantized-model",

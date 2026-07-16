@@ -16,10 +16,13 @@ import {
 import { nextRandom, normalizeSeed } from "./rng";
 import {
   CONTENT_VERSION,
+  SAVE_INTEGRITY_ALGORITHM,
   SCHEMA_VERSION,
   type LedgerEvent,
+  type MigrationMetadata,
   type PipelineMetrics,
   type PipelineSlotState,
+  type SaveIntegrity,
   type SimulationCommand,
   type SimulationState,
   type UpgradeNotice,
@@ -27,6 +30,18 @@ import {
 
 const MAX_LEDGER_EVENTS = 80;
 const ROLE_ORDER = ["preparation", "model", "evaluation"] as const;
+const EVENT_KINDS = ["info", "success", "warning", "failure"] as const;
+const BOTTLENECKS = [
+  "memory pressure",
+  "thermal throttling",
+  "compute capacity",
+  "module throughput",
+  "stage ordering",
+] as const;
+const EMPTY_INTEGRITY: SaveIntegrity = {
+  algorithm: SAVE_INTEGRITY_ALGORITHM,
+  digest: "00000000",
+};
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
@@ -34,6 +49,41 @@ const round = (value: number, digits = 2): number =>
   Number(value.toFixed(digits));
 const isFiniteNumber = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value);
+
+function stateIntegrityDigest(state: SimulationState): string {
+  const payload = { ...state } as Record<string, unknown>;
+  delete payload.integrity;
+  const serialized = JSON.stringify(payload);
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < serialized.length; index += 1) {
+    hash ^= serialized.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+/** Adds the deterministic corruption check carried by every runtime snapshot. */
+export function sealSimulationState(state: SimulationState): SimulationState {
+  return {
+    ...state,
+    integrity: {
+      algorithm: SAVE_INTEGRITY_ALGORITHM,
+      digest: stateIntegrityDigest(state),
+    },
+  };
+}
+
+export function hasValidStateIntegrity(state: SimulationState): boolean {
+  try {
+    return (
+      state.integrity.algorithm === SAVE_INTEGRITY_ALGORITHM &&
+      /^[0-9a-f]{8}$/.test(state.integrity.digest) &&
+      state.integrity.digest === stateIntegrityDigest(state)
+    );
+  } catch {
+    return false;
+  }
+}
 
 function modulesFor(state: Pick<SimulationState, "slots">) {
   return state.slots.map((slot) => getModule(slot.moduleId));
@@ -269,6 +319,11 @@ export function createInitialState(seed = 20260715): SimulationState {
   const base = {
     schemaVersion: SCHEMA_VERSION,
     contentVersion: CONTENT_VERSION,
+    migration: {
+      sourceSchemaVersion: SCHEMA_VERSION,
+      steps: [],
+    },
+    integrity: EMPTY_INTEGRITY,
     seed: normalizedSeed,
     rngState: normalizedSeed,
     tick: 0,
@@ -306,11 +361,13 @@ export function createInitialState(seed = 20260715): SimulationState {
     eventSequence: 0,
     ledger: [],
   } satisfies SimulationState;
-  return appendEvent(recalculate(base), {
-    kind: "info",
-    message:
-      "Pipeline initialized. Queue a workload, observe, then reconfigure.",
-  });
+  return sealSimulationState(
+    appendEvent(recalculate(base), {
+      kind: "info",
+      message:
+        "Pipeline initialized. Queue a workload, observe, then reconfigure.",
+    }),
+  );
 }
 
 function updateSlots(
@@ -599,7 +656,7 @@ export function applyCommand(
 ): SimulationState {
   if (typeof command !== "object" || command === null) return state;
   if (!hasValidNumericInput(command)) return state;
-  const next = applyValidCommand(state, command);
+  const next = sealSimulationState(applyValidCommand(state, command));
   return isStateValid(next) ? next : state;
 }
 
@@ -744,7 +801,7 @@ function advanceTick(state: SimulationState, seconds: number): SimulationState {
 
 export function tick(state: SimulationState, seconds: number): SimulationState {
   if (!isFiniteNumber(seconds)) return state;
-  const next = advanceTick(state, seconds);
+  const next = sealSimulationState(advanceTick(state, seconds));
   return isStateValid(next) ? next : state;
 }
 
@@ -764,20 +821,61 @@ const metricNumbers = (metrics: PipelineMetrics): readonly number[] => [
   metrics.operatingCost,
 ];
 
-function areMetricsValid(metrics: PipelineMetrics): boolean {
+const isText = (value: unknown, maxLength: number): value is string =>
+  typeof value === "string" && value.length <= maxLength;
+
+const isEventKind = (value: unknown): value is LedgerEvent["kind"] =>
+  EVENT_KINDS.includes(value as LedgerEvent["kind"]);
+
+function isMigrationMetadataValid(value: unknown): value is MigrationMetadata {
+  if (typeof value !== "object" || value === null) return false;
+  const migration = value as MigrationMetadata;
+  return (
+    Number.isSafeInteger(migration.sourceSchemaVersion) &&
+    migration.sourceSchemaVersion >= 1 &&
+    migration.sourceSchemaVersion <= SCHEMA_VERSION &&
+    Array.isArray(migration.steps) &&
+    migration.steps.length <= 8 &&
+    migration.steps.every((step) => isText(step, 64) && step.length > 0) &&
+    new Set(migration.steps).size === migration.steps.length
+  );
+}
+
+function isIntegrityShapeValid(value: unknown): value is SaveIntegrity {
+  if (typeof value !== "object" || value === null) return false;
+  const integrity = value as SaveIntegrity;
+  return (
+    integrity.algorithm === SAVE_INTEGRITY_ALGORITHM &&
+    typeof integrity.digest === "string" &&
+    /^[0-9a-f]{8}$/.test(integrity.digest)
+  );
+}
+
+function areMetricsValid(value: unknown): value is PipelineMetrics {
+  if (typeof value !== "object" || value === null) return false;
+  const metrics = value as PipelineMetrics;
   return (
     metricNumbers(metrics).every(
-      (value) => Number.isFinite(value) && value >= 0,
+      (number) => Number.isFinite(number) && number >= 0,
     ) &&
     metrics.predictedQuality <= 99 &&
     metrics.observedQuality <= 99 &&
     metrics.reliability <= 1 &&
     metrics.observability <= 1 &&
-    metrics.evaluationCoverage <= 1
+    metrics.evaluationCoverage <= 1 &&
+    BOTTLENECKS.includes(
+      metrics.dominantBottleneck as (typeof BOTTLENECKS)[number],
+    ) &&
+    findSlot(metrics.bottleneckSlotId) !== undefined &&
+    Array.isArray(metrics.orderWarnings) &&
+    metrics.orderWarnings.length <= slots.length &&
+    metrics.orderWarnings.every((warning) => isText(warning, 200))
   );
 }
 
-export function isStateValid(state: SimulationState): boolean {
+function isStateStructurallyValid(value: unknown): value is SimulationState {
+  if (typeof value !== "object" || value === null) return false;
+  const state = value as SimulationState;
   try {
     const nonnegativeNumbers = [
       state.resources.money,
@@ -801,6 +899,8 @@ export function isStateValid(state: SimulationState): boolean {
     return (
       state.schemaVersion === SCHEMA_VERSION &&
       state.contentVersion === CONTENT_VERSION &&
+      isMigrationMetadataValid(state.migration) &&
+      isIntegrityShapeValid(state.integrity) &&
       Number.isInteger(state.seed) &&
       state.seed > 0 &&
       state.seed <= 0xffff_ffff &&
@@ -809,13 +909,21 @@ export function isStateValid(state: SimulationState): boolean {
       state.rngState <= 0xffff_ffff &&
       Array.isArray(state.ownedHardwareIds) &&
       state.ownedHardwareIds.length > 0 &&
-      state.ownedHardwareIds.every((id) => hardwareIds.includes(id)) &&
+      state.ownedHardwareIds.every(
+        (id) => typeof id === "string" && hardwareIds.includes(id),
+      ) &&
       new Set(state.ownedHardwareIds).size === state.ownedHardwareIds.length &&
+      typeof state.hardwareId === "string" &&
       state.ownedHardwareIds.includes(state.hardwareId) &&
       Array.isArray(state.ownedModuleIds) &&
       starterModuleIds.every((id) => state.ownedModuleIds.includes(id)) &&
-      state.ownedModuleIds.every((id) => moduleIds.includes(id)) &&
+      state.ownedModuleIds.every(
+        (id) => typeof id === "string" && moduleIds.includes(id),
+      ) &&
       new Set(state.ownedModuleIds).size === state.ownedModuleIds.length &&
+      typeof state.workloadId === "string" &&
+      findWorkload(state.workloadId) !== undefined &&
+      typeof state.branchEnabled === "boolean" &&
       nonnegativeNumbers.every(
         (value) => Number.isFinite(value) && value >= 0,
       ) &&
@@ -830,12 +938,15 @@ export function isStateValid(state: SimulationState): boolean {
       state.memoryReserve <= 30 &&
       state.jobs.queued <= 99 &&
       state.jobs.processingCarry < 1 &&
+      typeof state.jobs.paused === "boolean" &&
+      (state.baselineLabel === null || isText(state.baselineLabel, 64)) &&
+      (state.failedModuleId === null ||
+        (typeof state.failedModuleId === "string" &&
+          findModule(state.failedModuleId) !== undefined)) &&
+      isText(state.lastWarning, 800) &&
       (state.lastUpgradeNotice === null ||
-        (typeof state.lastUpgradeNotice.message === "string" &&
-          state.lastUpgradeNotice.message.length <= 800 &&
-          ["info", "success", "warning", "failure"].includes(
-            state.lastUpgradeNotice.kind,
-          ))) &&
+        (isText(state.lastUpgradeNotice.message, 800) &&
+          isEventKind(state.lastUpgradeNotice.kind))) &&
       (state.lastSettlement === null ||
         (Number.isSafeInteger(state.lastSettlement.tick) &&
           state.lastSettlement.tick >= 0 &&
@@ -863,6 +974,11 @@ export function isStateValid(state: SimulationState): boolean {
         state.slots.some((current) => current.slotId === slot.id),
       ) &&
       state.slots.every((slotState) => {
+        if (
+          typeof slotState.slotId !== "string" ||
+          typeof slotState.moduleId !== "string"
+        )
+          return false;
         const module = findModule(slotState.moduleId);
         const slot = findSlot(slotState.slotId);
         return (
@@ -875,15 +991,27 @@ export function isStateValid(state: SimulationState): boolean {
       state.ledger.length <= MAX_LEDGER_EVENTS &&
       state.ledger.every(
         (event) =>
+          isText(event.id, 128) &&
+          event.id.length > 0 &&
           Number.isSafeInteger(event.tick) &&
           event.tick >= 0 &&
-          event.tick <= state.tick,
+          event.tick <= state.tick &&
+          isEventKind(event.kind) &&
+          isText(event.message, 800) &&
+          (event.directCause === undefined || isText(event.directCause, 800)) &&
+          (event.contributingCondition === undefined ||
+            isText(event.contributingCondition, 800)),
       ) &&
+      state.eventSequence >= state.ledger.length &&
       new Set(eventIds).size === eventIds.length
     );
   } catch {
     return false;
   }
+}
+
+export function isStateValid(state: SimulationState): boolean {
+  return isStateStructurallyValid(state) && hasValidStateIntegrity(state);
 }
 
 function finiteOr(value: unknown, fallback: number): number {
@@ -910,6 +1038,19 @@ function safeLegacySlots(value: unknown): readonly PipelineSlotState[] | null {
   return candidate as readonly PipelineSlotState[];
 }
 
+function withMigrationStep(
+  migration: MigrationMetadata,
+  step: string,
+): MigrationMetadata {
+  return {
+    ...migration,
+    steps: [
+      ...migration.steps.filter((current) => current !== step),
+      step,
+    ].slice(-8),
+  };
+}
+
 /** Restores current saves or migrates the former schema-v3 Pipeline Toy state. */
 export function restoreSimulationState(
   value: unknown,
@@ -919,8 +1060,28 @@ export function restoreSimulationState(
   if (typeof value !== "object" || value === null) return fallback;
   const record = value as Record<string, unknown>;
   if (record.schemaVersion === SCHEMA_VERSION) {
-    const candidate = value as SimulationState;
-    return isStateValid(candidate) ? recalculate(candidate) : fallback;
+    let migration = isMigrationMetadataValid(record.migration)
+      ? record.migration
+      : {
+          sourceSchemaVersion: SCHEMA_VERSION,
+          steps: ["schema-v4-metadata-added"],
+        };
+    const candidate = {
+      ...record,
+      migration,
+      integrity: isIntegrityShapeValid(record.integrity)
+        ? record.integrity
+        : EMPTY_INTEGRITY,
+    } as unknown as SimulationState;
+    if (!isStateStructurallyValid(candidate)) return fallback;
+    if (!isIntegrityShapeValid(record.integrity))
+      migration = withMigrationStep(migration, "integrity-added");
+    else if (!hasValidStateIntegrity(candidate))
+      migration = withMigrationStep(migration, "integrity-resealed");
+    const restored = sealSimulationState(
+      recalculate({ ...candidate, migration }),
+    );
+    return isStateValid(restored) ? restored : fallback;
   }
   if (record.schemaVersion !== 3) return fallback;
 
@@ -939,6 +1100,10 @@ export function restoreSimulationState(
   const seed = normalizeSeed(finiteOr(record.seed, fallback.seed));
   const migratedBase: SimulationState = {
     ...createInitialState(seed),
+    migration: {
+      sourceSchemaVersion: 3,
+      steps: ["schema-3-to-4"],
+    },
     rngState: normalizeSeed(finiteOr(record.rngState, seed)),
     tick: Math.min(
       Number.MAX_SAFE_INTEGER,
@@ -993,6 +1158,6 @@ export function restoreSimulationState(
         "Existing Pipeline Toy state migrated to the ownership economy; active starter equipment remains owned.",
     },
   };
-  const migrated = recalculate(migratedBase);
+  const migrated = sealSimulationState(recalculate(migratedBase));
   return isStateValid(migrated) ? migrated : fallback;
 }

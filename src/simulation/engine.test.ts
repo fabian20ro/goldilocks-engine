@@ -5,8 +5,10 @@ import {
   applyCommand,
   calculateMetrics,
   createInitialState,
+  hasValidStateIntegrity,
   isStateValid,
   restoreSimulationState,
+  sealSimulationState,
   tick,
 } from "./engine";
 import { normalizeSeed } from "./rng";
@@ -296,6 +298,106 @@ describe("deterministic simulation engine", () => {
     );
   });
 
+  it("checks full snapshot integrity and safely reseals valid local recovery", () => {
+    const initial = createInitialState(41);
+    expect(initial.migration).toEqual({
+      sourceSchemaVersion: 4,
+      steps: [],
+    });
+    expect(initial.integrity.algorithm).toBe("fnv1a-32-json-v1");
+    expect(hasValidStateIntegrity(initial)).toBe(true);
+
+    const edited = {
+      ...initial,
+      resources: { ...initial.resources, money: 14 },
+    };
+    expect(hasValidStateIntegrity(edited)).toBe(false);
+    const restored = restoreSimulationState(
+      JSON.parse(JSON.stringify(edited)),
+      41,
+    );
+    expect(restored.resources.money).toBe(14);
+    expect(restored.migration.steps).toContain("integrity-resealed");
+    expect(hasValidStateIntegrity(restored)).toBe(true);
+    expect(isStateValid(restored)).toBe(true);
+  });
+
+  it("rejects malformed persisted fields before they can reach rendering", () => {
+    const initial = createInitialState(43);
+    const invalidStates: unknown[] = [
+      { ...initial, workloadId: "missing" },
+      { ...initial, branchEnabled: "yes" },
+      { ...initial, jobs: { ...initial.jobs, paused: "no" } },
+      { ...initial, baselineLabel: { malformed: true } },
+      { ...initial, failedModuleId: "missing" },
+      { ...initial, lastWarning: { malformed: true } },
+      {
+        ...initial,
+        lastUpgradeNotice: { kind: "success", message: { malformed: true } },
+      },
+      {
+        ...initial,
+        metrics: {
+          ...initial.metrics,
+          dominantBottleneck: { malformed: true },
+        },
+      },
+      {
+        ...initial,
+        metrics: { ...initial.metrics, orderWarnings: [{ malformed: true }] },
+      },
+      {
+        ...initial,
+        baselineMetrics: {
+          ...initial.metrics,
+          bottleneckSlotId: "missing",
+        },
+      },
+      {
+        ...initial,
+        ledger: [{ ...initial.ledger[0]!, id: { malformed: true } }],
+      },
+      {
+        ...initial,
+        ledger: [{ ...initial.ledger[0]!, kind: "unknown" }],
+      },
+      {
+        ...initial,
+        ledger: [{ ...initial.ledger[0]!, message: { malformed: true } }],
+      },
+      {
+        ...initial,
+        ledger: [{ ...initial.ledger[0]!, directCause: { malformed: true } }],
+      },
+      {
+        ...initial,
+        ledger: [
+          {
+            ...initial.ledger[0]!,
+            contributingCondition: { malformed: true },
+          },
+        ],
+      },
+    ];
+
+    for (const malformed of invalidStates) {
+      expect(restoreSimulationState(malformed, 43)).toEqual(initial);
+    }
+
+    const repairedMetadata = restoreSimulationState({
+      ...initial,
+      migration: {
+        sourceSchemaVersion: 4,
+        steps: ["duplicate", "duplicate"],
+      },
+    });
+    expect(repairedMetadata.migration.steps).toEqual([
+      "schema-v4-metadata-added",
+      "integrity-resealed",
+    ]);
+    expect(isStateValid(repairedMetadata)).toBe(true);
+  });
+
   it("exposes branch and policy tradeoffs in metrics", () => {
     const state = createInitialState();
     const branched = applyCommand(state, { type: "TOGGLE_BRANCH" });
@@ -428,14 +530,14 @@ describe("deterministic simulation engine", () => {
 
   it("rejects a transition when a safe integer invariant would overflow", () => {
     const initial = createInitialState(19);
-    const maxTick = {
+    const maxTick = sealSimulationState({
       ...initial,
       tick: Number.MAX_SAFE_INTEGER,
-    } satisfies SimulationState;
-    const maxSequence = {
+    } satisfies SimulationState);
+    const maxSequence = sealSimulationState({
       ...initial,
       eventSequence: Number.MAX_SAFE_INTEGER,
-    } satisfies SimulationState;
+    } satisfies SimulationState);
 
     expect(isStateValid(maxTick)).toBe(true);
     expect(isStateValid(maxSequence)).toBe(true);
