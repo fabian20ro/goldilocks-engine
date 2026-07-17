@@ -104,6 +104,8 @@ button,
 }
 
 .app-header {
+  container-name: app-header;
+  container-type: inline-size;
   position: relative;
   z-index: 3;
   padding: 1rem 1rem 0.75rem;
@@ -289,6 +291,40 @@ h2 {
   border-color: var(--acid);
   background: #263b1c;
   color: var(--acid);
+}
+
+/*
+ * Viewport breakpoints alone cannot account for browser text enlargement.  At
+ * 200% text a 393px viewport has less usable header space than an unscaled
+ * 320px viewport, so let the header's own inline size choose the readable
+ * layout.  The normal compact five-item row remains unchanged.
+ */
+@container app-header (max-width: 16em) {
+  .resource-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 0.75rem;
+    row-gap: 0.55rem;
+  }
+
+  .resource-strip > div {
+    padding-right: 0;
+    border-right: 0;
+  }
+
+  .resource-strip dt,
+  .resource-strip dd {
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+  }
+
+  .time-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .speed-options {
+    width: 100%;
+  }
 }
 
 .main-content {
