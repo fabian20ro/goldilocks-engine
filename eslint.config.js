@@ -50,7 +50,11 @@ export default tseslint.config(
     },
   },
   {
-    files: ["public/sw.js"],
+    files: ["src/pwa/service-worker.template.js"],
     languageOptions: { globals: globals.serviceworker },
+  },
+  {
+    files: ["scripts/**/*.mjs"],
+    languageOptions: { globals: globals.node },
   },
 );

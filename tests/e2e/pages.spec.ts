@@ -62,23 +62,35 @@ test("the GitHub Pages build loads and remains worker-backed offline", async ({
     };
     const assetManifestResponse = await fetch(`${basePath}asset-manifest.json`);
     const assets = (await assetManifestResponse.json()) as string[];
+    const buildInfoResponse = await fetch(`${basePath}build-info.json`);
+    const buildInfo = (await buildInfoResponse.json()) as {
+      version: string;
+      scope: string;
+      cacheName: string;
+    };
     const registrations = await navigator.serviceWorker.getRegistrations();
     const registration = registrations.find(
       (entry) => new URL(entry.scope).pathname === basePath,
     );
-    const cacheName = `goldilocks-shell:${basePath}:v7`;
-    const cache = await caches.open(cacheName);
+    const cache = await caches.open(buildInfo.cacheName);
 
     return {
       manifestPath: new URL(manifestLink.href).pathname,
       iconPath: new URL(iconLink.href).pathname,
       manifest,
       assets,
+      buildInfo,
+      appVersion: document.documentElement.dataset.appVersion ?? null,
       registrationScope: registration
         ? new URL(registration.scope).pathname
         : null,
       controllerPath: navigator.serviceWorker.controller
         ? new URL(navigator.serviceWorker.controller.scriptURL).pathname
+        : null,
+      controllerBuild: navigator.serviceWorker.controller
+        ? new URL(
+            navigator.serviceWorker.controller.scriptURL,
+          ).searchParams.get("build")
         : null,
       cacheNames: await caches.keys(),
       cachedPaths: (await cache.keys()).map(
@@ -99,7 +111,10 @@ test("the GitHub Pages build loads and remains worker-backed offline", async ({
   });
   expect(packageState.registrationScope).toBe(pagesPath);
   expect(packageState.controllerPath).toBe(`${pagesPath}sw.js`);
-  expect(packageState.cacheNames).toContain(`goldilocks-shell:${pagesPath}:v7`);
+  expect(packageState.buildInfo.scope).toBe(pagesPath);
+  expect(packageState.appVersion).toBe(packageState.buildInfo.version);
+  expect(packageState.controllerBuild).toBe(packageState.buildInfo.version);
+  expect(packageState.cacheNames).toContain(packageState.buildInfo.cacheName);
   expect(
     packageState.assets.some((asset) => /worker-.*\.js$/.test(asset)),
   ).toBe(true);
@@ -112,6 +127,7 @@ test("the GitHub Pages build loads and remains worker-backed offline", async ({
     `${pagesPath}manifest.webmanifest`,
     `${pagesPath}icon.svg`,
     `${pagesPath}asset-manifest.json`,
+    `${pagesPath}build-info.json`,
     ...packageState.assets,
   ];
   for (const path of expectedCachedPaths)
@@ -181,22 +197,26 @@ test("verifier round 006: scoped activation preserves foreign caches", async ({
     .locator("html[data-offline-ready='true']")
     .waitFor({ timeout: 15_000 });
 
-  const cacheState = await page.evaluate(async () => {
+  const cacheState = await page.evaluate(async (basePath) => {
+    const buildInfo = (await (
+      await fetch(`${basePath}build-info.json`)
+    ).json()) as { cacheName: string };
     const names = await caches.keys();
     const sibling = await caches.open("goldilocks-shell:/other-app/:v7");
     const unrelated = await caches.open("third-party-test-cache");
     return {
       names,
+      cacheName: buildInfo.cacheName,
       controllerPath: navigator.serviceWorker.controller
         ? new URL(navigator.serviceWorker.controller.scriptURL).pathname
         : null,
       siblingBody: await (await sibling.match("/other-app/asset.js"))?.text(),
       unrelatedBody: await (await unrelated.match("/shared/asset.txt"))?.text(),
     };
-  });
+  }, pagesPath);
 
   expect(cacheState.controllerPath).toBe(`${pagesPath}sw.js`);
-  expect(cacheState.names).toContain(`goldilocks-shell:${pagesPath}:v7`);
+  expect(cacheState.names).toContain(cacheState.cacheName);
   expect(cacheState.names).not.toContain(`goldilocks-shell:${pagesPath}:v3`);
   expect(cacheState.names).toContain("goldilocks-shell:/other-app/:v7");
   expect(cacheState.names).toContain("third-party-test-cache");

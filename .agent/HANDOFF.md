@@ -24,7 +24,8 @@ The bounded Workstation Expansion I / per-task demand slice authorized in D-007 
 - GitHub Actions now has a Linux verification lane for `agent/implementation` pushes and manual dispatch. It asserts the checked-out commit equals `GITHUB_SHA`, runs the canonical `./scripts/verify` command on Ubuntu 24.04, installs pinned Chromium and Linux dependencies through repository-local caches, and uploads identity metadata plus root/Pages reports and results on both success and failure. The canonical script now continues through both browser packages after an earlier check failure, then returns nonzero if any phase failed.
 - Runtime commands now cross an explicit discriminator/input boundary before the engine switch. Unknown discriminants and malformed numeric, baseline-label, or expansion-active inputs are exact no-ops; a command batch preflights every nested command before applying any command, preserving atomicity. The Worker also safely omits an invalid request ID while returning its normal state response.
 - The tutorial explains earning, CU/memory/thermal pressure, task quotes/costs, demand, expansion purchase/activation/empty slots, 64× time, waiting-task clearing, and honest presets.
-- Schema version is 5; content version is `pipeline-toy-4`; scope-isolated service-worker cache is v7. Schema-3 and schema-4 saves migrate safely. Aggregate legacy queues become deterministic task records without losing the queue count or current workload identity.
+- Schema version is 5; content version is `pipeline-toy-4`; every production PWA build gets a content/base-derived ID shared by the app, generated worker, and inspectable `build-info.json`. Its scoped cache is `goldilocks-shell:<scope>:<build-id>`, never a manually bumped fixed cache number. Schema-3 and schema-4 saves migrate safely. Aggregate legacy queues become deterministic task records without losing the queue count or current workload identity.
+- Root and Pages packages are installable standalone PWAs. Online refresh registers a versioned worker with `updateViaCache: "none"`, atomically precaches the new full shell, claims clients, removes only obsolete caches inside that exact scope, retries a matching waiting-worker activation for at most 20 seconds when registration races the update, and performs at most one reload per new controller build. A first install does not reload its startup page. A failed candidate build cannot activate or delete the prior complete cache; localStorage saves are never touched by cache cleanup. Offline reload deliberately remains on the last fully installed version until connectivity returns.
 
 The source feedback is preserved in `.agent/playtests/2026-07-16-progression-expansion.md`. D-007 records the owner's process waiver and the bounded scope. The original human-study gates remain visible in `plan.md`; this implementation does not claim they passed.
 
@@ -47,7 +48,8 @@ The source feedback is preserved in `.agent/playtests/2026-07-16-progression-exp
 | Portrait/accessibility              | 320/393 CSS px, normal and 200% text, ≥44px visible buttons, no document overflow, reduced motion, touch/pointer placement; primary resources/time guidance reflow intrinsically and short content scrolls above the persistent bottom nav | Root browser suite, expanded round-025 header geometry/pointer regression, immutable V-031 case, retained verifier cases, headed visual inspection |
 | Stressed module readability         | Inline-size/text-scale-aware cards give all decision copy a full-width row at 320/393 and 200% while preserving normal-scale composition                                                                                                   | Round-019/020 browser regressions and fresh normal/scaled screenshots                                                                              |
 | Bottom-tab routing / disclosure     | No duplicate global page-opening CTAs; upgrade details use native disclosure                                                                                                                                                               | Browser assertions and source inspection                                                                                                           |
-| Persistence/migration/offline       | Schema-5 integrity; schema-3/4 migration; atomic preset restore; persist-before-publish command acknowledgements; expanded preset/save/offline resume; cache v7                                                                            | Worker/hook/localStorage integration tests; 50-repeat exact offline path; retained root browser suite; Pages production build                      |
+| Persistence/migration/offline       | Schema-5 integrity; schema-3/4 migration; atomic preset restore; persist-before-publish command acknowledgements; expanded preset/save/offline resume; content-derived scoped PWA shell cache and rollback                                 | Worker/hook/localStorage integration tests; 50-repeat exact offline path; retained root browser suite; Pages production build; A→B PWA suite       |
+| Redeploy-safe PWA                   | Root/Pages manifest installability; versioned app/worker/build-info identity; cache-bypassing update check; atomic full-shell precache; one-reload controller handoff; scope-only cleanup; save-safe rollback/offline                      | CDP installability plus deterministic A→B fixture server: two clients, cache/worker version, save, offline, and failed-update recovery             |
 | Rerunnable browser verification     | Exact lint ignores cover only generated root/Pages reports, results, visual output, CLI state, and caches                                                                                                                                  | Round-019 workflow regression; lint with populated report trees                                                                                    |
 | Linux Pages browser evidence        | Exact-SHA GitHub Actions job runs the canonical root + Pages/offline gate with pinned Chromium, workspace-local caches, and retained failure artifacts; both browser suites run before aggregate failure                                   | `src/test/verifyWorkflow.test.ts`; pending independently queryable workflow run after candidate publication                                        |
 | Runtime command recovery            | Direct and Worker command paths reject unsupported discriminants safely; Worker batches validate fully before any nested valid command can mutate state                                                                                    | V-028 regression; engine and Worker-protocol command-boundary tests                                                                                |
@@ -84,6 +86,10 @@ Requirements: Node.js 20.19+ (or 22.12+) and npm.
 ./scripts/run
 # http://127.0.0.1:4173
 
+# Built root package for local PWA installation/update inspection
+./scripts/run-pwa
+# http://127.0.0.1:4173
+
 # Canonical full gate: setup, formatting, lint, typecheck, coverage,
 # all balance models, root/Pages builds, root E2E, and Pages/offline E2E
 ./scripts/verify
@@ -94,6 +100,8 @@ npm run test:e2e -- tests/e2e/round-015-expansion.spec.ts
 npm run test:e2e -- tests/e2e/round-015-expansion.spec.ts --grep "buys expansion exactly once" --repeat-each=50
 npm run test:e2e -- tests/e2e/verifier-round-024.spec.ts tests/e2e/verifier-round-025.spec.ts tests/e2e/round-025-header-scale.spec.ts
 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright npx playwright test tests/e2e/round-025-header-scale.spec.ts tests/e2e/verifier-round-026.spec.ts --reporter=line
+npm run build:pwa-update-fixtures
+npm run test:e2e -- tests/e2e/pwa-update.spec.ts --reporter=line
 npm run test:e2e
 npm run test:e2e:pages
 
@@ -102,7 +110,7 @@ gh run list --workflow verify.yml --commit <candidate-sha>
 gh run view <run-id> --log-failed
 ```
 
-Dependency cache: ignored `.cache/npm`. Browser cache: ignored `.cache/ms-playwright`. Playwright CLI daemon cache: ignored `.cache/pwcli-daemon`; reports/results are ignored under `playwright-report/`, `playwright-pages-report/`, and `test-results/`; visual artifacts are ignored under `output/playwright/`. These exact generated paths are also outside ESLint scope. Root and Pages servers bind `127.0.0.1:4173`, wait for readiness, and are cleaned up by Playwright. Set `PLAYWRIGHT_INSTALL_DEPS=1` only on a Linux runner with privilege to install Playwright's required system libraries; the verification workflow does this before calling the same canonical command.
+Dependency cache: ignored `.cache/npm`. Browser cache: ignored `.cache/ms-playwright`. Generated two-version PWA fixtures live under ignored `.cache/pwa-update`. Playwright CLI daemon cache: ignored `.cache/pwcli-daemon`; reports/results are ignored under `playwright-report/`, `playwright-pages-report/`, and `test-results/`; visual artifacts are ignored under `output/playwright/`. These exact generated paths are also outside ESLint scope. Root and Pages servers bind `127.0.0.1:4173`; the A→B fixture server binds deterministic `127.0.0.1:4181`; all wait for readiness and are cleaned up by Playwright. Set `PLAYWRIGHT_INSTALL_DEPS=1` only on a Linux runner with privilege to install Playwright's required system libraries; the verification workflow does this before calling the same canonical command.
 
 On this managed macOS host, a direct browser launch can fail with a Mach-port permission denial inside the filesystem sandbox. The exact same repository-local command succeeds outside that boundary; this is an environment constraint, not a skipped test or product workaround.
 
@@ -128,6 +136,8 @@ On this managed macOS host, a direct browser launch can fail with a Mach-port pe
 - Harmless storage integrity mismatches are resealed only after full structural validation. Malformed render-bound values still restart safely.
 - The canonical browser gate has an independent Linux execution path: `verify.yml` validates the frozen checkout against `GITHUB_SHA`, keeps npm/browser/XDG caches inside ignored `.cache/`, and records a run-scoped artifact even when `./scripts/verify` fails. A Verifier must still inspect that exact run's SHA and conclusion; an absent or failed run is not acceptance evidence.
 - Runtime command validation is intentionally shared by the direct engine entry point and Worker protocol. The batch preflight is pure and occurs before reduction, so a malformed second command cannot make a valid first command visible.
+- The Vite PWA artifact plugin hashes deterministic deployment inputs, base scope, and an optional deployment marker; it emits the virtual app version, `build-info.json`, `asset-manifest.json`, and generated `sw.js` from one identity. The worker uses a scope-derived cache namespace plus that ID. It fetches update metadata without HTTP-cache reuse, uses atomic `Cache.addAll` for the complete shell before activation, and deletes only obsolete names in its own namespace. It never runtime-caches a network response, preventing a newly deployed HTML from being blended into an older offline shell.
+- The client registers `sw.js?build=<id>` with `updateViaCache: "none"`, checks for an update when online, recognizes a controller by the same script-path/query identity, and gates offline readiness on both a matching controller and complete matching shell. The worker replies to a version handshake. If registration began while a new worker was already installing, the client retries activation of its matching waiting worker for at most 20 seconds. A first controller transition retains its startup page; a later matching controller transition marks one session-scoped reload for that target ID, so each refreshed client converges without a reload loop.
 
 ## Known limitations and risks
 
@@ -139,6 +149,7 @@ On this managed macOS host, a direct browser launch can fail with a Mach-port pe
 - Browser acceptance uses pinned Chromium. Physical-device thermal/battery behavior, non-Chromium engines, platform screen readers, haptics, and audio remain unverified.
 - This managed macOS host can deny Chromium at Mach-port registration. Round 023's committed Linux workflow proved the prior frozen candidate; each new candidate still needs its own exact-SHA Linux run and fresh Verifier inspection before it becomes acceptance evidence.
 - localStorage denial leaves the in-memory session playable but cannot provide cross-reload durability.
+- An offline installed client intentionally stays on its last complete deployed version. It must reconnect and refresh before a newer version can install; this is the required safe limitation, not a stale-cache failure. The test fixture uses a deliberate build marker to represent a changed deployment, while normal production IDs change from deployment inputs automatically.
 - Implementer does not push, deploy, or issue acceptance. Exact-SHA publication and fresh independent PASS remain Orchestrator/Verifier work.
 
 ## Checks executed before final candidate
@@ -182,6 +193,10 @@ On this managed macOS host, a direct browser launch can fail with a Mach-port pe
 - `npm run test:e2e -- --reporter=dot`: PASS, 67/67 root browser tests.
 - `npm run test:e2e:pages -- --reporter=dot`: PASS, 2/2 scoped Pages/offline browser tests.
 - Round-027 `./scripts/verify`: PASS (exit 0). Fresh locked setup, format, lint, typecheck, 18 files / 87 unit tests, numeric prototype, 20,001-seed upgrade sweep, 41-seed progression sweep, root build, 67 root browser tests, and 2 scoped Pages/offline browser tests all passed with the pinned repository-local Chromium cache outside the managed macOS filesystem sandbox.
+- `npm run lint`, `npm run typecheck`, `npm run build`, `npm run build:pages`, and `npm run build:pwa-update-fixtures`: PASS after the redeploy-safe PWA changes.
+- `npm run test:e2e -- tests/e2e/pwa-update.spec.ts --reporter=line`: PASS, 4/4. Root and Pages each prove CDP installability, a same-origin A→B deploy/update for two controlled clients, app/controller/worker-message/cache identity B, old scoped-cache removal, exact non-default paused save preservation, B offline reload, and failed-B preservation/offline recovery of A. Chromium ran with the pinned repository-local cache outside the managed macOS filesystem sandbox because the sandbox denies its Mach-port registration.
+- `npm run test:e2e -- tests/e2e/pwa-update.spec.ts --repeat-each=3 --reporter=line`: PASS, 12/12 consecutive root/Pages A→B and failed-update recovery flows, including the update-registration race retry.
+- Final candidate `./scripts/verify`: PASS (exit 0). Fresh locked setup, formatting, lint, typecheck, 18 files / 87 unit tests, numeric prototype, 20,001-seed upgrade sweep, 41-seed progression sweep, root production build, 71 root browser tests, and 2 scoped Pages/offline browser tests all passed with the pinned repository-local Chromium cache outside the managed macOS filesystem sandbox.
 
 ## Checks not run
 

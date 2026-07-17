@@ -11,6 +11,7 @@ Playtest deployment target: <https://fabian20ro.github.io/goldlocks-engine/>. Th
 ```sh
 ./scripts/setup
 ./scripts/run       # http://127.0.0.1:4173
+./scripts/run-pwa   # built, installable root PWA at the same loopback URL
 ./scripts/verify    # root + Pages complete reproducible check
 
 # 20,001-seed first-module/first-rig pacing and exact-once checks
@@ -19,9 +20,21 @@ npm run balance:upgrades
 # GitHub Pages package and scoped offline/worker browser check
 npm run build:pages
 npm run test:e2e:pages
+
+# Reproducible A → B deploy/update/rollback acceptance
+npm run build:pwa-update-fixtures
+npm run test:e2e -- tests/e2e/pwa-update.spec.ts
 ```
 
 The default build and local server remain rooted at `/`. `build:pages` packages every HTML, manifest, icon, service-worker, CSS, JavaScript, and Web Worker URL for `/goldlocks-engine/`. The Pages browser check serves that exact subpath, loads it online, audits the scoped cache, reloads offline, and exercises the worker-backed pipeline again.
+
+## Install and update behavior
+
+Open the deployed root or GitHub Pages URL while online, then use the browser’s **Install app** control or menu. Both packages expose a standalone, portrait manifest with a relative start URL and scope. `./scripts/run-pwa` is the equivalent built root package for local installation testing; `./scripts/run-pages-e2e` builds and previews the Pages-scoped package.
+
+Each production build has a content-derived deployment ID. On an online refresh after a redeploy, the browser fetches the new worker without reusing an old worker-script cache, verifies and atomically precaches the complete new shell, activates it, and reloads the page at most once. The installed app therefore converges on the new deployed version without erasing its local save. For deterministic inspection, the current app version is on `html[data-app-version]` and `<scope>/build-info.json` names its version and scoped cache.
+
+Offline is deliberately conservative: an installed client can reload the last fully installed version, but cannot receive a newer deploy until it reconnects and refreshes. A failed or partial update leaves the last complete worker/cache and local save intact.
 
 Local setup and GitHub Actions both keep npm downloads in the ignored workspace path `.cache/npm`; Playwright browsers use `.cache/ms-playwright`. Neither workflow depends on a writable user-home cache.
 
