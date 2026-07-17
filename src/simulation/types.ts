@@ -241,9 +241,15 @@ export type SimulationCommand =
   | { type: "CAPTURE_BASELINE"; label: string }
   | { type: "RESET"; seed?: number };
 
-export type WorkerRequest =
+export type WorkerRequest = (
   | { type: "INIT"; seed?: number; savedState?: unknown }
   | { type: "COMMAND"; command: SimulationCommand }
-  | { type: "TICK"; seconds: number };
+  | { type: "COMMAND_BATCH"; commands: readonly SimulationCommand[] }
+  | { type: "TICK"; seconds: number }
+) & { requestId?: number };
 
-export type WorkerResponse = { type: "STATE"; state: SimulationState };
+export type WorkerResponse = {
+  type: "STATE";
+  state: SimulationState;
+  requestId?: number;
+};

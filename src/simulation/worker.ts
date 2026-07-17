@@ -10,6 +10,10 @@ let state: SimulationState = createInitialState();
 
 scope.addEventListener("message", (event: MessageEvent<WorkerRequest>) => {
   state = reduceWorkerRequest(state, event.data);
-  const response: WorkerResponse = { type: "STATE", state };
+  const response: WorkerResponse = {
+    type: "STATE",
+    state,
+    requestId: event.data.requestId,
+  };
   scope.postMessage(response);
 });

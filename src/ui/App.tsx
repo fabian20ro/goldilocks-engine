@@ -1943,7 +1943,8 @@ function InspectView({
 }
 
 export function App() {
-  const { state, command, timeSpeed, setTimeSpeed } = useSimulation();
+  const { state, command, commandBatch, timeSpeed, setTimeSpeed } =
+    useSimulation();
   const [tab, setTab] = useState<TabId>("build");
   const [selected, setSelected] = useState<{
     moduleId: string;
@@ -2090,7 +2091,9 @@ export function App() {
   };
 
   const loadPreset = (preset: SavedPreset) => {
-    command({ type: "EQUIP_HARDWARE", hardwareId: preset.hardwareId });
+    const commands: SimulationCommand[] = [
+      { type: "EQUIP_HARDWARE", hardwareId: preset.hardwareId },
+    ];
     for (const slotId of [
       "prepare",
       "runtime",
@@ -2099,26 +2102,33 @@ export function App() {
       "process-5",
       "process-6",
     ])
-      command({ type: "REMOVE_MODULE", slotId });
-    command({
+      commands.push({ type: "REMOVE_MODULE", slotId });
+    commands.push({
       type: "SET_EXPANSION_ACTIVE",
       active: preset.activeExpansionId !== null,
     });
     for (const slot of preset.slots)
       if (slot.moduleId)
-        command({
+        commands.push({
           type: "PLACE_MODULE",
           moduleId: slot.moduleId,
           slotId: slot.slotId,
         });
-    command({ type: "SET_WORKLOAD", workloadId: preset.workloadId });
-    command({
+    commands.push({
+      type: "SET_WORKLOAD",
+      workloadId: preset.workloadId,
+    });
+    commands.push({
       type: "SET_COMPUTE_ALLOCATION",
       percent: preset.computeAllocation,
     });
-    command({ type: "SET_MEMORY_RESERVE", percent: preset.memoryReserve });
+    commands.push({
+      type: "SET_MEMORY_RESERVE",
+      percent: preset.memoryReserve,
+    });
     if (state.branchEnabled !== preset.branchEnabled)
-      command({ type: "TOGGLE_BRANCH" });
+      commands.push({ type: "TOGGLE_BRANCH" });
+    commandBatch(commands);
     setTab("build");
   };
 

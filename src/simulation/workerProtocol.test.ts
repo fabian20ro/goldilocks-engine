@@ -72,6 +72,39 @@ describe("simulation worker numeric protocol", () => {
     expect(isStateValid(run())).toBe(true);
   });
 
+  it("applies a configuration batch as one worker request", () => {
+    const initial = {
+      ...createInitialState(2027),
+      ownedExpansionIds: ["workstation-expansion-i"],
+    };
+    const request: WorkerRequest = {
+      type: "COMMAND_BATCH",
+      commands: [
+        { type: "REMOVE_MODULE", slotId: "prepare" },
+        { type: "SET_EXPANSION_ACTIVE", active: true },
+        {
+          type: "PLACE_MODULE",
+          moduleId: "basic-cleaner",
+          slotId: "process-4",
+        },
+      ],
+    };
+
+    const restored = reduceWorkerRequest(initial, request);
+
+    expect(restored.activeExpansionId).toBe("workstation-expansion-i");
+    expect(
+      restored.slots.find((slot) => slot.slotId === "prepare")?.moduleId,
+    ).toBeNull();
+    expect(
+      restored.slots.find((slot) => slot.slotId === "process-4")?.moduleId,
+    ).toBe("basic-cleaner");
+    expect(isStateValid(restored)).toBe(true);
+    expect(
+      reduceWorkerRequest(initial, { type: "COMMAND_BATCH", commands: [] }),
+    ).toBe(initial);
+  });
+
   it("rejects malformed envelopes and restores persisted ownership safely", () => {
     const initial = createInitialState(303);
     const malformed = [

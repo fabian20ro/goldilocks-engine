@@ -9,9 +9,16 @@ import type {
   WorkerRequest,
   WorkerResponse,
 } from "../simulation/types";
+import {
+  acknowledgeDurableState,
+  markDurableCommandPending,
+} from "./offlineReadiness";
 
 export const TIME_SPEEDS = [1, 4, 16, 64] as const;
 export type TimeSpeed = (typeof TIME_SPEEDS)[number];
+type DurableWorkerRequest =
+  | { type: "COMMAND"; command: SimulationCommand }
+  | { type: "COMMAND_BATCH"; commands: readonly SimulationCommand[] };
 // Keep the established storage address so verifier-owned browser probes and
 // existing sessions observe the schema-5 migration in place. The payload's
 // schemaVersion, not this opaque key, is the save contract.
@@ -34,13 +41,25 @@ function loadSavedState(): unknown {
   }
 }
 
-function persistState(state: SimulationState): void {
+function persistState(state: SimulationState): boolean {
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(state));
     for (const key of LEGACY_SAVE_KEYS) localStorage.removeItem(key);
+    return true;
   } catch {
     // Storage failure leaves the current in-memory run operable.
+    return false;
   }
+}
+
+export function persistBeforePublish<T>(
+  value: T,
+  persist: (next: T) => boolean,
+  publish: (next: T) => void,
+): boolean {
+  const durable = persist(value);
+  publish(value);
+  return durable;
 }
 
 export function useSimulation() {
@@ -51,6 +70,7 @@ export function useSimulation() {
       : restoreSimulationState(savedStateRef.current),
   );
   const workerRef = useRef<Worker | null>(null);
+  const nextRequestIdRef = useRef(1);
   const speedRef = useRef<TimeSpeed>(1);
   const [timeSpeed, setTimeSpeedState] = useState<TimeSpeed>(1);
 
@@ -63,8 +83,12 @@ export function useSimulation() {
     worker.addEventListener(
       "message",
       (event: MessageEvent<WorkerResponse>) => {
-        setState(event.data.state);
-        persistState(event.data.state);
+        const durable = persistBeforePublish(
+          event.data.state,
+          persistState,
+          setState,
+        );
+        acknowledgeDurableState(event.data.requestId, durable);
       },
     );
     worker.postMessage({
@@ -84,12 +108,30 @@ export function useSimulation() {
     };
   }, []);
 
-  const command = useCallback((next: SimulationCommand) => {
-    workerRef.current?.postMessage({
-      type: "COMMAND",
-      command: next,
-    } satisfies WorkerRequest);
+  const postDurableRequest = useCallback((request: DurableWorkerRequest) => {
+    const worker = workerRef.current;
+    if (!worker) return;
+    const requestId = nextRequestIdRef.current++;
+    markDurableCommandPending(requestId);
+    worker.postMessage({ ...request, requestId } as WorkerRequest);
   }, []);
+
+  const command = useCallback(
+    (next: SimulationCommand) => {
+      postDurableRequest({
+        type: "COMMAND",
+        command: next,
+      });
+    },
+    [postDurableRequest],
+  );
+
+  const commandBatch = useCallback(
+    (commands: readonly SimulationCommand[]) => {
+      postDurableRequest({ type: "COMMAND_BATCH", commands });
+    },
+    [postDurableRequest],
+  );
 
   const setTimeSpeed = useCallback((next: number) => {
     if (!isTimeSpeed(next)) return;
@@ -97,5 +139,5 @@ export function useSimulation() {
     setTimeSpeedState(next);
   }, []);
 
-  return { state, command, timeSpeed, setTimeSpeed };
+  return { state, command, commandBatch, timeSpeed, setTimeSpeed };
 }

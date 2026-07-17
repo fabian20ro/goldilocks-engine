@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./ui/App";
+import { setOfflineShellReady } from "./ui/offlineReadiness";
 import "./ui/styles.css";
 
 createRoot(document.getElementById("root")!).render(
@@ -41,9 +42,9 @@ if ("serviceWorker" in navigator) {
       );
       const cachedUrls = await cache.keys();
       if (!cachedUrls.length) throw new Error("Offline cache is empty");
-      document.documentElement.dataset.offlineReady = "true";
+      setOfflineShellReady(true);
     })().catch(() => {
-      document.documentElement.dataset.offlineReady = "false";
+      setOfflineShellReady(false);
     });
   });
 }

@@ -25,6 +25,17 @@ export function reduceWorkerRequest(
       if (typeof request.command !== "object" || request.command === null)
         return state;
       return applyCommand(state, request.command);
+    case "COMMAND_BATCH":
+      if (
+        !Array.isArray(request.commands) ||
+        request.commands.length === 0 ||
+        request.commands.length > 32 ||
+        request.commands.some(
+          (command) => typeof command !== "object" || command === null,
+        )
+      )
+        return state;
+      return request.commands.reduce(applyCommand, state);
     case "TICK":
       return tick(state, request.seconds);
     default:
