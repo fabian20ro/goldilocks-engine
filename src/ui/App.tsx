@@ -2142,99 +2142,101 @@ export function App() {
       <a className="skip-link" href="#main-content">
         Skip to controls
       </a>
-      <header className="app-header">
-        <div className="brand-row">
-          <div>
-            <span className="brand-kicker">BEDROOM NODE / 01</span>
-            <h1>Goldilocks Engine</h1>
-          </div>
-          <div className="header-actions">
-            <button
-              type="button"
-              className="help-toggle"
-              aria-expanded={showTutorial}
-              aria-controls="quick-start-title"
-              onClick={() => {
-                setShowTutorial(true);
-              }}
-            >
-              Help / Quick start
-            </button>
-            <div className="animation-control">
+      <div className="app-scroll-region">
+        <header className="app-header">
+          <div className="brand-row">
+            <div>
+              <span className="brand-kicker">BEDROOM NODE / 01</span>
+              <h1>Goldilocks Engine</h1>
+            </div>
+            <div className="header-actions">
               <button
                 type="button"
-                className="motion-toggle"
-                aria-pressed={reducedMotion}
-                onClick={() => setReducedMotion((value) => !value)}
+                className="help-toggle"
+                aria-expanded={showTutorial}
+                aria-controls="quick-start-title"
+                onClick={() => {
+                  setShowTutorial(true);
+                }}
               >
-                {reducedMotion ? "Animations off" : "Animations on"}
+                Help / Quick start
               </button>
-              <small>Visual only</small>
+              <div className="animation-control">
+                <button
+                  type="button"
+                  className="motion-toggle"
+                  aria-pressed={reducedMotion}
+                  onClick={() => setReducedMotion((value) => !value)}
+                >
+                  {reducedMotion ? "Animations off" : "Animations on"}
+                </button>
+                <small>Visual only</small>
+              </div>
             </div>
           </div>
-        </div>
-        <ResourceStrip state={state} />
-        <TimeSpeedControl value={timeSpeed} onChange={setTimeSpeed} />
-      </header>
+          <ResourceStrip state={state} />
+          <TimeSpeedControl value={timeSpeed} onChange={setTimeSpeed} />
+        </header>
 
-      <main id="main-content" className="main-content">
-        {showTutorial ? <QuickStart onDismiss={dismissTutorial} /> : null}
-        <WarningBanner state={state} />
-        <UpgradeFeedback state={state} />
-        {selectedName ? (
-          <div className="selection-banner" role="status">
-            <span>
-              {selectedName} selected · compatible slots are highlighted; tap
-              Snap here or drag to replace/reorder.
-            </span>
-            <button type="button" onClick={() => setSelected(null)}>
-              Cancel
-            </button>
-          </div>
-        ) : null}
+        <main id="main-content" className="main-content">
+          {showTutorial ? <QuickStart onDismiss={dismissTutorial} /> : null}
+          <WarningBanner state={state} />
+          <UpgradeFeedback state={state} />
+          {selectedName ? (
+            <div className="selection-banner" role="status">
+              <span>
+                {selectedName} selected · compatible slots are highlighted; tap
+                Snap here or drag to replace/reorder.
+              </span>
+              <button type="button" onClick={() => setSelected(null)}>
+                Cancel
+              </button>
+            </div>
+          ) : null}
 
-        {tab === "build" ? (
-          <BuildView
-            state={state}
-            command={command}
-            selected={selected}
-            onSelect={onSelect}
-            onDragStart={onDragStart}
-            onInstall={onInstall}
-            reducedMotion={reducedMotion}
-          />
-        ) : tab === "jobs" ? (
-          <JobsView state={state} command={command} />
-        ) : tab === "upgrades" ? (
-          <UpgradesView
-            state={state}
-            command={command}
-            onChooseModule={(moduleId) => {
-              const equippedSlot = state.slots.find(
-                (slot) => slot.moduleId === moduleId,
-              );
-              setSelected({
-                moduleId,
-                fromSlotId: equippedSlot?.slotId,
-              });
-            }}
-          />
-        ) : (
-          <InspectView
-            state={state}
-            command={command}
-            presets={presets}
-            onSavePreset={savePreset}
-            onLoadPreset={loadPreset}
-            pendingDeleteId={pendingDeleteId}
-            deletedPreset={deletedPreset}
-            onRequestDelete={requestPresetDelete}
-            onCancelDelete={() => setPendingDeleteId(null)}
-            onConfirmDelete={confirmPresetDelete}
-            onUndoDelete={undoPresetDelete}
-          />
-        )}
-      </main>
+          {tab === "build" ? (
+            <BuildView
+              state={state}
+              command={command}
+              selected={selected}
+              onSelect={onSelect}
+              onDragStart={onDragStart}
+              onInstall={onInstall}
+              reducedMotion={reducedMotion}
+            />
+          ) : tab === "jobs" ? (
+            <JobsView state={state} command={command} />
+          ) : tab === "upgrades" ? (
+            <UpgradesView
+              state={state}
+              command={command}
+              onChooseModule={(moduleId) => {
+                const equippedSlot = state.slots.find(
+                  (slot) => slot.moduleId === moduleId,
+                );
+                setSelected({
+                  moduleId,
+                  fromSlotId: equippedSlot?.slotId,
+                });
+              }}
+            />
+          ) : (
+            <InspectView
+              state={state}
+              command={command}
+              presets={presets}
+              onSavePreset={savePreset}
+              onLoadPreset={loadPreset}
+              pendingDeleteId={pendingDeleteId}
+              deletedPreset={deletedPreset}
+              onRequestDelete={requestPresetDelete}
+              onCancelDelete={() => setPendingDeleteId(null)}
+              onConfirmDelete={confirmPresetDelete}
+              onUndoDelete={undoPresetDelete}
+            />
+          )}
+        </main>
+      </div>
 
       <nav className="bottom-nav" aria-label="Primary">
         {(

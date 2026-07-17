@@ -77,16 +77,27 @@ button,
 
 .app-shell {
   position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
   width: min(100%, 31rem);
-  overflow-x: hidden;
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   margin: 0 auto;
   background: linear-gradient(rgba(183, 243, 107, 0.018) 1px, transparent 1px),
     var(--bg);
   background-size: 100% 4px;
   box-shadow: 0 0 4rem #0009;
   isolation: isolate;
+}
+
+.app-scroll-region {
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .app-shell.dragging,
@@ -347,7 +358,7 @@ h2 {
   width: 100%;
   min-width: 0;
   gap: 0.75rem;
-  padding: 0.75rem 0.75rem 6rem;
+  padding: 0.75rem;
 }
 
 .main-content > * {
@@ -1758,11 +1769,8 @@ h2 {
 }
 
 .bottom-nav {
-  position: fixed;
+  position: relative;
   z-index: 20;
-  right: max(0px, calc((100vw - 31rem) / 2));
-  bottom: 0;
-  left: max(0px, calc((100vw - 31rem) / 2));
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   padding: 0.4rem max(0.4rem, env(safe-area-inset-right))
