@@ -571,6 +571,8 @@ h2 {
 
 .pipeline-slot {
   position: relative;
+  container-name: module-space;
+  container-type: inline-size;
   padding: 0.42rem;
   border: 1px solid #34463b;
   border-radius: 0.52rem;
@@ -717,6 +719,42 @@ h2 {
   margin-left: auto;
   color: #617269;
   font-size: 1.1rem;
+}
+
+@container module-space (max-width: 19em) {
+  .module-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .module-card .module-code {
+    grid-column: 1;
+    grid-row: 1;
+    width: 2.8rem;
+  }
+
+  .module-card .module-copy {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+  }
+
+  .module-card .drag-grip {
+    grid-column: 2;
+    grid-row: 1;
+    margin-left: 0;
+  }
+
+  .module-copy strong,
+  .module-copy small,
+  .module-copy .module-status {
+    overflow: visible;
+    overflow-wrap: normal;
+    text-overflow: clip;
+    white-space: normal;
+  }
 }
 
 .snap-action {
@@ -885,6 +923,8 @@ h2 {
 
 .module-library {
   display: grid;
+  container-name: module-space;
+  container-type: inline-size;
   grid-auto-columns: 82%;
   grid-auto-flow: column;
   gap: 0.55rem;
@@ -1855,31 +1895,6 @@ h2 {
   .pipeline-slot {
     min-width: 0;
     max-width: 100%;
-  }
-
-  .module-card {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    min-width: 0;
-  }
-
-  .module-card .module-code {
-    grid-column: 1;
-    grid-row: 1;
-    width: 2.8rem;
-  }
-
-  .module-card .module-copy {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    width: 100%;
-  }
-
-  .module-card .drag-grip {
-    grid-column: 2;
-    grid-row: 1;
-    margin-left: 0;
   }
 
   .slot-meta,
