@@ -105,6 +105,19 @@ describe("simulation worker numeric protocol", () => {
     ).toBe(initial);
   });
 
+  it("rejects an entire batch when a nested runtime command is malformed", () => {
+    const initial = createInitialState(2028);
+    const request = {
+      type: "COMMAND_BATCH",
+      commands: [
+        { type: "SET_COMPUTE_ALLOCATION", percent: 25 },
+        { type: "QUEUE_JOBS", count: Number.NaN },
+      ],
+    } as unknown as WorkerRequest;
+
+    expect(reduceWorkerRequest(initial, request)).toBe(initial);
+  });
+
   it("rejects malformed envelopes and restores persisted ownership safely", () => {
     const initial = createInitialState(303);
     const malformed = [

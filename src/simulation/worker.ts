@@ -8,12 +8,21 @@ const scope: DedicatedWorkerGlobalScope =
   self as unknown as DedicatedWorkerGlobalScope;
 let state: SimulationState = createInitialState();
 
+function requestIdFrom(request: unknown): number | undefined {
+  if (typeof request !== "object" || request === null) return undefined;
+  const requestId = (request as { requestId?: unknown }).requestId;
+  return typeof requestId === "number" && Number.isFinite(requestId)
+    ? requestId
+    : undefined;
+}
+
 scope.addEventListener("message", (event: MessageEvent<WorkerRequest>) => {
-  state = reduceWorkerRequest(state, event.data);
+  const request = event.data;
+  state = reduceWorkerRequest(state, request);
   const response: WorkerResponse = {
     type: "STATE",
     state,
-    requestId: event.data.requestId,
+    requestId: requestIdFrom(request),
   };
   scope.postMessage(response);
 });

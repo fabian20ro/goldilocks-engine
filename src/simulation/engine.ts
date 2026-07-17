@@ -66,6 +66,49 @@ const round = (value: number, digits = 2): number =>
 const isFiniteNumber = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value);
 
+/**
+ * Worker messages are structured-cloned runtime input, not TypeScript values.
+ * Keep the discriminator boundary explicit before an exhaustive command switch.
+ */
+export function isRuntimeSimulationCommand(command: unknown): boolean {
+  if (typeof command !== "object" || command === null) return false;
+  const input = command as {
+    type?: unknown;
+    percent?: unknown;
+    count?: unknown;
+    seed?: unknown;
+    label?: unknown;
+    active?: unknown;
+  };
+
+  switch (input.type) {
+    case "SET_COMPUTE_ALLOCATION":
+    case "SET_MEMORY_RESERVE":
+      return isFiniteNumber(input.percent);
+    case "QUEUE_JOBS":
+      return isFiniteNumber(input.count);
+    case "RESET":
+      return input.seed === undefined || isFiniteNumber(input.seed);
+    case "CAPTURE_BASELINE":
+      return typeof input.label === "string";
+    case "SET_EXPANSION_ACTIVE":
+      return typeof input.active === "boolean";
+    case "PLACE_MODULE":
+    case "SET_WORKLOAD":
+    case "BUY_HARDWARE":
+    case "EQUIP_HARDWARE":
+    case "BUY_MODULE":
+    case "BUY_EXPANSION":
+    case "REMOVE_MODULE":
+    case "TOGGLE_BRANCH":
+    case "CLEAR_WAITING_TASKS":
+    case "TOGGLE_PAUSE":
+      return true;
+    default:
+      return false;
+  }
+}
+
 function stateIntegrityDigest(state: SimulationState): string {
   const payload = { ...state } as Record<string, unknown>;
   delete payload.integrity;
@@ -624,22 +667,6 @@ function updateSlots(
   );
 }
 
-function hasValidNumericInput(command: SimulationCommand): boolean {
-  switch (command.type) {
-    case "SET_COMPUTE_ALLOCATION":
-    case "SET_MEMORY_RESERVE":
-      return isFiniteNumber(command.percent);
-    case "QUEUE_JOBS":
-      return isFiniteNumber(command.count);
-    case "RESET":
-      return command.seed === undefined || isFiniteNumber(command.seed);
-    case "CAPTURE_BASELINE":
-      return typeof command.label === "string";
-    default:
-      return true;
-  }
-}
-
 function applyValidCommand(
   state: SimulationState,
   command: SimulationCommand,
@@ -1019,6 +1046,8 @@ function applyValidCommand(
           message: "Current configuration captured for comparison.",
         },
       );
+    default:
+      return state;
   }
 }
 
@@ -1026,8 +1055,7 @@ export function applyCommand(
   state: SimulationState,
   command: SimulationCommand,
 ): SimulationState {
-  if (typeof command !== "object" || command === null) return state;
-  if (!hasValidNumericInput(command)) return state;
+  if (!isRuntimeSimulationCommand(command)) return state;
   const applied = applyValidCommand(state, command);
   if (applied === state) return state;
   const next = sealSimulationState(refreshWorkloadUnlocks(applied));

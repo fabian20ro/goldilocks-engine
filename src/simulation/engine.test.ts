@@ -32,6 +32,17 @@ describe("deterministic simulation engine", () => {
     expect(state.ledger).toHaveLength(1);
   });
 
+  it("rejects an unknown runtime command discriminator as an exact no-op", () => {
+    const initial = createInitialState(8);
+
+    expect(() =>
+      applyCommand(initial, { type: "UNKNOWN_COMMAND" } as never),
+    ).not.toThrow();
+    expect(applyCommand(initial, { type: "UNKNOWN_COMMAND" } as never)).toBe(
+      initial,
+    );
+  });
+
   it("replays an ordered command stream identically", () => {
     const commands: SimulationCommand[] = [
       { type: "SET_WORKLOAD", workloadId: "batch-classification" },

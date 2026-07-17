@@ -1,4 +1,4 @@
-# Round 023 implementation handoff
+# Round 024 implementation handoff
 
 ## Implemented behavior summary
 
@@ -21,6 +21,7 @@ The bounded Workstation Expansion I / per-task demand slice authorized in D-007 
 - Pipeline and module-drawer cards reflow from their available inline size measured against inherited text scale, not from viewport width alone. At both 320 and 393 CSS pixels with 200% text, code/grip occupy a compact header and the full name, throughput, memory, reliability, and state receive a full-width row. Normal 320 remains cleanly stacked; normal 393 retains its horizontal composition and controls.
 - Every repository-local Playwright output directory used by setup, root/Pages checks, retained traces, or visual inspection is excluded from canonical ESLint by an exact generated-path ignore. Generated reports remain Git-ignored and cannot poison the next lint/full-verification run.
 - GitHub Actions now has a Linux verification lane for `agent/implementation` pushes and manual dispatch. It asserts the checked-out commit equals `GITHUB_SHA`, runs the canonical `./scripts/verify` command on Ubuntu 24.04, installs pinned Chromium and Linux dependencies through repository-local caches, and uploads identity metadata plus root/Pages reports and results on both success and failure. The canonical script now continues through both browser packages after an earlier check failure, then returns nonzero if any phase failed.
+- Runtime commands now cross an explicit discriminator/input boundary before the engine switch. Unknown discriminants and malformed numeric, baseline-label, or expansion-active inputs are exact no-ops; a command batch preflights every nested command before applying any command, preserving atomicity. The Worker also safely omits an invalid request ID while returning its normal state response.
 - The tutorial explains earning, CU/memory/thermal pressure, task quotes/costs, demand, expansion purchase/activation/empty slots, 64× time, waiting-task clearing, and honest presets.
 - Schema version is 5; content version is `pipeline-toy-4`; scope-isolated service-worker cache is v7. Schema-3 and schema-4 saves migrate safely. Aggregate legacy queues become deterministic task records without losing the queue count or current workload identity.
 
@@ -48,6 +49,7 @@ The source feedback is preserved in `.agent/playtests/2026-07-16-progression-exp
 | Persistence/migration/offline       | Schema-5 integrity; schema-3/4 migration; atomic preset restore; persist-before-publish command acknowledgements; expanded preset/save/offline resume; cache v7                                          | Worker/hook/localStorage integration tests; 50-repeat exact offline path; retained root browser suite; Pages production build |
 | Rerunnable browser verification     | Exact lint ignores cover only generated root/Pages reports, results, visual output, CLI state, and caches                                                                                                | Round-019 workflow regression; lint with populated report trees                                                               |
 | Linux Pages browser evidence        | Exact-SHA GitHub Actions job runs the canonical root + Pages/offline gate with pinned Chromium, workspace-local caches, and retained failure artifacts; both browser suites run before aggregate failure | `src/test/verifyWorkflow.test.ts`; pending independently queryable workflow run after candidate publication                   |
+| Runtime command recovery            | Direct and Worker command paths reject unsupported discriminants safely; Worker batches validate fully before any nested valid command can mutate state                                                  | V-028 regression; engine and Worker-protocol command-boundary tests                                                           |
 
 ## Prior verifier findings
 
@@ -62,6 +64,7 @@ The source feedback is preserved in `.agent/playtests/2026-07-16-progression-exp
 - V-025 resolved: narrow module cards use a two-row grid so the icon and grip remain compact while all decision-relevant copy receives the full card width. The exact 320/200% regression reports one rendered line for `Delivery`; fresh screenshots show the complete name, throughput, memory, reliability, and equipped state.
 - V-026 resolved: pipeline slots and the module drawer are named inline-size containers, and their two-row module layout activates through an `em`-based container condition. Because that condition follows inherited text scale, 393/200% no longer keeps the clipped horizontal composition; the unchanged exact regression reports no clipped decision field.
 - V-027 resolved: the preset loader previously submitted each remove, expansion, placement, and policy mutation as a separate Worker request. When the pre-load DOM already matched the preset, the visibility assertion could complete immediately while an intermediate `REMOVE_MODULE` response was persisted; service-worker readiness did not represent that in-flight state mutation. Preset loading is now one atomic `COMMAND_BATCH`. Request IDs keep offline readiness false until the matching state is persisted, and the message handler persists before publishing to React. Deterministic Worker→React→localStorage coverage and 50 consecutive exact offline reloads verify the boundary without sleeps or timing delays.
+- V-028 resolved: `applyCommand` now rejects an unrecognized runtime command discriminant before the command switch. `COMMAND_BATCH` validates every nested command before reduction, so an unsupported or malformed nested command cannot crash the Worker or leave earlier batch commands partially applied. The Worker response path also reads malformed request IDs defensively; the preserved verifier direct and batch regressions pass.
 - The previously recorded B-005 human-study blocker is owner-waived for this bounded implementation slice under D-007. That waiver permits implementation; it is not empirical evidence that either original human gate passed.
 - All reports under `.agent/verification/` were read before implementation. Their evidence remains immutable.
 
@@ -116,6 +119,7 @@ On this managed macOS host, a direct browser launch can fail with a Mach-port pe
 - The established `goldilocks-simulation-save-v4` localStorage address is intentionally retained while the payload advances to schema 5. Existing runs and verifier-owned browser probes therefore exercise migration in place; `schemaVersion` is the save-format contract.
 - Harmless storage integrity mismatches are resealed only after full structural validation. Malformed render-bound values still restart safely.
 - The canonical browser gate has an independent Linux execution path: `verify.yml` validates the frozen checkout against `GITHUB_SHA`, keeps npm/browser/XDG caches inside ignored `.cache/`, and records a run-scoped artifact even when `./scripts/verify` fails. A Verifier must still inspect that exact run's SHA and conclusion; an absent or failed run is not acceptance evidence.
+- Runtime command validation is intentionally shared by the direct engine entry point and Worker protocol. The batch preflight is pure and occurs before reduction, so a malformed second command cannot make a valid first command visible.
 
 ## Known limitations and risks
 
@@ -125,7 +129,7 @@ On this managed macOS host, a direct browser launch can fail with a Mach-port pe
 - Reliability-weighted offer net is an expectation over the deterministic model, not a promise for an individual task; successful and failed settlement outcomes remain discrete.
 - No selling, refunds, queue repricing, cancellation payout, or module auto-purchase. Clear waiting is intentionally lossless only in state mutation, not a refund mechanism, because acceptance spends no money.
 - Browser acceptance uses pinned Chromium. Physical-device thermal/battery behavior, non-Chromium engines, platform screen readers, haptics, and audio remain unverified.
-- This managed macOS host can deny Chromium at Mach-port registration. The committed Linux workflow supplies a reproducible non-host-restricted canonical root + Pages/offline path, but no exact-SHA workflow result is claimed until the Orchestrator publishes this candidate and a fresh Verifier reads the run metadata/artifact.
+- This managed macOS host can deny Chromium at Mach-port registration. Round 023's committed Linux workflow proved the prior frozen candidate; each new candidate still needs its own exact-SHA Linux run and fresh Verifier inspection before it becomes acceptance evidence.
 - localStorage denial leaves the in-memory session playable but cannot provide cross-reload durability.
 - Implementer does not push, deploy, or issue acceptance. Exact-SHA publication and fresh independent PASS remain Orchestrator/Verifier work.
 
@@ -151,10 +155,18 @@ On this managed macOS host, a direct browser launch can fail with a Mach-port pe
 - `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm run balance`, and `npm run build`: PASS after the round-023 changes.
 - `npm run test:e2e -- --reporter=dot`: PASS, 52/52 root browser cases in the available local launch window.
 - Round-023 `./scripts/verify`: expected nonzero only from the managed macOS Chromium boundary after all static/unit/balance/build stages passed. Crucially, its aggregate runner continued from the 52 root launch-only failures into both Pages browser cases; both Pages cases reached the same pre-page Mach-port denial. No test was skipped or reported as passing.
+- `npx vitest run src/simulation/verifierRound023.test.ts src/simulation/workerProtocol.test.ts src/simulation/engine.test.ts --coverage.enabled=false`: PASS, 43/43 preserved V-028 direct/batch plus direct-engine and numeric-batch atomicity checks.
+- `npm run format:check`, `npm run lint`, and `npm run typecheck`: PASS after the round-024 changes.
+- `npm test`: PASS, 17 files / 85 tests; coverage 87.64% statements, 86.18% branches, 94.87% functions, and 90.63% lines.
+- `npm run balance`: PASS, including the 20,001-seed upgrade sweep and 41-seed progression sweep; zero failures.
+- `npm run build` and `npm run build:pages`: PASS, including the scoped `/goldlocks-engine/` package.
+- `npm run test:e2e -- --reporter=dot`: PASS, 52/52 root browser cases in an available local launch window.
+- `npm run test:e2e:pages -- --reporter=dot`: infrastructure-limited. Both cases reached only the managed macOS Chromium Mach-port registration denial before page creation; no app assertion failed.
+- Round-024 `./scripts/verify`: all setup/static/unit/balance/build phases passed. Its aggregate browser phases both ran and recorded only the same pre-page macOS Mach-port denial (52 root launches, then 2 Pages launches); it correctly returned nonzero rather than skipping required browser checks.
 
 ## Checks not run
 
-- Git push, GitHub Actions execution, deployment, and live exact-candidate-SHA URL validation: intentionally left to the Orchestrator after fresh verification. The new Linux workflow must complete successfully at the frozen candidate SHA before it is used to resolve B-008.
+- Git push, GitHub Actions execution, deployment, and live exact-candidate-SHA URL validation: intentionally left to the Orchestrator after fresh verification. The Linux workflow must complete successfully at this frozen candidate SHA before it is acceptance evidence.
 - The owner's promised post-step-two 30-minute play session: not yet performed; this candidate exists to make that session meaningful.
 - Physical mobile device, non-Chromium browser, battery/CPU/thermal profile, and actual assistive-technology output: infrastructure not supplied.
 - Deferred researcher/hype/parallel-pipeline/new-model systems: outside this authorized bounded slice.

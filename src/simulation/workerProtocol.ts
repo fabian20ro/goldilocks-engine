@@ -1,6 +1,7 @@
 import {
   applyCommand,
   createInitialState,
+  isRuntimeSimulationCommand,
   restoreSimulationState,
   tick,
 } from "./engine";
@@ -22,17 +23,14 @@ export function reduceWorkerRequest(
         return restoreSimulationState(request.savedState, request.seed);
       return createInitialState(request.seed);
     case "COMMAND":
-      if (typeof request.command !== "object" || request.command === null)
-        return state;
+      if (!isRuntimeSimulationCommand(request.command)) return state;
       return applyCommand(state, request.command);
     case "COMMAND_BATCH":
       if (
         !Array.isArray(request.commands) ||
         request.commands.length === 0 ||
         request.commands.length > 32 ||
-        request.commands.some(
-          (command) => typeof command !== "object" || command === null,
-        )
+        !request.commands.every(isRuntimeSimulationCommand)
       )
         return state;
       return request.commands.reduce(applyCommand, state);
