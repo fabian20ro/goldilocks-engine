@@ -108,10 +108,12 @@ function pwaDeploymentArtifacts(): Plugin {
       this.emitFile({
         type: "asset",
         fileName: "sw.js",
-        source: serviceWorkerTemplate.replaceAll(
-          "__GOLDLOCKS_BUILD_ID__",
-          buildId,
-        ),
+        source: serviceWorkerTemplate
+          .replaceAll("__GOLDLOCKS_BUILD_ID__", buildId)
+          .replaceAll(
+            "__GOLDLOCKS_EXPECTED_ASSETS_JSON__",
+            JSON.stringify(assets),
+          ),
       });
     },
   };

@@ -2,19 +2,27 @@ const BUILD_ID = "__GOLDLOCKS_BUILD_ID__";
 const SCOPE_URL = new URL(self.registration.scope);
 const CACHE_NAMESPACE = `goldilocks-shell:${SCOPE_URL.pathname}:`;
 const CACHE = `${CACHE_NAMESPACE}${BUILD_ID}`;
+// Generated from this exact build's Rollup output. The remotely fetched
+// manifest is metadata to verify, never authority to expand the cache.
+const EXPECTED_ASSETS = JSON.parse(
+  String.raw`__GOLDLOCKS_EXPECTED_ASSETS_JSON__`,
+);
 
 function scopedUrl(path = "") {
   return new URL(path, SCOPE_URL).toString();
 }
 
 function scopedAssetUrl(value) {
-  if (typeof value !== "string") return null;
+  if (typeof value !== "string")
+    throw new Error("Asset manifest entry is not a string");
   const url = new URL(value, self.location.origin);
   if (
     url.origin !== self.location.origin ||
-    !url.pathname.startsWith(SCOPE_URL.pathname)
+    !url.pathname.startsWith(SCOPE_URL.pathname) ||
+    url.search ||
+    url.hash
   )
-    return null;
+    throw new Error("Asset manifest entry escapes this deployment scope");
   return url.toString();
 }
 
@@ -26,23 +34,100 @@ const CORE = [
   scopedUrl("build-info.json"),
 ];
 
+const EXPECTED_ASSET_URLS = EXPECTED_ASSETS.map(scopedAssetUrl);
+
+function assertExactAssetManifest(manifest) {
+  if (!Array.isArray(manifest)) throw new Error("Asset manifest is malformed");
+  if (manifest.length !== EXPECTED_ASSET_URLS.length)
+    throw new Error("Asset manifest has an unexpected number of entries");
+
+  const actual = manifest.map(scopedAssetUrl);
+  if (new Set(actual).size !== actual.length)
+    throw new Error("Asset manifest contains duplicate entries");
+
+  for (let index = 0; index < EXPECTED_ASSET_URLS.length; index += 1) {
+    if (actual[index] !== EXPECTED_ASSET_URLS[index])
+      throw new Error("Asset manifest does not match this worker build");
+  }
+
+  return actual;
+}
+
+async function fetchRequired(request) {
+  const response = await fetch(request);
+  if (!response.ok || response.type === "opaque")
+    throw new Error(`Required shell asset failed: ${request.url}`);
+  // Fully consume each network response before requesting the next one. Keeping
+  // several unread bodies open can exhaust a browser's per-origin connection
+  // pool during install and strand the transaction before cache validation.
+  const cacheableResponse = response.clone();
+  await response.arrayBuffer();
+  return cacheableResponse;
+}
+
+async function assertBuildInfo(response) {
+  let buildInfo;
+  try {
+    buildInfo = await response.clone().json();
+  } catch {
+    throw new Error("Build metadata is malformed");
+  }
+
+  if (
+    !buildInfo ||
+    buildInfo.version !== BUILD_ID ||
+    buildInfo.scope !== SCOPE_URL.pathname ||
+    buildInfo.cacheName !== CACHE
+  )
+    throw new Error("Build metadata does not match this worker build");
+}
+
+function requiredResponse(responses, url) {
+  const response = responses.get(url);
+  if (!response) throw new Error(`Required shell response is missing: ${url}`);
+  return response;
+}
+
 async function precacheCompleteShell() {
-  const manifestResponse = await fetch(
+  const manifestUrl = scopedUrl("asset-manifest.json");
+  const manifestResponse = await fetchRequired(
     new Request(scopedUrl("asset-manifest.json"), { cache: "no-store" }),
   );
-  if (!manifestResponse.ok)
-    throw new Error(`Asset manifest failed: ${manifestResponse.status}`);
-  const manifest = await manifestResponse.json();
-  if (!Array.isArray(manifest)) throw new Error("Asset manifest is malformed");
+  let manifest;
+  try {
+    manifest = await manifestResponse.clone().json();
+  } catch {
+    throw new Error("Asset manifest is malformed");
+  }
+  const assets = assertExactAssetManifest(manifest);
+  const urls = [...CORE, ...assets];
+  if (new Set(urls).size !== urls.length)
+    throw new Error("Shell asset set contains duplicates");
 
-  const assets = manifest.map(scopedAssetUrl).filter(Boolean);
-  const urls = [...new Set([...CORE, ...assets])];
-  const cache = await caches.open(CACHE);
+  // Fetch and validate every response before opening the candidate cache.
+  // A partial response can therefore never activate or evict the old shell.
+  const responses = new Map([[manifestUrl, manifestResponse]]);
+  for (const url of urls) {
+    if (url === manifestUrl) continue;
+    responses.set(
+      url,
+      await fetchRequired(new Request(url, { cache: "reload" })),
+    );
+  }
+  await assertBuildInfo(
+    requiredResponse(responses, scopedUrl("build-info.json")),
+  );
 
   try {
-    await cache.addAll(
-      urls.map((url) => new Request(url, { cache: "reload" })),
+    const cache = await caches.open(CACHE);
+    await Promise.all(
+      urls.map(async (url) => {
+        await cache.put(url, requiredResponse(responses, url));
+      }),
     );
+    const cached = await Promise.all(urls.map((url) => cache.match(url)));
+    if (cached.some((response) => !response))
+      throw new Error("Candidate shell cache is incomplete");
   } catch (error) {
     await caches.delete(CACHE);
     throw error;
@@ -51,10 +136,13 @@ async function precacheCompleteShell() {
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    (async () => {
-      await precacheCompleteShell();
-      await self.skipWaiting();
-    })(),
+    precacheCompleteShell()
+      .then(() => self.skipWaiting())
+      .catch(async (error) => {
+        await caches.delete(CACHE);
+        console.error("Goldilocks PWA install rejected", error);
+        throw error;
+      }),
   );
 });
 
@@ -76,10 +164,6 @@ self.addEventListener("message", (event) => {
   if (!event.data || typeof event.data !== "object") return;
   if (event.data.type === "GOLDLOCKS_PWA_VERSION") {
     event.ports[0]?.postMessage({ buildId: BUILD_ID, cacheName: CACHE });
-    return;
-  }
-  if (event.data.type === "GOLDLOCKS_PWA_ACTIVATE") {
-    event.waitUntil(self.skipWaiting());
   }
 });
 

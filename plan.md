@@ -62,21 +62,23 @@ Every expansion preserves the same decisions:
 - Centralization versus contestability
 - Immediate output versus retained knowledge
 
-### 2.3 Primary kill gate
+### 2.3 Primary quality gate
 
 Before narrative depth, research characters, labor politics, or cosmic content:
 
-> Reconfiguring a constrained vertical pipeline must be enjoyable for at least thirty minutes.
+> Reconfiguring a constrained vertical pipeline must demonstrate legible, meaningful tradeoffs under repeatable simulation and browser acceptance evidence.
 
-If the pipeline toy is not fun, redesign it before adding systems or content.
+If verification shows that the pipeline has no meaningful configuration tradeoffs, unclear consequences, broken recovery, or an inaccessible/mobile-hostile interaction, redesign it before adding systems or content. Optional player feedback can identify further work; its absence is never a progression or release blocker.
 
 ### 2.4 Scope rule
 
 The first release ends at the founding of a local laboratory. Startup departments, workforce politics, state competition, automated science, orbital industry, and post-scarcity governance remain design constraints and expansion targets—not launch requirements.
 
-Each milestone is independently gated. A later milestone may not be used to compensate for a failed earlier gate.
+Each milestone is independently evidenced. A later milestone may not be used to compensate for an unmet earlier requirement.
 
-Owner-directed experiment note (2026-07-16): the original human gates and their evidence history remain unchanged, but the owner has authorized the bounded **Workstation Expansion I** progression slice defined under Milestone 2 and D-007 without structured telemetry. This waiver permits implementation and independent automated verification; it is not a claim that either human gate passed.
+Advancement and release require all applicable plan requirements, deterministic unit/property/balance checks, repository-pinned browser/UX/accessibility checks, a fresh independent Verifier `PASS`, and successful deployment of that exact accepted SHA/version. A deployed latest version must identify the accepted build identity. Casual owner play and opt-in studies are welcome, non-blocking feedback sources; they may create dated observations and follow-up decisions, never an unrecorded mandatory gate.
+
+Historical note (2026-07-16): earlier plan revisions used voluntary human play-duration and tester-understanding gates. No evidence is represented as having passed those former gates. D-009 supersedes only their manual-gate blocking effect while preserving their intended quality outcomes as testable acceptance and refinement work.
 
 ---
 
@@ -1366,7 +1368,7 @@ postmortemUnlocks
 
 ## 26. Content editor
 
-Treat content tooling as core infrastructure once the pipeline and vertical slice are validated.
+Treat content tooling as core infrastructure once the pipeline and vertical slice have their applicable automated quality evidence.
 
 Required capabilities:
 
@@ -1443,9 +1445,11 @@ Run headless simulations to detect:
 
 ---
 
-## 28. Playtesting and telemetry
+## 28. Optional playtesting and telemetry
 
-Collect only necessary, disclosed metrics in opt-in playtest builds:
+Collect only necessary, disclosed metrics in opt-in playtest builds when research feedback is desired. These studies supplement automated verification; participation, session duration, recording, and telemetry are not advancement or release requirements.
+
+Record optional experiment findings as dated immutable observations. Promote accepted improvements into the product-decision log or an explicitly authorized plan update; do not silently treat informal feedback as release evidence.
 
 - Drop-off point
 - Funding path choices
@@ -1487,9 +1491,9 @@ Validate:
 - No dominant strategy
 - Every upgrade creates another constraint
 
-Exit gate:
+Completion evidence:
 
-> The resource economy produces interesting decisions without narrative spectacle.
+> Deterministic scenario/property/balance checks demonstrate at least three viable funding paths, no dominant strategy in the defined sweep, and every upgrade introducing a new constraint without narrative spectacle.
 
 ### Milestone 1 — Pipeline toy
 
@@ -1506,11 +1510,11 @@ Build:
 
 Exclude story, research characters, investors, labor, and cosmic systems.
 
-Exit gate:
+Completion evidence:
 
-> Testers voluntarily reconfigure the pipeline for at least thirty minutes and can explain the tradeoffs.
+> Pinned browser, accessibility, interaction, persistence, offline/recovery, and deterministic pipeline scenarios demonstrate that constrained reconfiguration exposes legible throughput, memory, cost, and failure tradeoffs. Optional feedback may refine this evidence.
 
-Failure action: redesign; do not proceed by adding content.
+Failure action: redesign the demonstrated defect before adding dependent content.
 
 ### Milestone 2 — Bedroom vertical slice
 
@@ -1550,9 +1554,9 @@ Executable acceptance for this slice:
 - Unit/property/balance plus repository-pinned Playwright cover 320/393 CSS pixels, 200% text, 44 CSS-pixel controls, starter/expanded pipeline, keyboard/tap/real-touch drag, locks, queue identity, quote locking, demand, clear, time equivalence, migration, offline, reduced motion, screen-reader labels, no color-only meaning, bottom-nav-only routing, no duplicate page CTAs, recovery, and double activation.
 - Real visual inspection at both portrait widths supplements, but does not replace, committed browser checks.
 
-Exit gate:
+Completion evidence:
 
-> The stage feels like a complete small game rather than a tutorial for later content.
+> Deterministic pacing/balance scenarios plus browser acceptance demonstrate the documented first-session loop, purchasable capability progression, queue management, safe save/offline recovery, and multiple viable workload configurations.
 
 ### Milestone 3 — Evaluation, failure, and replay
 
@@ -1567,9 +1571,9 @@ Add:
 - Five endings
 - Diagnostic meta-progression
 
-Exit gate:
+Completion evidence:
 
-> Testers understand why they failed and immediately form a different strategy.
+> Fixed failure/replay scenarios and accessible postmortem assertions show supported causes, uncertainty labels, and at least one materially different viable response.
 
 ### Milestone 4 — Research
 
@@ -1582,9 +1586,9 @@ Add:
 - Team collaboration
 - First legendary archetype
 
-Exit gate:
+Completion evidence:
 
-> Choosing the research question matters more than accumulating research points.
+> Deterministic research scenarios demonstrate question-dependent prerequisites, risks, useful failures, and outcomes that cannot be reproduced by undifferentiated point accumulation.
 
 ### Milestone 5 — Hype and fear
 
@@ -1599,9 +1603,9 @@ Add:
 - Doom feed
 - Tool-switching panic
 
-Exit gate:
+Completion evidence:
 
-> Attention accelerates progress but cannot be exploited indefinitely without changing the project and its stakeholders.
+> Balance and scenario checks demonstrate bounded attention gains, durable stakeholder consequences, and no indefinitely dominant attention-only strategy.
 
 ### Milestone 6 — Local laboratory endgame
 
@@ -1616,9 +1620,9 @@ Add:
 - Scenario unlocks
 - Remaining first-release endings
 
-Exit gate:
+Completion evidence:
 
-> Bedroom Developer to Local Laboratory is coherent, replayable, and satisfying.
+> End-to-end scenario, persistence, accessibility, and balance evidence covers a coherent Bedroom Developer-to-Local-Laboratory run, multiple viable routes, understandable failures, and replay variation.
 
 ### Milestone 7 — Commercial release
 
@@ -1633,13 +1637,15 @@ Focus:
 - Localization readiness
 - Packaging and distribution
 
-Do not begin the startup expansion until evidence shows:
+Do not begin the startup expansion until applicable automated quality and release evidence shows:
 
-- The pipeline remains enjoyable.
-- Multiple strategies are viable.
-- Failures are understandable.
-- Replays produce new stories.
-- Players want a larger scale.
+- The pipeline retains legible, meaningful tradeoffs.
+- Multiple strategies are viable within declared scenario/balance bounds.
+- Failures have accessible, supported explanations.
+- Replay scenarios produce meaningfully different stories.
+- The exact accepted build is independently verified and successfully deployed.
+
+Optional owner/player feedback can guide expansion priorities but cannot be required as a release condition.
 
 ---
 
@@ -1663,7 +1669,7 @@ Execute only after Milestone 0 rules and numbers are specified.
 14. Add queues and animated flow.
 15. Add memory, latency, throughput, and failure propagation.
 16. Add an inspector showing predicted versus observed performance.
-17. Run the Pipeline Toy kill-gate playtest.
+17. Run the Pipeline Toy deterministic, balance, browser, UX, and accessibility quality suite.
 
 Owner-authorized Workstation Expansion I follow-up:
 
@@ -1675,7 +1681,7 @@ Owner-authorized Workstation Expansion I follow-up:
 23. Remove duplicate global page CTAs and add compact progressive disclosure.
 24. Run deterministic pacing/market sweeps and pinned portrait/accessibility/offline browser acceptance.
 
-Do not implement research, creators, fear, workforce, or endgame before the pipeline gate passes.
+Do not implement research, creators, fear, workforce, or endgame before the applicable pipeline requirements and automated quality evidence are complete.
 
 ---
 
@@ -1772,7 +1778,7 @@ Question:
 
 ## 32. Deferred features
 
-Do not add before first-release validation:
+Do not add before first-release automated validation, fresh independent Verifier `PASS`, and exact-SHA deployment:
 
 - Real public personalities
 - Full workforce simulation
@@ -1795,7 +1801,7 @@ Do not add before first-release validation:
 
 ### Compelling thesis, weak game
 
-Mitigation: Pipeline Toy kill gate before narrative implementation.
+Mitigation: Pipeline Toy deterministic/balance/browser quality evidence before narrative implementation; optional feedback may prioritize follow-up work.
 
 ### Multiple shallow games
 
@@ -1864,11 +1870,11 @@ Reject or defer features that fail these questions.
 
 ## 35. Definition of success
 
-The first game succeeds when a player can tell a story like:
+The first game succeeds when its tested systems can support a player story like:
 
 > I began with an underpowered computer and entered competitions to fund an upgrade. I overfit the first competition, then built a better validation pipeline. A creator made my local coding tool popular, but support nearly ended the run. I used the attention to fund uncertain research, worked with a brilliant but difficult collaborator, and founded a small laboratory. One run failed because I chased every framework. Another failed because hype outran reliability. The successful run was slower, understandable, and sustainable.
 
-The long-term series succeeds when that player can later say:
+The long-term series succeeds when those systems can later support a player story like:
 
 > The evaluation culture I formed in the bedroom stage shaped the laboratory, the company, and the institutions governing automated science. We avoided paperclips but nearly created a safe dictatorship. Civilization survived because automated systems remained contestable and communities retained the right to choose differently.
 
@@ -1877,3 +1883,5 @@ The solar economy is the spectacle.
 The pipeline is the game.
 
 The accumulated history of decisions is the product.
+
+The stories above are product-quality direction, not a mandatory recorded session. Release claims require the evidence defined in Section 2.4; optional owner/player feedback remains valuable iteration input.

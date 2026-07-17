@@ -11,6 +11,7 @@ const PORT = 4181;
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 
 type Deployment = "a" | "b";
+type ManifestFault = "omitted-null" | "duplicate" | "out-of-scope";
 
 interface ScopeDefinition {
   readonly name: "root" | "pages";
@@ -52,6 +53,11 @@ const contentTypes: Record<string, string> = {
 let deployment: Deployment = "a";
 let failedManifestScope: string | null = null;
 let failedManifestRequests = 0;
+let manifestFaultScope: string | null = null;
+let manifestFault: ManifestFault | null = null;
+let manifestFaultRequests = 0;
+let failedShellPath: string | null = null;
+let failedShellRequests = 0;
 let server: Server;
 
 function fixtureDirectory(scope: ScopeDefinition, target = deployment): string {
@@ -91,6 +97,13 @@ function startFixtureServer(): Promise<void> {
       return;
     }
 
+    if (scope && failedShellPath === requestUrl.pathname) {
+      failedShellRequests += 1;
+      response.writeHead(503, { "Cache-Control": "no-store" });
+      response.end("candidate shell response unavailable");
+      return;
+    }
+
     const path = fileForRequest(requestUrl.pathname);
     if (!path) {
       response.writeHead(404, { "Cache-Control": "no-store" });
@@ -99,7 +112,40 @@ function startFixtureServer(): Promise<void> {
     }
 
     try {
-      const body = await readFile(path);
+      let body = await readFile(path);
+      if (
+        scope &&
+        manifestFaultScope === scope.basePath &&
+        requestUrl.pathname === `${scope.basePath}asset-manifest.json` &&
+        manifestFault
+      ) {
+        manifestFaultRequests += 1;
+        const manifest = JSON.parse(body.toString("utf8")) as string[];
+        if (manifestFault === "omitted-null") {
+          const requiredIndex = manifest.findIndex((entry) =>
+            /\/assets\/index-.*\.js$/.test(entry),
+          );
+          if (requiredIndex < 0) throw new Error("fixture lacks index script");
+          body = Buffer.from(
+            JSON.stringify([
+              ...manifest.slice(0, requiredIndex),
+              ...manifest.slice(requiredIndex + 1),
+              null,
+            ]),
+          );
+        } else if (manifestFault === "duplicate") {
+          body = Buffer.from(
+            JSON.stringify([manifest[0], manifest[0], ...manifest.slice(2)]),
+          );
+        } else {
+          body = Buffer.from(
+            JSON.stringify([
+              "https://example.invalid/out-of-scope.js",
+              ...manifest.slice(1),
+            ]),
+          );
+        }
+      }
       const extension = extname(path);
       const headers: Record<string, string> = {
         "Cache-Control": "no-store",
@@ -163,27 +209,69 @@ async function workerVersionMessage(
 async function packageState(
   page: Page,
   scope: ScopeDefinition,
+  expected: BuildInfo,
 ): Promise<PackageState> {
-  const state = await page.evaluate(async (basePath) => {
-    const buildInfo = (await (
-      await fetch(`${basePath}build-info.json`, { cache: "no-store" })
-    ).json()) as {
-      version: string;
-      scope: string;
-      cacheName: string;
-    };
+  const state = await page.evaluate(
+    async ({ basePath, expectedBuild }) => {
+      const cacheNames = await caches.keys();
+      const cache = cacheNames.includes(expectedBuild.cacheName)
+        ? await caches.open(expectedBuild.cacheName)
+        : null;
+      const [metadata, assetManifest] = cache
+        ? await Promise.all([
+            cache.match(`${basePath}build-info.json`),
+            cache.match(`${basePath}asset-manifest.json`),
+          ])
+        : [undefined, undefined];
+      if (!metadata || !assetManifest)
+        throw new Error("Expected shell metadata is absent from the cache");
+      const [buildInfo, assets] = (await Promise.all([
+        metadata.clone().json(),
+        assetManifest.clone().json(),
+      ])) as [BuildInfo, string[]];
+      const controller = navigator.serviceWorker.controller;
+      return {
+        appVersion: document.documentElement.dataset.appVersion ?? null,
+        offlineReady: document.documentElement.dataset.offlineReady ?? null,
+        buildInfo,
+        controllerBuild: controller
+          ? new URL(controller.scriptURL).searchParams.get("build")
+          : null,
+        controllerPath: controller
+          ? new URL(controller.scriptURL).pathname
+          : null,
+        scopedCacheNames: cacheNames
+          .filter((name) => name.startsWith(`goldilocks-shell:${basePath}:`))
+          .sort(),
+        cachedPaths: cache
+          ? (await cache.keys())
+              .map((request) => new URL(request.url).pathname)
+              .sort()
+          : [],
+        assets,
+      };
+    },
+    { basePath: scope.basePath, expectedBuild: expected },
+  );
+  return { ...state, workerMessage: await workerVersionMessage(page) };
+}
+
+async function packageTransitionState(
+  page: Page,
+  scope: ScopeDefinition,
+): Promise<{
+  readonly appVersion: string | null;
+  readonly offlineReady: string | null;
+  readonly controllerBuild: string | null;
+  readonly controllerPath: string | null;
+  readonly scopedCacheNames: readonly string[];
+}> {
+  return page.evaluate(async (basePath) => {
     const controller = navigator.serviceWorker.controller;
     const cacheNames = await caches.keys();
-    const cache = cacheNames.includes(buildInfo.cacheName)
-      ? await caches.open(buildInfo.cacheName)
-      : null;
-    const assets = (await (
-      await fetch(`${basePath}asset-manifest.json`, { cache: "no-store" })
-    ).json()) as string[];
     return {
       appVersion: document.documentElement.dataset.appVersion ?? null,
       offlineReady: document.documentElement.dataset.offlineReady ?? null,
-      buildInfo,
       controllerBuild: controller
         ? new URL(controller.scriptURL).searchParams.get("build")
         : null,
@@ -193,15 +281,8 @@ async function packageState(
       scopedCacheNames: cacheNames
         .filter((name) => name.startsWith(`goldilocks-shell:${basePath}:`))
         .sort(),
-      cachedPaths: cache
-        ? (await cache.keys())
-            .map((request) => new URL(request.url).pathname)
-            .sort()
-        : [],
-      assets,
     };
   }, scope.basePath);
-  return { ...state, workerMessage: await workerVersionMessage(page) };
 }
 
 function isTransientPwaTransitionError(error: unknown): boolean {
@@ -217,24 +298,19 @@ async function waitForPackage(
   scope: ScopeDefinition,
   expected: BuildInfo,
 ): Promise<PackageState> {
-  let latestState: PackageState | null = null;
+  let latestState: unknown = null;
   try {
     await expect
       .poll(
         async () => {
           try {
-            const state = await packageState(page, scope);
+            const state = await packageTransitionState(page, scope);
             latestState = state;
             return (
               state.appVersion === expected.version &&
               state.offlineReady === "true" &&
-              state.buildInfo.version === expected.version &&
-              state.buildInfo.scope === scope.basePath &&
-              state.buildInfo.cacheName === expected.cacheName &&
               state.controllerBuild === expected.version &&
               state.controllerPath === `${scope.basePath}sw.js` &&
-              state.workerMessage?.buildId === expected.version &&
-              state.workerMessage.cacheName === expected.cacheName &&
               state.scopedCacheNames.length === 1 &&
               state.scopedCacheNames[0] === expected.cacheName
             );
@@ -270,7 +346,57 @@ async function waitForPackage(
       `${error instanceof Error ? error.message : String(error)}\nLast PWA state: ${JSON.stringify(latestState)}\nRegistration: ${JSON.stringify(registration)}`,
     );
   }
-  return packageState(page, scope);
+  const state = await packageState(page, scope, expected);
+  expect(state.buildInfo).toEqual(expected);
+  expect(state.workerMessage).toEqual({
+    buildId: expected.version,
+    cacheName: expected.cacheName,
+  });
+  return state;
+}
+
+async function activeShellState(
+  page: Page,
+  scope: ScopeDefinition,
+): Promise<{
+  readonly controllerBuild: string | null;
+  readonly scopedCacheNames: readonly string[];
+}> {
+  return page.evaluate(async (basePath) => {
+    const controller = navigator.serviceWorker.controller;
+    const cacheNames = await caches.keys();
+    return {
+      controllerBuild: controller
+        ? new URL(controller.scriptURL).searchParams.get("build")
+        : null,
+      scopedCacheNames: cacheNames
+        .filter((name) => name.startsWith(`goldilocks-shell:${basePath}:`))
+        .sort(),
+    };
+  }, scope.basePath);
+}
+
+async function expectActiveShell(
+  page: Page,
+  scope: ScopeDefinition,
+  expected: BuildInfo,
+): Promise<void> {
+  await expect
+    .poll(() => activeShellState(page, scope), { timeout: 20_000 })
+    .toEqual({
+      controllerBuild: expected.version,
+      scopedCacheNames: [expected.cacheName],
+    });
+}
+
+async function controllerReloadMarker(
+  page: Page,
+  buildId: string,
+): Promise<string | null> {
+  return page.evaluate(
+    (key) => sessionStorage.getItem(key),
+    `goldilocks-pwa-controller-version:${buildId}`,
+  );
 }
 
 function expectCompleteCache(
@@ -387,6 +513,11 @@ test.describe("atomic PWA redeployment contract", () => {
     deployment = "a";
     failedManifestScope = null;
     failedManifestRequests = 0;
+    manifestFaultScope = null;
+    manifestFault = null;
+    manifestFaultRequests = 0;
+    failedShellPath = null;
+    failedShellRequests = 0;
   });
 
   for (const scope of SCOPES) {
@@ -421,9 +552,10 @@ test.describe("atomic PWA redeployment contract", () => {
       const stateB = await waitForPackage(page, scope, buildB);
       expectCompleteCache(stateB, scope);
 
-      await peer.reload({ waitUntil: "domcontentloaded" });
       const peerStateB = await waitForPackage(peer, scope, buildB);
       expectCompleteCache(peerStateB, scope);
+      expect(await controllerReloadMarker(page, buildB.version)).toBe("1");
+      expect(await controllerReloadMarker(peer, buildB.version)).toBe("1");
       await peer.close();
 
       expect(await savedProjection(page)).toEqual(savedBeforeUpdate);
@@ -446,29 +578,7 @@ test.describe("atomic PWA redeployment contract", () => {
       deployment = "b";
       failedManifestScope = scope.basePath;
       await page.reload({ waitUntil: "domcontentloaded" });
-      await expect
-        .poll(
-          () =>
-            page.evaluate(async (basePath) => {
-              const controller = navigator.serviceWorker.controller;
-              const cacheNames = await caches.keys();
-              return {
-                controllerBuild: controller
-                  ? new URL(controller.scriptURL).searchParams.get("build")
-                  : null,
-                scopedCaches: cacheNames
-                  .filter((name) =>
-                    name.startsWith(`goldilocks-shell:${basePath}:`),
-                  )
-                  .sort(),
-              };
-            }, scope.basePath),
-          { timeout: 20_000 },
-        )
-        .toEqual({
-          controllerBuild: buildA.version,
-          scopedCaches: [buildA.cacheName],
-        });
+      await expectActiveShell(page, scope, buildA);
       expect(failedManifestRequests).toBeGreaterThan(0);
 
       await context.setOffline(true);
@@ -477,5 +587,83 @@ test.describe("atomic PWA redeployment contract", () => {
       expectCompleteCache(recovered, scope);
       await context.setOffline(false);
     });
+
+    for (const fault of [
+      "omitted-null",
+      "duplicate",
+      "out-of-scope",
+    ] as const) {
+      test(`rejects ${fault} ${scope.name} manifest metadata without activating B`, async ({
+        page,
+        context,
+      }) => {
+        const buildA = await fixtureBuildInfo(scope, "a");
+        await page.goto(urlFor(scope), { waitUntil: "domcontentloaded" });
+        await waitForPackage(page, scope, buildA);
+
+        deployment = "b";
+        manifestFaultScope = scope.basePath;
+        manifestFault = fault;
+        await page.reload({ waitUntil: "domcontentloaded" });
+        await expect.poll(() => manifestFaultRequests).toBeGreaterThan(0);
+        await expectActiveShell(page, scope, buildA);
+
+        await context.setOffline(true);
+        await page.reload({ waitUntil: "domcontentloaded" });
+        await waitForPackage(page, scope, buildA);
+        await context.setOffline(false);
+      });
+    }
+
+    test(`rejects a partial ${scope.name} shell response without activating B`, async ({
+      page,
+      context,
+    }) => {
+      const buildA = await fixtureBuildInfo(scope, "a");
+      await page.goto(urlFor(scope), { waitUntil: "domcontentloaded" });
+      await waitForPackage(page, scope, buildA);
+
+      deployment = "b";
+      // build-info is a required precache response requested only by the
+      // candidate worker, so this proves response completeness, not merely
+      // page-resource failure handling.
+      failedShellPath = `${scope.basePath}build-info.json`;
+      await page.reload({ waitUntil: "domcontentloaded" });
+      await expect.poll(() => failedShellRequests).toBeGreaterThan(0);
+      await expectActiveShell(page, scope, buildA);
+
+      await context.setOffline(true);
+      await page.reload({ waitUntil: "domcontentloaded" });
+      await waitForPackage(page, scope, buildA);
+      await context.setOffline(false);
+    });
   }
+
+  test("root B activation never evicts the independently installed Pages A shell", async ({
+    page,
+    context,
+  }) => {
+    const root = SCOPES[0];
+    const pages = SCOPES[1];
+    const rootA = await fixtureBuildInfo(root, "a");
+    const rootB = await fixtureBuildInfo(root, "b");
+    const pagesA = await fixtureBuildInfo(pages, "a");
+
+    await page.goto(urlFor(root), { waitUntil: "domcontentloaded" });
+    await waitForPackage(page, root, rootA);
+    const pagesClient = await context.newPage();
+    await pagesClient.goto(urlFor(pages), { waitUntil: "domcontentloaded" });
+    await waitForPackage(pagesClient, pages, pagesA);
+
+    deployment = "b";
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await waitForPackage(page, root, rootB);
+    await expectActiveShell(pagesClient, pages, pagesA);
+
+    await context.setOffline(true);
+    await pagesClient.reload({ waitUntil: "domcontentloaded" });
+    await waitForPackage(pagesClient, pages, pagesA);
+    await context.setOffline(false);
+    await pagesClient.close();
+  });
 });
