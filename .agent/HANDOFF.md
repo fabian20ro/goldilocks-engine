@@ -1,4 +1,4 @@
-# Round 018 implementation handoff
+# Round 020 implementation handoff
 
 ## Implemented behavior summary
 
@@ -17,6 +17,8 @@ The bounded Workstation Expansion I / per-task demand slice authorized in D-007 
 - Waiting tasks can be cleared only after confirmation. The active task, its progress/identity/quote, money, demand, reputation, RNG, and settled history remain unchanged.
 - Fixed 1×/4×/16×/64× controls advance the same 0.5-second simulation quanta. Animation and pause remain separate.
 - Global page changes use only the four bottom tabs. Warning and module copy point to those tabs rather than duplicating page-opening actions. Rig/module detail is progressively disclosed.
+- At 320 CSS pixels, module cards reflow into a compact code/grip header plus a full-width copy row. At 200% text, names, throughput, memory, reliability, and state remain readable instead of fragmenting vertically; normal 320 and all 393 layouts retain their established content and controls.
+- Every repository-local Playwright output directory used by setup, root/Pages checks, retained traces, or visual inspection is excluded from canonical ESLint by an exact generated-path ignore. Generated reports remain Git-ignored and cannot poison the next lint/full-verification run.
 - The tutorial explains earning, CU/memory/thermal pressure, task quotes/costs, demand, expansion purchase/activation/empty slots, 64× time, waiting-task clearing, and honest presets.
 - Schema version is 5; content version is `pipeline-toy-4`; scope-isolated service-worker cache is v7. Schema-3 and schema-4 saves migrate safely. Aggregate legacy queues become deterministic task records without losing the queue count or current workload identity.
 
@@ -39,8 +41,10 @@ The source feedback is preserved in `.agent/playtests/2026-07-16-progression-exp
 | Active-task feedback                | Active work owns pressure, warning, bottleneck, and queue-stage diagnostics; future selection owns offer details                                      | Engine regression and round-015 verifier browser case                          |
 | Fixed fast-forward                  | 1×/4×/16×/64× use identical fixed quanta and preserve settlements/resources/ledger identities                                                         | Schedule-equivalence engine test; browser controls                             |
 | Portrait/accessibility              | 320/393 CSS px, 200% text, ≥44px visible buttons, no document overflow, reduced motion, touch/pointer placement                                       | Root browser suite, retained verifier cases, headed visual inspection          |
+| Stressed module readability         | ≤350px cards give all decision copy a full-width row while preserving code/grip and normal/393 behavior                                               | Round-019 browser regression and fresh 320/393 screenshots                     |
 | Bottom-tab routing / disclosure     | No duplicate global page-opening CTAs; upgrade details use native disclosure                                                                          | Browser assertions and source inspection                                       |
-| Persistence/migration/offline       | Schema-5 integrity; schema-3/4 migration; expanded preset/save/offline resume; cache v7                                                               | Unit migration tests; root and Pages browser suites                            |
+| Persistence/migration/offline       | Schema-5 integrity; schema-3/4 migration; expanded preset/save/offline resume; cache v7                                                               | Unit migration tests; retained root browser suite; Pages production build      |
+| Rerunnable browser verification     | Exact lint ignores cover only generated root/Pages reports, results, visual output, CLI state, and caches                                             | Round-019 workflow regression; lint with populated report trees                |
 
 ## Prior verifier findings
 
@@ -51,6 +55,8 @@ The source feedback is preserved in `.agent/playtests/2026-07-16-progression-exp
 - V-021 resolved: one shared offer estimator applies modeled delivery reliability to gross payout and subtracts configured cost. No-model and memory-overload guarantees produce expected gross $0 and negative expected net in both workload cards and the money loop.
 - V-022 resolved: settlement records the full configured operating cost even when money is $0. Cash collection is separately capped to available money, aggregate operating costs count only what was paid, and the persisted ledger plus latest-settlement UI explicitly distinguish paid and unpaid cost without allowing negative money.
 - V-023 resolved: ledger and Latest settlement select one precision for the complete currency equation. Cent-exact equations use two decimals; any reachable sub-cent member promotes every displayed member to three decimals, preserving both configured = paid + unpaid and net = gross − configured. The UI explicitly explains the extra precision.
+- V-024 resolved: ESLint's flat-config ignore list now names `playwright-pages-report`, `output/playwright`, and `.playwright-cli` alongside the existing root report, result, and cache paths. Source-bearing parent directories remain in lint scope; populated generated trees no longer affect canonical lint.
+- V-025 resolved: narrow module cards use a two-row grid so the icon and grip remain compact while all decision-relevant copy receives the full card width. The exact 320/200% regression reports one rendered line for `Delivery`; fresh screenshots show the complete name, throughput, memory, reliability, and equipped state.
 - The previously recorded B-005 human-study blocker is owner-waived for this bounded implementation slice under D-007. That waiver permits implementation; it is not empirical evidence that either original human gate passed.
 - All reports under `.agent/verification/` were read before implementation. Their evidence remains immutable.
 
@@ -77,7 +83,7 @@ npm run test:e2e
 npm run test:e2e:pages
 ```
 
-Dependency cache: ignored `.cache/npm`. Browser cache: ignored `.cache/ms-playwright`. Playwright CLI daemon cache: ignored `.cache/pwcli-daemon`; optional visual artifacts: ignored `output/playwright/`. Root and Pages servers bind `127.0.0.1:4173`, wait for readiness, and are cleaned up by Playwright.
+Dependency cache: ignored `.cache/npm`. Browser cache: ignored `.cache/ms-playwright`. Playwright CLI daemon cache: ignored `.cache/pwcli-daemon`; reports/results are ignored under `playwright-report/`, `playwright-pages-report/`, and `test-results/`; visual artifacts are ignored under `output/playwright/`. These exact generated paths are also outside ESLint scope. Root and Pages servers bind `127.0.0.1:4173`, wait for readiness, and are cleaned up by Playwright.
 
 On this managed macOS host, a direct browser launch can fail with a Mach-port permission denial inside the filesystem sandbox. The exact same repository-local command succeeds outside that boundary; this is an environment constraint, not a skipped test or product workaround.
 
@@ -88,6 +94,8 @@ On this managed macOS host, a direct browser launch can fail with a Mach-port pe
 - Offer comparisons are expected-value projections, not guaranteed gross claims: modeled reliability weights the gross quote before configured cost is subtracted, and deterministic failure overrides expected gross to zero.
 - `lastSettlement.operatingCost` is the full incurred configured cost. `lastSettlement.netChange` remains the actual cash delta, so existing cash accounting stays exact; paid cost is derivable as gross minus cash delta and any remainder is explicitly unpaid. `jobs.operatingCostsPaid` intentionally remains a cash-paid aggregate.
 - Currency precision is selected per settlement equation rather than per amount. This prevents independent half-cent rounding from inflating a visible partition while keeping ordinary values at familiar cent precision.
+- The ≤350px module card layout changes only composition: code/grip occupy the first row and the existing name/stats/status copy spans the second. It does not hide, abbreviate, or shrink decision content, and the entire card remains the existing accessible 44px-plus control.
+- Generated browser output is ignored by exact leaf paths in both Git and ESLint. The broader `output/` tree and project source remain visible to tooling.
 - The quote function owns reservation counting. Callers cannot accidentally display an unreserved quote while acceptance uses a reserved one; batch acceptance passes only the zero-based count of additional tasks in that batch.
 - Persistent `state.metrics` describes work physically in flight when an active task exists; selected-work projections are computed ephemerally for offer comparison and are not allowed to overwrite active diagnostics.
 - Market-floor safety is structural: no-model graphs cannot deliver, every delivering graph contains at least one model, all other costs are nonnegative, and modeled reliability is capped below one.
@@ -105,20 +113,25 @@ On this managed macOS host, a direct browser launch can fail with a Mach-port pe
 - Reliability-weighted offer net is an expectation over the deterministic model, not a promise for an individual task; successful and failed settlement outcomes remain discrete.
 - No selling, refunds, queue repricing, cancellation payout, or module auto-purchase. Clear waiting is intentionally lossless only in state mutation, not a refund mechanism, because acceptance spends no money.
 - Browser acceptance uses pinned Chromium. Physical-device thermal/battery behavior, non-Chromium engines, platform screen readers, haptics, and audio remain unverified.
+- This session could not execute the exact Pages browser cases outside the macOS Mach-port sandbox: the scoped escalation was rejected by the environment's external usage limit. The sandboxed command reached the repository-built server but both browser launches were denied before page creation; no workaround was attempted.
 - localStorage denial leaves the in-memory session playable but cannot provide cross-reload durability.
 - Implementer does not push, deploy, or issue acceptance. Exact-SHA publication and fresh independent PASS remain Orchestrator/Verifier work.
 
 ## Checks executed before final candidate
 
-- `npm test`: PASS, 70/70 unit/property/migration/economy/currency tests; coverage 87.53% statements, 85.75% branches, 94.87% functions, and 90.70% lines.
+- `npm test`: PASS, 73/73 unit/property/migration/economy/currency/workflow tests; coverage 87.53% statements, 85.87% branches, 94.87% functions, and 90.70% lines.
 - `npm run balance:progression`: PASS, 41/41 deterministic seeds; expansion 13.14–15.59 simulated hours; full catalogue 40.63–44.40 hours; zero failures.
 - `npx vitest run src/simulation/engine.test.ts src/simulation/verifierRound015.test.ts src/simulation/verifierRound016.test.ts src/simulation/progressionBalance.test.ts --coverage.enabled=false`: PASS, 43/43 focused economy, active-task, and round-016 regressions.
 - `npm run test:e2e -- tests/e2e/verifier-round-016.spec.ts`: PASS, 1/1 exact guaranteed-failure offer regression.
 - `npx vitest run src/simulation/currency.test.ts src/simulation/verifierRound017.test.ts --coverage.enabled=false`: PASS, 9/9 focused additive-currency and exact verifier regressions.
 - `npm run test:e2e -- tests/e2e/verifier-round-017.spec.ts`: PASS, 2/2 exact settlement-feedback regressions.
-- `npm run test:e2e`: PASS, 47/47 root browser cases on the final fresh rerun. An earlier run had one transient round-015 offline-preset assertion after 46 other cases passed; the exact round-015 file immediately passed 4/4 and a complete fresh rerun passed 47/47 without a code change.
-- `npm run test:e2e:pages`: PASS, 2/2 GitHub Pages/offline/cache-isolation cases. The first sandboxed launch failed at macOS Mach registration; the exact escalated rerun passed.
-- The canonical `./scripts/verify` passed clean dependency recreation, formatting, lint, typecheck, 70/70 covered tests, the base model, the 20,001-seed upgrade balance, the 41-seed progression balance, and production build. Its root-browser phase then hit the documented macOS Mach-port sandbox denial before page creation. Exact fresh package-manager reruns passed root 47/47 and Pages 2/2, with Pages rerun outside that sandbox boundary.
+- `npx vitest run src/test/verifierRound019Workflow.test.ts --coverage.enabled=false`: PASS, 1/1 exact Pages-report lint-isolation regression.
+- `npm run test:e2e -- tests/e2e/verifier-round-019.spec.ts`: PASS, 2/2 exact 320/393 visual regressions. Fresh generated screenshots were inspected at normal and 200% text: 320 now shows `Delivery Gate`, `20/m · 0.2 GB · 99.7%`, and `EQUIPPED` without fragmentation; normal 320 and the unchanged 393 composition have no new clipping or overlap.
+- `npm run test:e2e`: PASS, 49/49 root browser cases before the final clean dependency recreation.
+- `npm run lint` with populated `playwright-pages-report/`, `playwright-report/`, `test-results/`, and `output/playwright/`: PASS both before and after fresh browser output, proving required artifacts do not poison reruns.
+- `npm run build:pages`: PASS for the `/goldlocks-engine/` base with main, Worker, manifest, and service-worker assets emitted.
+- `npm run test:e2e:pages`: infrastructure-limited for this exact candidate. The sandboxed run was 0/2 before page creation due macOS Mach registration denial; the exact outside-sandbox rerun request was rejected by the environment usage limit.
+- The canonical `./scripts/verify`, deliberately started with generated Pages/root/visual reports present, passed clean dependency recreation, formatting, lint, typecheck, 73/73 covered tests, the base model, the 20,001-seed upgrade balance, the 41-seed progression balance, and production build. Its root-browser phase then hit the documented macOS Mach-port sandbox denial before page creation.
 
 ## Checks not run
 

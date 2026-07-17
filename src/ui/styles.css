@@ -1858,7 +1858,28 @@ h2 {
   }
 
   .module-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
     min-width: 0;
+  }
+
+  .module-card .module-code {
+    grid-column: 1;
+    grid-row: 1;
+    width: 2.8rem;
+  }
+
+  .module-card .module-copy {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+  }
+
+  .module-card .drag-grip {
+    grid-column: 2;
+    grid-row: 1;
+    margin-left: 0;
   }
 
   .slot-meta,
@@ -1875,8 +1896,11 @@ h2 {
   }
 
   .module-copy strong,
-  .module-copy small {
-    overflow-wrap: anywhere;
+  .module-copy small,
+  .module-copy .module-status {
+    overflow: visible;
+    overflow-wrap: normal;
+    text-overflow: clip;
     white-space: normal;
   }
 
