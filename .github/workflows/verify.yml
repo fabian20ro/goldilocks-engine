@@ -1,0 +1,70 @@
+name: Verify
+
+on:
+  push:
+    branches:
+      - agent/implementation
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  canonical:
+    name: Canonical verification (${{ github.sha }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      npm_config_cache: ${{ github.workspace }}/.cache/npm
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/ms-playwright
+      PLAYWRIGHT_INSTALL_DEPS: "1"
+      XDG_CACHE_HOME: ${{ github.workspace }}/.cache/xdg
+    steps:
+      - name: Check out frozen candidate
+        uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Record exact candidate identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$GITHUB_SHA"
+          mkdir -p .cache/verification
+          {
+            printf 'candidate_sha=%s\n' "$actual"
+            printf 'workflow=%s\n' "$GITHUB_WORKFLOW"
+            printf 'run_id=%s\n' "$GITHUB_RUN_ID"
+            printf 'run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
+            printf 'runner_os=%s\n' "$RUNNER_OS"
+            printf 'node=%s\n' "$(node --version)"
+            printf 'npm=%s\n' "$(npm --version)"
+          } > .cache/verification/metadata.txt
+          cat .cache/verification/metadata.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run canonical complete verification
+        run: ./scripts/verify
+
+      - name: Upload verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-evidence-${{ github.sha }}
+          path: |
+            .cache/verification
+            playwright-report
+            playwright-pages-report
+            test-results
+            coverage
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 14

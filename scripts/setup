@@ -8,4 +8,9 @@ export npm_config_cache="$ROOT/.cache/npm"
 export PLAYWRIGHT_BROWSERS_PATH="$ROOT/.cache/ms-playwright"
 
 npm ci --prefer-offline
-npx playwright install chromium
+
+if [ "${PLAYWRIGHT_INSTALL_DEPS:-0}" = "1" ]; then
+  npx playwright install --with-deps chromium
+else
+  npx playwright install chromium
+fi

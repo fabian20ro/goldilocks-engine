@@ -1,15 +1,30 @@
 #!/bin/sh
-set -eu
+set -u
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
 
-./scripts/setup
-npm run format:check
-npm run lint
-npm run typecheck
-npm run test
-npm run balance
-npm run build
-npm run test:e2e
-npm run test:e2e:pages
+if ! ./scripts/setup; then
+  exit 1
+fi
+
+failed=0
+
+run_step() {
+  if "$@"; then
+    return 0
+  fi
+
+  failed=1
+}
+
+run_step npm run format:check
+run_step npm run lint
+run_step npm run typecheck
+run_step npm run test
+run_step npm run balance
+run_step npm run build
+run_step npm run test:e2e
+run_step npm run test:e2e:pages
+
+exit "$failed"
