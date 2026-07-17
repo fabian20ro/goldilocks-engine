@@ -31,6 +31,35 @@ async function assertReadableHeader(page: Page) {
   expect(undersizedSpeedButtons).toEqual([]);
 }
 
+async function assertSpeedControlsAreTapReachable(page: Page) {
+  const nav = page.getByRole("navigation", { name: "Primary" });
+  const navBox = await nav.boundingBox();
+  expect(navBox).not.toBeNull();
+  if (!navBox) return;
+
+  for (const label of ["1×", "4×", "16×", "64×"]) {
+    const speed = page.getByRole("button", { name: label, exact: true });
+    const speedBox = await speed.boundingBox();
+    expect(speedBox).not.toBeNull();
+    if (!speedBox) return;
+
+    expect(speedBox.y + speedBox.height).toBeLessThanOrEqual(navBox.y);
+
+    const center = {
+      x: speedBox.x + speedBox.width / 2,
+      y: speedBox.y + speedBox.height / 2,
+    };
+    const hitTarget = await page.evaluate(({ x, y }) => {
+      const element = document.elementFromPoint(x, y);
+      return element?.closest("button")?.textContent?.trim() ?? null;
+    }, center);
+    expect(hitTarget).toBe(label);
+
+    await page.mouse.click(center.x, center.y);
+    await expect(speed).toHaveAttribute("aria-pressed", "true");
+  }
+}
+
 for (const { width, rootFontSize, description } of [
   { width: 320, rootFontSize: "16px", description: "normal text" },
   { width: 393, rootFontSize: "16px", description: "normal text" },
@@ -49,5 +78,6 @@ for (const { width, rootFontSize, description } of [
     await expect(page.getByLabel("Primary resources")).toBeVisible();
     await expect(page.getByRole("group", { name: "Time speed" })).toBeVisible();
     await assertReadableHeader(page);
+    await assertSpeedControlsAreTapReachable(page);
   });
 }
