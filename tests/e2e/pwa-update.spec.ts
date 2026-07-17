@@ -567,6 +567,39 @@ test.describe("atomic PWA redeployment contract", () => {
       await context.setOffline(false);
     });
 
+    test(`repairs a stale ${scope.name} worker URL identity after A to B`, async ({
+      page,
+      context,
+    }) => {
+      const buildA = await fixtureBuildInfo(scope, "a");
+      const buildB = await fixtureBuildInfo(scope, "b");
+      await page.goto(urlFor(scope), { waitUntil: "domcontentloaded" });
+      await waitForPackage(page, scope, buildA);
+
+      // A static host resolves the retained `sw.js?build=A` request by
+      // pathname, so B bytes can activate while the browser retains A in the
+      // controller URL. The app must restore B's versioned URL before its one
+      // controller-change reload; no page reload is used to initiate this.
+      deployment = "b";
+      await page.evaluate(async (basePath) => {
+        const registration =
+          await navigator.serviceWorker.getRegistration(basePath);
+        if (!registration)
+          throw new Error("missing service-worker registration");
+        await registration.update();
+      }, scope.basePath);
+
+      const repaired = await waitForPackage(page, scope, buildB);
+      expectCompleteCache(repaired, scope);
+      expect(await controllerReloadMarker(page, buildB.version)).toBe("1");
+
+      await context.setOffline(true);
+      await page.reload({ waitUntil: "domcontentloaded" });
+      const offlineState = await waitForPackage(page, scope, buildB);
+      expectCompleteCache(offlineState, scope);
+      await context.setOffline(false);
+    });
+
     test(`keeps ${scope.name} version A usable when version B cannot complete its cache`, async ({
       page,
       context,
@@ -665,5 +698,33 @@ test.describe("atomic PWA redeployment contract", () => {
     await waitForPackage(pagesClient, pages, pagesA);
     await context.setOffline(false);
     await pagesClient.close();
+  });
+
+  test("root B remains controllable when only a Pages A cache remains", async ({
+    page,
+    context,
+  }) => {
+    const root = SCOPES[0];
+    const pages = SCOPES[1];
+    const rootA = await fixtureBuildInfo(root, "a");
+    const rootB = await fixtureBuildInfo(root, "b");
+    const pagesA = await fixtureBuildInfo(pages, "a");
+
+    await page.goto(urlFor(root), { waitUntil: "domcontentloaded" });
+    await waitForPackage(page, root, rootA);
+    const pagesClient = await context.newPage();
+    await pagesClient.goto(urlFor(pages), { waitUntil: "domcontentloaded" });
+    await waitForPackage(pagesClient, pages, pagesA);
+    await pagesClient.close();
+
+    deployment = "b";
+    await page.reload({ waitUntil: "domcontentloaded" });
+    const rootState = await waitForPackage(page, root, rootB);
+    expectCompleteCache(rootState, root);
+
+    await context.setOffline(true);
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await waitForPackage(page, root, rootB);
+    await context.setOffline(false);
   });
 });

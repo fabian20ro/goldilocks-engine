@@ -36,6 +36,37 @@ const CORE = [
 
 const EXPECTED_ASSET_URLS = EXPECTED_ASSETS.map(scopedAssetUrl);
 
+function cacheScope(cacheName) {
+  if (!cacheName.startsWith("goldilocks-shell:")) return null;
+  const buildSeparator = cacheName.lastIndexOf(":");
+  if (buildSeparator <= "goldilocks-shell:".length) return null;
+  return cacheName.slice("goldilocks-shell:".length, buildSeparator);
+}
+
+function nestedGoldilocksScopes(cacheNames) {
+  return cacheNames.flatMap((cacheName) => {
+    const scope = cacheScope(cacheName);
+    return scope !== null &&
+      scope !== SCOPE_URL.pathname &&
+      scope.startsWith(SCOPE_URL.pathname)
+      ? [scope]
+      : [];
+  });
+}
+
+async function hasLiveNestedGoldilocksClient(cacheNames) {
+  const nestedScopes = nestedGoldilocksScopes(cacheNames);
+  if (nestedScopes.length === 0) return false;
+  const clients = await self.clients.matchAll({
+    type: "window",
+    includeUncontrolled: true,
+  });
+  return clients.some((client) => {
+    const pathname = new URL(client.url).pathname;
+    return nestedScopes.some((scope) => pathname.startsWith(scope));
+  });
+}
+
 function assertExactAssetManifest(manifest) {
   if (!Array.isArray(manifest)) throw new Error("Asset manifest is malformed");
   if (manifest.length !== EXPECTED_ASSET_URLS.length)
@@ -155,7 +186,15 @@ self.addEventListener("activate", (event) => {
           .filter((name) => name.startsWith(CACHE_NAMESPACE) && name !== CACHE)
           .map((name) => caches.delete(name)),
       );
-      await self.clients.claim();
+      // `clients.claim()` applies to every client under this scope. A root
+      // worker would otherwise take over an independently installed, more
+      // specific Pages client at `/goldlocks-engine/`. Preserve a live nested
+      // client with its complete shell; a stale nested cache alone must not
+      // stop the root worker from controlling a new root install. The root
+      // page observes its registration activation and reloads without a global
+      // claim when a nested client is present.
+      if (!(await hasLiveNestedGoldilocksClient(cacheNames)))
+        await self.clients.claim();
     })(),
   );
 });
