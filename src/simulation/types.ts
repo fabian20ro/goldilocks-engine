@@ -1,5 +1,5 @@
-export const SCHEMA_VERSION = 5;
-export const CONTENT_VERSION = "pipeline-toy-4";
+export const SCHEMA_VERSION = 6;
+export const CONTENT_VERSION = "bedroom-career-1";
 export const SAVE_INTEGRITY_ALGORITHM = "fnv1a-32-json-v1";
 
 export type SlotType = "source" | "process" | "sink";
@@ -78,6 +78,107 @@ export interface PipelineExpansionSpec {
   purchaseCost: number;
   processSlots: number;
   tradeoff: string;
+}
+
+/** The deliberately finite after-hours choices in the Bedroom Developer loop. */
+export type CareerRoute =
+  | "freelance"
+  | "competition"
+  | "product"
+  | "maintenance";
+
+export type QuantizationProfile = "q4" | "q8";
+
+export interface LocalModelTierSpec {
+  id: string;
+  name: string;
+  shortName: string;
+  description: string;
+  qualityBonus: number;
+  memoryMultiplier: number;
+  throughputMultiplier: number;
+  reliabilityBonus: number;
+  operatingCostPerHour: number;
+  unlockDescription: string;
+}
+
+export interface CareerRouteSpec {
+  id: CareerRoute;
+  name: string;
+  description: string;
+  workloadId: string;
+  opportunityCost: string;
+}
+
+export interface EveningSchedule {
+  day: number;
+  hoursAvailable: number;
+  hoursRemaining: number;
+  allocations: Readonly<Record<CareerRoute, number>>;
+  completedEvenings: number;
+}
+
+export interface CompetitionProgress {
+  id: "bedroom-benchmark-cup";
+  name: string;
+  progress: number;
+  submissions: number;
+  bestScore: number;
+  overfitRisk: number;
+  prizeClaimed: boolean;
+  lifetimePrizeMoney: number;
+}
+
+export interface ProductProgress {
+  id: "deskflow-local";
+  name: string;
+  buildProgress: number;
+  released: boolean;
+  releases: number;
+  serviceDebt: number;
+  lifetimeRevenue: number;
+  maintenanceHours: number;
+}
+
+export interface OfflinePolicyReport {
+  requestedHours: number;
+  appliedHours: number;
+  route: "freelance";
+  gross: number;
+  configuredCost: number;
+  stoppedReason: string;
+}
+
+/**
+ * Offline automation has one intentionally narrow job: safe freelance work.
+ * It cannot purchase, submit, release, or touch product/competition progress.
+ */
+export interface OfflinePolicy {
+  enabled: boolean;
+  route: "freelance";
+  maxHours: number;
+  maxElectricityCost: number;
+  maxOperatingCost: number;
+  minReliability: number;
+  lastReport: OfflinePolicyReport | null;
+}
+
+export interface CareerState {
+  schedule: EveningSchedule;
+  savings: number;
+  electricityCostsIncurred: number;
+  operatingCostsIncurred: number;
+  costsPaid: number;
+  unpaidCosts: number;
+  freelanceHours: number;
+  freelanceGross: number;
+  competition: CompetitionProgress;
+  product: ProductProgress;
+  unlockedModelTierIds: readonly string[];
+  activeModelTierId: string;
+  quantization: QuantizationProfile;
+  offlinePolicy: OfflinePolicy;
+  exitAchieved: boolean;
 }
 
 export interface PipelineSlotState {
@@ -206,6 +307,7 @@ export interface SimulationState {
   computeAllocation: number;
   memoryReserve: number;
   resources: Resources;
+  career: CareerState;
   jobs: JobState;
   lastSettlement: JobSettlement | null;
   metrics: PipelineMetrics;
@@ -239,6 +341,23 @@ export type SimulationCommand =
   | { type: "CLEAR_WAITING_TASKS" }
   | { type: "TOGGLE_PAUSE" }
   | { type: "CAPTURE_BASELINE"; label: string }
+  | { type: "SET_EVENING_ALLOCATION"; route: CareerRoute; hours: number }
+  | { type: "RUN_EVENING" }
+  | { type: "DEPOSIT_SAVINGS"; amount: number }
+  | { type: "WITHDRAW_SAVINGS"; amount: number }
+  | { type: "SELECT_LOCAL_MODEL_TIER"; modelTierId: string }
+  | { type: "SET_QUANTIZATION"; profile: QuantizationProfile }
+  | { type: "SUBMIT_COMPETITION" }
+  | { type: "RELEASE_PRODUCT" }
+  | {
+      type: "SET_OFFLINE_POLICY";
+      enabled: boolean;
+      maxHours: number;
+      maxElectricityCost: number;
+      maxOperatingCost: number;
+      minReliability: number;
+    }
+  | { type: "APPLY_OFFLINE_POLICY"; requestedHours: number }
   | { type: "RESET"; seed?: number };
 
 export type WorkerRequest = (

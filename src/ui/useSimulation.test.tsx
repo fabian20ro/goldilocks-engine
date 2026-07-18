@@ -2,14 +2,19 @@
 
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createInitialState } from "../simulation/engine";
+import { applyCommand, createInitialState } from "../simulation/engine";
 import type { WorkerRequest, WorkerResponse } from "../simulation/types";
 import { reduceWorkerRequest } from "../simulation/workerProtocol";
 import {
   resetOfflineReadinessForTest,
   setOfflineShellReady,
 } from "./offlineReadiness";
-import { persistBeforePublish, SAVE_KEY, useSimulation } from "./useSimulation";
+import {
+  OFFLINE_SAVED_AT_KEY,
+  persistBeforePublish,
+  SAVE_KEY,
+  useSimulation,
+} from "./useSimulation";
 
 class FakeWorker {
   static instances: FakeWorker[] = [];
@@ -159,6 +164,62 @@ describe("durable Worker state publication", () => {
     ).toBe("basic-cleaner");
     expect(document.documentElement.dataset.offlineReady).toBe("true");
 
+    unmount();
+  });
+
+  it("applies only the persisted bounded offline policy after a restored session", async () => {
+    const saved = applyCommand(createInitialState(2030), {
+      type: "SET_OFFLINE_POLICY",
+      enabled: true,
+      maxHours: 1,
+      maxElectricityCost: 0.1,
+      maxOperatingCost: 0.4,
+      minReliability: 0.9,
+    });
+    localStorage.setItem(SAVE_KEY, JSON.stringify(saved));
+    localStorage.setItem(OFFLINE_SAVED_AT_KEY, String(Date.now() - 3_600_000));
+
+    const { result, unmount } = renderHook(() => useSimulation());
+    const worker = FakeWorker.instances[0];
+    if (!worker) throw new Error("Expected the simulation Worker");
+    act(() => worker.emit({ type: "STATE", state: saved }));
+
+    await waitFor(() => {
+      const request = worker.requests.find(
+        (candidate) =>
+          candidate.type === "COMMAND" &&
+          candidate.command.type === "APPLY_OFFLINE_POLICY",
+      );
+      expect(request).toBeDefined();
+      if (!request || request.type !== "COMMAND")
+        throw new Error("Expected offline command");
+      expect(request.command.type).toBe("APPLY_OFFLINE_POLICY");
+      if (request.command.type !== "APPLY_OFFLINE_POLICY")
+        throw new Error("Expected offline command");
+      expect(request.command.requestedHours).toBeGreaterThanOrEqual(1);
+    });
+    const request = worker.requests.find(
+      (candidate) =>
+        candidate.type === "COMMAND" &&
+        candidate.command.type === "APPLY_OFFLINE_POLICY",
+    );
+    if (!request || request.type !== "COMMAND")
+      throw new Error("Expected offline command");
+    const advanced = reduceWorkerRequest(saved, request);
+    act(() => {
+      worker.emit({
+        type: "STATE",
+        state: advanced,
+        requestId: request.requestId,
+      });
+    });
+    await waitFor(() => {
+      expect(
+        result.current.state.career.offlinePolicy.lastReport?.appliedHours,
+      ).toBe(1);
+    });
+    expect(result.current.state.career.competition.progress).toBe(0);
+    expect(result.current.state.career.product.buildProgress).toBe(0);
     unmount();
   });
 });

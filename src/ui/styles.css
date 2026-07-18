@@ -1768,11 +1768,214 @@ h2 {
   line-height: 1.4;
 }
 
+.career-overview .concept-note {
+  border-top: 1px solid var(--line);
+}
+
+.career-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--line);
+}
+
+.career-stat-grid > div {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+  padding: 0.65rem 0.72rem;
+  background: #0e1612;
+}
+
+.career-stat-grid dt {
+  color: var(--muted);
+  font-size: 0.54rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.career-stat-grid dd {
+  overflow-wrap: anywhere;
+  color: var(--acid);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+.career-exit,
+.offline-report {
+  padding: 0.72rem 0.8rem;
+  color: #cde1d1;
+  font-size: 0.67rem;
+  line-height: 1.45;
+}
+
+.career-route-list,
+.career-model-list {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem;
+}
+
+.career-route {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 5.15rem;
+  gap: 0.65rem;
+  align-items: center;
+  min-width: 0;
+  padding: 0.68rem;
+  border: 1px solid var(--line);
+  border-radius: 0.48rem;
+  background: #0e1612;
+}
+
+.career-route > span:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 0.22rem;
+}
+
+.career-route strong {
+  font-size: 0.77rem;
+}
+
+.career-route small,
+.career-route em,
+.career-actions p,
+.career-project-grid p {
+  color: var(--muted);
+  font-size: 0.63rem;
+  font-style: normal;
+  line-height: 1.42;
+}
+
+.career-route em {
+  color: #b4c5b8;
+}
+
+.career-hours-control {
+  display: grid;
+  gap: 0.22rem;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.55rem;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.career-hours-control input,
+.savings-controls input,
+.offline-policy-form input[type="number"] {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.42rem;
+  border: 1px solid var(--line-bright);
+  border-radius: 0.38rem;
+  background: #09110d;
+  color: #fff;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.76rem;
+}
+
+.career-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  padding: 0 0.75rem 0.75rem;
+}
+
+.career-actions p {
+  grid-column: 1 / -1;
+}
+
+.career-project-grid {
+  display: grid;
+  gap: 1px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--line);
+}
+
+.career-project-grid article {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.78rem;
+  background: #0e1612;
+}
+
+.career-project-grid article > strong {
+  color: #e8f0ea;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+  line-height: 1.42;
+}
+
+.career-project-grid .secondary-action {
+  width: 100%;
+  margin-top: 0.15rem;
+}
+
+.savings-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  padding: 0.75rem;
+}
+
+.savings-controls label,
+.offline-policy-form label {
+  display: grid;
+  gap: 0.32rem;
+  color: var(--muted);
+  font-size: 0.62rem;
+}
+
+.savings-controls .secondary-action {
+  min-height: 2.75rem;
+  align-self: end;
+}
+
+.quantization-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  padding: 0 0.75rem 0.75rem;
+}
+
+.quantization-controls button {
+  min-height: 3.25rem;
+  font-size: 0.62rem;
+}
+
+.offline-policy-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  padding: 0.75rem;
+}
+
+.offline-policy-form .policy-toggle {
+  grid-column: 1 / -1;
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.5rem;
+  color: #d8e6db;
+}
+
+.offline-policy-form .policy-toggle input {
+  width: 1.2rem;
+  height: 1.2rem;
+  accent-color: var(--acid);
+}
+
 .bottom-nav {
   position: relative;
   z-index: 20;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   padding: 0.4rem max(0.4rem, env(safe-area-inset-right))
     max(0.4rem, env(safe-area-inset-bottom))
     max(0.4rem, env(safe-area-inset-left));
@@ -1993,7 +2196,24 @@ h2 {
 
   .job-actions,
   .pressure-grid,
-  .money-loop-copy {
+  .money-loop-copy,
+  .career-actions,
+  .savings-controls,
+  .offline-policy-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .career-route {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .career-hours-control {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    text-align: left;
+  }
+
+  .career-stat-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -2046,7 +2266,7 @@ h2 {
   }
 
   .bottom-nav {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
   .stat-grid {

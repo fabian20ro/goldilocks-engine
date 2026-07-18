@@ -300,7 +300,7 @@ describe("deterministic simulation engine", () => {
     delete legacy.ownedModuleIds;
     delete legacy.lastUpgradeNotice;
     const migrated = restoreSimulationState(legacy);
-    expect(migrated.schemaVersion).toBe(5);
+    expect(migrated.schemaVersion).toBe(6);
     expect(migrated.hardwareId).toBe("used-gpu");
     expect(migrated.ownedHardwareIds).toEqual(["bedroom-cpu", "used-gpu"]);
     expect(migrated.ownedModuleIds).toEqual(
@@ -332,7 +332,7 @@ describe("deterministic simulation engine", () => {
   it("checks full snapshot integrity and safely reseals valid local recovery", () => {
     const initial = createInitialState(41);
     expect(initial.migration).toEqual({
-      sourceSchemaVersion: 5,
+      sourceSchemaVersion: 6,
       steps: [],
     });
     expect(initial.integrity.algorithm).toBe("fnv1a-32-json-v1");
@@ -423,7 +423,7 @@ describe("deterministic simulation engine", () => {
       },
     });
     expect(repairedMetadata.migration.steps).toEqual([
-      "schema-v4-metadata-added",
+      "schema-v6-metadata-added",
       "integrity-resealed",
     ]);
     expect(isStateValid(repairedMetadata)).toBe(true);
@@ -885,7 +885,7 @@ describe("deterministic simulation engine", () => {
     delete jobs.waitingTasks;
     delete jobs.nextTaskSequence;
     const migrated = restoreSimulationState(legacy, 97);
-    expect(migrated.schemaVersion).toBe(5);
+    expect(migrated.schemaVersion).toBe(6);
     expect(migrated.jobs.queued).toBe(3);
     expect(migrated.jobs.waitingTasks).toHaveLength(3);
     expect(
@@ -895,10 +895,182 @@ describe("deterministic simulation engine", () => {
           task.lockedGrossQuote === 1.4,
       ),
     ).toBe(true);
-    expect(migrated.migration.steps).toContain(
-      "schema-4-to-5-task-market-expansion",
-    );
+    expect(migrated.migration.steps).toContain("schema-4-to-6-bedroom-career");
     expect(isStateValid(migrated)).toBe(true);
+  });
+
+  it("migrates deployed schema-v5 saves into the bounded Bedroom Career loop", () => {
+    const source = applyCommand(createInitialState(191), {
+      type: "QUEUE_JOBS",
+      count: 2,
+    });
+    const legacy = JSON.parse(JSON.stringify(source)) as Record<
+      string,
+      unknown
+    >;
+    legacy.schemaVersion = 5;
+    legacy.contentVersion = "pipeline-toy-4";
+    legacy.migration = { sourceSchemaVersion: 5, steps: [] };
+    delete legacy.career;
+
+    const migrated = restoreSimulationState(legacy, 191);
+
+    expect(migrated.schemaVersion).toBe(6);
+    expect(migrated.jobs.queued).toBe(2);
+    expect(migrated.career.schedule.hoursAvailable).toBe(4);
+    expect(migrated.career.savings).toBe(3);
+    expect(migrated.career.unlockedModelTierIds).toEqual(["lantern-3b"]);
+    expect(migrated.migration.steps).toContain("schema-5-to-6-bedroom-career");
+    expect(isStateValid(migrated)).toBe(true);
+  });
+
+  it("uses finite evening allocations with visible cash, electricity, and opportunity costs", () => {
+    const initial = createInitialState(192);
+    const waited = tick(initial, 60);
+    const rejected = applyCommand(initial, { type: "RUN_EVENING" });
+
+    expect(waited.career).toEqual(initial.career);
+    expect(rejected.career.schedule.day).toBe(1);
+    expect(rejected.resources.money).toBe(initial.resources.money);
+    expect(rejected.ledger.at(-1)?.message).toMatch(/never creates career/i);
+
+    let scheduled = applyCommand(initial, {
+      type: "SET_EVENING_ALLOCATION",
+      route: "freelance",
+      hours: 3,
+    });
+    const overbooked = applyCommand(scheduled, {
+      type: "SET_EVENING_ALLOCATION",
+      route: "competition",
+      hours: 2,
+    });
+    expect(overbooked.career.schedule.allocations.competition).toBe(0);
+    expect(overbooked.ledger.at(-1)?.message).toMatch(/overbooked/i);
+
+    scheduled = applyCommand(scheduled, {
+      type: "SET_EVENING_ALLOCATION",
+      route: "competition",
+      hours: 1,
+    });
+    const completed = applyCommand(scheduled, { type: "RUN_EVENING" });
+    expect(completed.career.schedule.day).toBe(2);
+    expect(completed.career.schedule.completedEvenings).toBe(1);
+    expect(completed.career.schedule.hoursRemaining).toBe(4);
+    expect(completed.career.freelanceHours).toBe(3);
+    expect(completed.career.competition.progress).toBeGreaterThan(0);
+    expect(completed.career.product.buildProgress).toBe(0);
+    expect(completed.career.electricityCostsIncurred).toBeGreaterThan(0);
+    expect(completed.career.operatingCostsIncurred).toBeGreaterThan(0);
+    expect(isStateValid(completed)).toBe(true);
+  });
+
+  it("keeps freelance, competition, and product funding mechanically distinct", () => {
+    const evening = (route: "freelance" | "competition" | "product") => {
+      let state = createInitialState(193);
+      state = applyCommand(state, {
+        type: "SET_EVENING_ALLOCATION",
+        route,
+        hours: 4,
+      });
+      return applyCommand(state, { type: "RUN_EVENING" });
+    };
+    const freelance = evening("freelance");
+    const competition = evening("competition");
+    let product = evening("product");
+    product = applyCommand(product, {
+      type: "SET_EVENING_ALLOCATION",
+      route: "product",
+      hours: 4,
+    });
+    product = applyCommand(product, { type: "RUN_EVENING" });
+    product = applyCommand(product, { type: "RELEASE_PRODUCT" });
+    product = applyCommand(product, {
+      type: "SET_EVENING_ALLOCATION",
+      route: "product",
+      hours: 4,
+    });
+    product = applyCommand(product, { type: "RUN_EVENING" });
+
+    expect(freelance.resources.money).toBeGreaterThan(0);
+    expect(freelance.career.competition.progress).toBe(0);
+    expect(freelance.career.product.buildProgress).toBe(0);
+    expect(competition.career.competition.progress).toBeGreaterThan(0);
+    expect(competition.career.freelanceGross).toBe(0);
+    expect(competition.resources.money).toBe(0);
+    expect(product.career.product.released).toBe(true);
+    expect(product.career.product.lifetimeRevenue).toBeGreaterThan(0);
+    expect(product.career.competition.progress).toBe(0);
+    expect(isStateValid(product)).toBe(true);
+  });
+
+  it("unlocks durable local tiers and makes quantization a real model tradeoff", () => {
+    let state = createInitialState(194);
+    for (let index = 0; index < 2; index += 1) {
+      state = applyCommand(state, {
+        type: "SET_EVENING_ALLOCATION",
+        route: "competition",
+        hours: 4,
+      });
+      state = applyCommand(state, { type: "RUN_EVENING" });
+    }
+    state = applyCommand(state, { type: "SUBMIT_COMPETITION" });
+    expect(state.career.unlockedModelTierIds).toContain("harbor-7b");
+
+    const harbor = applyCommand(state, {
+      type: "SELECT_LOCAL_MODEL_TIER",
+      modelTierId: "harbor-7b",
+    });
+    const q8 = applyCommand(harbor, {
+      type: "SET_QUANTIZATION",
+      profile: "q8",
+    });
+    expect(q8.metrics.predictedQuality).toBeGreaterThan(
+      state.metrics.predictedQuality,
+    );
+    expect(q8.metrics.memoryUsed).toBeGreaterThan(state.metrics.memoryUsed);
+    expect(q8.metrics.throughputPerMinute).toBeLessThan(
+      state.metrics.throughputPerMinute,
+    );
+    expect(isStateValid(q8)).toBe(true);
+  });
+
+  it("bounds safe offline policy to self-financing freelance and preserves recovery", () => {
+    let state = createInitialState(195);
+    state = applyCommand(state, {
+      type: "SET_OFFLINE_POLICY",
+      enabled: true,
+      maxHours: 1,
+      maxElectricityCost: 0.1,
+      maxOperatingCost: 0.4,
+      minReliability: 0.9,
+    });
+    const applied = applyCommand(state, {
+      type: "APPLY_OFFLINE_POLICY",
+      requestedHours: 24,
+    });
+    expect(applied.career.offlinePolicy.lastReport?.appliedHours).toBe(1);
+    expect(applied.career.freelanceHours).toBe(1);
+    expect(applied.career.competition.progress).toBe(0);
+    expect(applied.career.product.buildProgress).toBe(0);
+    expect(applied.career.product.released).toBe(false);
+    expect(
+      applied.career.offlinePolicy.lastReport?.configuredCost,
+    ).toBeLessThanOrEqual(0.5);
+
+    const unsafePipeline = applyCommand(applied, {
+      type: "REMOVE_MODULE",
+      slotId: "runtime",
+    });
+    const recovered = applyCommand(unsafePipeline, {
+      type: "APPLY_OFFLINE_POLICY",
+      requestedHours: 1,
+    });
+    expect(recovered.career.freelanceHours).toBe(applied.career.freelanceHours);
+    expect(recovered.career.offlinePolicy.lastReport?.appliedHours).toBe(0);
+    expect(recovered.career.offlinePolicy.lastReport?.stoppedReason).toMatch(
+      /(pipeline safety|reliability)/i,
+    );
+    expect(isStateValid(recovered)).toBe(true);
   });
 
   it("keeps bounded ledger event identifiers unique", () => {

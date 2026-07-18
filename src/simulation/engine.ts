@@ -1,13 +1,17 @@
 import {
+  bedroomCareerRoutes,
   findHardware,
+  findLocalModelTier,
   findModule,
   findPipelineExpansion,
   findSlot,
   findWorkload,
   getHardware,
+  getLocalModelTier,
   getModule,
   getWorkload,
   hardware,
+  localModelTiers,
   modules,
   pipelineExpansions,
   slots,
@@ -22,10 +26,13 @@ import {
   SAVE_INTEGRITY_ALGORITHM,
   SCHEMA_VERSION,
   type LedgerEvent,
+  type CareerRoute,
+  type CareerState,
   type MigrationMetadata,
   type PipelineMetrics,
   type PipelineSlotState,
   type QueuedTask,
+  type QuantizationProfile,
   type SaveIntegrity,
   type SimulationCommand,
   type SimulationState,
@@ -38,6 +45,17 @@ import { currencyDisplayPrecision, formatCurrencyMagnitude } from "./currency";
 const MAX_LEDGER_EVENTS = 80;
 const MAX_QUEUED_TASKS = 99;
 const FIXED_TICK_SECONDS = 0.5;
+const EVENING_HOURS = 4;
+const ELECTRICITY_RATE = 0.24;
+const CAREER_HOUR_INCREMENT = 0.25;
+const CAREER_ROUTES: readonly CareerRoute[] = [
+  "freelance",
+  "competition",
+  "product",
+  "maintenance",
+];
+const QUANTIZATION_PROFILES: readonly QuantizationProfile[] = ["q4", "q8"];
+const MAX_OFFLINE_HOURS = 4;
 export const SIMULATION_TIME_SCALE = 70;
 
 export function getSimulationAgeHours(
@@ -79,6 +97,17 @@ export function isRuntimeSimulationCommand(command: unknown): boolean {
     seed?: unknown;
     label?: unknown;
     active?: unknown;
+    amount?: unknown;
+    hours?: unknown;
+    route?: unknown;
+    modelTierId?: unknown;
+    profile?: unknown;
+    enabled?: unknown;
+    maxHours?: unknown;
+    maxElectricityCost?: unknown;
+    maxOperatingCost?: unknown;
+    minReliability?: unknown;
+    requestedHours?: unknown;
   };
 
   switch (input.type) {
@@ -91,6 +120,30 @@ export function isRuntimeSimulationCommand(command: unknown): boolean {
       return input.seed === undefined || isFiniteNumber(input.seed);
     case "CAPTURE_BASELINE":
       return typeof input.label === "string";
+    case "SET_EVENING_ALLOCATION":
+      return (
+        CAREER_ROUTES.includes(input.route as CareerRoute) &&
+        isFiniteNumber(input.hours)
+      );
+    case "DEPOSIT_SAVINGS":
+    case "WITHDRAW_SAVINGS":
+      return isFiniteNumber(input.amount);
+    case "SELECT_LOCAL_MODEL_TIER":
+      return typeof input.modelTierId === "string";
+    case "SET_QUANTIZATION":
+      return QUANTIZATION_PROFILES.includes(
+        input.profile as QuantizationProfile,
+      );
+    case "SET_OFFLINE_POLICY":
+      return (
+        typeof input.enabled === "boolean" &&
+        isFiniteNumber(input.maxHours) &&
+        isFiniteNumber(input.maxElectricityCost) &&
+        isFiniteNumber(input.maxOperatingCost) &&
+        isFiniteNumber(input.minReliability)
+      );
+    case "APPLY_OFFLINE_POLICY":
+      return isFiniteNumber(input.requestedHours);
     case "SET_EXPANSION_ACTIVE":
       return typeof input.active === "boolean";
     case "PLACE_MODULE":
@@ -103,6 +156,9 @@ export function isRuntimeSimulationCommand(command: unknown): boolean {
     case "TOGGLE_BRANCH":
     case "CLEAR_WAITING_TASKS":
     case "TOGGLE_PAUSE":
+    case "RUN_EVENING":
+    case "SUBMIT_COMPETITION":
+    case "RELEASE_PRODUCT":
       return true;
     default:
       return false;
@@ -186,7 +242,8 @@ export function calculateMetrics(
     | "memoryReserve"
     | "branchEnabled"
     | "rngState"
-  >,
+  > &
+    Partial<Pick<SimulationState, "career">>,
 ): PipelineMetrics {
   const selectedSlots = state.slots.flatMap((slot) =>
     slot.moduleId ? [{ slot, module: getModule(slot.moduleId) }] : [],
@@ -194,15 +251,32 @@ export function calculateMetrics(
   const selectedModules = selectedSlots.map((entry) => entry.module);
   const selectedHardware = getHardware(state.hardwareId);
   const workload = getWorkload(state.workloadId);
+  const activeTier =
+    findLocalModelTier(state.career?.activeModelTierId) ?? localModelTiers[0]!;
+  const quantization = state.career?.quantization ?? "q4";
+  const quantizationMemoryMultiplier = quantization === "q8" ? 1.28 : 1;
+  const quantizationThroughputMultiplier = quantization === "q8" ? 0.86 : 1;
+  const quantizationQualityBonus = quantization === "q8" ? 3 : 0;
+  const quantizationReliabilityBonus = quantization === "q8" ? 0.003 : 0;
+  const tunedMemory = (item: (typeof selectedModules)[number]) =>
+    item.memory *
+    (item.role === "model"
+      ? activeTier.memoryMultiplier * quantizationMemoryMultiplier
+      : 1);
+  const tunedThroughput = (item: (typeof selectedModules)[number]) =>
+    item.throughput *
+    (item.role === "model"
+      ? activeTier.throughputMultiplier * quantizationThroughputMultiplier
+      : 1);
   const allocation = clamp(state.computeAllocation, 25, 100) / 100;
   const usableMemory =
     selectedHardware.memory * (1 - clamp(state.memoryReserve, 0, 30) / 100);
   const memoryUsed =
     workload.memoryDemand +
-    selectedModules.reduce((total, item) => total + item.memory, 0);
+    selectedModules.reduce((total, item) => total + tunedMemory(item), 0);
   const memoryPressure = memoryUsed / Math.max(usableMemory, 0.1);
   const moduleThroughput = Math.min(
-    ...selectedModules.map((item) => item.throughput),
+    ...selectedModules.map((item) => tunedThroughput(item)),
   );
   const computeThroughput =
     (selectedHardware.compute * allocation * 10) / workload.computeDemand;
@@ -240,11 +314,15 @@ export function calculateMetrics(
     (total, item) => total + item.quality,
     0,
   );
+  const modelStageCount = selectedModules.filter(
+    (item) => item.role === "model",
+  ).length;
   const qualityPenalty =
     Math.max(0, memoryPressure - 1) * 18 + orderWarnings.length * 9;
   const predictedQuality = clamp(
     workload.baseQuality +
       moduleQuality +
+      modelStageCount * (activeTier.qualityBonus + quantizationQualityBonus) +
       (state.branchEnabled ? 3 : 0) -
       qualityPenalty,
     0,
@@ -264,7 +342,9 @@ export function calculateMetrics(
         moduleReliability *
           selectedHardware.reliability *
           orderFactor *
-          (memoryPressure > 1 ? 1 / memoryPressure : 1),
+          (memoryPressure > 1 ? 1 / memoryPressure : 1) +
+          activeTier.reliabilityBonus +
+          quantizationReliabilityBonus,
         0.01,
         0.999,
       )
@@ -382,6 +462,407 @@ function recalculate(state: SimulationState): SimulationState {
   else if (metrics.evaluationCoverage < 0.4)
     lastWarning = "Evaluation blind spots widen observed uncertainty.";
   return { ...state, metrics, lastWarning };
+}
+
+function emptyEveningAllocations(): Record<CareerRoute, number> {
+  return {
+    freelance: 0,
+    competition: 0,
+    product: 0,
+    maintenance: 0,
+  };
+}
+
+function createInitialCareerState(): CareerState {
+  return {
+    schedule: {
+      day: 1,
+      hoursAvailable: EVENING_HOURS,
+      hoursRemaining: EVENING_HOURS,
+      allocations: emptyEveningAllocations(),
+      completedEvenings: 0,
+    },
+    // A small emergency reserve makes the initial laptop-and-power constraints
+    // concrete without changing the pre-existing pipeline cash balance.
+    savings: 3,
+    electricityCostsIncurred: 0,
+    operatingCostsIncurred: 0,
+    costsPaid: 0,
+    unpaidCosts: 0,
+    freelanceHours: 0,
+    freelanceGross: 0,
+    competition: {
+      id: "bedroom-benchmark-cup",
+      name: "Bedroom Benchmark Cup",
+      progress: 0,
+      submissions: 0,
+      bestScore: 0,
+      overfitRisk: 0,
+      prizeClaimed: false,
+      lifetimePrizeMoney: 0,
+    },
+    product: {
+      id: "deskflow-local",
+      name: "Deskflow Local",
+      buildProgress: 0,
+      released: false,
+      releases: 0,
+      serviceDebt: 0,
+      lifetimeRevenue: 0,
+      maintenanceHours: 0,
+    },
+    unlockedModelTierIds: [localModelTiers[0]!.id],
+    activeModelTierId: localModelTiers[0]!.id,
+    quantization: "q4",
+    offlinePolicy: {
+      enabled: false,
+      route: "freelance",
+      maxHours: 1,
+      maxElectricityCost: 0.1,
+      maxOperatingCost: 0.4,
+      minReliability: 0.9,
+      lastReport: null,
+    },
+    exitAchieved: false,
+  };
+}
+
+function isTierEligible(career: CareerState, tierId: string): boolean {
+  switch (tierId) {
+    case "lantern-3b":
+      return true;
+    case "harbor-7b":
+      return (
+        career.savings >= 8 ||
+        career.competition.submissions >= 1 ||
+        career.product.released
+      );
+    case "kiln-13b":
+      return (
+        career.savings >= 18 &&
+        (career.competition.prizeClaimed || career.product.lifetimeRevenue >= 8)
+      );
+    default:
+      return false;
+  }
+}
+
+export function localModelTierUnlockProgress(
+  state: Pick<SimulationState, "career">,
+  tierId: string,
+): { unlocked: boolean; requirement: string } {
+  const tier = getLocalModelTier(tierId);
+  return {
+    unlocked: state.career.unlockedModelTierIds.includes(tier.id),
+    requirement: tier.unlockDescription,
+  };
+}
+
+function careerExitSatisfied(career: CareerState): boolean {
+  return (
+    career.savings >= 24 &&
+    career.competition.submissions >= 1 &&
+    career.product.released &&
+    career.unlockedModelTierIds.includes("kiln-13b")
+  );
+}
+
+function refreshCareerUnlocks(state: SimulationState): SimulationState {
+  let next = state;
+  for (const tier of localModelTiers) {
+    if (next.career.unlockedModelTierIds.includes(tier.id)) continue;
+    if (!isTierEligible(next.career, tier.id)) continue;
+    next = appendEvent(
+      {
+        ...next,
+        career: {
+          ...next.career,
+          unlockedModelTierIds: [...next.career.unlockedModelTierIds, tier.id],
+        },
+      },
+      {
+        kind: "success",
+        message: `${tier.name} unlocked. Its durable local-model tradeoff is now selectable in Career.`,
+      },
+    );
+  }
+  if (!next.career.exitAchieved && careerExitSatisfied(next.career)) {
+    next = appendEvent(
+      {
+        ...next,
+        career: { ...next.career, exitAchieved: true },
+      },
+      {
+        kind: "success",
+        message:
+          "Bedroom Developer exit reached: $24 durable savings, a submitted competition entry, a released local product, and the Kiln 13B tier are in place.",
+      },
+    );
+  }
+  return next;
+}
+
+function scheduledHours(career: CareerState): number {
+  return CAREER_ROUTES.reduce(
+    (total, route) => total + career.schedule.allocations[route],
+    0,
+  );
+}
+
+function isQuarterHour(value: number): boolean {
+  return (
+    Math.abs(
+      value / CAREER_HOUR_INCREMENT - Math.round(value / CAREER_HOUR_INCREMENT),
+    ) < 0.000_001
+  );
+}
+
+function careerRouteMetrics(
+  state: SimulationState,
+  route: CareerRoute,
+): PipelineMetrics {
+  const spec = bedroomCareerRoutes.find((item) => item.id === route);
+  if (!spec) return state.metrics;
+  return calculateMetrics({ ...state, workloadId: spec.workloadId });
+}
+
+function careerCosts(
+  state: SimulationState,
+  metrics: PipelineMetrics,
+  hours: number,
+): { operatingCost: number; electricityCost: number; electricityKwh: number } {
+  const tier = getLocalModelTier(state.career.activeModelTierId);
+  const watts =
+    getHardware(state.hardwareId).watts * (state.computeAllocation / 100);
+  const electricityKwh = round((watts * hours) / 1000, 4);
+  return {
+    operatingCost: round(
+      hours * (metrics.operatingCost * 1.5 + tier.operatingCostPerHour),
+      3,
+    ),
+    electricityCost: round(electricityKwh * ELECTRICITY_RATE, 3),
+    electricityKwh,
+  };
+}
+
+function settleCareerAccounting(
+  state: SimulationState,
+  gross: number,
+  operatingCost: number,
+  electricityCost: number,
+): SimulationState {
+  const configuredCost = round(operatingCost + electricityCost, 3);
+  const due = round(state.career.unpaidCosts + configuredCost, 3);
+  const available = round(state.resources.money + gross, 3);
+  const paid = round(Math.min(available, due), 3);
+  return {
+    ...state,
+    resources: {
+      ...state.resources,
+      money: round(Math.max(0, available - due), 3),
+    },
+    career: {
+      ...state.career,
+      electricityCostsIncurred: round(
+        state.career.electricityCostsIncurred + electricityCost,
+        3,
+      ),
+      operatingCostsIncurred: round(
+        state.career.operatingCostsIncurred + operatingCost,
+        3,
+      ),
+      costsPaid: round(state.career.costsPaid + paid, 3),
+      unpaidCosts: round(Math.max(0, due - paid), 3),
+    },
+  };
+}
+
+function freelanceGross(metrics: PipelineMetrics, hours: number): number {
+  if (
+    metrics.memoryPressure > 1 ||
+    metrics.orderWarnings.includes("no model stage") ||
+    metrics.reliability < 0.72
+  )
+    return 0;
+  const qualityFactor = clamp(metrics.predictedQuality / 55, 0.55, 1.65);
+  const latencyFactor = clamp(1.35 - metrics.latencySeconds / 12, 0.45, 1.2);
+  return round(
+    hours *
+      (1.15 + qualityFactor * 0.85 + latencyFactor * 0.35) *
+      metrics.reliability,
+    3,
+  );
+}
+
+interface CareerRouteResult {
+  state: SimulationState;
+  gross: number;
+  operatingCost: number;
+  electricityCost: number;
+  electricityKwh: number;
+}
+
+function runCareerRoute(
+  state: SimulationState,
+  route: CareerRoute,
+  hours: number,
+): CareerRouteResult {
+  const metrics = careerRouteMetrics(state, route);
+  const costs = careerCosts(state, metrics, hours);
+  let gross = 0;
+  let next = state;
+  const usable =
+    metrics.memoryPressure <= 1 &&
+    !metrics.orderWarnings.includes("no model stage");
+
+  switch (route) {
+    case "freelance":
+      gross = freelanceGross(metrics, hours);
+      next = {
+        ...next,
+        career: {
+          ...next.career,
+          freelanceHours: round(next.career.freelanceHours + hours, 2),
+          freelanceGross: round(next.career.freelanceGross + gross, 3),
+        },
+      };
+      break;
+    case "competition": {
+      const progressRate = usable
+        ? clamp(
+            0.45 +
+              metrics.predictedQuality / 100 +
+              metrics.evaluationCoverage * 0.35,
+            0.4,
+            1.65,
+          )
+        : 0;
+      const risk = usable
+        ? hours * clamp(0.72 - metrics.evaluationCoverage, 0, 0.72) * 0.14
+        : 0;
+      next = {
+        ...next,
+        career: {
+          ...next.career,
+          competition: {
+            ...next.career.competition,
+            progress: round(
+              next.career.competition.progress + hours * progressRate,
+              3,
+            ),
+            overfitRisk: round(
+              clamp(next.career.competition.overfitRisk + risk, 0, 8),
+              3,
+            ),
+          },
+        },
+      };
+      break;
+    }
+    case "product": {
+      if (!next.career.product.released) {
+        const buildRate = usable
+          ? clamp(0.5 + metrics.predictedQuality / 105, 0.35, 1.5)
+          : 0;
+        next = {
+          ...next,
+          career: {
+            ...next.career,
+            product: {
+              ...next.career.product,
+              buildProgress: round(
+                next.career.product.buildProgress + hours * buildRate,
+                3,
+              ),
+            },
+          },
+        };
+      } else {
+        const debtFactor = clamp(
+          1 - next.career.product.serviceDebt / 20,
+          0.25,
+          1,
+        );
+        const serviceFactor = usable
+          ? clamp(
+              metrics.reliability * (metrics.predictedQuality / 60),
+              0.35,
+              1.55,
+            )
+          : 0;
+        gross = round(hours * (1.25 + serviceFactor * 0.95) * debtFactor, 3);
+        const debtAdded = usable
+          ? hours * clamp((0.965 - metrics.reliability) * 9 + 0.08, 0.08, 1.1)
+          : hours;
+        next = {
+          ...next,
+          career: {
+            ...next.career,
+            product: {
+              ...next.career.product,
+              serviceDebt: round(
+                clamp(next.career.product.serviceDebt + debtAdded, 0, 20),
+                3,
+              ),
+              lifetimeRevenue: round(
+                next.career.product.lifetimeRevenue + gross,
+                3,
+              ),
+            },
+          },
+        };
+      }
+      break;
+    }
+    case "maintenance": {
+      const repair = usable
+        ? hours * (1.5 + metrics.evaluationCoverage * 2.5)
+        : 0;
+      next = {
+        ...next,
+        career: {
+          ...next.career,
+          product: {
+            ...next.career.product,
+            serviceDebt: round(
+              Math.max(0, next.career.product.serviceDebt - repair),
+              3,
+            ),
+            maintenanceHours: round(
+              next.career.product.maintenanceHours + hours,
+              2,
+            ),
+          },
+        },
+      };
+      break;
+    }
+  }
+
+  next = settleCareerAccounting(
+    next,
+    gross,
+    costs.operatingCost,
+    costs.electricityCost,
+  );
+  next = {
+    ...next,
+    resources: {
+      ...next.resources,
+      electricityKwh: round(
+        next.resources.electricityKwh + costs.electricityKwh,
+        4,
+      ),
+    },
+  };
+  const totalCost = round(costs.operatingCost + costs.electricityCost, 3);
+  const routeName =
+    bedroomCareerRoutes.find((item) => item.id === route)?.name ?? route;
+  next = appendEvent(next, {
+    kind: gross > 0 || route !== "freelance" ? "info" : "warning",
+    message: `${routeName}: ${hours.toFixed(2)}h allocated; $${gross.toFixed(3)} gross, $${totalCost.toFixed(3)} configured operating + electricity cost, $${next.career.unpaidCosts.toFixed(3)} career cost still unpaid.`,
+  });
+  return { ...costs, state: next, gross };
 }
 
 function demandFor(
@@ -579,6 +1060,7 @@ export function createInitialState(seed = 20260715): SimulationState {
     computeAllocation: 80,
     memoryReserve: 10,
     resources: { money: 0, timeHours: 4, electricityKwh: 0, reputation: 0 },
+    career: createInitialCareerState(),
     jobs: {
       queued: 0,
       completed: 0,
@@ -1034,6 +1516,398 @@ function applyValidCommand(
             : "Processing paused; queued work retained.",
         },
       );
+    case "SET_EVENING_ALLOCATION": {
+      if (
+        command.hours < 0 ||
+        command.hours > EVENING_HOURS ||
+        !isQuarterHour(command.hours)
+      )
+        return appendEvent(state, {
+          kind: "warning",
+          message:
+            "Evening allocation rejected: use a finite 0.25-hour increment between 0 and 4.",
+        });
+      const allocations = state.career.schedule.allocations;
+      const otherHours = CAREER_ROUTES.reduce(
+        (total, route) =>
+          total + (route === command.route ? 0 : allocations[route]),
+        0,
+      );
+      if (otherHours + command.hours > EVENING_HOURS + 0.000_001)
+        return appendEvent(state, {
+          kind: "warning",
+          message:
+            "Evening allocation rejected: the four-hour after-work window cannot be overbooked.",
+        });
+      const nextAllocations = {
+        ...allocations,
+        [command.route]: command.hours,
+      };
+      const total = round(otherHours + command.hours, 2);
+      return appendEvent(
+        {
+          ...state,
+          career: {
+            ...state.career,
+            schedule: {
+              ...state.career.schedule,
+              allocations: nextAllocations,
+              hoursRemaining: round(EVENING_HOURS - total, 2),
+            },
+          },
+        },
+        {
+          kind: "info",
+          message: `${command.hours.toFixed(2)}h scheduled for ${bedroomCareerRoutes.find((route) => route.id === command.route)?.name ?? command.route}. ${Math.max(0, EVENING_HOURS - total).toFixed(2)}h remains unallocated tonight.`,
+        },
+      );
+    }
+    case "RUN_EVENING": {
+      const planned = CAREER_ROUTES.filter(
+        (route) => state.career.schedule.allocations[route] > 0,
+      );
+      if (planned.length === 0)
+        return appendEvent(state, {
+          kind: "warning",
+          message:
+            "No evening was run: schedule at least 0.25h of real work. Advancing time alone never creates career money or progress.",
+        });
+      let next = state;
+      for (const route of planned) {
+        next = runCareerRoute(
+          next,
+          route,
+          next.career.schedule.allocations[route],
+        ).state;
+      }
+      const usedHours = scheduledHours(next.career);
+      next = {
+        ...next,
+        career: {
+          ...next.career,
+          schedule: {
+            day: next.career.schedule.day + 1,
+            hoursAvailable: EVENING_HOURS,
+            hoursRemaining: EVENING_HOURS,
+            allocations: emptyEveningAllocations(),
+            completedEvenings: next.career.schedule.completedEvenings + 1,
+          },
+        },
+      };
+      return appendEvent(next, {
+        kind: "info",
+        message: `Evening ${state.career.schedule.day} closed after ${usedHours.toFixed(2)}h of allocated work. Tomorrow has a fresh four-hour window; unused time produced no money or progress.`,
+      });
+    }
+    case "DEPOSIT_SAVINGS": {
+      if (command.amount <= 0 || command.amount > state.resources.money)
+        return appendEvent(state, {
+          kind: "warning",
+          message:
+            "Savings deposit rejected: move only available liquid money; unpaid costs are never hidden by a deposit.",
+        });
+      return appendEvent(
+        {
+          ...state,
+          resources: {
+            ...state.resources,
+            money: round(state.resources.money - command.amount, 3),
+          },
+          career: {
+            ...state.career,
+            savings: round(state.career.savings + command.amount, 3),
+          },
+        },
+        {
+          kind: "success",
+          message: `$${command.amount.toFixed(3)} moved into durable savings. It is no longer available for immediate pipeline purchases or operating costs.`,
+        },
+      );
+    }
+    case "WITHDRAW_SAVINGS": {
+      if (command.amount <= 0 || command.amount > state.career.savings)
+        return appendEvent(state, {
+          kind: "warning",
+          message:
+            "Savings withdrawal rejected: the requested amount exceeds the durable reserve.",
+        });
+      return appendEvent(
+        {
+          ...state,
+          resources: {
+            ...state.resources,
+            money: round(state.resources.money + command.amount, 3),
+          },
+          career: {
+            ...state.career,
+            savings: round(state.career.savings - command.amount, 3),
+          },
+        },
+        {
+          kind: "info",
+          message: `$${command.amount.toFixed(3)} withdrawn from durable savings to liquid operating cash.`,
+        },
+      );
+    }
+    case "SELECT_LOCAL_MODEL_TIER": {
+      const tier = findLocalModelTier(command.modelTierId);
+      if (!tier || !state.career.unlockedModelTierIds.includes(tier.id))
+        return appendEvent(state, {
+          kind: "warning",
+          message:
+            "Local model selection rejected: unlock that durable tier through the Bedroom Developer loop first.",
+        });
+      if (tier.id === state.career.activeModelTierId) return state;
+      const next = recalculate({
+        ...state,
+        career: { ...state.career, activeModelTierId: tier.id },
+        baselineMetrics: state.metrics,
+        baselineLabel: "Before local model tier change",
+      });
+      return appendEvent(next, {
+        kind: "info",
+        message: `${tier.name} selected. Its memory, throughput, quality, reliability, and nightly operating tradeoffs now apply to model stages.`,
+      });
+    }
+    case "SET_QUANTIZATION": {
+      if (command.profile === state.career.quantization) return state;
+      const next = recalculate({
+        ...state,
+        career: { ...state.career, quantization: command.profile },
+        baselineMetrics: state.metrics,
+        baselineLabel: "Before quantization change",
+      });
+      return appendEvent(next, {
+        kind: "info",
+        message:
+          command.profile === "q8"
+            ? "Q8 selected: quality and reliability improve, while model memory and throughput costs rise."
+            : "Q4 selected: the lower-memory, faster baseline quantization is active.",
+      });
+    }
+    case "SUBMIT_COMPETITION": {
+      if (state.career.competition.progress < 8)
+        return appendEvent(state, {
+          kind: "warning",
+          message: `Competition submission needs 8.00 verified progress; ${state.career.competition.progress.toFixed(2)} is ready.`,
+        });
+      const metrics = careerRouteMetrics(state, "competition");
+      const score = round(
+        clamp(
+          metrics.predictedQuality * 0.64 +
+            metrics.observedQuality * 0.22 +
+            metrics.evaluationCoverage * 14 -
+            state.career.competition.overfitRisk * 10,
+          0,
+          99,
+        ),
+        1,
+      );
+      const qualifies = score >= 45;
+      const prize =
+        qualifies && !state.career.competition.prizeClaimed ? 12 : 0;
+      let next = settleCareerAccounting(state, prize, 0, 0);
+      next = {
+        ...next,
+        resources: {
+          ...next.resources,
+          reputation: round(
+            next.resources.reputation + (qualifies ? 1.2 : 0.08),
+            3,
+          ),
+        },
+        career: {
+          ...next.career,
+          competition: {
+            ...next.career.competition,
+            progress: 0,
+            submissions: next.career.competition.submissions + 1,
+            bestScore: Math.max(next.career.competition.bestScore, score),
+            overfitRisk: round(next.career.competition.overfitRisk * 0.35, 3),
+            prizeClaimed: next.career.competition.prizeClaimed || prize > 0,
+            lifetimePrizeMoney: round(
+              next.career.competition.lifetimePrizeMoney + prize,
+              3,
+            ),
+          },
+        },
+      };
+      return appendEvent(next, {
+        kind: qualifies ? "success" : "warning",
+        message: qualifies
+          ? `Bedroom Benchmark Cup submitted at ${score.toFixed(1)}. ${prize > 0 ? "$12.000 prize paid into the same explicit cost ledger." : "The one-time prize was already claimed; this submission added technical reputation only."}`
+          : `Bedroom Benchmark Cup submitted at ${score.toFixed(1)}; the entry missed the 45.0 verified threshold. No prize was paid and no run state was destroyed.`,
+      });
+    }
+    case "RELEASE_PRODUCT": {
+      if (state.career.product.released) return state;
+      if (state.career.product.buildProgress < 8)
+        return appendEvent(state, {
+          kind: "warning",
+          message: `Deskflow Local needs 8.00 build progress before release; ${state.career.product.buildProgress.toFixed(2)} is ready.`,
+        });
+      return appendEvent(
+        {
+          ...state,
+          career: {
+            ...state.career,
+            product: {
+              ...state.career.product,
+              released: true,
+              releases: state.career.product.releases + 1,
+            },
+          },
+        },
+        {
+          kind: "success",
+          message:
+            "Deskflow Local released. Future product hours provide service revenue, while reliability debt may require maintenance time.",
+        },
+      );
+    }
+    case "SET_OFFLINE_POLICY": {
+      const maxHours = round(
+        Math.floor(
+          clamp(command.maxHours, 0, MAX_OFFLINE_HOURS) / CAREER_HOUR_INCREMENT,
+        ) * CAREER_HOUR_INCREMENT,
+        2,
+      );
+      const maxElectricityCost = round(
+        clamp(command.maxElectricityCost, 0, 5),
+        3,
+      );
+      const maxOperatingCost = round(clamp(command.maxOperatingCost, 0, 5), 3);
+      const minReliability = round(
+        clamp(command.minReliability, 0.7, 0.999),
+        3,
+      );
+      return appendEvent(
+        {
+          ...state,
+          career: {
+            ...state.career,
+            offlinePolicy: {
+              ...state.career.offlinePolicy,
+              enabled: command.enabled,
+              maxHours,
+              maxElectricityCost,
+              maxOperatingCost,
+              minReliability,
+            },
+          },
+        },
+        {
+          kind: "info",
+          message: command.enabled
+            ? `Safe offline policy enabled: freelance only, ≤${maxHours.toFixed(2)}h, ≤$${maxOperatingCost.toFixed(3)} operating and ≤$${maxElectricityCost.toFixed(3)} electricity cost, ≥${(minReliability * 100).toFixed(1)}% reliability.`
+            : "Safe offline policy disabled. No background work will be authorized.",
+        },
+      );
+    }
+    case "APPLY_OFFLINE_POLICY": {
+      const policy = state.career.offlinePolicy;
+      const report = (
+        appliedHours: number,
+        gross: number,
+        configuredCost: number,
+        stoppedReason: string,
+      ) => ({
+        ...state,
+        career: {
+          ...state.career,
+          offlinePolicy: {
+            ...state.career.offlinePolicy,
+            lastReport: {
+              requestedHours: round(Math.max(0, command.requestedHours), 2),
+              appliedHours: round(appliedHours, 2),
+              route: "freelance" as const,
+              gross: round(gross, 3),
+              configuredCost: round(configuredCost, 3),
+              stoppedReason,
+            },
+          },
+        },
+      });
+      if (!policy.enabled)
+        return appendEvent(report(0, 0, 0, "policy disabled"), {
+          kind: "info",
+          message: "Offline policy did nothing because the player disabled it.",
+        });
+      if (scheduledHours(state.career) > 0)
+        return appendEvent(report(0, 0, 0, "player schedule pending"), {
+          kind: "info",
+          message:
+            "Offline policy deferred: a player-authored evening schedule is pending and takes priority.",
+        });
+      const hours = round(
+        Math.floor(
+          Math.min(command.requestedHours, policy.maxHours, EVENING_HOURS) /
+            CAREER_HOUR_INCREMENT,
+        ) * CAREER_HOUR_INCREMENT,
+        2,
+      );
+      if (hours <= 0)
+        return appendEvent(report(0, 0, 0, "zero bounded hours"), {
+          kind: "info",
+          message:
+            "Offline policy did nothing: its bounded hour allowance is zero.",
+        });
+      const metrics = careerRouteMetrics(state, "freelance");
+      const costs = careerCosts(state, metrics, hours);
+      const gross = freelanceGross(metrics, hours);
+      const configuredCost = round(
+        costs.operatingCost + costs.electricityCost,
+        3,
+      );
+      const unsafeReason =
+        metrics.reliability < policy.minReliability
+          ? "reliability below player minimum"
+          : metrics.memoryPressure > 1 ||
+              metrics.orderWarnings.includes("no model stage")
+            ? "pipeline safety check failed"
+            : costs.electricityCost > policy.maxElectricityCost
+              ? "electricity cap reached"
+              : costs.operatingCost > policy.maxOperatingCost
+                ? "operating-cost cap reached"
+                : state.resources.money + gross <
+                    state.career.unpaidCosts + configuredCost
+                  ? "cash reserve would create unpaid cost"
+                  : null;
+      if (unsafeReason)
+        return appendEvent(report(0, 0, configuredCost, unsafeReason), {
+          kind: "warning",
+          message: `Offline policy stopped safely: ${unsafeReason}. No route progress, spending, purchase, release, or submission occurred.`,
+        });
+      let next = runCareerRoute(state, "freelance", hours).state;
+      next = {
+        ...next,
+        career: {
+          ...next.career,
+          schedule: {
+            day: next.career.schedule.day + 1,
+            hoursAvailable: EVENING_HOURS,
+            hoursRemaining: EVENING_HOURS,
+            allocations: emptyEveningAllocations(),
+            completedEvenings: next.career.schedule.completedEvenings + 1,
+          },
+          offlinePolicy: {
+            ...next.career.offlinePolicy,
+            lastReport: {
+              requestedHours: round(Math.max(0, command.requestedHours), 2),
+              appliedHours: hours,
+              route: "freelance",
+              gross,
+              configuredCost,
+              stoppedReason: "completed within player bounds",
+            },
+          },
+        },
+      };
+      return appendEvent(next, {
+        kind: "success",
+        message: `Offline policy completed ${hours.toFixed(2)}h of bounded freelance only. It did not purchase, submit, release, or alter product/competition progress.`,
+      });
+    }
     case "CAPTURE_BASELINE":
       return appendEvent(
         {
@@ -1058,7 +1932,9 @@ export function applyCommand(
   if (!isRuntimeSimulationCommand(command)) return state;
   const applied = applyValidCommand(state, command);
   if (applied === state) return state;
-  const next = sealSimulationState(refreshWorkloadUnlocks(applied));
+  const next = sealSimulationState(
+    refreshCareerUnlocks(refreshWorkloadUnlocks(applied)),
+  );
   return isStateValid(next) ? next : state;
 }
 
@@ -1352,6 +2228,109 @@ function isIntegrityShapeValid(value: unknown): value is SaveIntegrity {
   );
 }
 
+function isCareerStateValid(value: unknown): value is CareerState {
+  if (typeof value !== "object" || value === null) return false;
+  const career = value as CareerState;
+  try {
+    const schedule = career.schedule;
+    const allocations = schedule.allocations;
+    const allocationKeys = Object.keys(allocations);
+    const allocationTotal = CAREER_ROUTES.reduce(
+      (total, route) => total + allocations[route],
+      0,
+    );
+    const nonnegative = [
+      career.savings,
+      career.electricityCostsIncurred,
+      career.operatingCostsIncurred,
+      career.costsPaid,
+      career.unpaidCosts,
+      career.freelanceHours,
+      career.freelanceGross,
+      career.competition.progress,
+      career.competition.bestScore,
+      career.competition.overfitRisk,
+      career.competition.lifetimePrizeMoney,
+      career.product.buildProgress,
+      career.product.serviceDebt,
+      career.product.lifetimeRevenue,
+      career.product.maintenanceHours,
+    ];
+    const report = career.offlinePolicy.lastReport;
+    const reportValid =
+      report === null ||
+      (typeof report === "object" &&
+        report.route === "freelance" &&
+        [
+          report.requestedHours,
+          report.appliedHours,
+          report.gross,
+          report.configuredCost,
+        ].every((number) => Number.isFinite(number) && number >= 0) &&
+        report.appliedHours <= EVENING_HOURS &&
+        isText(report.stoppedReason, 160));
+    return (
+      Number.isSafeInteger(schedule.day) &&
+      schedule.day >= 1 &&
+      schedule.hoursAvailable === EVENING_HOURS &&
+      Number.isFinite(schedule.hoursRemaining) &&
+      schedule.hoursRemaining >= 0 &&
+      schedule.hoursRemaining <= EVENING_HOURS &&
+      Number.isSafeInteger(schedule.completedEvenings) &&
+      schedule.completedEvenings >= 0 &&
+      allocationKeys.length === CAREER_ROUTES.length &&
+      CAREER_ROUTES.every(
+        (route) =>
+          Number.isFinite(allocations[route]) &&
+          allocations[route] >= 0 &&
+          allocations[route] <= EVENING_HOURS &&
+          isQuarterHour(allocations[route]),
+      ) &&
+      allocationTotal <= EVENING_HOURS + 0.000_001 &&
+      Math.abs(schedule.hoursRemaining - (EVENING_HOURS - allocationTotal)) <
+        0.000_001 &&
+      nonnegative.every((number) => Number.isFinite(number) && number >= 0) &&
+      career.competition.id === "bedroom-benchmark-cup" &&
+      isText(career.competition.name, 80) &&
+      Number.isSafeInteger(career.competition.submissions) &&
+      career.competition.submissions >= 0 &&
+      typeof career.competition.prizeClaimed === "boolean" &&
+      career.product.id === "deskflow-local" &&
+      isText(career.product.name, 80) &&
+      typeof career.product.released === "boolean" &&
+      Number.isSafeInteger(career.product.releases) &&
+      career.product.releases >= 0 &&
+      Array.isArray(career.unlockedModelTierIds) &&
+      career.unlockedModelTierIds.includes(localModelTiers[0]!.id) &&
+      career.unlockedModelTierIds.every((id) => findLocalModelTier(id)) &&
+      new Set(career.unlockedModelTierIds).size ===
+        career.unlockedModelTierIds.length &&
+      career.unlockedModelTierIds.includes(career.activeModelTierId) &&
+      QUANTIZATION_PROFILES.includes(career.quantization) &&
+      typeof career.offlinePolicy.enabled === "boolean" &&
+      career.offlinePolicy.route === "freelance" &&
+      Number.isFinite(career.offlinePolicy.maxHours) &&
+      career.offlinePolicy.maxHours >= 0 &&
+      career.offlinePolicy.maxHours <= MAX_OFFLINE_HOURS &&
+      isQuarterHour(career.offlinePolicy.maxHours) &&
+      Number.isFinite(career.offlinePolicy.maxElectricityCost) &&
+      career.offlinePolicy.maxElectricityCost >= 0 &&
+      career.offlinePolicy.maxElectricityCost <= 5 &&
+      Number.isFinite(career.offlinePolicy.maxOperatingCost) &&
+      career.offlinePolicy.maxOperatingCost >= 0 &&
+      career.offlinePolicy.maxOperatingCost <= 5 &&
+      Number.isFinite(career.offlinePolicy.minReliability) &&
+      career.offlinePolicy.minReliability >= 0.7 &&
+      career.offlinePolicy.minReliability <= 0.999 &&
+      reportValid &&
+      typeof career.exitAchieved === "boolean" &&
+      (!career.exitAchieved || careerExitSatisfied(career))
+    );
+  } catch {
+    return false;
+  }
+}
+
 function areMetricsValid(value: unknown): value is PipelineMetrics {
   if (typeof value !== "object" || value === null) return false;
   const metrics = value as PipelineMetrics;
@@ -1503,6 +2482,7 @@ function isStateStructurallyValid(value: unknown): value is SimulationState {
       nonnegativeNumbers.every(
         (value) => Number.isFinite(value) && value >= 0,
       ) &&
+      isCareerStateValid(state.career) &&
       nonnegativeIntegers.every(
         (value) => Number.isSafeInteger(value) && value >= 0,
       ) &&
@@ -1653,7 +2633,7 @@ function withMigrationStep(
   };
 }
 
-/** Restores current saves or migrates schema-v3/v4 Pipeline Toy state. */
+/** Restores current saves or migrates Pipeline Toy saves into Bedroom Career. */
 export function restoreSimulationState(
   value: unknown,
   fallbackSeed = 20260715,
@@ -1666,7 +2646,7 @@ export function restoreSimulationState(
       ? record.migration
       : {
           sourceSchemaVersion: SCHEMA_VERSION,
-          steps: ["schema-v4-metadata-added"],
+          steps: ["schema-v6-metadata-added"],
         };
     const candidate = {
       ...record,
@@ -1684,6 +2664,26 @@ export function restoreSimulationState(
       recalculate({ ...candidate, migration }),
     );
     return isStateValid(restored) ? restored : fallback;
+  }
+  if (record.schemaVersion === 5) {
+    const inheritedMigration = isMigrationMetadataValid(record.migration)
+      ? record.migration
+      : { sourceSchemaVersion: 5, steps: [] };
+    const migration = withMigrationStep(
+      inheritedMigration,
+      "schema-5-to-6-bedroom-career",
+    );
+    const candidate = {
+      ...record,
+      schemaVersion: SCHEMA_VERSION,
+      contentVersion: CONTENT_VERSION,
+      migration,
+      integrity: EMPTY_INTEGRITY,
+      career: createInitialCareerState(),
+    } as unknown as SimulationState;
+    if (!isStateStructurallyValid(candidate)) return fallback;
+    const migrated = sealSimulationState(recalculate(candidate));
+    return isStateValid(migrated) ? migrated : fallback;
   }
   if (record.schemaVersion !== 3 && record.schemaVersion !== 4) return fallback;
 
@@ -1743,7 +2743,7 @@ export function restoreSimulationState(
     ...createInitialState(seed),
     migration: {
       sourceSchemaVersion: legacySchema,
-      steps: [`schema-${legacySchema}-to-5-task-market-expansion`],
+      steps: [`schema-${legacySchema}-to-6-bedroom-career`],
     },
     rngState: normalizeSeed(finiteOr(record.rngState, seed)),
     tick: Math.min(

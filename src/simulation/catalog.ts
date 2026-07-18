@@ -1,5 +1,7 @@
 import type {
+  CareerRouteSpec,
   HardwareSpec,
+  LocalModelTierSpec,
   ModuleSpec,
   PipelineExpansionSpec,
   SlotSpec,
@@ -7,6 +9,91 @@ import type {
 } from "./types";
 
 export const STARTER_HARDWARE_ID = "bedroom-cpu";
+
+/**
+ * Fictional, versioned local models. These are durable gameplay tiers rather
+ * than references to a transient vendor catalogue. They modify a model stage
+ * already installed in the one pipeline; they do not create a second pipeline.
+ */
+export const localModelTiers: readonly LocalModelTierSpec[] = [
+  {
+    id: "lantern-3b",
+    name: "Lantern 3B",
+    shortName: "L3B",
+    description:
+      "Starter local model. Q4 fits the bedroom machine and establishes the baseline.",
+    qualityBonus: 0,
+    memoryMultiplier: 1,
+    throughputMultiplier: 1,
+    reliabilityBonus: 0,
+    operatingCostPerHour: 0,
+    unlockDescription: "Starter model; always available.",
+  },
+  {
+    id: "harbor-7b",
+    name: "Harbor 7B",
+    shortName: "H7B",
+    description:
+      "A durable 7B local tier: stronger output, more memory pressure, modest nightly power draw.",
+    qualityBonus: 7,
+    memoryMultiplier: 1.32,
+    throughputMultiplier: 0.9,
+    reliabilityBonus: 0.004,
+    operatingCostPerHour: 0.08,
+    unlockDescription:
+      "Unlock with $8 saved, one competition submission, or one product release.",
+  },
+  {
+    id: "kiln-13b",
+    name: "Kiln 13B",
+    shortName: "K13B",
+    description:
+      "A durable 13B local tier: higher quality at a real memory, throughput, and operating-cost tradeoff.",
+    qualityBonus: 15,
+    memoryMultiplier: 1.9,
+    throughputMultiplier: 0.72,
+    reliabilityBonus: 0.007,
+    operatingCostPerHour: 0.18,
+    unlockDescription:
+      "Unlock with $18 saved plus either the competition prize or $8 product revenue.",
+  },
+];
+
+export const bedroomCareerRoutes: readonly CareerRouteSpec[] = [
+  {
+    id: "freelance",
+    name: "Freelance delivery",
+    description:
+      "Cash now from small local delivery work. Sensitive to latency and reliability; it does not build the product or competition record.",
+    workloadId: "interactive-chat",
+    opportunityCost:
+      "Every hour here displaces competition, product, or maintenance work.",
+  },
+  {
+    id: "competition",
+    name: "Bedroom Benchmark Cup",
+    description:
+      "One persistent competition. Build a verified score, then submit deliberately; weak evaluation raises overfit risk.",
+    workloadId: "competition-run",
+    opportunityCost: "No immediate cash while you build the entry.",
+  },
+  {
+    id: "product",
+    name: "Deskflow Local",
+    description:
+      "One persistent local utility. Initial build work earns nothing; released service hours earn durable product revenue and can create service debt.",
+    workloadId: "interactive-chat",
+    opportunityCost: "Build and service time replace direct freelance income.",
+  },
+  {
+    id: "maintenance",
+    name: "Product maintenance",
+    description:
+      "Pays down Deskflow service debt. It protects retained product income but creates no direct cash or competition progress.",
+    workloadId: "batch-classification",
+    opportunityCost: "Safety work consumes the same finite evening hours.",
+  },
+];
 
 export const starterSlots: readonly SlotSpec[] = [
   { id: "source", name: "Input", type: "source" },
@@ -568,4 +655,24 @@ export function findPipelineExpansion(
   return typeof id === "string"
     ? pipelineExpansions.find((item) => item.id === id)
     : undefined;
+}
+
+export function getLocalModelTier(id: string): LocalModelTierSpec {
+  const found = localModelTiers.find((item) => item.id === id);
+  if (!found) throw new Error(`Unknown local model tier: ${id}`);
+  return found;
+}
+
+export function findLocalModelTier(
+  id: unknown,
+): LocalModelTierSpec | undefined {
+  return typeof id === "string"
+    ? localModelTiers.find((item) => item.id === id)
+    : undefined;
+}
+
+export function getBedroomCareerRoute(id: string): CareerRouteSpec {
+  const found = bedroomCareerRoutes.find((item) => item.id === id);
+  if (!found) throw new Error(`Unknown bedroom career route: ${id}`);
+  return found;
 }

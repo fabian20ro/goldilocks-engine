@@ -20,10 +20,11 @@ type DurableWorkerRequest =
   | { type: "COMMAND"; command: SimulationCommand }
   | { type: "COMMAND_BATCH"; commands: readonly SimulationCommand[] };
 // Keep the established storage address so verifier-owned browser probes and
-// existing sessions observe the schema-5 migration in place. The payload's
+// existing sessions observe the schema-6 migration in place. The payload's
 // schemaVersion, not this opaque key, is the save contract.
 export const SAVE_KEY = "goldilocks-simulation-save-v4";
 export const LEGACY_SAVE_KEYS = ["goldilocks-simulation-save-v3"] as const;
+export const OFFLINE_SAVED_AT_KEY = "goldilocks-simulation-offline-saved-at-v1";
 
 const isTimeSpeed = (value: number): value is TimeSpeed =>
   TIME_SPEEDS.some((speed) => speed === value);
@@ -44,11 +45,22 @@ function loadSavedState(): unknown {
 function persistState(state: SimulationState): boolean {
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+    localStorage.setItem(OFFLINE_SAVED_AT_KEY, String(Date.now()));
     for (const key of LEGACY_SAVE_KEYS) localStorage.removeItem(key);
     return true;
   } catch {
     // Storage failure leaves the current in-memory run operable.
     return false;
+  }
+}
+
+function offlineElapsedHours(): number {
+  try {
+    const savedAt = Number(localStorage.getItem(OFFLINE_SAVED_AT_KEY));
+    if (!Number.isFinite(savedAt) || savedAt <= 0) return 0;
+    return Math.min(24, Math.max(0, (Date.now() - savedAt) / 3_600_000));
+  } catch {
+    return 0;
   }
 }
 
@@ -69,10 +81,23 @@ export function useSimulation() {
       ? createInitialState()
       : restoreSimulationState(savedStateRef.current),
   );
+  const shouldApplyInitialOfflineRef = useRef(
+    savedStateRef.current !== undefined && state.career.offlinePolicy.enabled,
+  );
   const workerRef = useRef<Worker | null>(null);
   const nextRequestIdRef = useRef(1);
+  const initialOfflineHoursRef = useRef(offlineElapsedHours());
+  const initialOfflineAppliedRef = useRef(false);
   const speedRef = useRef<TimeSpeed>(1);
   const [timeSpeed, setTimeSpeedState] = useState<TimeSpeed>(1);
+
+  const postDurableRequest = useCallback((request: DurableWorkerRequest) => {
+    const worker = workerRef.current;
+    if (!worker) return;
+    const requestId = nextRequestIdRef.current++;
+    markDurableCommandPending(requestId);
+    worker.postMessage({ ...request, requestId } as WorkerRequest);
+  }, []);
 
   useEffect(() => {
     const worker = new Worker(
@@ -89,6 +114,21 @@ export function useSimulation() {
           setState,
         );
         acknowledgeDurableState(event.data.requestId, durable);
+        if (
+          !initialOfflineAppliedRef.current &&
+          savedStateRef.current !== undefined &&
+          shouldApplyInitialOfflineRef.current &&
+          initialOfflineHoursRef.current > 0
+        ) {
+          initialOfflineAppliedRef.current = true;
+          postDurableRequest({
+            type: "COMMAND",
+            command: {
+              type: "APPLY_OFFLINE_POLICY",
+              requestedHours: initialOfflineHoursRef.current,
+            },
+          });
+        }
       },
     );
     worker.postMessage({
@@ -106,15 +146,7 @@ export function useSimulation() {
       worker.terminate();
       workerRef.current = null;
     };
-  }, []);
-
-  const postDurableRequest = useCallback((request: DurableWorkerRequest) => {
-    const worker = workerRef.current;
-    if (!worker) return;
-    const requestId = nextRequestIdRef.current++;
-    markDurableCommandPending(requestId);
-    worker.postMessage({ ...request, requestId } as WorkerRequest);
-  }, []);
+  }, [postDurableRequest]);
 
   const command = useCallback(
     (next: SimulationCommand) => {
