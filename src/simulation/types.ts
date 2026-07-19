@@ -200,6 +200,16 @@ export interface EvaluationState {
   hardwareDebt: number;
 }
 
+/**
+ * Compact causal checkpoint sealed alongside every runtime snapshot. It keeps
+ * evaluation evidence verifiable after the bounded event ledger evicts its
+ * earliest entries.
+ */
+export interface CausalEvidenceSnapshot {
+  eventSequence: number;
+  evaluation: EvaluationState;
+}
+
 export type DiagnosticUnlockId =
   | "leakage-warning"
   | "shift-monitor"
@@ -402,6 +412,8 @@ export interface SimulationState {
   lastUpgradeNotice: UpgradeNotice | null;
   eventSequence: number;
   ledger: readonly LedgerEvent[];
+  /** Optional only while restoring schema-7 saves written before checkpoints. */
+  causalEvidenceSnapshot?: CausalEvidenceSnapshot;
 }
 
 export type SimulationCommand =

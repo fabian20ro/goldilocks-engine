@@ -26,6 +26,7 @@ import {
   SAVE_INTEGRITY_ALGORITHM,
   SCHEMA_VERSION,
   type CausalEvidence,
+  type CausalEvidenceSnapshot,
   type DiagnosticUnlockId,
   type EvaluationState,
   type LedgerEvent,
@@ -214,13 +215,33 @@ function stateIntegrityDigest(state: SimulationState): string {
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
+function cloneEvaluationState(evaluation: EvaluationState): EvaluationState {
+  return {
+    ...evaluation,
+    warnings: { ...evaluation.warnings },
+  };
+}
+
+function createCausalEvidenceSnapshot(
+  state: Pick<SimulationState, "career" | "eventSequence">,
+): CausalEvidenceSnapshot {
+  return {
+    eventSequence: state.eventSequence,
+    evaluation: cloneEvaluationState(state.career.evaluation),
+  };
+}
+
 /** Adds the deterministic corruption check carried by every runtime snapshot. */
 export function sealSimulationState(state: SimulationState): SimulationState {
-  return {
+  const snapshotState: SimulationState = {
     ...state,
+    causalEvidenceSnapshot: createCausalEvidenceSnapshot(state),
+  };
+  return {
+    ...snapshotState,
     integrity: {
       algorithm: SAVE_INTEGRITY_ALGORITHM,
-      digest: stateIntegrityDigest(state),
+      digest: stateIntegrityDigest(snapshotState),
     },
   };
 }
@@ -3091,6 +3112,57 @@ function isEvaluationStateValid(value: unknown): value is EvaluationState {
   );
 }
 
+function evaluationStatesMatch(
+  left: EvaluationState,
+  right: EvaluationState,
+): boolean {
+  return (
+    left.publicScore === right.publicScore &&
+    left.privateAssessment === right.privateAssessment &&
+    left.coverage === right.coverage &&
+    left.evaluationSpend === right.evaluationSpend &&
+    left.publicEvaluations === right.publicEvaluations &&
+    left.privateEvaluations === right.privateEvaluations &&
+    left.leakageRisk === right.leakageRisk &&
+    left.distributionShiftRisk === right.distributionShiftRisk &&
+    left.reliabilityIncidents === right.reliabilityIncidents &&
+    left.ignoredWarnings === right.ignoredWarnings &&
+    left.modelSwitches === right.modelSwitches &&
+    left.capitalCommitments === right.capitalCommitments &&
+    left.hardwareDebt === right.hardwareDebt &&
+    left.warnings.leakage === right.warnings.leakage &&
+    left.warnings.reliability === right.warnings.reliability &&
+    left.warnings.hardware === right.warnings.hardware &&
+    left.warnings.tutorial === right.warnings.tutorial
+  );
+}
+
+function isCausalEvidenceSnapshotShapeValid(
+  value: unknown,
+): value is CausalEvidenceSnapshot {
+  if (typeof value !== "object" || value === null) return false;
+  const snapshot = value as CausalEvidenceSnapshot;
+  return (
+    Number.isSafeInteger(snapshot.eventSequence) &&
+    snapshot.eventSequence >= 0 &&
+    isEvaluationStateValid(snapshot.evaluation)
+  );
+}
+
+function hasCoherentCausalEvidenceSnapshot(
+  state: Pick<
+    SimulationState,
+    "career" | "causalEvidenceSnapshot" | "eventSequence"
+  >,
+): boolean {
+  const snapshot = state.causalEvidenceSnapshot;
+  return (
+    isCausalEvidenceSnapshotShapeValid(snapshot) &&
+    snapshot.eventSequence === state.eventSequence &&
+    evaluationStatesMatch(snapshot.evaluation, state.career.evaluation)
+  );
+}
+
 const warningLedgerPrefixes: Readonly<
   Record<EvaluationWarningKey, readonly string[]>
 > = {
@@ -3106,65 +3178,61 @@ function hasRetainedCausalLedgerEvidence(
   const { evaluation } = state.career;
   const { ledger } = state;
 
-  // The ledger deliberately retains only its newest bounded window. Before
-  // that window can evict anything, every causal counter must have matching
-  // recorded evidence. Once history is bounded, older counters may correctly
-  // outlive their original events and cannot be reconstructed from a save.
-  if (state.eventSequence <= MAX_LEDGER_EVENTS) {
-    if (ledger.length !== state.eventSequence) return false;
+  // Complete retained history can independently verify causal counters. Once
+  // the bounded window has evicted an event, restoration must instead rely on
+  // the integrity-sealed causal checkpoint; a full ledger is not evidence by
+  // itself.
+  if (state.eventSequence > MAX_LEDGER_EVENTS) return false;
+  if (ledger.length !== state.eventSequence) return false;
 
-    const ignoredWarningEvents = ledger.filter(
+  const ignoredWarningEvents = ledger.filter(
+    (event) =>
+      event.kind === "warning" &&
+      event.message.startsWith("Ignored ") &&
+      event.directCause !== undefined &&
+      event.contributingCondition !== undefined,
+  ).length;
+  if (evaluation.ignoredWarnings > ignoredWarningEvents) return false;
+
+  for (const warning of Object.keys(
+    warningLedgerPrefixes,
+  ) as EvaluationWarningKey[]) {
+    const evidence = ledger.filter(
       (event) =>
         event.kind === "warning" &&
-        event.message.startsWith("Ignored ") &&
-        event.directCause !== undefined &&
-        event.contributingCondition !== undefined,
-    ).length;
-    if (evaluation.ignoredWarnings > ignoredWarningEvents) return false;
-
-    for (const warning of Object.keys(
-      warningLedgerPrefixes,
-    ) as EvaluationWarningKey[]) {
-      const evidence = ledger.filter(
-        (event) =>
-          event.kind === "warning" &&
-          warningLedgerPrefixes[warning].some((prefix) =>
-            event.message.startsWith(prefix),
-          ),
-      ).length;
-      if (evaluation.warnings[warning] > evidence) return false;
-    }
-
-    const modelSwitchEvents = ledger.filter(
-      (event) =>
-        event.kind === "info" &&
-        (/^Q[48] selected:/.test(event.message) ||
-          event.message.endsWith(
-            "selected. Its memory, throughput, quality, reliability, and nightly operating tradeoffs now apply to model stages.",
-          )),
-    ).length;
-    if (evaluation.modelSwitches > modelSwitchEvents) return false;
-
-    const capitalCommitmentEvents = ledger.filter(
-      (event) =>
-        event.kind === "success" && event.message.includes(" purchased for $"),
-    ).length;
-    if (evaluation.capitalCommitments > capitalCommitmentEvents) return false;
-
-    const reliabilityIncidentEvents = ledger.filter(
-      (event) =>
-        event.kind === "failure" &&
-        event.message.startsWith(
-          "Distribution-shift reliability incident recorded",
+        warningLedgerPrefixes[warning].some((prefix) =>
+          event.message.startsWith(prefix),
         ),
     ).length;
-    if (evaluation.reliabilityIncidents > reliabilityIncidentEvents)
-      return false;
-
-    return true;
+    if (evaluation.warnings[warning] > evidence) return false;
   }
 
-  return ledger.length === MAX_LEDGER_EVENTS;
+  const modelSwitchEvents = ledger.filter(
+    (event) =>
+      event.kind === "info" &&
+      (/^Q[48] selected:/.test(event.message) ||
+        event.message.endsWith(
+          "selected. Its memory, throughput, quality, reliability, and nightly operating tradeoffs now apply to model stages.",
+        )),
+  ).length;
+  if (evaluation.modelSwitches > modelSwitchEvents) return false;
+
+  const capitalCommitmentEvents = ledger.filter(
+    (event) =>
+      event.kind === "success" && event.message.includes(" purchased for $"),
+  ).length;
+  if (evaluation.capitalCommitments > capitalCommitmentEvents) return false;
+
+  const reliabilityIncidentEvents = ledger.filter(
+    (event) =>
+      event.kind === "failure" &&
+      event.message.startsWith(
+        "Distribution-shift reliability incident recorded",
+      ),
+  ).length;
+  if (evaluation.reliabilityIncidents > reliabilityIncidentEvents) return false;
+
+  return true;
 }
 
 function isMetaProgressionValid(value: unknown): value is MetaProgression {
@@ -3428,6 +3496,8 @@ function isStateStructurallyValid(value: unknown): value is SimulationState {
       state.contentVersion === CONTENT_VERSION &&
       isMigrationMetadataValid(state.migration) &&
       isIntegrityShapeValid(state.integrity) &&
+      (state.causalEvidenceSnapshot === undefined ||
+        isCausalEvidenceSnapshotShapeValid(state.causalEvidenceSnapshot)) &&
       Number.isInteger(state.seed) &&
       state.seed > 0 &&
       state.seed <= 0xffff_ffff &&
@@ -3614,7 +3684,11 @@ function isStateStructurallyValid(value: unknown): value is SimulationState {
 }
 
 export function isStateValid(state: SimulationState): boolean {
-  return isStateStructurallyValid(state) && hasValidStateIntegrity(state);
+  return (
+    isStateStructurallyValid(state) &&
+    hasCoherentCausalEvidenceSnapshot(state) &&
+    hasValidStateIntegrity(state)
+  );
 }
 
 function finiteOr(value: unknown, fallback: number): number {
@@ -3666,6 +3740,9 @@ export function restoreSimulationState(
   if (typeof value !== "object" || value === null) return fallback;
   const record = value as Record<string, unknown>;
   if (record.schemaVersion === SCHEMA_VERSION) {
+    const originalIntegrityValid =
+      isIntegrityShapeValid(record.integrity) &&
+      hasValidStateIntegrity(record as unknown as SimulationState);
     let migration = isMigrationMetadataValid(record.migration)
       ? record.migration
       : {
@@ -3688,17 +3765,35 @@ export function restoreSimulationState(
     const evaluationEvidenceInvalid =
       isEvaluationStateShapeValid(evaluation) &&
       !isEvaluationStateValid(evaluation);
-    const causalLedgerInvalid =
-      structurallyValid && !hasRetainedCausalLedgerEvidence(candidate);
-    if (!structurallyValid || causalLedgerInvalid) {
+    const hasRetainedCausalEvidence =
+      structurallyValid && hasRetainedCausalLedgerEvidence(candidate);
+    const hasCoherentCausalSnapshot =
+      structurallyValid && hasCoherentCausalEvidenceSnapshot(candidate);
+    const hasTrustedCausalSnapshot =
+      candidate.causalEvidenceSnapshot !== undefined &&
+      originalIntegrityValid &&
+      hasCoherentCausalSnapshot;
+    // Schema-7 saves written before causal checkpoints can still prove their
+    // bounded history through their original integrity seal. The first restore
+    // upgrades that proof into an explicit checkpoint.
+    const hasTrustedLegacyCausalHistory =
+      candidate.causalEvidenceSnapshot === undefined &&
+      originalIntegrityValid &&
+      structurallyValid;
+    const causalEvidenceInvalid =
+      structurallyValid &&
+      !hasRetainedCausalEvidence &&
+      !hasTrustedCausalSnapshot &&
+      !hasTrustedLegacyCausalHistory;
+    if (!structurallyValid || causalEvidenceInvalid) {
       if (
         career === null ||
         !isEvaluationStateShapeValid(evaluation) ||
-        (!evaluationEvidenceInvalid && !causalLedgerInvalid)
+        (!evaluationEvidenceInvalid && !causalEvidenceInvalid)
       )
         return fallback;
 
-      const invalidEnding = causalLedgerInvalid ? career.runEnding : null;
+      const invalidEnding = causalEvidenceInvalid ? career.runEnding : null;
       candidate = {
         ...candidate,
         meta:
@@ -3720,25 +3815,49 @@ export function restoreSimulationState(
           runEnding: invalidEnding === null ? career.runEnding : null,
         },
       };
+      candidate = {
+        ...candidate,
+        causalEvidenceSnapshot: createCausalEvidenceSnapshot(candidate),
+      };
       if (evaluationEvidenceInvalid)
         migration = withMigrationStep(
           migration,
           "schema-v7-evaluation-evidence-repaired",
         );
-      if (causalLedgerInvalid)
+      if (causalEvidenceInvalid)
         migration = withMigrationStep(
           migration,
           "schema-v7-causal-ledger-repaired",
         );
       if (
         !isStateStructurallyValid(candidate) ||
-        !hasRetainedCausalLedgerEvidence(candidate)
+        !hasCoherentCausalEvidenceSnapshot(candidate)
       )
         return fallback;
+    } else if (candidate.causalEvidenceSnapshot === undefined) {
+      candidate = {
+        ...candidate,
+        causalEvidenceSnapshot: createCausalEvidenceSnapshot(candidate),
+      };
+      migration = withMigrationStep(
+        migration,
+        "schema-v7-causal-snapshot-added",
+      );
+    } else if (!hasCoherentCausalSnapshot) {
+      // Complete retained history independently proves this non-saturated
+      // evaluation, so rebuild only its stale checkpoint before resealing.
+      candidate = {
+        ...candidate,
+        causalEvidenceSnapshot: createCausalEvidenceSnapshot(candidate),
+      };
+      migration = withMigrationStep(
+        migration,
+        "schema-v7-causal-snapshot-rebuilt",
+      );
     }
     if (!isIntegrityShapeValid(record.integrity))
       migration = withMigrationStep(migration, "integrity-added");
-    else if (!hasValidStateIntegrity(candidate))
+    else if (!originalIntegrityValid)
       migration = withMigrationStep(migration, "integrity-resealed");
     const restored = sealSimulationState(
       recalculate({ ...candidate, migration }),

@@ -27,6 +27,18 @@ const endingIds: readonly RunEndingId[] = [
   "honest-independent-builder",
 ];
 
+function legacyIntegrityDigest(save: Record<string, unknown>): string {
+  const payload = { ...save };
+  delete payload.integrity;
+  const serialized = JSON.stringify(payload);
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < serialized.length; index += 1) {
+    hash ^= serialized.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
 describe("D-011 evaluation, failure, and replay", () => {
   it("reaches all five deterministic endings through recorded causal patterns", () => {
     for (const endingId of endingIds) {
@@ -300,6 +312,89 @@ describe("D-011 evaluation, failure, and replay", () => {
       bounded.career.evaluation,
     );
     expect(isStateValid(boundedRestored)).toBe(true);
+  });
+
+  it("pins saturated causal counters to sealed checkpoints and migrates valid legacy histories", () => {
+    const seed = 72;
+    let saturated = createInitialState(seed);
+    for (let index = 0; index < 7; index += 1)
+      saturated = applyCommand(saturated, {
+        type: "SET_QUANTIZATION",
+        profile: index % 2 === 0 ? "q8" : "q4",
+      });
+    for (let index = 0; index < 81; index += 1)
+      saturated = applyCommand(saturated, {
+        type: "CAPTURE_BASELINE",
+        label: `checkpoint-history-${index}`,
+      });
+
+    expect(saturated.eventSequence).toBeGreaterThan(80);
+    expect(saturated.ledger).toHaveLength(80);
+    expect(saturated.career.runEnding).toBeNull();
+    expect(saturated.causalEvidenceSnapshot).toMatchObject({
+      eventSequence: saturated.eventSequence,
+      evaluation: saturated.career.evaluation,
+    });
+
+    const restored = restoreSimulationState(
+      JSON.parse(JSON.stringify(saturated)),
+      seed,
+    );
+    expect(restored.career.evaluation).toEqual(saturated.career.evaluation);
+    expect(restored.causalEvidenceSnapshot).toMatchObject({
+      eventSequence: restored.eventSequence,
+      evaluation: restored.career.evaluation,
+    });
+    expect(isStateValid(restored)).toBe(true);
+
+    const legacy = JSON.parse(JSON.stringify(saturated)) as Record<
+      string,
+      unknown
+    >;
+    delete legacy.causalEvidenceSnapshot;
+    (legacy.integrity as { digest: string }).digest =
+      legacyIntegrityDigest(legacy);
+    const migratedLegacy = restoreSimulationState(legacy, seed);
+    expect(migratedLegacy.career.evaluation).toEqual(
+      saturated.career.evaluation,
+    );
+    expect(migratedLegacy.migration.steps).toContain(
+      "schema-v7-causal-snapshot-added",
+    );
+    expect(isStateValid(migratedLegacy)).toBe(true);
+
+    const forged = JSON.parse(JSON.stringify(saturated)) as Record<
+      string,
+      unknown
+    >;
+    const forgedCareer = forged.career as Record<string, unknown>;
+    forgedCareer.unpaidCosts = 0.1;
+    forgedCareer.evaluation = {
+      ...(forgedCareer.evaluation as Record<string, unknown>),
+      capitalCommitments: 3,
+      hardwareDebt: 8,
+      ignoredWarnings: 2,
+      warnings: {
+        ...(forgedCareer.evaluation as { warnings: Record<string, unknown> })
+          .warnings,
+        hardware: 2,
+      },
+    };
+    (forged.causalEvidenceSnapshot as Record<string, unknown>).evaluation =
+      JSON.parse(JSON.stringify(forgedCareer.evaluation));
+
+    const recovered = restoreSimulationState(forged, seed);
+    const advanced = applyCommand(recovered, {
+      type: "RUN_PUBLIC_EVALUATION",
+    });
+    expect(recovered.career.evaluation).toEqual(
+      createInitialState(seed).career.evaluation,
+    );
+    expect(recovered.migration.steps).toContain(
+      "schema-v7-causal-ledger-repaired",
+    );
+    expect(advanced.career.runEnding).toBeNull();
+    expect(getPostmortemEvent(advanced)).toBeNull();
   });
 
   it("proves diagnostics have zero flat production effect", () => {
