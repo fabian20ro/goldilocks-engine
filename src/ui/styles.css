@@ -1804,6 +1804,150 @@ h2 {
   font-weight: 700;
 }
 
+.evaluation-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--line);
+}
+
+.evaluation-stat-grid > div {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+  padding: 0.65rem 0.72rem;
+  background: #0e1612;
+}
+
+.evaluation-stat-grid dt {
+  color: var(--muted);
+  font-size: 0.54rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.evaluation-stat-grid dd {
+  overflow-wrap: anywhere;
+  color: var(--cyan);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.evaluation-actions {
+  padding-top: 0.75rem;
+}
+
+.conclusion-reasons,
+.conclusion-ready,
+.postmortem-outcome,
+.next-run-response {
+  margin: 0;
+  padding: 0.72rem 0.8rem;
+  color: #cde1d1;
+  font-size: 0.67rem;
+  line-height: 1.45;
+}
+
+.conclusion-reasons {
+  display: grid;
+  gap: 0.42rem;
+  padding-left: 2rem;
+  color: var(--muted);
+}
+
+.conclusion-ready {
+  color: var(--acid);
+}
+
+.diagnostic-list {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+  background: var(--line);
+}
+
+.diagnostic-list li {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.72rem 0.8rem;
+  background: #0e1612;
+}
+
+.diagnostic-list strong {
+  color: var(--acid);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+}
+
+.diagnostic-list span {
+  color: var(--muted);
+  font-size: 0.62rem;
+  line-height: 1.42;
+}
+
+.run-ending h3 {
+  margin: 0;
+  padding: 0.75rem 0.8rem 0;
+  color: var(--acid);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.92rem;
+}
+
+.run-ending > p {
+  margin: 0;
+  padding: 0.7rem 0.8rem;
+  color: var(--muted);
+  font-size: 0.67rem;
+  line-height: 1.45;
+}
+
+.causal-evidence-list {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--line);
+}
+
+.causal-evidence-list > div {
+  display: grid;
+  gap: 0.38rem;
+  padding: 0.72rem 0.8rem;
+  background: #0e1612;
+}
+
+.causal-evidence-list dt {
+  color: var(--cyan);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.61rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.causal-evidence-list dd {
+  margin: 0;
+}
+
+.causal-evidence-list ul {
+  display: grid;
+  gap: 0.36rem;
+  margin: 0;
+  padding-left: 1rem;
+  color: #cde1d1;
+  font-size: 0.65rem;
+  line-height: 1.42;
+}
+
 .career-exit,
 .offline-report {
   padding: 0.72rem 0.8rem;
@@ -2213,7 +2357,8 @@ h2 {
     text-align: left;
   }
 
-  .career-stat-grid {
+  .career-stat-grid,
+  .evaluation-stat-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 

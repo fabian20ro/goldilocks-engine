@@ -25,14 +25,21 @@ import {
   CONTENT_VERSION,
   SAVE_INTEGRITY_ALGORITHM,
   SCHEMA_VERSION,
+  type CausalEvidence,
+  type DiagnosticUnlockId,
+  type EvaluationState,
   type LedgerEvent,
   type CareerRoute,
   type CareerState,
+  type MetaProgression,
   type MigrationMetadata,
   type PipelineMetrics,
   type PipelineSlotState,
+  type PrivateAssessment,
   type QueuedTask,
   type QuantizationProfile,
+  type RunEnding,
+  type RunEndingId,
   type SaveIntegrity,
   type SimulationCommand,
   type SimulationState,
@@ -56,6 +63,31 @@ const CAREER_ROUTES: readonly CareerRoute[] = [
 ];
 const QUANTIZATION_PROFILES: readonly QuantizationProfile[] = ["q4", "q8"];
 const MAX_OFFLINE_HOURS = 4;
+const PRIVATE_EVALUATION_COST = 0.75;
+const MAX_EVALUATION_SPEND = 10_000;
+const MAX_EVALUATION_COUNTER = 10_000;
+const MAX_META_REPLAYS = 1_000_000;
+const PRIVATE_ASSESSMENTS: readonly PrivateAssessment[] = [
+  "not-run",
+  "inconclusive",
+  "credible",
+  "at-risk",
+  "failed",
+];
+const DIAGNOSTIC_UNLOCK_IDS: readonly DiagnosticUnlockId[] = [
+  "leakage-warning",
+  "shift-monitor",
+  "bottleneck-map",
+  "decision-history",
+  "confidence-intervals",
+];
+const RUN_ENDING_IDS: readonly RunEndingId[] = [
+  "public-leaderboard-hero",
+  "product-reliability-collapse",
+  "hardware-debt-spiral",
+  "tutorial-loop",
+  "honest-independent-builder",
+];
 export const SIMULATION_TIME_SCALE = 70;
 
 export function getSimulationAgeHours(
@@ -159,6 +191,9 @@ export function isRuntimeSimulationCommand(command: unknown): boolean {
     case "RUN_EVENING":
     case "SUBMIT_COMPETITION":
     case "RELEASE_PRODUCT":
+    case "RUN_PUBLIC_EVALUATION":
+    case "RUN_PRIVATE_EVALUATION":
+    case "CONCLUDE_INDEPENDENT_RUN":
       return true;
     default:
       return false;
@@ -438,6 +473,482 @@ function appendEvent(
   return { ...state, eventSequence, ledger };
 }
 
+type EvaluationWarningKey = keyof EvaluationState["warnings"];
+
+const ENDING_DETAILS: Readonly<
+  Record<
+    RunEndingId,
+    {
+      title: string;
+      outcome: RunEnding["outcome"];
+      diagnosticUnlockId: DiagnosticUnlockId;
+      nextRunResponse: string;
+    }
+  >
+> = {
+  "public-leaderboard-hero": {
+    title: "Public Leaderboard Hero",
+    outcome: "failure",
+    diagnosticUnlockId: "leakage-warning",
+    nextRunResponse:
+      "Budget private evaluation before another public submission, then stop optimizing the public preview once it disagrees with private evidence.",
+  },
+  "product-reliability-collapse": {
+    title: "Product Reliability Collapse",
+    outcome: "failure",
+    diagnosticUnlockId: "shift-monitor",
+    nextRunResponse:
+      "Hold service growth after the first shift warning; fund broader private coverage and maintenance before taking more product work.",
+  },
+  "hardware-debt-spiral": {
+    title: "Hardware Debt Spiral",
+    outcome: "failure",
+    diagnosticUnlockId: "bottleneck-map",
+    nextRunResponse:
+      "Compare the active bottleneck before another capital commitment, retain operating reserve, and earn down unpaid costs before expanding the rig.",
+  },
+  "tutorial-loop": {
+    title: "Tutorial Loop",
+    outcome: "failure",
+    diagnosticUnlockId: "decision-history",
+    nextRunResponse:
+      "Freeze one configuration long enough to finish a small competition or product milestone, then change it only against recorded evidence.",
+  },
+  "honest-independent-builder": {
+    title: "Honest Independent Builder",
+    outcome: "success",
+    diagnosticUnlockId: "confidence-intervals",
+    nextRunResponse:
+      "Keep the same discipline: preserve evidence coverage, pay costs before expansion, and treat private uncertainty as an operational constraint.",
+  },
+};
+
+function privateAssessmentFor(
+  state: SimulationState,
+  coverage = state.career.evaluation.coverage,
+): PrivateAssessment {
+  const evaluation = state.career.evaluation;
+  // This intermediate is intentionally transient. Only the categorical result
+  // is persisted or rendered, so exact latent capability is never exposed.
+  const privateSignal =
+    state.metrics.observedQuality +
+    state.metrics.reliability * 14 +
+    coverage * 8 -
+    evaluation.leakageRisk * 32 -
+    evaluation.distributionShiftRisk * 14 -
+    state.career.product.serviceDebt * 0.35;
+  if (privateSignal >= 65) return "credible";
+  if (privateSignal >= 53) return "inconclusive";
+  if (privateSignal >= 40) return "at-risk";
+  return "failed";
+}
+
+function evaluationCoverageGain(state: SimulationState): number {
+  return round(
+    clamp(
+      0.22 +
+        state.metrics.evaluationCoverage * 0.25 +
+        state.metrics.observability * 0.1,
+      0.25,
+      0.5,
+    ),
+    3,
+  );
+}
+
+function publicScoreFor(state: SimulationState, nextRisk: number): number {
+  const evaluation = state.career.evaluation;
+  return round(
+    clamp(
+      state.metrics.predictedQuality +
+        (evaluation.publicEvaluations + 1) * 4 +
+        nextRisk * 16,
+      0,
+      99,
+    ),
+    1,
+  );
+}
+
+function withIgnoredWarnings(
+  state: SimulationState,
+  warningKeys: readonly EvaluationWarningKey[],
+): SimulationState {
+  const evaluation = state.career.evaluation;
+  if (!warningKeys.some((key) => evaluation.warnings[key] > 0)) return state;
+  return {
+    ...state,
+    career: {
+      ...state.career,
+      evaluation: {
+        ...evaluation,
+        ignoredWarnings: Math.min(
+          MAX_EVALUATION_COUNTER,
+          evaluation.ignoredWarnings + 1,
+        ),
+      },
+    },
+  };
+}
+
+function recordEvaluationWarning(
+  state: SimulationState,
+  warning: EvaluationWarningKey,
+  level: number,
+  message: string,
+): SimulationState {
+  const evaluation = state.career.evaluation;
+  if (evaluation.warnings[warning] >= level) return state;
+  return appendEvent(
+    {
+      ...state,
+      career: {
+        ...state.career,
+        evaluation: {
+          ...evaluation,
+          warnings: { ...evaluation.warnings, [warning]: level },
+        },
+      },
+    },
+    { kind: "warning", message },
+  );
+}
+
+function refreshEvaluationWarnings(state: SimulationState): SimulationState {
+  let next = state;
+  const evaluation = () => next.career.evaluation;
+  if (evaluation().leakageRisk >= 0.34)
+    next = recordEvaluationWarning(
+      next,
+      "leakage",
+      1,
+      "Leakage warning: repeated public previews are becoming a target. Private evidence is still incomplete.",
+    );
+  if (evaluation().leakageRisk >= 0.58)
+    next = recordEvaluationWarning(
+      next,
+      "leakage",
+      2,
+      "Leakage warning escalated: public optimization can now overstate private reliability. Submit only with stronger private coverage.",
+    );
+  if (evaluation().distributionShiftRisk >= 0.7)
+    next = recordEvaluationWarning(
+      next,
+      "reliability",
+      1,
+      "Distribution-shift warning: released product work exceeds the evidence gathered for changed inputs.",
+    );
+  if (evaluation().distributionShiftRisk >= 1.35)
+    next = recordEvaluationWarning(
+      next,
+      "reliability",
+      2,
+      "Reliability warning escalated: continued product service is likely to repeat an incident unless coverage or maintenance changes.",
+    );
+  if (evaluation().hardwareDebt >= 5)
+    next = recordEvaluationWarning(
+      next,
+      "hardware",
+      1,
+      "Hardware commitment warning: capital outlay is outrunning the operating reserve while the active bottleneck remains visible.",
+    );
+  if (evaluation().hardwareDebt >= 8)
+    next = recordEvaluationWarning(
+      next,
+      "hardware",
+      2,
+      "Hardware commitment warning escalated: another purchase without resolving the current bottleneck risks unpaid operating cost.",
+    );
+  if (evaluation().modelSwitches >= 3)
+    next = recordEvaluationWarning(
+      next,
+      "tutorial",
+      1,
+      "Tutorial-loop warning: configuration changes are accumulating without a finished competition or product milestone.",
+    );
+  if (evaluation().modelSwitches >= 6)
+    next = recordEvaluationWarning(
+      next,
+      "tutorial",
+      2,
+      "Tutorial-loop warning escalated: freeze a configuration and finish work before switching again.",
+    );
+  return next;
+}
+
+function recordCapitalCommitment(
+  state: SimulationState,
+  purchaseCost: number,
+): SimulationState {
+  const evaluation = state.career.evaluation;
+  const unresolvedBottleneck =
+    state.metrics.orderWarnings.length > 0 ||
+    (state.metrics.dominantBottleneck !== "compute capacity" &&
+      state.metrics.dominantBottleneck !== "memory pressure");
+  const reserveGap = Math.max(0, 6 - state.resources.money);
+  const debtAdded = round(
+    purchaseCost * (unresolvedBottleneck ? 0.45 : 0.2) + reserveGap * 0.35,
+    3,
+  );
+  const next = {
+    ...state,
+    career: {
+      ...state.career,
+      evaluation: {
+        ...evaluation,
+        capitalCommitments: Math.min(
+          MAX_EVALUATION_COUNTER,
+          evaluation.capitalCommitments + 1,
+        ),
+        hardwareDebt: round(
+          Math.min(MAX_EVALUATION_SPEND, evaluation.hardwareDebt + debtAdded),
+          3,
+        ),
+      },
+    },
+  };
+  return withIgnoredWarnings(next, ["hardware"]);
+}
+
+function recordModelSwitch(state: SimulationState): SimulationState {
+  const evaluation = state.career.evaluation;
+  const next = {
+    ...state,
+    career: {
+      ...state.career,
+      evaluation: {
+        ...evaluation,
+        modelSwitches: Math.min(
+          MAX_EVALUATION_COUNTER,
+          evaluation.modelSwitches + 1,
+        ),
+      },
+    },
+  };
+  return withIgnoredWarnings(next, ["tutorial"]);
+}
+
+function endingCausalEvidence(
+  state: SimulationState,
+  endingId: RunEndingId,
+): CausalEvidence {
+  const { evaluation } = state.career;
+  switch (endingId) {
+    case "public-leaderboard-hero":
+      return {
+        directCauses: [
+          "An irreversible Cup submission relied on a strong public score while the recorded private assessment was at risk or failed.",
+        ],
+        contributingFactors: [
+          `${evaluation.publicEvaluations} public previews increased leakage risk to ${(evaluation.leakageRisk * 100).toFixed(0)}%.`,
+          `Only ${(evaluation.coverage * 100).toFixed(0)}% private coverage was recorded before submission.`,
+        ],
+        correlations: [
+          `The active ${state.career.quantization.toUpperCase()} configuration was present when the public score was submitted.`,
+        ],
+        hypotheses: [
+          "A paid private evaluation before submission may have revealed the divergence early enough to change the entry.",
+        ],
+        unknowns: [
+          "The simulator intentionally does not expose an exact latent capability score.",
+        ],
+      };
+    case "product-reliability-collapse":
+      return {
+        directCauses: [
+          `${evaluation.reliabilityIncidents} recorded distribution-shift reliability incidents occurred after the irreversible product release.`,
+        ],
+        contributingFactors: [
+          `Shift risk reached ${(evaluation.distributionShiftRisk * 100).toFixed(0)}% with ${(evaluation.coverage * 100).toFixed(0)}% private coverage.`,
+          `${state.career.product.serviceDebt.toFixed(2)} service debt increased the cost of recovering each incident.`,
+        ],
+        correlations: [
+          `${state.career.product.maintenanceHours.toFixed(2)}h of maintenance had been recorded alongside the incidents.`,
+        ],
+        hypotheses: [
+          "Pausing service work for broader private coverage and maintenance may have prevented a further incident.",
+        ],
+        unknowns: [
+          "Current instrumentation cannot identify the exact unseen input mix behind each shifted request.",
+        ],
+      };
+    case "hardware-debt-spiral":
+      return {
+        directCauses: [
+          `${evaluation.capitalCommitments} irreversible capital commitments left $${state.career.unpaidCosts.toFixed(3)} of recorded operating cost unpaid.`,
+        ],
+        contributingFactors: [
+          `Hardware commitment pressure reached ${evaluation.hardwareDebt.toFixed(2)} while ${state.metrics.dominantBottleneck} remained the active bottleneck.`,
+          `${evaluation.warnings.hardware} hardware warnings were recorded before the run closed.`,
+        ],
+        correlations: [
+          `${state.resources.electricityKwh.toFixed(3)} kWh of modeled electricity had been used in this run.`,
+        ],
+        hypotheses: [
+          "Keeping a cash reserve and addressing the measured bottleneck before the next purchase may have broken the spiral.",
+        ],
+        unknowns: [
+          "The ledger cannot prove which future purchase would have been sufficient without a counterfactual run.",
+        ],
+      };
+    case "tutorial-loop":
+      return {
+        directCauses: [
+          `${evaluation.modelSwitches} model or quantization changes accumulated without a finished competition submission or product release.`,
+        ],
+        contributingFactors: [
+          `${evaluation.warnings.tutorial} tutorial-loop warnings and ${evaluation.ignoredWarnings} ignored-warning decisions were recorded.`,
+        ],
+        correlations: [
+          `The current local tier remained ${state.career.activeModelTierId} at run close.`,
+        ],
+        hypotheses: [
+          "Committing one configuration to a bounded milestone may have converted comparison work into durable progress.",
+        ],
+        unknowns: [
+          "The ledger cannot infer whether a different model would have been better without a completed comparison plan.",
+        ],
+      };
+    case "honest-independent-builder":
+      return {
+        directCauses: [
+          "The player explicitly concluded after the Bedroom Developer exit, credible private evidence, and no unpaid career costs were recorded.",
+        ],
+        contributingFactors: [
+          `${(evaluation.coverage * 100).toFixed(0)}% private coverage and a ${evaluation.privateAssessment} assessment were recorded before conclusion.`,
+          `${evaluation.reliabilityIncidents} reliability incidents remained in the run history.`,
+        ],
+        correlations: [
+          `${state.career.competition.submissions} Cup submission(s) and ${state.career.product.releases} product release(s) were completed.`,
+        ],
+        hypotheses: [
+          "Keeping evidence, maintenance, and cash reserves explicit may preserve this independent route under a different seed.",
+        ],
+        unknowns: [
+          "Future workload mixes and costs are not known at the point of conclusion.",
+        ],
+      };
+  }
+}
+
+function finalizeRunEnding(
+  state: SimulationState,
+  endingId: RunEndingId,
+): SimulationState {
+  if (state.career.runEnding) return state;
+  const detail = ENDING_DETAILS[endingId];
+  const recorded = appendEvent(state, {
+    kind: detail.outcome === "success" ? "success" : "failure",
+    message: `Run ended: ${detail.title}. Review the evidence-backed postmortem in Career or Inspect before restarting.`,
+    causal: endingCausalEvidence(state, endingId),
+  });
+  const endingEvent = recorded.ledger.at(-1);
+  if (!endingEvent) return state;
+  const meta: MetaProgression = {
+    unlockedDiagnosticIds: [
+      ...new Set([
+        ...recorded.meta.unlockedDiagnosticIds,
+        detail.diagnosticUnlockId,
+      ]),
+    ],
+    completedEndingIds: [
+      ...new Set([...recorded.meta.completedEndingIds, endingId]),
+    ],
+    replayCount: recorded.meta.replayCount,
+  };
+  return {
+    ...recorded,
+    meta,
+    career: {
+      ...recorded.career,
+      runEnding: {
+        id: endingId,
+        title: detail.title,
+        outcome: detail.outcome,
+        eventId: endingEvent.id,
+        diagnosticUnlockId: detail.diagnosticUnlockId,
+        reachedAtTick: recorded.tick,
+      },
+    },
+  };
+}
+
+function resolveRunEnding(state: SimulationState): SimulationState {
+  if (state.career.runEnding) return state;
+  const { career } = state;
+  const evaluation = career.evaluation;
+  if (
+    career.product.released &&
+    evaluation.reliabilityIncidents >= 2 &&
+    evaluation.warnings.reliability >= 2 &&
+    evaluation.ignoredWarnings >= 2
+  )
+    return finalizeRunEnding(state, "product-reliability-collapse");
+  if (
+    evaluation.capitalCommitments >= 3 &&
+    evaluation.hardwareDebt >= 8 &&
+    career.unpaidCosts >= 0.1 &&
+    evaluation.warnings.hardware >= 2 &&
+    evaluation.ignoredWarnings >= 2
+  )
+    return finalizeRunEnding(state, "hardware-debt-spiral");
+  if (
+    evaluation.modelSwitches >= 8 &&
+    evaluation.warnings.tutorial >= 2 &&
+    evaluation.ignoredWarnings >= 2 &&
+    career.competition.submissions === 0 &&
+    career.product.releases === 0
+  )
+    return finalizeRunEnding(state, "tutorial-loop");
+  if (
+    career.competition.submissions >= 1 &&
+    evaluation.publicScore !== null &&
+    evaluation.publicScore >= 64 &&
+    (evaluation.privateAssessment === "at-risk" ||
+      evaluation.privateAssessment === "failed") &&
+    evaluation.publicEvaluations >= 3 &&
+    evaluation.warnings.leakage >= 2 &&
+    evaluation.ignoredWarnings >= 1
+  )
+    return finalizeRunEnding(state, "public-leaderboard-hero");
+  return state;
+}
+
+export function independentRunReadiness(state: SimulationState): {
+  ready: boolean;
+  reasons: readonly string[];
+} {
+  const { career } = state;
+  const evaluation = career.evaluation;
+  const reasons: string[] = [];
+  if (!career.exitAchieved)
+    reasons.push("Complete the Bedroom Developer exit milestones.");
+  if (evaluation.coverage < 0.72)
+    reasons.push("Record at least 72% private evaluation coverage.");
+  if (evaluation.privateAssessment !== "credible")
+    reasons.push("Reach a credible private assessment.");
+  if (career.unpaidCosts > 0)
+    reasons.push("Pay all recorded career operating costs.");
+  if (evaluation.reliabilityIncidents > 1)
+    reasons.push("Keep reliability incidents to at most one.");
+  if (evaluation.ignoredWarnings > 1)
+    reasons.push("Do not carry more than one ignored escalating warning.");
+  return { ready: reasons.length === 0, reasons };
+}
+
+export function getPostmortemEvent(
+  state: Pick<SimulationState, "career" | "ledger">,
+): LedgerEvent | null {
+  const ending = state.career.runEnding;
+  if (!ending) return null;
+  const event = state.ledger.find((entry) => entry.id === ending.eventId);
+  return event?.causal ? event : null;
+}
+
+export function endingNextRunResponse(endingId: RunEndingId): string {
+  return ENDING_DETAILS[endingId].nextRunResponse;
+}
+
 function withUpgradeNotice(
   state: SimulationState,
   notice: UpgradeNotice,
@@ -470,6 +981,38 @@ function emptyEveningAllocations(): Record<CareerRoute, number> {
     competition: 0,
     product: 0,
     maintenance: 0,
+  };
+}
+
+function createInitialEvaluationState(): EvaluationState {
+  return {
+    publicScore: null,
+    privateAssessment: "not-run",
+    coverage: 0,
+    evaluationSpend: 0,
+    publicEvaluations: 0,
+    privateEvaluations: 0,
+    leakageRisk: 0,
+    distributionShiftRisk: 0,
+    reliabilityIncidents: 0,
+    ignoredWarnings: 0,
+    warnings: {
+      leakage: 0,
+      reliability: 0,
+      hardware: 0,
+      tutorial: 0,
+    },
+    modelSwitches: 0,
+    capitalCommitments: 0,
+    hardwareDebt: 0,
+  };
+}
+
+function createInitialMetaProgression(): MetaProgression {
+  return {
+    unlockedDiagnosticIds: [],
+    completedEndingIds: [],
+    replayCount: 0,
   };
 }
 
@@ -524,6 +1067,8 @@ function createInitialCareerState(): CareerState {
       lastReport: null,
     },
     exitAchieved: false,
+    evaluation: createInitialEvaluationState(),
+    runEnding: null,
   };
 }
 
@@ -711,6 +1256,8 @@ function runCareerRoute(
   const costs = careerCosts(state, metrics, hours);
   let gross = 0;
   let next = state;
+  let reliabilityIncident = false;
+  let incidentShiftRisk = 0;
   const usable =
     metrics.memoryPressure <= 1 &&
     !metrics.orderWarnings.includes("no model stage");
@@ -794,6 +1341,21 @@ function runCareerRoute(
         const debtAdded = usable
           ? hours * clamp((0.965 - metrics.reliability) * 9 + 0.08, 0.08, 1.1)
           : hours;
+        const evaluation = next.career.evaluation;
+        const shiftAdded =
+          hours *
+          (clamp(0.72 - evaluation.coverage, 0, 0.72) * 0.13 +
+            clamp(0.975 - metrics.reliability, 0, 0.2) * 0.35);
+        const distributionShiftRisk = round(
+          clamp(evaluation.distributionShiftRisk + shiftAdded, 0, 8),
+          3,
+        );
+        const incidentBandBefore = Math.floor(
+          evaluation.distributionShiftRisk / 1.1,
+        );
+        const incidentBandAfter = Math.floor(distributionShiftRisk / 1.1);
+        reliabilityIncident = incidentBandAfter > incidentBandBefore;
+        incidentShiftRisk = distributionShiftRisk;
         next = {
           ...next,
           career: {
@@ -807,6 +1369,14 @@ function runCareerRoute(
               lifetimeRevenue: round(
                 next.career.product.lifetimeRevenue + gross,
                 3,
+              ),
+            },
+            evaluation: {
+              ...evaluation,
+              distributionShiftRisk,
+              reliabilityIncidents: Math.min(
+                MAX_EVALUATION_COUNTER,
+                evaluation.reliabilityIncidents + (reliabilityIncident ? 1 : 0),
               ),
             },
           },
@@ -855,6 +1425,32 @@ function runCareerRoute(
       ),
     },
   };
+  if (route === "product" && state.career.product.released)
+    next = withIgnoredWarnings(next, ["reliability"]);
+  if (reliabilityIncident) {
+    next = appendEvent(next, {
+      kind: "failure",
+      message: `Distribution-shift reliability incident recorded after released product work. Shift risk reached ${(incidentShiftRisk * 100).toFixed(0)}%; service debt and recovery work remain visible.`,
+      causal: {
+        directCauses: [
+          "Released product work crossed a recorded distribution-shift risk band and produced a reliability incident.",
+        ],
+        contributingFactors: [
+          `${(next.career.evaluation.coverage * 100).toFixed(0)}% private evaluation coverage was recorded at the incident.`,
+          `${(metrics.reliability * 100).toFixed(1)}% modeled pipeline reliability applied to the service work.`,
+        ],
+        correlations: [
+          `${next.career.product.serviceDebt.toFixed(2)} service debt was present after the route.`,
+        ],
+        hypotheses: [
+          "Broader private evaluation or maintenance before more service work may reduce later shift risk.",
+        ],
+        unknowns: [
+          "The local evidence set cannot identify the exact unseen input that triggered this modeled incident.",
+        ],
+      },
+    });
+  }
   const totalCost = round(costs.operatingCost + costs.electricityCost, 3);
   const routeName =
     bedroomCareerRoutes.find((item) => item.id === route)?.name ?? route;
@@ -1061,6 +1657,7 @@ export function createInitialState(seed = 20260715): SimulationState {
     memoryReserve: 10,
     resources: { money: 0, timeHours: 4, electricityKwh: 0, reputation: 0 },
     career: createInitialCareerState(),
+    meta: createInitialMetaProgression(),
     jobs: {
       queued: 0,
       completed: 0,
@@ -1154,8 +1751,23 @@ function applyValidCommand(
   command: SimulationCommand,
 ): SimulationState {
   switch (command.type) {
-    case "RESET":
-      return createInitialState(command.seed ?? state.seed);
+    case "RESET": {
+      const fresh = createInitialState(command.seed ?? state.seed);
+      return appendEvent(
+        {
+          ...fresh,
+          meta: {
+            ...state.meta,
+            replayCount: Math.min(MAX_META_REPLAYS, state.meta.replayCount + 1),
+          },
+        },
+        {
+          kind: "info",
+          message:
+            "New deterministic run started. Diagnostic unlocks are retained as information only; production metrics begin fresh.",
+        },
+      );
+    }
     case "PLACE_MODULE": {
       const module = findModule(command.moduleId);
       const slot = findSlot(command.slotId);
@@ -1242,19 +1854,22 @@ function applyValidCommand(
           kind: "warning",
           message: `${item.name} costs $${item.purchaseCost.toFixed(2)}; $${(item.purchaseCost - state.resources.money).toFixed(2)} more is required. No money was deducted.`,
         });
-      return withUpgradeNotice(
-        {
-          ...state,
-          ownedHardwareIds: [...state.ownedHardwareIds, item.id],
-          resources: {
-            ...state.resources,
-            money: round(state.resources.money - item.purchaseCost, 3),
+      return recordCapitalCommitment(
+        withUpgradeNotice(
+          {
+            ...state,
+            ownedHardwareIds: [...state.ownedHardwareIds, item.id],
+            resources: {
+              ...state.resources,
+              money: round(state.resources.money - item.purchaseCost, 3),
+            },
           },
-        },
-        {
-          kind: "success",
-          message: `${item.name} purchased for $${item.purchaseCost.toFixed(2)} and is now owned. Equip it to apply its constraints; purchase deducted exactly once.`,
-        },
+          {
+            kind: "success",
+            message: `${item.name} purchased for $${item.purchaseCost.toFixed(2)} and is now owned. Equip it to apply its constraints; purchase deducted exactly once.`,
+          },
+        ),
+        item.purchaseCost,
       );
     }
     case "EQUIP_HARDWARE": {
@@ -1310,19 +1925,22 @@ function applyValidCommand(
           kind: "warning",
           message: `${item.name} costs $${item.purchaseCost.toFixed(2)}; $${(item.purchaseCost - state.resources.money).toFixed(2)} more is required. No money was deducted.`,
         });
-      return withUpgradeNotice(
-        {
-          ...state,
-          ownedModuleIds: [...state.ownedModuleIds, item.id],
-          resources: {
-            ...state.resources,
-            money: round(state.resources.money - item.purchaseCost, 3),
+      return recordCapitalCommitment(
+        withUpgradeNotice(
+          {
+            ...state,
+            ownedModuleIds: [...state.ownedModuleIds, item.id],
+            resources: {
+              ...state.resources,
+              money: round(state.resources.money - item.purchaseCost, 3),
+            },
           },
-        },
-        {
-          kind: "success",
-          message: `${item.name} purchased for $${item.purchaseCost.toFixed(2)} and is now owned. Add it to a compatible ${item.slotTypes.join("/")} slot in Build; purchase deducted exactly once.`,
-        },
+          {
+            kind: "success",
+            message: `${item.name} purchased for $${item.purchaseCost.toFixed(2)} and is now owned. Add it to a compatible ${item.slotTypes.join("/")} slot in Build; purchase deducted exactly once.`,
+          },
+        ),
+        item.purchaseCost,
       );
     }
     case "BUY_EXPANSION": {
@@ -1342,19 +1960,22 @@ function applyValidCommand(
           kind: "warning",
           message: `${item.name} costs $${item.purchaseCost.toFixed(2)}; $${(item.purchaseCost - state.resources.money).toFixed(2)} more is required. No money was deducted.`,
         });
-      return withUpgradeNotice(
-        {
-          ...state,
-          ownedExpansionIds: [...state.ownedExpansionIds, item.id],
-          resources: {
-            ...state.resources,
-            money: round(state.resources.money - item.purchaseCost, 3),
+      return recordCapitalCommitment(
+        withUpgradeNotice(
+          {
+            ...state,
+            ownedExpansionIds: [...state.ownedExpansionIds, item.id],
+            resources: {
+              ...state.resources,
+              money: round(state.resources.money - item.purchaseCost, 3),
+            },
           },
-        },
-        {
-          kind: "success",
-          message: `${item.name} purchased for $${item.purchaseCost.toFixed(2)} and is now owned. Activate it explicitly; its three new positions start empty and no module was bought or filled automatically.`,
-        },
+          {
+            kind: "success",
+            message: `${item.name} purchased for $${item.purchaseCost.toFixed(2)} and is now owned. Activate it explicitly; its three new positions start empty and no module was bought or filled automatically.`,
+          },
+        ),
+        item.purchaseCost,
       );
     }
     case "SET_EXPANSION_ACTIVE": {
@@ -1664,7 +2285,7 @@ function applyValidCommand(
         baselineMetrics: state.metrics,
         baselineLabel: "Before local model tier change",
       });
-      return appendEvent(next, {
+      return appendEvent(recordModelSwitch(next), {
         kind: "info",
         message: `${tier.name} selected. Its memory, throughput, quality, reliability, and nightly operating tradeoffs now apply to model stages.`,
       });
@@ -1677,7 +2298,7 @@ function applyValidCommand(
         baselineMetrics: state.metrics,
         baselineLabel: "Before quantization change",
       });
-      return appendEvent(next, {
+      return appendEvent(recordModelSwitch(next), {
         kind: "info",
         message:
           command.profile === "q8"
@@ -1707,6 +2328,13 @@ function applyValidCommand(
       const prize =
         qualifies && !state.career.competition.prizeClaimed ? 12 : 0;
       let next = settleCareerAccounting(state, prize, 0, 0);
+      const publicScore =
+        state.career.evaluation.publicScore ??
+        round(
+          clamp(score + state.career.evaluation.leakageRisk * 12, 0, 99),
+          1,
+        );
+      const privateAssessment = privateAssessmentFor(next);
       next = {
         ...next,
         resources: {
@@ -1730,13 +2358,19 @@ function applyValidCommand(
               3,
             ),
           },
+          evaluation: {
+            ...next.career.evaluation,
+            publicScore,
+            privateAssessment,
+          },
         },
       };
+      next = withIgnoredWarnings(next, ["leakage"]);
       return appendEvent(next, {
         kind: qualifies ? "success" : "warning",
         message: qualifies
-          ? `Bedroom Benchmark Cup submitted at ${score.toFixed(1)}. ${prize > 0 ? "$12.000 prize paid into the same explicit cost ledger." : "The one-time prize was already claimed; this submission added technical reputation only."}`
-          : `Bedroom Benchmark Cup submitted at ${score.toFixed(1)}; the entry missed the 45.0 verified threshold. No prize was paid and no run state was destroyed.`,
+          ? `Bedroom Benchmark Cup submitted with public score ${publicScore.toFixed(1)} and private assessment ${privateAssessment}. ${prize > 0 ? "$12.000 prize paid into the same explicit cost ledger." : "The one-time prize was already claimed; this submission added technical reputation only."} Exact latent capability remains intentionally unreported.`
+          : `Bedroom Benchmark Cup submitted with public score ${publicScore.toFixed(1)} and private assessment ${privateAssessment}; the entry missed the 45.0 verified threshold. No prize was paid and no run state was destroyed. Exact latent capability remains intentionally unreported.`,
       });
     }
     case "RELEASE_PRODUCT": {
@@ -1747,23 +2381,127 @@ function applyValidCommand(
           message: `Deskflow Local needs 8.00 build progress before release; ${state.career.product.buildProgress.toFixed(2)} is ready.`,
         });
       return appendEvent(
-        {
-          ...state,
-          career: {
-            ...state.career,
-            product: {
-              ...state.career.product,
-              released: true,
-              releases: state.career.product.releases + 1,
+        withIgnoredWarnings(
+          {
+            ...state,
+            career: {
+              ...state.career,
+              product: {
+                ...state.career.product,
+                released: true,
+                releases: state.career.product.releases + 1,
+              },
             },
           },
-        },
+          ["reliability"],
+        ),
         {
           kind: "success",
           message:
             "Deskflow Local released. Future product hours provide service revenue, while reliability debt may require maintenance time.",
         },
       );
+    }
+    case "RUN_PUBLIC_EVALUATION": {
+      const evaluation = state.career.evaluation;
+      const nextRisk = round(
+        clamp(
+          evaluation.leakageRisk +
+            clamp(0.24 - evaluation.coverage * 0.16, 0.08, 0.24),
+          0,
+          1,
+        ),
+        3,
+      );
+      const publicScore = publicScoreFor(state, nextRisk);
+      return appendEvent(
+        {
+          ...state,
+          career: {
+            ...state.career,
+            evaluation: {
+              ...evaluation,
+              publicScore,
+              publicEvaluations: Math.min(
+                MAX_EVALUATION_COUNTER,
+                evaluation.publicEvaluations + 1,
+              ),
+              leakageRisk: nextRisk,
+            },
+          },
+        },
+        {
+          kind: "info",
+          message: `Public preview recorded ${publicScore.toFixed(1)}. It is a visible benchmark signal, not an exact capability claim; repeated previews increase leakage risk.`,
+        },
+      );
+    }
+    case "RUN_PRIVATE_EVALUATION": {
+      if (state.resources.money < PRIVATE_EVALUATION_COST)
+        return appendEvent(state, {
+          kind: "warning",
+          message: `Private evaluation needs $${PRIVATE_EVALUATION_COST.toFixed(3)} liquid cash for the evidence sample. No coverage or cost changed.`,
+        });
+      const accounted = settleCareerAccounting(
+        state,
+        0,
+        PRIVATE_EVALUATION_COST,
+        0,
+      );
+      const previous = accounted.career.evaluation;
+      const coverage = round(
+        clamp(previous.coverage + evaluationCoverageGain(accounted), 0, 1),
+        3,
+      );
+      const candidate = {
+        ...accounted,
+        career: {
+          ...accounted.career,
+          evaluation: {
+            ...previous,
+            coverage,
+            evaluationSpend: round(
+              previous.evaluationSpend + PRIVATE_EVALUATION_COST,
+              3,
+            ),
+            privateEvaluations: Math.min(
+              MAX_EVALUATION_COUNTER,
+              previous.privateEvaluations + 1,
+            ),
+            leakageRisk: round(Math.max(0, previous.leakageRisk - 0.22), 3),
+            distributionShiftRisk: round(
+              Math.max(0, previous.distributionShiftRisk - 0.18),
+              3,
+            ),
+          },
+        },
+      };
+      const privateAssessment = privateAssessmentFor(candidate, coverage);
+      return appendEvent(
+        {
+          ...candidate,
+          career: {
+            ...candidate.career,
+            evaluation: {
+              ...candidate.career.evaluation,
+              privateAssessment,
+            },
+          },
+        },
+        {
+          kind: "success",
+          message: `Private evidence sample paid for $${PRIVATE_EVALUATION_COST.toFixed(3)}. Coverage is now ${(coverage * 100).toFixed(0)}%; private assessment: ${privateAssessment}. Exact latent capability remains intentionally unreported.`,
+        },
+      );
+    }
+    case "CONCLUDE_INDEPENDENT_RUN": {
+      const readiness = independentRunReadiness(state);
+      if (!readiness.ready)
+        return appendEvent(state, {
+          kind: "warning",
+          message: `Independent conclusion is not ready: ${readiness.reasons.join(" ")}`,
+        });
+      return finalizeRunEnding(state, "honest-independent-builder");
     }
     case "SET_OFFLINE_POLICY": {
       const maxHours = round(
@@ -1930,10 +2668,15 @@ export function applyCommand(
   command: SimulationCommand,
 ): SimulationState {
   if (!isRuntimeSimulationCommand(command)) return state;
+  if (state.career.runEnding && command.type !== "RESET") return state;
   const applied = applyValidCommand(state, command);
   if (applied === state) return state;
   const next = sealSimulationState(
-    refreshCareerUnlocks(refreshWorkloadUnlocks(applied)),
+    resolveRunEnding(
+      refreshEvaluationWarnings(
+        refreshCareerUnlocks(refreshWorkloadUnlocks(applied)),
+      ),
+    ),
   );
   return isStateValid(next) ? next : state;
 }
@@ -2167,6 +2910,7 @@ function advanceTickQuantum(
 
 export function tick(state: SimulationState, seconds: number): SimulationState {
   if (!isFiniteNumber(seconds)) return state;
+  if (state.career.runEnding) return state;
   const elapsed = clamp(seconds, 0, 60);
   if (elapsed === 0) return state;
   if (state.tick + Math.round(elapsed * 1000) > Number.MAX_SAFE_INTEGER)
@@ -2203,6 +2947,132 @@ const isText = (value: unknown, maxLength: number): value is string =>
 
 const isEventKind = (value: unknown): value is LedgerEvent["kind"] =>
   EVENT_KINDS.includes(value as LedgerEvent["kind"]);
+
+function isCausalEvidenceValid(value: unknown): value is CausalEvidence {
+  if (typeof value !== "object" || value === null) return false;
+  const evidence = value as CausalEvidence;
+  const categories = [
+    evidence.directCauses,
+    evidence.contributingFactors,
+    evidence.correlations,
+    evidence.hypotheses,
+    evidence.unknowns,
+  ];
+  return categories.every(
+    (items) =>
+      Array.isArray(items) &&
+      items.length > 0 &&
+      items.length <= 4 &&
+      items.every((item) => isText(item, 400)) &&
+      new Set(items).size === items.length,
+  );
+}
+
+function isEvaluationStateValid(value: unknown): value is EvaluationState {
+  if (typeof value !== "object" || value === null) return false;
+  const evaluation = value as EvaluationState;
+  const warnings = evaluation.warnings;
+  if (typeof warnings !== "object" || warnings === null) return false;
+  const warningKeys: readonly EvaluationWarningKey[] = [
+    "leakage",
+    "reliability",
+    "hardware",
+    "tutorial",
+  ];
+  const finiteCounters = [
+    evaluation.evaluationSpend,
+    evaluation.publicEvaluations,
+    evaluation.privateEvaluations,
+    evaluation.reliabilityIncidents,
+    evaluation.ignoredWarnings,
+    evaluation.modelSwitches,
+    evaluation.capitalCommitments,
+    evaluation.hardwareDebt,
+  ];
+  return (
+    (evaluation.publicScore === null ||
+      (Number.isFinite(evaluation.publicScore) &&
+        evaluation.publicScore >= 0 &&
+        evaluation.publicScore <= 99)) &&
+    PRIVATE_ASSESSMENTS.includes(evaluation.privateAssessment) &&
+    Number.isFinite(evaluation.coverage) &&
+    evaluation.coverage >= 0 &&
+    evaluation.coverage <= 1 &&
+    Number.isFinite(evaluation.leakageRisk) &&
+    evaluation.leakageRisk >= 0 &&
+    evaluation.leakageRisk <= 1 &&
+    Number.isFinite(evaluation.distributionShiftRisk) &&
+    evaluation.distributionShiftRisk >= 0 &&
+    evaluation.distributionShiftRisk <= 8 &&
+    finiteCounters.every(
+      (item) =>
+        Number.isFinite(item) && item >= 0 && item <= MAX_EVALUATION_SPEND,
+    ) &&
+    Number.isSafeInteger(evaluation.publicEvaluations) &&
+    Number.isSafeInteger(evaluation.privateEvaluations) &&
+    Number.isSafeInteger(evaluation.reliabilityIncidents) &&
+    Number.isSafeInteger(evaluation.ignoredWarnings) &&
+    Number.isSafeInteger(evaluation.modelSwitches) &&
+    Number.isSafeInteger(evaluation.capitalCommitments) &&
+    Object.keys(warnings).length === warningKeys.length &&
+    warningKeys.every(
+      (key) =>
+        Number.isSafeInteger(warnings[key]) &&
+        warnings[key] >= 0 &&
+        warnings[key] <= MAX_EVALUATION_COUNTER,
+    )
+  );
+}
+
+function isMetaProgressionValid(value: unknown): value is MetaProgression {
+  if (typeof value !== "object" || value === null) return false;
+  const meta = value as MetaProgression;
+  return (
+    Array.isArray(meta.unlockedDiagnosticIds) &&
+    meta.unlockedDiagnosticIds.length <= DIAGNOSTIC_UNLOCK_IDS.length &&
+    meta.unlockedDiagnosticIds.every((id) =>
+      DIAGNOSTIC_UNLOCK_IDS.includes(id),
+    ) &&
+    new Set(meta.unlockedDiagnosticIds).size ===
+      meta.unlockedDiagnosticIds.length &&
+    Array.isArray(meta.completedEndingIds) &&
+    meta.completedEndingIds.length <= RUN_ENDING_IDS.length &&
+    meta.completedEndingIds.every((id) => RUN_ENDING_IDS.includes(id)) &&
+    new Set(meta.completedEndingIds).size === meta.completedEndingIds.length &&
+    Number.isSafeInteger(meta.replayCount) &&
+    meta.replayCount >= 0 &&
+    meta.replayCount <= MAX_META_REPLAYS
+  );
+}
+
+function isRunEndingValid(
+  value: unknown,
+  ledger: readonly LedgerEvent[],
+  tick: number,
+): value is RunEnding | null {
+  if (value === null) return true;
+  if (typeof value !== "object") return false;
+  const ending = value as RunEnding;
+  const detail = RUN_ENDING_IDS.includes(ending.id)
+    ? ENDING_DETAILS[ending.id]
+    : undefined;
+  const event = ledger.find((entry) => entry.id === ending.eventId);
+  return (
+    detail !== undefined &&
+    ending.title === detail.title &&
+    ending.outcome === detail.outcome &&
+    ending.diagnosticUnlockId === detail.diagnosticUnlockId &&
+    isText(ending.eventId, 128) &&
+    ending.eventId.length > 0 &&
+    Number.isSafeInteger(ending.reachedAtTick) &&
+    ending.reachedAtTick >= 0 &&
+    ending.reachedAtTick <= tick &&
+    event !== undefined &&
+    event.tick === ending.reachedAtTick &&
+    event.causal !== undefined &&
+    isCausalEvidenceValid(event.causal)
+  );
+}
 
 function isMigrationMetadataValid(value: unknown): value is MigrationMetadata {
   if (typeof value !== "object" || value === null) return false;
@@ -2324,7 +3194,10 @@ function isCareerStateValid(value: unknown): value is CareerState {
       career.offlinePolicy.minReliability <= 0.999 &&
       reportValid &&
       typeof career.exitAchieved === "boolean" &&
-      (!career.exitAchieved || careerExitSatisfied(career))
+      (!career.exitAchieved || careerExitSatisfied(career)) &&
+      isEvaluationStateValid(career.evaluation) &&
+      (career.runEnding === null ||
+        (typeof career.runEnding === "object" && career.runEnding !== null))
     );
   } catch {
     return false;
@@ -2483,6 +3356,7 @@ function isStateStructurallyValid(value: unknown): value is SimulationState {
         (value) => Number.isFinite(value) && value >= 0,
       ) &&
       isCareerStateValid(state.career) &&
+      isMetaProgressionValid(state.meta) &&
       nonnegativeIntegers.every(
         (value) => Number.isSafeInteger(value) && value >= 0,
       ) &&
@@ -2579,10 +3453,17 @@ function isStateStructurallyValid(value: unknown): value is SimulationState {
           isText(event.message, 800) &&
           (event.directCause === undefined || isText(event.directCause, 800)) &&
           (event.contributingCondition === undefined ||
-            isText(event.contributingCondition, 800)),
+            isText(event.contributingCondition, 800)) &&
+          (event.causal === undefined || isCausalEvidenceValid(event.causal)),
       ) &&
       state.eventSequence >= state.ledger.length &&
-      new Set(eventIds).size === eventIds.length
+      new Set(eventIds).size === eventIds.length &&
+      isRunEndingValid(state.career.runEnding, state.ledger, state.tick) &&
+      (state.career.runEnding === null ||
+        (state.meta.unlockedDiagnosticIds.includes(
+          state.career.runEnding.diagnosticUnlockId,
+        ) &&
+          state.meta.completedEndingIds.includes(state.career.runEnding.id)))
     );
   } catch {
     return false;
@@ -2633,7 +3514,7 @@ function withMigrationStep(
   };
 }
 
-/** Restores current saves or migrates Pipeline Toy saves into Bedroom Career. */
+/** Restores current saves or migrates legacy Pipeline Toy/Career saves safely. */
 export function restoreSimulationState(
   value: unknown,
   fallbackSeed = 20260715,
@@ -2646,7 +3527,7 @@ export function restoreSimulationState(
       ? record.migration
       : {
           sourceSchemaVersion: SCHEMA_VERSION,
-          steps: ["schema-v6-metadata-added"],
+          steps: ["schema-v7-metadata-added"],
         };
     const candidate = {
       ...record,
@@ -2665,14 +3546,44 @@ export function restoreSimulationState(
     );
     return isStateValid(restored) ? restored : fallback;
   }
+  if (record.schemaVersion === 6) {
+    const inheritedMigration = isMigrationMetadataValid(record.migration)
+      ? record.migration
+      : { sourceSchemaVersion: 6, steps: [] };
+    const migration = withMigrationStep(
+      inheritedMigration,
+      "schema-6-to-7-evaluation-replay",
+    );
+    const legacyCareer =
+      typeof record.career === "object" && record.career !== null
+        ? (record.career as Record<string, unknown>)
+        : {};
+    const candidate = {
+      ...record,
+      schemaVersion: SCHEMA_VERSION,
+      contentVersion: CONTENT_VERSION,
+      migration,
+      integrity: EMPTY_INTEGRITY,
+      career: {
+        ...legacyCareer,
+        evaluation: createInitialEvaluationState(),
+        runEnding: null,
+      },
+      meta: createInitialMetaProgression(),
+    } as unknown as SimulationState;
+    if (!isStateStructurallyValid(candidate)) return fallback;
+    const migrated = sealSimulationState(recalculate(candidate));
+    return isStateValid(migrated) ? migrated : fallback;
+  }
   if (record.schemaVersion === 5) {
     const inheritedMigration = isMigrationMetadataValid(record.migration)
       ? record.migration
       : { sourceSchemaVersion: 5, steps: [] };
-    const migration = withMigrationStep(
+    let migration = withMigrationStep(
       inheritedMigration,
       "schema-5-to-6-bedroom-career",
     );
+    migration = withMigrationStep(migration, "schema-6-to-7-evaluation-replay");
     const candidate = {
       ...record,
       schemaVersion: SCHEMA_VERSION,
@@ -2680,6 +3591,7 @@ export function restoreSimulationState(
       migration,
       integrity: EMPTY_INTEGRITY,
       career: createInitialCareerState(),
+      meta: createInitialMetaProgression(),
     } as unknown as SimulationState;
     if (!isStateStructurallyValid(candidate)) return fallback;
     const migrated = sealSimulationState(recalculate(candidate));
@@ -2743,7 +3655,10 @@ export function restoreSimulationState(
     ...createInitialState(seed),
     migration: {
       sourceSchemaVersion: legacySchema,
-      steps: [`schema-${legacySchema}-to-6-bedroom-career`],
+      steps: [
+        `schema-${legacySchema}-to-6-bedroom-career`,
+        "schema-6-to-7-evaluation-replay",
+      ],
     },
     rngState: normalizeSeed(finiteOr(record.rngState, seed)),
     tick: Math.min(

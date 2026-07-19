@@ -1,43 +1,42 @@
-# Candidate handoff — Bedroom Career Loop
+# Candidate handoff — Evaluation, Failure, and Replay
 
 ## Implemented behavior summary
 
-- Existing deterministic workstation, purchase, expansion, queue, demand, settlement, persistence, root/Pages PWA, and service-worker recovery behavior remains intact.
-- Schema 6 / content `bedroom-career-1` adds a bounded Bedroom Developer loop to the same workstation. A player has one explicit four-hour evening, allocates quarter-hour blocks across freelance delivery, one competition, one local product, and product maintenance, then runs the evening. Empty time produces neither money nor progress.
-- Route tradeoffs are concrete: freelance provides immediate configuration-sensitive income; competition builds a verified score and may earn one prize; product hours build then service one durable utility; maintenance reduces service debt. All routes use the current single pipeline and consume finite evening time.
-- Career accounting exposes savings, electricity, operating costs, paid costs, and unpaid costs. Cash remains nonnegative; income pays prior career cost debt first.
-- Three fictional durable local-model tiers (Lantern 3B, Harbor 7B, Kiln 13B) and Q4/Q8 selections alter the installed model stage’s quality, memory, throughput, reliability, and operating-cost tradeoffs. Tier criteria and the Bedroom Developer exit are explicit and durable.
-- Safe offline automation is opt-in, freelance-only, quarter-hour bounded, and limited by player-selected electricity, operating-cost, and reliability caps. It defers to a pending player schedule, cannot create unpaid costs, and cannot buy, submit, release, or advance product/competition state. A persisted report names its applied work or safe stop reason.
-- Current schema-5 saves migrate in place with initialized career state. Existing schema-3/4 migrations continue through schema 6. Malformed current career payloads restart safely under the existing integrity validator.
-- Career schedule edits are one atomic Worker command batch followed by `RUN_EVENING`; React cannot run a stale partial schedule. State still persists before UI publication.
+- Retains the deterministic single workstation, purchasing, expansion, queue, demand, Bedroom Career, local-tier, offline-policy, root/Pages PWA, and service-worker recovery product.
+- Schema 7 / content `evaluation-replay-1` adds separate public benchmark previews and paid private evaluation. Public score is visible; private evidence is a categorical assessment plus coverage and cost, never an exact latent capability or private numeric score.
+- Repeated public previews raise leakage risk; paid private evidence reduces leakage/shift uncertainty without guaranteeing an outcome. Insufficient cash is a durable no-op with a recorded explanation; later funding/retry succeeds exactly once.
+- Released-product service work can accumulate distribution-shift risk, reliability incidents, service debt, and causal ledger evidence. Capital commitments against unresolved constraints can create hardware debt/unpaid-cost pressure. Model/quantization churn can accumulate tutorial-loop warnings.
+- Five deterministic, command-reachable endings exist: Public Leaderboard Hero, Product Reliability Collapse, Hardware Debt Spiral, Tutorial Loop, and explicit Honest Independent Builder. Automatic endings require their recorded causal pattern and escalating ignored warnings; the honest ending requires player-confirmed visible evidence.
+- A closed run freezes. Same-seed restart and next-seed replay reset the pipeline/economy while retaining only completed-ending history and explanation-only diagnostic unlocks. Unlocks grant no production, money, quality, reliability, or coverage modifier.
+- Every ending has an accessible postmortem backed by retained bounded-ledger causal evidence: direct causes, contributing factors, correlations, player-visible hypotheses, and unknowns.
+- Schema-6 Bedroom Career saves migrate in place with initialized evaluation/replay state; malformed current evaluation or dangling postmortem data safely recovers through integrity validation.
 
 ## Plan requirements covered
 
-| Requirement                                                    | Candidate evidence                                                                                       |
-| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Personal schedule; finite evenings; no idle-only reward        | Engine command/invariant tests; `careerBalance` no-wait scenarios; 320/393 Playwright keyboard flow      |
-| Savings and electricity with honest costs                      | Career route accounting tests and deterministic balance sweep                                            |
-| Existing hardware/pipeline plus local-model workloads          | Existing purchase/expansion tests retained; tier/Q4/Q8 metric tests                                      |
-| Freelance work, quantization, first competition, first product | Route, submission, release, prize, service-debt, and maintenance engine tests                            |
-| Save/load and safe schema migration                            | Schema-5 migration unit test and browser reload/persistence test                                         |
-| Basic offline policy and recovery                              | Engine cap/safety tests; browser failure/recovery and offline reload case                                |
-| Portrait/accessibility constraints                             | Pinned Playwright at 320/393, keyboard, 200% text, reduced motion, 44px controls, no horizontal overflow |
-| Determinism and viable non-dominant paths                      | 101-seed `careerBalance` sweep; route strategies exit without wait-money exploit                         |
-| Existing PWA/root/Pages safety                                 | Existing pinned root and Pages suites remain part of canonical verification                              |
+| Requirement                                                                     | Candidate evidence                                                                                                                                                                   |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Distinct public/private evaluation; no exact latent capability disclosure       | Engine model/validation tests; `evaluationReplay.test.ts`; pinned 393px browser payment/recovery flow                                                                                |
+| Leakage/overfitting, costly coverage, distribution shift, reliability incidents | Deterministic engine scenarios and 121-seed `balance:evaluation` sweep                                                                                                               |
+| Bounded causal ledger and accessible postmortems                                | Ending causal-evidence invariants; 320px Playwright postmortem with all five semantic categories                                                                                     |
+| Five causal, non-opaque endings and replay                                      | Fixed command scenarios, property tests, 121-seed sweep, browser Tutorial Loop/restart case                                                                                          |
+| Information-only diagnostic meta-progression                                    | Metric equality assertion; serialized restart/reload and browser diagnostic-unlock coverage                                                                                          |
+| Preserve existing Career and schema-6 saves                                     | Schema-6 unit/browser migration; retained Career/PWA regression suites                                                                                                               |
+| Portrait/accessibility/motion/touch/reload/offline paths                        | 320/393 browser cases, keyboard and CDP touch input, 200% text, reduced motion, offline reload; canonical suites retain pointer/touch drag, PWA update, Pages, and recovery coverage |
+| Determinism and viable distinct responses                                       | Arbitrary command/persisted JSON properties plus 121-seed ending/avoidability/non-dominance sweep                                                                                    |
 
 ## Verifier findings resolved
 
-- No unresolved verifier finding is intentionally carried forward. Immutable reports through round 029 remain untouched; their regression coverage stays in the repository.
-- This candidate additionally prevents the career-schedule Worker race by batching all four allocations with the evening run, and prevents React synthetic-event clearing from losing an offline-policy checkbox update.
+- No unresolved verifier finding from rounds 001–030 was carried forward; immutable reports remain untouched.
+- D-011 adds regression coverage for schema-6 migration, malformed evaluation/postmortem recovery, causal-ended-state serialization, bounded ledger references, deterministic ending patterns, and browser replay state persistence.
 
 ## Setup, startup, and verification commands
 
-Prerequisites: Node matching `package.json` (`^20.19.0 || >=22.12.0`) and a network connection for the first locked dependency/browser install.
+Prerequisite: Node matching `package.json` (`^20.19.0 || >=22.12.0`). First setup needs network access for the lockfile dependencies and Chromium.
 
 ```sh
 ./scripts/setup
 ./scripts/run
-# browse http://127.0.0.1:4173
+# http://127.0.0.1:4173
 ```
 
 `./scripts/setup` uses ignored repository-local caches only:
@@ -45,23 +44,21 @@ Prerequisites: Node matching `package.json` (`^20.19.0 || >=22.12.0`) and a netw
 ```text
 npm cache:       .cache/npm
 Chromium cache:  .cache/ms-playwright
-Playwright data: playwright-report/, playwright-pages-report/, test-results/
+test artifacts:  playwright-report/, playwright-pages-report/, test-results/
 ```
 
-On a Linux host needing browser libraries, run `PLAYWRIGHT_INSTALL_DEPS=1 ./scripts/setup`; this installs Chromium dependencies before the same repository-local browser install. The root and Pages Playwright configurations start deterministic loopback servers, wait for readiness, and clean them up.
-
-Focused commands:
+On Linux hosts requiring browser libraries:
 
 ```sh
-npm run typecheck
-npm run lint
-npm test
-npm run balance
-npm run build
-npm run build:pages
-npm run test:e2e -- tests/e2e/career.spec.ts
-npm run test:e2e
-npm run test:e2e:pages
+PLAYWRIGHT_INSTALL_DEPS=1 ./scripts/setup
+```
+
+Focused D-011 commands:
+
+```sh
+npx vitest run --no-coverage src/simulation/engine.test.ts src/simulation/evaluationReplay.test.ts
+npm run balance:evaluation
+npm run test:e2e -- tests/e2e/evaluation-replay.spec.ts
 ```
 
 Canonical full check:
@@ -70,41 +67,36 @@ Canonical full check:
 ./scripts/verify
 ```
 
-`./scripts/verify` runs setup, formatting, lint, typecheck, unit/property tests with coverage, all balance sweeps, root build, root Playwright, and Pages Playwright. It returns nonzero if any phase fails while continuing to collect both browser-suite results.
+`./scripts/verify` runs setup, formatting, lint, typecheck, unit/property coverage, all deterministic balance sweeps, root build, root Playwright, and Pages Playwright. `playwright.config.ts` starts `./scripts/run-e2e` on deterministic `127.0.0.1:4173`, waits for it, and tears it down. No global package, user-home browser cache, profile, or in-app Browser is required.
 
 ## Important architectural decisions
 
-- Simulation owns every career mutation; React only renders snapshots and submits typed commands through the Worker.
-- `CareerState` is versioned state, validated before restore, sealed with the existing integrity digest, and migrated from schema 5 without changing the established localStorage address.
-- The schedule has a deliberate 0.25-hour grid and a four-hour maximum. The UI holds a local draft so multiple input edits yield one atomic batch instead of four asynchronous Worker requests.
-- Local tiers are data in `catalog.ts`, modify the existing model-stage metric calculation, and are intentionally fictional/durable. They introduce no second pipeline or automatic purchase.
-- Career costs use configured operating cost plus physical hardware electricity at $0.24/kWh. Cost debt is explicit, settles before new cash, and does not permit negative money.
-- Offline policy evaluates current freelance metrics and all player caps before route execution. A report records either completed bounded work or the precise safety reason; it cannot call economic or milestone commands.
-- Auto-resume is one bounded `APPLY_OFFLINE_POLICY` command after a restored, durable, policy-enabled session receives Worker state. The elapsed wall clock is capped and all actual work remains engine-validated.
-- Browser automation is pinned through `@playwright/test` and uses `PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright`; no user-home cache, global package, pre-existing profile, or in-app Browser is required.
+- The simulation engine is sole authority: React renders Worker snapshots and sends typed commands only.
+- `EvaluationState`, ending metadata, causal evidence, and `MetaProgression` are sealed/validated schema state. The only public/private bridge is a visible public score and a categorical private assessment; no latent numeric field is persisted.
+- Ending completion appends causal evidence before freezing commands. The retained event ID is validated, so a postmortem cannot point at evicted/unrelated ledger data.
+- Ending thresholds combine observed history, irreversible action, warning escalation, and ignored-warning decisions. `CONCLUDE_INDEPENDENT_RUN` is deliberately explicit rather than an automatic hidden success roll.
+- Reset carries only diagnostic IDs, completed-ending IDs, and replay count. `calculateMetrics` and command economics do not inspect meta state for a bonus.
+- Browser tests use pinned `@playwright/test`, repository-local Chromium cache, native keyboard controls, and CDP touch dispatch. Existing suites remain the drag, PWA update, root/Pages, malformed-state, and failure-recovery regression gates.
 
 ## Known limitations and risks
 
-- Career values are deterministic gameplay tuning, not real salary, electricity, or marketplace forecasting.
-- Offline execution is deliberately at most four hours and only processes freelance work; it is safety automation, not unattended progression.
-- Physical mobile-device thermal/battery behavior, non-Chromium engines, audio/haptics, and actual assistive-technology output remain unverified infrastructure areas.
-- localStorage denial leaves an in-memory session playable but cannot preserve reload state.
-- The candidate does not add characters, attention systems, extra pipelines, transient model catalogues, narrative, labor, startup, or laboratory systems.
-- Implementer does not push, deploy, or accept the candidate. Fresh exact-SHA independent verification and deployment remain Orchestrator/Verifier responsibilities.
+- Evaluation bands, warning thresholds, private-evaluation price, and endings are deterministic gameplay tuning—not real-world measurement, reliability forecasting, or hardware finance advice.
+- Causal postmortems describe modeled evidence and bounded uncertainty; they intentionally cannot identify an exact latent capability or unseen production input.
+- Physical mobile-device thermal/battery behavior, non-Chromium engines, and actual assistive-technology speech output remain unverified infrastructure areas.
+- localStorage denial leaves an in-memory session playable but cannot preserve replay state across reload.
+- No researchers/characters, attention economy, creators/hype/fear, extra pipelines, startup/labor/laboratory progression, narrative expansion, or transient model catalogues were added.
+- Implementer does not push, deploy, merge, or accept the candidate. Fresh exact-SHA independent verification and release remain Orchestrator/Verifier work.
 
-## Checks executed before final candidate
+## Checks executed before candidate handoff
 
-- `npm run format:check && npm run lint && npm run typecheck` — PASS.
-- `npm test` — PASS, 19 files / 94 tests; coverage: 86.70% statements, 83.68% branches, 94.08% functions, 89.86% lines.
-- `npm run balance:career` — PASS, 101 seeds / zero failures. The canonical `npm run balance` also ran the retained numeric prototype, 20,001-seed upgrade sweep, 41-seed progression sweep, and this career sweep without a reported failure.
-- `npm run build && npm run build:pages` — PASS.
-- `npm run test:e2e -- tests/e2e/career.spec.ts` — PASS, 5/5: 320/393 keyboard schedule, schema-5 migration/reload, offline stop/recovery/offline reload, 200% text/reduced motion.
-- `npm run test:e2e` — PASS, 94 root cases, including retained PWA/update coverage and the five Career cases.
-- `npm run test:e2e:pages` — PASS, 2/2 Pages/offline cases. A first immediate attempt found only a stale root test-server port conflict before page creation; stopping that exact owned Vite PID and rerunning produced 2/2. Canonical verification subsequently left no Vite server and a final Playwright result of `{"status":"passed","failedTests":[]}`.
-- `./scripts/verify` — PASS, exit 0. Fresh repository-local setup; format, lint, typecheck, 19 files / 94 unit/property tests, retained numeric prototype, 20,001-seed upgrade balance, 41-seed progression balance, 101-seed career balance, root build, 94 root Playwright cases, and 2 Pages/offline cases all completed.
+- `npm run typecheck` — PASS.
+- `npx vitest run --no-coverage src/simulation/engine.test.ts src/simulation/evaluationReplay.test.ts` — PASS, 2 files / 50 tests.
+- `npm run balance:evaluation` — PASS, 121 seeds / zero failures.
+- `npm run test:e2e -- tests/e2e/evaluation-replay.spec.ts` — PASS, 2/2 browser cases (run with repository-cached Chromium).
+- `./scripts/verify` — PASS. Fresh repository-local setup; format, lint, typecheck; 20 files / 103 unit-property tests; retained numeric prototype; 20,001-seed upgrade, 41-seed progression, 101-seed Career, and 121-seed evaluation balance sweeps; root build; 100 root Playwright cases; and 2 Pages/offline cases completed. Fresh root/Pages reports contain no failed-test artifacts and final `.last-run.json` is `{"status":"passed","failedTests":[]}`.
 
 ## Checks not run
 
-- No Git push, deployment, GitHub Actions execution, or live exact-candidate URL validation; intentionally Orchestrator-owned after candidate publication.
-- No physical device, non-Chromium, battery/thermal, or platform screen-reader testing; required hardware/services unavailable.
+- No Git push, deployment, live URL validation, or GitHub Actions run; outside Implementer authority.
+- No physical-device, non-Chromium, battery/thermal, or platform screen-reader testing; required hardware/services unavailable.
 - No manual play-duration or telemetry session; D-009 makes that optional feedback, not a release blocker.

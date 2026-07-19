@@ -21,7 +21,11 @@ import {
   workloadUnlockProgress,
 } from "./engine";
 import { normalizeSeed } from "./rng";
-import type { SimulationCommand, SimulationState } from "./types";
+import {
+  SCHEMA_VERSION,
+  type SimulationCommand,
+  type SimulationState,
+} from "./types";
 
 describe("deterministic simulation engine", () => {
   it("creates a valid, operable default pipeline", () => {
@@ -300,7 +304,7 @@ describe("deterministic simulation engine", () => {
     delete legacy.ownedModuleIds;
     delete legacy.lastUpgradeNotice;
     const migrated = restoreSimulationState(legacy);
-    expect(migrated.schemaVersion).toBe(6);
+    expect(migrated.schemaVersion).toBe(SCHEMA_VERSION);
     expect(migrated.hardwareId).toBe("used-gpu");
     expect(migrated.ownedHardwareIds).toEqual(["bedroom-cpu", "used-gpu"]);
     expect(migrated.ownedModuleIds).toEqual(
@@ -332,7 +336,7 @@ describe("deterministic simulation engine", () => {
   it("checks full snapshot integrity and safely reseals valid local recovery", () => {
     const initial = createInitialState(41);
     expect(initial.migration).toEqual({
-      sourceSchemaVersion: 6,
+      sourceSchemaVersion: SCHEMA_VERSION,
       steps: [],
     });
     expect(initial.integrity.algorithm).toBe("fnv1a-32-json-v1");
@@ -423,7 +427,7 @@ describe("deterministic simulation engine", () => {
       },
     });
     expect(repairedMetadata.migration.steps).toEqual([
-      "schema-v6-metadata-added",
+      "schema-v7-metadata-added",
       "integrity-resealed",
     ]);
     expect(isStateValid(repairedMetadata)).toBe(true);
@@ -885,7 +889,7 @@ describe("deterministic simulation engine", () => {
     delete jobs.waitingTasks;
     delete jobs.nextTaskSequence;
     const migrated = restoreSimulationState(legacy, 97);
-    expect(migrated.schemaVersion).toBe(6);
+    expect(migrated.schemaVersion).toBe(SCHEMA_VERSION);
     expect(migrated.jobs.queued).toBe(3);
     expect(migrated.jobs.waitingTasks).toHaveLength(3);
     expect(
@@ -915,7 +919,7 @@ describe("deterministic simulation engine", () => {
 
     const migrated = restoreSimulationState(legacy, 191);
 
-    expect(migrated.schemaVersion).toBe(6);
+    expect(migrated.schemaVersion).toBe(SCHEMA_VERSION);
     expect(migrated.jobs.queued).toBe(2);
     expect(migrated.career.schedule.hoursAvailable).toBe(4);
     expect(migrated.career.savings).toBe(3);

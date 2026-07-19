@@ -211,7 +211,7 @@ test("malformed current career state safely falls back without a runtime error",
   await waitForSave(page);
   await openCareer(page);
   const recovered = await savedState(page);
-  expect(recovered.schemaVersion).toBe(6);
+  expect(recovered.schemaVersion).toBe(7);
   expect(recovered.career?.schedule?.allocations).toEqual({
     freelance: 0,
     competition: 0,

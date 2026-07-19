@@ -110,7 +110,7 @@ test.describe("Bedroom Developer career acceptance", () => {
     });
   }
 
-  test("migrates a deployed schema-v5 save and persists career work through reload", async ({
+  test("migrates a deployed schema-v6 save and persists Career work through reload", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 393, height: 850 });
@@ -121,10 +121,13 @@ test.describe("Bedroom Developer career acceptance", () => {
         string,
         unknown
       >;
-      state.schemaVersion = 5;
-      state.contentVersion = "pipeline-toy-4";
-      state.migration = { sourceSchemaVersion: 5, steps: [] };
-      delete state.career;
+      state.schemaVersion = 6;
+      state.contentVersion = "bedroom-career-1";
+      state.migration = { sourceSchemaVersion: 6, steps: [] };
+      const career = state.career as Record<string, unknown>;
+      delete career.evaluation;
+      delete career.runEnding;
+      delete state.meta;
       localStorage.setItem(key, JSON.stringify(state));
     }, SAVE_KEY);
     await page.reload();
@@ -136,11 +139,11 @@ test.describe("Bedroom Developer career acceptance", () => {
         return {
           schemaVersion: state.schemaVersion,
           migrated: state.migration?.steps?.includes(
-            "schema-5-to-6-bedroom-career",
+            "schema-6-to-7-evaluation-replay",
           ),
         };
       })
-      .toEqual({ schemaVersion: 6, migrated: true });
+      .toEqual({ schemaVersion: 7, migrated: true });
 
     await page.getByLabel("Freelance delivery evening hours").fill("4");
     await page.getByRole("button", { name: "Run scheduled evening" }).click();

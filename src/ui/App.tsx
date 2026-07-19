@@ -20,9 +20,12 @@ import {
 } from "../simulation/catalog";
 import {
   calculateMetrics,
+  endingNextRunResponse,
   estimateWorkloadOffer,
+  getPostmortemEvent,
   getSimulationAgeHours,
   getWorkloadQuote,
+  independentRunReadiness,
   localModelTierUnlockProgress,
   workloadUnlockProgress,
 } from "../simulation/engine";
@@ -32,8 +35,11 @@ import {
 } from "../simulation/currency";
 import type {
   CareerRoute,
+  CausalEvidence,
+  DiagnosticUnlockId,
   PipelineMetrics,
   PipelineSlotState,
+  RunEndingId,
   SimulationCommand,
   SimulationState,
 } from "../simulation/types";
@@ -68,6 +74,36 @@ interface DeletedPreset {
   preset: SavedPreset;
   index: number;
 }
+
+const diagnosticCopy: Readonly<
+  Record<DiagnosticUnlockId, { name: string; description: string }>
+> = {
+  "leakage-warning": {
+    name: "Leakage warnings",
+    description:
+      "Makes repeated public-preview risk explicit. Information only; no production multiplier.",
+  },
+  "shift-monitor": {
+    name: "Shift monitor",
+    description:
+      "Shows that product evidence may not cover changed inputs. Information only; no production multiplier.",
+  },
+  "bottleneck-map": {
+    name: "Bottleneck map",
+    description:
+      "Keeps capital commitments beside the active constraint. Information only; no production multiplier.",
+  },
+  "decision-history": {
+    name: "Decision history",
+    description:
+      "Keeps configuration churn visible across a replay. Information only; no production multiplier.",
+  },
+  "confidence-intervals": {
+    name: "Confidence intervals",
+    description:
+      "Frames private evidence as bounded confidence rather than a capability guarantee. Information only; no production multiplier.",
+  },
+};
 
 function formatNumber(value: number, digits = 0): string {
   return new Intl.NumberFormat("en-US", {
@@ -1649,6 +1685,154 @@ function JobsView({
   );
 }
 
+const causalCategoryLabels: readonly [keyof CausalEvidence, string][] = [
+  ["directCauses", "Direct causes"],
+  ["contributingFactors", "Contributing factors"],
+  ["correlations", "Correlated conditions"],
+  ["hypotheses", "Player-visible hypotheses"],
+  ["unknowns", "Unknowns"],
+];
+
+function DiagnosticMemory({ state }: { state: SimulationState }) {
+  const unlocked = state.meta.unlockedDiagnosticIds;
+  return (
+    <section className="panel diagnostic-memory" aria-labelledby="memory-title">
+      <div className="section-heading compact">
+        <div>
+          <span className="eyebrow">Replay memory / information only</span>
+          <h2 id="memory-title">Diagnostic unlocks</h2>
+        </div>
+        <span className="counter">{unlocked.length}/5 retained</span>
+      </div>
+      <p className="concept-note">
+        Endings retain diagnostic language, never flat production, money,
+        quality, reliability, or coverage bonuses. Every new run starts its
+        pipeline and economy fresh.
+      </p>
+      {unlocked.length ? (
+        <ul className="diagnostic-list" aria-label="Unlocked diagnostics">
+          {unlocked.map((id) => (
+            <li key={id}>
+              <strong>{diagnosticCopy[id].name}</strong>
+              <span>{diagnosticCopy[id].description}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="empty-state">
+          Complete a run to retain one diagnostic lens for replay. It will not
+          change production outcomes.
+        </p>
+      )}
+    </section>
+  );
+}
+
+function CausalPostmortem({ state }: { state: SimulationState }) {
+  const ending = state.career.runEnding;
+  const event = getPostmortemEvent(state);
+  const causal = event?.causal;
+  if (!ending || !event || !causal) return null;
+  return (
+    <section className="panel postmortem" aria-labelledby="postmortem-title">
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow">
+            Bounded causal ledger / recorded evidence
+          </span>
+          <h2 id="postmortem-title">Run postmortem</h2>
+        </div>
+        <span
+          className={
+            ending.outcome === "success" ? "equipment-state" : "counter"
+          }
+        >
+          {ending.outcome === "success" ? "SUCCESS" : "RUN CLOSED"}
+        </span>
+      </div>
+      <p className="postmortem-outcome" role="status">
+        <strong>{ending.title}</strong> · Evidence event {event.id}
+      </p>
+      <dl className="causal-evidence-list">
+        {causalCategoryLabels.map(([key, label]) => (
+          <div key={key}>
+            <dt>{label}</dt>
+            <dd>
+              <ul>
+                {causal[key].map((statement) => (
+                  <li key={statement}>{statement}</li>
+                ))}
+              </ul>
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <p className="next-run-response">
+        <strong>Next-run response:</strong>{" "}
+        {endingNextRunResponse(ending.id as RunEndingId)}
+      </p>
+    </section>
+  );
+}
+
+function RunEndingView({
+  state,
+  command,
+}: {
+  state: SimulationState;
+  command: (command: SimulationCommand) => void;
+}) {
+  const ending = state.career.runEnding;
+  if (!ending) return null;
+  const nextSeed = state.seed >= 0xffff_ffff ? 1 : state.seed + 1;
+  return (
+    <>
+      <section
+        className="panel career-overview run-ending"
+        aria-labelledby="career-title"
+      >
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">Deterministic run conclusion</span>
+            <h2 id="career-title">Career loop</h2>
+          </div>
+          <span
+            className={
+              ending.outcome === "success" ? "equipment-state" : "counter"
+            }
+          >
+            {ending.outcome === "success" ? "COMPLETE" : "CLOSED"}
+          </span>
+        </div>
+        <h3>{ending.title}</h3>
+        <p>
+          This run is frozen so its postmortem stays tied to retained ledger
+          evidence. Restart to replay the same deterministic scenario, or move
+          to the next deterministic seed.
+        </p>
+        <div className="career-actions">
+          <button
+            type="button"
+            className="primary-action"
+            onClick={() => command({ type: "RESET", seed: state.seed })}
+          >
+            Restart this scenario
+          </button>
+          <button
+            type="button"
+            className="secondary-action"
+            onClick={() => command({ type: "RESET", seed: nextSeed })}
+          >
+            Replay next scenario
+          </button>
+        </div>
+      </section>
+      <CausalPostmortem state={state} />
+      <DiagnosticMemory state={state} />
+    </>
+  );
+}
+
 function CareerView({
   state,
   command,
@@ -1674,6 +1858,11 @@ function CareerView({
   useEffect(() => {
     setScheduleDraft({ ...career.schedule.allocations });
   }, [career.schedule.allocations, career.schedule.completedEvenings]);
+
+  if (career.runEnding)
+    return <RunEndingView state={state} command={command} />;
+
+  const conclusion = independentRunReadiness(state);
 
   const updateRouteHours = (route: CareerRoute, value: number) => {
     if (!Number.isFinite(value)) return;
@@ -1881,6 +2070,85 @@ function CareerView({
               Release Deskflow Local
             </button>
           </article>
+        </div>
+      </section>
+
+      <section
+        className="panel evaluation-panel"
+        aria-labelledby="evaluation-title"
+      >
+        <div className="section-heading compact">
+          <div>
+            <span className="eyebrow">Public proxy / private evidence</span>
+            <h2 id="evaluation-title">Evaluation discipline</h2>
+          </div>
+          <span className="counter">
+            {(career.evaluation.coverage * 100).toFixed(0)}% covered
+          </span>
+        </div>
+        <p className="concept-note">
+          Public previews are visible benchmark proxies. Private evaluation
+          costs cash and returns an evidence band, not an exact
+          actual-capability number. Coverage reduces leakage and shifted-input
+          uncertainty but does not guarantee a result.
+        </p>
+        <dl className="evaluation-stat-grid" aria-label="Evaluation evidence">
+          <div>
+            <dt>Public score</dt>
+            <dd>
+              {career.evaluation.publicScore === null
+                ? "Not run"
+                : career.evaluation.publicScore.toFixed(1)}
+            </dd>
+          </div>
+          <div>
+            <dt>Private assessment</dt>
+            <dd>{career.evaluation.privateAssessment}</dd>
+          </div>
+          <div>
+            <dt>Leakage risk</dt>
+            <dd>{(career.evaluation.leakageRisk * 100).toFixed(0)}%</dd>
+          </div>
+          <div>
+            <dt>Shift risk</dt>
+            <dd>
+              {(career.evaluation.distributionShiftRisk * 100).toFixed(0)}%
+            </dd>
+          </div>
+          <div>
+            <dt>Reliability incidents</dt>
+            <dd>{career.evaluation.reliabilityIncidents}</dd>
+          </div>
+          <div>
+            <dt>Paid evidence</dt>
+            <dd>${career.evaluation.evaluationSpend.toFixed(3)}</dd>
+          </div>
+        </dl>
+        <div className="career-actions evaluation-actions">
+          <button
+            type="button"
+            className="secondary-action"
+            aria-label="Run public benchmark preview"
+            onClick={() => command({ type: "RUN_PUBLIC_EVALUATION" })}
+          >
+            Run public preview
+          </button>
+          <button
+            type="button"
+            className="primary-action"
+            aria-label="Run paid private evaluation"
+            onClick={() => command({ type: "RUN_PRIVATE_EVALUATION" })}
+          >
+            Run private evaluation · $0.750
+          </button>
+          <p>
+            {career.evaluation.publicEvaluations} public preview
+            {career.evaluation.publicEvaluations === 1 ? "" : "s"} ·{" "}
+            {career.evaluation.privateEvaluations} paid private sample
+            {career.evaluation.privateEvaluations === 1 ? "" : "s"}. Warnings
+            remain evidence in the causal ledger; ignoring an escalating warning
+            is a durable run decision.
+          </p>
         </div>
       </section>
 
@@ -2131,6 +2399,55 @@ function CareerView({
           </p>
         ) : null}
       </section>
+
+      <section
+        className="panel conclusion-panel"
+        aria-labelledby="conclusion-title"
+      >
+        <div className="section-heading compact">
+          <div>
+            <span className="eyebrow">Explicit success condition</span>
+            <h2 id="conclusion-title">Independent conclusion</h2>
+          </div>
+          <span className={conclusion.ready ? "equipment-state" : "counter"}>
+            {conclusion.ready ? "READY" : "EVIDENCE NEEDED"}
+          </span>
+        </div>
+        <p className="concept-note">
+          The honest ending is never a hidden roll. It requires the existing
+          Bedroom Developer exit plus credible private evidence, adequate
+          coverage, paid costs, and restrained incident history.
+        </p>
+        {conclusion.reasons.length ? (
+          <ul className="conclusion-reasons">
+            {conclusion.reasons.map((reason) => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="conclusion-ready" role="status">
+            Evidence is sufficient for a deliberate independent conclusion.
+          </p>
+        )}
+        <div className="career-actions">
+          <button
+            type="button"
+            className="primary-action"
+            disabled={!conclusion.ready}
+            aria-describedby="conclusion-status"
+            onClick={() => command({ type: "CONCLUDE_INDEPENDENT_RUN" })}
+          >
+            Conclude independent run
+          </button>
+          <p id="conclusion-status">
+            {conclusion.ready
+              ? "This irreversible conclusion opens its recorded postmortem and diagnostic unlock."
+              : "The listed evidence gaps keep this conclusion unavailable; no progress is lost."}
+          </p>
+        </div>
+      </section>
+
+      <DiagnosticMemory state={state} />
     </>
   );
 }
@@ -2265,6 +2582,7 @@ function InspectView({
 }) {
   return (
     <>
+      <CausalPostmortem state={state} />
       <section className="panel" aria-labelledby="inspector-title">
         <div className="section-heading">
           <div>
@@ -2422,6 +2740,11 @@ function InspectView({
                   ) : null}
                   {event.contributingCondition ? (
                     <small>Contributing: {event.contributingCondition}</small>
+                  ) : null}
+                  {event.causal ? (
+                    <small>
+                      Recorded causal evidence: {event.causal.directCauses[0]}
+                    </small>
                   ) : null}
                 </div>
               </li>
