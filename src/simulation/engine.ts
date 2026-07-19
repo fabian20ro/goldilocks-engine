@@ -64,6 +64,8 @@ const CAREER_ROUTES: readonly CareerRoute[] = [
 const QUANTIZATION_PROFILES: readonly QuantizationProfile[] = ["q4", "q8"];
 const MAX_OFFLINE_HOURS = 4;
 const PRIVATE_EVALUATION_COST = 0.75;
+const MIN_PRIVATE_EVALUATION_COVERAGE_GAIN = 0.25;
+const MAX_PRIVATE_EVALUATION_COVERAGE_GAIN = 0.5;
 const MAX_EVALUATION_SPEND = 10_000;
 const MAX_EVALUATION_COUNTER = 10_000;
 const MAX_META_REPLAYS = 1_000_000;
@@ -549,8 +551,8 @@ function evaluationCoverageGain(state: SimulationState): number {
       0.22 +
         state.metrics.evaluationCoverage * 0.25 +
         state.metrics.observability * 0.1,
-      0.25,
-      0.5,
+      MIN_PRIVATE_EVALUATION_COVERAGE_GAIN,
+      MAX_PRIVATE_EVALUATION_COVERAGE_GAIN,
     ),
     3,
   );
@@ -2697,7 +2699,10 @@ export function applyCommand(
       ),
     ),
   );
-  return isStateValid(next) ? next : state;
+  // `sealSimulationState` just produced this digest. Rehashing the complete
+  // snapshot here adds no corruption protection, while structural validation
+  // still prevents an invalid transition from escaping the engine.
+  return isStateStructurallyValid(next) ? next : state;
 }
 
 function firstFailureModule(
@@ -2942,7 +2947,8 @@ export function tick(state: SimulationState, seconds: number): SimulationState {
     remaining = round(remaining - quantum, 6);
   }
   next = sealSimulationState(next);
-  return isStateValid(next) ? next : state;
+  // See applyCommand: the freshly sealed digest is known-good at this point.
+  return isStateStructurallyValid(next) ? next : state;
 }
 
 const metricNumbers = (metrics: PipelineMetrics): readonly number[] => [
@@ -3056,8 +3062,23 @@ function hasCoherentPrivateEvaluationEvidence(
     evaluation.privateEvaluations * PRIVATE_EVALUATION_COST,
     3,
   );
+  const minimumCoverage = Math.min(
+    1,
+    round(
+      evaluation.privateEvaluations * MIN_PRIVATE_EVALUATION_COVERAGE_GAIN,
+      3,
+    ),
+  );
+  const maximumCoverage = Math.min(
+    1,
+    round(
+      evaluation.privateEvaluations * MAX_PRIVATE_EVALUATION_COVERAGE_GAIN,
+      3,
+    ),
+  );
   return (
-    evaluation.coverage > 0 &&
+    evaluation.coverage >= minimumCoverage - 0.000_001 &&
+    evaluation.coverage <= maximumCoverage + 0.000_001 &&
     Math.abs(evaluation.evaluationSpend - expectedSpend) < 0.000_001 &&
     evaluation.privateAssessment !== "not-run"
   );
@@ -3068,6 +3089,82 @@ function isEvaluationStateValid(value: unknown): value is EvaluationState {
     isEvaluationStateShapeValid(value) &&
     hasCoherentPrivateEvaluationEvidence(value)
   );
+}
+
+const warningLedgerPrefixes: Readonly<
+  Record<EvaluationWarningKey, readonly string[]>
+> = {
+  leakage: ["Leakage warning"],
+  reliability: ["Distribution-shift warning", "Reliability warning"],
+  hardware: ["Hardware commitment warning"],
+  tutorial: ["Tutorial-loop warning"],
+};
+
+function hasRetainedCausalLedgerEvidence(
+  state: Pick<SimulationState, "career" | "eventSequence" | "ledger">,
+): boolean {
+  const { evaluation } = state.career;
+  const { ledger } = state;
+
+  // The ledger deliberately retains only its newest bounded window. Before
+  // that window can evict anything, every causal counter must have matching
+  // recorded evidence. Once history is bounded, older counters may correctly
+  // outlive their original events and cannot be reconstructed from a save.
+  if (state.eventSequence <= MAX_LEDGER_EVENTS) {
+    if (ledger.length !== state.eventSequence) return false;
+
+    const ignoredWarningEvents = ledger.filter(
+      (event) =>
+        event.kind === "warning" &&
+        event.message.startsWith("Ignored ") &&
+        event.directCause !== undefined &&
+        event.contributingCondition !== undefined,
+    ).length;
+    if (evaluation.ignoredWarnings > ignoredWarningEvents) return false;
+
+    for (const warning of Object.keys(
+      warningLedgerPrefixes,
+    ) as EvaluationWarningKey[]) {
+      const evidence = ledger.filter(
+        (event) =>
+          event.kind === "warning" &&
+          warningLedgerPrefixes[warning].some((prefix) =>
+            event.message.startsWith(prefix),
+          ),
+      ).length;
+      if (evaluation.warnings[warning] > evidence) return false;
+    }
+
+    const modelSwitchEvents = ledger.filter(
+      (event) =>
+        event.kind === "info" &&
+        (/^Q[48] selected:/.test(event.message) ||
+          event.message.endsWith(
+            "selected. Its memory, throughput, quality, reliability, and nightly operating tradeoffs now apply to model stages.",
+          )),
+    ).length;
+    if (evaluation.modelSwitches > modelSwitchEvents) return false;
+
+    const capitalCommitmentEvents = ledger.filter(
+      (event) =>
+        event.kind === "success" && event.message.includes(" purchased for $"),
+    ).length;
+    if (evaluation.capitalCommitments > capitalCommitmentEvents) return false;
+
+    const reliabilityIncidentEvents = ledger.filter(
+      (event) =>
+        event.kind === "failure" &&
+        event.message.startsWith(
+          "Distribution-shift reliability incident recorded",
+        ),
+    ).length;
+    if (evaluation.reliabilityIncidents > reliabilityIncidentEvents)
+      return false;
+
+    return true;
+  }
+
+  return ledger.length === MAX_LEDGER_EVENTS;
 }
 
 function isMetaProgressionValid(value: unknown): value is MetaProgression {
@@ -3582,30 +3679,62 @@ export function restoreSimulationState(
         ? record.integrity
         : EMPTY_INTEGRITY,
     } as unknown as SimulationState;
-    if (!isStateStructurallyValid(candidate as unknown)) {
-      const career =
-        typeof candidate.career === "object" && candidate.career !== null
-          ? candidate.career
-          : null;
-      const evaluation = career?.evaluation;
+    const structurallyValid = isStateStructurallyValid(candidate);
+    const career =
+      typeof candidate.career === "object" && candidate.career !== null
+        ? candidate.career
+        : null;
+    const evaluation = career?.evaluation;
+    const evaluationEvidenceInvalid =
+      isEvaluationStateShapeValid(evaluation) &&
+      !isEvaluationStateValid(evaluation);
+    const causalLedgerInvalid =
+      structurallyValid && !hasRetainedCausalLedgerEvidence(candidate);
+    if (!structurallyValid || causalLedgerInvalid) {
       if (
         career === null ||
         !isEvaluationStateShapeValid(evaluation) ||
-        isEvaluationStateValid(evaluation)
+        (!evaluationEvidenceInvalid && !causalLedgerInvalid)
       )
         return fallback;
+
+      const invalidEnding = causalLedgerInvalid ? career.runEnding : null;
       candidate = {
         ...candidate,
+        meta:
+          invalidEnding !== null
+            ? {
+                ...candidate.meta,
+                completedEndingIds: candidate.meta.completedEndingIds.filter(
+                  (id) => id !== invalidEnding.id,
+                ),
+                unlockedDiagnosticIds:
+                  candidate.meta.unlockedDiagnosticIds.filter(
+                    (id) => id !== invalidEnding.diagnosticUnlockId,
+                  ),
+              }
+            : candidate.meta,
         career: {
           ...career,
           evaluation: createInitialEvaluationState(),
+          runEnding: invalidEnding === null ? career.runEnding : null,
         },
       };
-      migration = withMigrationStep(
-        migration,
-        "schema-v7-evaluation-evidence-repaired",
-      );
-      if (!isStateStructurallyValid(candidate as unknown)) return fallback;
+      if (evaluationEvidenceInvalid)
+        migration = withMigrationStep(
+          migration,
+          "schema-v7-evaluation-evidence-repaired",
+        );
+      if (causalLedgerInvalid)
+        migration = withMigrationStep(
+          migration,
+          "schema-v7-causal-ledger-repaired",
+        );
+      if (
+        !isStateStructurallyValid(candidate) ||
+        !hasRetainedCausalLedgerEvidence(candidate)
+      )
+        return fallback;
     }
     if (!isIntegrityShapeValid(record.integrity))
       migration = withMigrationStep(migration, "integrity-added");

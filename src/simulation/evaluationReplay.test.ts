@@ -204,6 +204,104 @@ describe("D-011 evaluation, failure, and replay", () => {
     expect(isStateValid(recovered)).toBe(true);
   });
 
+  it("preserves runtime evidence while repairing impossible coverage and unrecorded causal counters", () => {
+    let paid = createInitialState(67);
+    paid = applyCommand(paid, { type: "WITHDRAW_SAVINGS", amount: 1 });
+    paid = applyCommand(paid, { type: "RUN_PRIVATE_EVALUATION" });
+
+    const paidRestored = restoreSimulationState(
+      JSON.parse(JSON.stringify(paid)),
+      67,
+    );
+    expect(paidRestored.career.evaluation).toEqual(paid.career.evaluation);
+
+    const impossibleCoverage = JSON.parse(
+      JSON.stringify(createInitialState(68)),
+    ) as Record<string, unknown>;
+    const impossibleCareer = impossibleCoverage.career as Record<
+      string,
+      unknown
+    >;
+    impossibleCareer.evaluation = {
+      ...(impossibleCareer.evaluation as Record<string, unknown>),
+      privateAssessment: "credible",
+      privateEvaluations: 1,
+      evaluationSpend: 0.75,
+      coverage: 0.9,
+    };
+
+    const coverageRecovered = restoreSimulationState(impossibleCoverage, 68);
+    expect(coverageRecovered.career.evaluation).toEqual(
+      createInitialState(68).career.evaluation,
+    );
+    expect(coverageRecovered.migration.steps).toContain(
+      "schema-v7-evaluation-evidence-repaired",
+    );
+
+    const unrecordedCounters = JSON.parse(
+      JSON.stringify(createInitialState(69)),
+    ) as Record<string, unknown>;
+    const counterCareer = unrecordedCounters.career as Record<string, unknown>;
+    counterCareer.evaluation = {
+      ...(counterCareer.evaluation as Record<string, unknown>),
+      modelSwitches: 8,
+      ignoredWarnings: 2,
+      warnings: {
+        ...(counterCareer.evaluation as { warnings: Record<string, unknown> })
+          .warnings,
+        tutorial: 2,
+      },
+    };
+
+    const causalityRecovered = restoreSimulationState(unrecordedCounters, 69);
+    const advanced = applyCommand(causalityRecovered, {
+      type: "RUN_PUBLIC_EVALUATION",
+    });
+    expect(causalityRecovered.career.evaluation).toEqual(
+      createInitialState(69).career.evaluation,
+    );
+    expect(causalityRecovered.migration.steps).toContain(
+      "schema-v7-causal-ledger-repaired",
+    );
+    expect(advanced.career.runEnding).toBeNull();
+    expect(isStateValid(advanced)).toBe(true);
+  });
+
+  it("retains a complete causal history when its counters have ledger evidence", () => {
+    let state = createInitialState(70);
+    for (let index = 0; index < 8; index += 1)
+      state = applyCommand(state, {
+        type: "SET_QUANTIZATION",
+        profile: index % 2 === 0 ? "q8" : "q4",
+      });
+
+    const restored = restoreSimulationState(
+      JSON.parse(JSON.stringify(state)),
+      70,
+    );
+
+    expect(restored.career.evaluation).toEqual(state.career.evaluation);
+    expect(restored.career.runEnding).toEqual(state.career.runEnding);
+    expect(getPostmortemEvent(restored)?.causal).toBeDefined();
+    expect(isStateValid(restored)).toBe(true);
+
+    let bounded = createInitialState(71);
+    for (let index = 0; index < 85; index += 1)
+      bounded = applyCommand(bounded, {
+        type: "CAPTURE_BASELINE",
+        label: `bounded-history-${index}`,
+      });
+    const boundedRestored = restoreSimulationState(
+      JSON.parse(JSON.stringify(bounded)),
+      71,
+    );
+    expect(boundedRestored.ledger).toHaveLength(80);
+    expect(boundedRestored.career.evaluation).toEqual(
+      bounded.career.evaluation,
+    );
+    expect(isStateValid(boundedRestored)).toBe(true);
+  });
+
   it("proves diagnostics have zero flat production effect", () => {
     const base = createInitialState(63);
     const withDiagnostics = sealSimulationState({
