@@ -66,6 +66,29 @@ describe("D-011 evaluation, failure, and replay", () => {
     );
   });
 
+  it("does not let a competition result mint unpaid private evidence", () => {
+    let state = createInitialState(65);
+    for (let index = 0; index < 2; index += 1) {
+      state = applyCommand(state, {
+        type: "SET_EVENING_ALLOCATION",
+        route: "competition",
+        hours: 4,
+      });
+      state = applyCommand(state, { type: "RUN_EVENING" });
+    }
+
+    state = applyCommand(state, { type: "SUBMIT_COMPETITION" });
+
+    expect(state.career.evaluation).toMatchObject({
+      publicScore: expect.any(Number),
+      privateAssessment: "not-run",
+      coverage: 0,
+      evaluationSpend: 0,
+      privateEvaluations: 0,
+    });
+    expect(isStateValid(state)).toBe(true);
+  });
+
   it("freezes a closed run, then restarts the same scenario with information-only meta memory", () => {
     const ended = runEndingScenario(13, "tutorial-loop");
     const frozen = applyCommand(ended, { type: "RUN_PUBLIC_EVALUATION" });
@@ -137,6 +160,50 @@ describe("D-011 evaluation, failure, and replay", () => {
     expect(isStateValid(recovered)).toBe(true);
   });
 
+  it("records ignored warnings and repairs incoherent current private evidence", () => {
+    let state = createInitialState(66);
+    for (let index = 0; index < 3; index += 1)
+      state = applyCommand(state, {
+        type: "SET_QUANTIZATION",
+        profile: index % 2 === 0 ? "q8" : "q4",
+      });
+    const ledgerLength = state.ledger.length;
+    state = applyCommand(state, { type: "SET_QUANTIZATION", profile: "q4" });
+
+    expect(
+      state.ledger
+        .slice(ledgerLength)
+        .find((event) => /ignored tutorial warning/i.test(event.message)),
+    ).toMatchObject({
+      kind: "warning",
+      directCause: expect.stringMatching(/tutorial warning/i),
+      contributingCondition: expect.stringMatching(/unresolved/i),
+    });
+
+    const forged = JSON.parse(JSON.stringify(createInitialState(66))) as Record<
+      string,
+      unknown
+    >;
+    const career = forged.career as Record<string, unknown>;
+    career.evaluation = {
+      ...(career.evaluation as Record<string, unknown>),
+      privateAssessment: "credible",
+      coverage: 0,
+      evaluationSpend: 0,
+      privateEvaluations: 0,
+    };
+
+    const recovered = restoreSimulationState(forged, 66);
+
+    expect(recovered.career.evaluation).toEqual(
+      createInitialState(66).career.evaluation,
+    );
+    expect(recovered.migration.steps).toContain(
+      "schema-v7-evaluation-evidence-repaired",
+    );
+    expect(isStateValid(recovered)).toBe(true);
+  });
+
   it("proves diagnostics have zero flat production effect", () => {
     const base = createInitialState(63);
     const withDiagnostics = sealSimulationState({
@@ -170,6 +237,8 @@ describe("D-011 evaluation, failure, and replay", () => {
     );
   });
 
+  // Coverage instrumentation can exceed Vitest's default 5s on CI. This
+  // scoped budget preserves the complete deterministic 121-seed gate.
   it("passes the declared 121-seed balance sweep: endings reachable, avoidable, and non-dominant", () => {
     for (let seed = 1; seed <= 121; seed += 1) {
       const result = validateEvaluationReplay(seed);
@@ -179,7 +248,7 @@ describe("D-011 evaluation, failure, and replay", () => {
       expect(result.materiallyDifferentResponses).toBe(true);
       expect(result.valid).toBe(true);
     }
-  });
+  }, 20_000);
 });
 
 describe("evaluation/replay runtime boundary properties", () => {

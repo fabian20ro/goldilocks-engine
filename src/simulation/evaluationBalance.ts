@@ -66,8 +66,10 @@ function depositAllCash(state: SimulationState): SimulationState {
 
 function runPublicLeaderboardHero(seed: number): SimulationState {
   let state = competitionReady(createInitialState(seed));
-  for (let index = 0; index < 3; index += 1)
+  for (let index = 0; index < 5; index += 1)
     state = applyCommand(state, { type: "RUN_PUBLIC_EVALUATION" });
+  state = applyCommand(state, { type: "WITHDRAW_SAVINGS", amount: 1 });
+  state = applyCommand(state, { type: "RUN_PRIVATE_EVALUATION" });
   return applyCommand(state, { type: "SUBMIT_COMPETITION" });
 }
 

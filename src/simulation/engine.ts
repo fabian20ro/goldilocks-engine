@@ -575,8 +575,13 @@ function withIgnoredWarnings(
   warningKeys: readonly EvaluationWarningKey[],
 ): SimulationState {
   const evaluation = state.career.evaluation;
-  if (!warningKeys.some((key) => evaluation.warnings[key] > 0)) return state;
-  return {
+  const ignored = warningKeys.filter((key) => evaluation.warnings[key] > 0);
+  if (
+    ignored.length === 0 ||
+    evaluation.ignoredWarnings >= MAX_EVALUATION_COUNTER
+  )
+    return state;
+  const next = {
     ...state,
     career: {
       ...state.career,
@@ -589,6 +594,17 @@ function withIgnoredWarnings(
       },
     },
   };
+  const warningNames = ignored.map((warning) => `${warning} warning`);
+  const namedWarnings =
+    warningNames.length === 1
+      ? warningNames[0]!
+      : `${warningNames.slice(0, -1).join(", ")} and ${warningNames.at(-1)}`;
+  return appendEvent(next, {
+    kind: "warning",
+    message: `Ignored ${namedWarnings}: the next action proceeded despite the recorded warning.`,
+    directCause: `The player continued after the recorded ${namedWarnings}.`,
+    contributingCondition: `The ${namedWarnings} remained unresolved when this action was chosen.`,
+  });
 }
 
 function recordEvaluationWarning(
@@ -2334,7 +2350,7 @@ function applyValidCommand(
           clamp(score + state.career.evaluation.leakageRisk * 12, 0, 99),
           1,
         );
-      const privateAssessment = privateAssessmentFor(next);
+      const privateAssessment = next.career.evaluation.privateAssessment;
       next = {
         ...next,
         resources: {
@@ -2361,16 +2377,19 @@ function applyValidCommand(
           evaluation: {
             ...next.career.evaluation,
             publicScore,
-            privateAssessment,
           },
         },
       };
       next = withIgnoredWarnings(next, ["leakage"]);
+      const privateEvidenceSummary =
+        privateAssessment === "not-run"
+          ? "no paid private assessment"
+          : `paid private assessment ${privateAssessment}`;
       return appendEvent(next, {
         kind: qualifies ? "success" : "warning",
         message: qualifies
-          ? `Bedroom Benchmark Cup submitted with public score ${publicScore.toFixed(1)} and private assessment ${privateAssessment}. ${prize > 0 ? "$12.000 prize paid into the same explicit cost ledger." : "The one-time prize was already claimed; this submission added technical reputation only."} Exact latent capability remains intentionally unreported.`
-          : `Bedroom Benchmark Cup submitted with public score ${publicScore.toFixed(1)} and private assessment ${privateAssessment}; the entry missed the 45.0 verified threshold. No prize was paid and no run state was destroyed. Exact latent capability remains intentionally unreported.`,
+          ? `Bedroom Benchmark Cup submitted with public score ${publicScore.toFixed(1)} and ${privateEvidenceSummary}. ${prize > 0 ? "$12.000 prize paid into the same explicit cost ledger." : "The one-time prize was already claimed; this submission added technical reputation only."} Exact latent capability remains intentionally unreported.`
+          : `Bedroom Benchmark Cup submitted with public score ${publicScore.toFixed(1)} and ${privateEvidenceSummary}; the entry missed the 45.0 verified threshold. No prize was paid and no run state was destroyed. Exact latent capability remains intentionally unreported.`,
       });
     }
     case "RELEASE_PRODUCT": {
@@ -2968,7 +2987,7 @@ function isCausalEvidenceValid(value: unknown): value is CausalEvidence {
   );
 }
 
-function isEvaluationStateValid(value: unknown): value is EvaluationState {
+function isEvaluationStateShapeValid(value: unknown): value is EvaluationState {
   if (typeof value !== "object" || value === null) return false;
   const evaluation = value as EvaluationState;
   const warnings = evaluation.warnings;
@@ -3021,6 +3040,33 @@ function isEvaluationStateValid(value: unknown): value is EvaluationState {
         warnings[key] >= 0 &&
         warnings[key] <= MAX_EVALUATION_COUNTER,
     )
+  );
+}
+
+function hasCoherentPrivateEvaluationEvidence(
+  evaluation: EvaluationState,
+): boolean {
+  if (evaluation.privateEvaluations === 0)
+    return (
+      evaluation.coverage === 0 &&
+      evaluation.evaluationSpend === 0 &&
+      evaluation.privateAssessment === "not-run"
+    );
+  const expectedSpend = round(
+    evaluation.privateEvaluations * PRIVATE_EVALUATION_COST,
+    3,
+  );
+  return (
+    evaluation.coverage > 0 &&
+    Math.abs(evaluation.evaluationSpend - expectedSpend) < 0.000_001 &&
+    evaluation.privateAssessment !== "not-run"
+  );
+}
+
+function isEvaluationStateValid(value: unknown): value is EvaluationState {
+  return (
+    isEvaluationStateShapeValid(value) &&
+    hasCoherentPrivateEvaluationEvidence(value)
   );
 }
 
@@ -3529,14 +3575,38 @@ export function restoreSimulationState(
           sourceSchemaVersion: SCHEMA_VERSION,
           steps: ["schema-v7-metadata-added"],
         };
-    const candidate = {
+    let candidate = {
       ...record,
       migration,
       integrity: isIntegrityShapeValid(record.integrity)
         ? record.integrity
         : EMPTY_INTEGRITY,
     } as unknown as SimulationState;
-    if (!isStateStructurallyValid(candidate)) return fallback;
+    if (!isStateStructurallyValid(candidate as unknown)) {
+      const career =
+        typeof candidate.career === "object" && candidate.career !== null
+          ? candidate.career
+          : null;
+      const evaluation = career?.evaluation;
+      if (
+        career === null ||
+        !isEvaluationStateShapeValid(evaluation) ||
+        isEvaluationStateValid(evaluation)
+      )
+        return fallback;
+      candidate = {
+        ...candidate,
+        career: {
+          ...career,
+          evaluation: createInitialEvaluationState(),
+        },
+      };
+      migration = withMigrationStep(
+        migration,
+        "schema-v7-evaluation-evidence-repaired",
+      );
+      if (!isStateStructurallyValid(candidate as unknown)) return fallback;
+    }
     if (!isIntegrityShapeValid(record.integrity))
       migration = withMigrationStep(migration, "integrity-added");
     else if (!hasValidStateIntegrity(candidate))
