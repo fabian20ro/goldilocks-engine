@@ -1,8 +1,9 @@
-# Candidate handoff — Evaluation, Failure, and Replay repair (round 034)
+# Candidate handoff — Evaluation, Failure, and Replay repair (round 035)
 
 ## Implemented behavior summary
 
 - Retains the deterministic single workstation, purchasing, expansion, queue, demand, Bedroom Career, local-tier, offline-policy, root/Pages PWA, and service-worker recovery product.
+- Canonical Prettier checks exclude only immutable `.agent/verification/*.md` evidence; source, tests, scripts, configuration, and mutable documentation remain checked.
 - Schema 7 / content `evaluation-replay-1` adds separate public benchmark previews and paid private evaluation. Public score is visible; private evidence is a categorical assessment plus coverage and cost, never an exact latent capability or private numeric score.
 - Repeated public previews raise leakage risk; paid private evidence reduces leakage/shift uncertainty without guaranteeing an outcome. Insufficient cash is a durable no-op with a recorded explanation; later funding/retry succeeds exactly once.
 - Ignoring an outstanding leakage, reliability, hardware, or tutorial warning now appends a bounded ledger warning with a direct cause and contributing condition; the aggregate ignored-warning counter remains bounded too.
@@ -38,6 +39,7 @@
 - **V-039:** restore checks causal counters against retained ledger evidence while the entire history is present. Unsupported warning/ignored-warning/model-switch/capital/reliability counters reset evaluation and, if applicable, discard an unsupported frozen ending; valid tutorial-ending and post-cap bounded histories survive reload.
 - **V-040:** `applyCommand` and `tick` no longer hash a snapshot a second time after they have just sealed it; they retain full structural validation, while `isStateValid` remains the external structural-plus-integrity gate. The untouched verifier mixed-stream test completed in 1.15s under local coverage instrumentation.
 - **V-041:** post-rollover recovery no longer treats a full 80-entry ledger as causal proof. `CausalEvidenceSnapshot` is sealed atomically with every state and must exactly match `eventSequence` and every evaluation field before an integrity-valid saturated save is retained. A forged or stale full-history save resets evaluation and clears any unsupported frozen ending; valid pre-checkpoint schema-7 saves migrate with `schema-v7-causal-snapshot-added`. Candidate tests cover a real causal history after rollover, valid legacy migration, a forged hardware-ending pattern, and the preserved 320px Tutorial Loop browser regression.
+- **Round 035 tooling repair:** immutable verifier report Markdown is excluded from Prettier’s repository-wide scan, preventing the formatter from proposing a rewrite of append-only verification evidence while retaining formatting checks for every other tracked applicable path.
 
 ## Setup, startup, and verification commands
 
@@ -110,6 +112,8 @@ Canonical full check:
 - `npm test` — PASS, 23 files / 117 tests with coverage; includes the complete 121-seed evidence loop and the unchanged round-031 mixed deterministic stream under instrumentation.
 - `npm test -- src/simulation/verifierRound031.test.ts` — test body PASS in 1.15s under coverage instrumentation; the isolated command reports expected global coverage-threshold failures because it intentionally runs one file only.
 - `./scripts/verify` — PASS (exit 0) from repository-local setup: formatting, lint, typecheck; 23 unit/property files / 117 tests with coverage; numeric prototype; 20,001-seed upgrade, 41-seed progression, 101-seed Career, and 121-seed evaluation balance sweeps (all zero failures); production build; 104 root Playwright cases; and 2 Pages/offline cases.
+- `npm run format:check` — exit 0; immutable verifier reports are excluded while every other applicable tracked path remains checked.
+- `./scripts/verify` — exit 0 from repository-local setup: formatting, lint, typecheck; 24 unit/property files / 122 tests with coverage; numeric prototype; 20,001-seed upgrade, 41-seed progression, 101-seed Career, and 121-seed evaluation balance sweeps (all zero failures); production build; 106 root Playwright cases; and 2 Pages/offline cases.
 
 ## Checks not run
 
