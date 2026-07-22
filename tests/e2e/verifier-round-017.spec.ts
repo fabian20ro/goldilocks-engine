@@ -27,12 +27,29 @@ async function setSavedMoney(page: Page, money: number) {
 }
 
 async function removeProcessModules(page: Page) {
-  for (const name of [
-    "Remove Basic Cleaner from Prepare and bypass position",
-    "Remove Quantized Model from Runtime and bypass position",
-    "Remove Smoke Check from Verify and bypass position",
-  ])
+  for (const [slotId, moduleName, name] of [
+    [
+      "prepare",
+      "Basic Cleaner",
+      "Remove Basic Cleaner from Prepare and bypass position",
+    ],
+    [
+      "runtime",
+      "Quantized Model",
+      "Remove Quantized Model from Runtime and bypass position",
+    ],
+    [
+      "verify",
+      "Smoke Check",
+      "Remove Smoke Check from Verify and bypass position",
+    ],
+  ] as const) {
+    await page
+      .getByTestId(`slot-${slotId}`)
+      .getByRole("button", { name: new RegExp(`^${moduleName}`) })
+      .click();
     await page.getByRole("button", { name }).click();
+  }
 }
 
 test.describe("verifier round 017 settlement feedback", () => {

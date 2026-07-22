@@ -164,7 +164,7 @@ test("the GitHub Pages build loads and remains worker-backed offline", async ({
 
 test("verifier round 006: scoped activation preserves foreign caches", async ({
   page,
-}) => {
+}, testInfo) => {
   const errors = captureErrors(page);
 
   await page.route("**/cache-seed", async (route) => {
@@ -173,7 +173,8 @@ test("verifier round 006: scoped activation preserves foreign caches", async ({
       body: "<!doctype html><title>cache seed</title>",
     });
   });
-  await page.goto("http://127.0.0.1:4173/cache-seed");
+  const origin = new URL(testInfo.project.use.baseURL as string).origin;
+  await page.goto(`${origin}/cache-seed`);
   await page.evaluate(async (basePath) => {
     const stale = await caches.open(`goldilocks-shell:${basePath}:v3`);
     await stale.put(

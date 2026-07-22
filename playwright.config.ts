@@ -1,5 +1,8 @@
 import { defineConfig } from "@playwright/test";
 
+const port = process.env.E2E_PORT ?? "4173";
+const baseURL = `http://127.0.0.1:${port}`;
+
 export default defineConfig({
   testDir: "./tests/e2e",
   testIgnore: "pages.spec.ts",
@@ -9,7 +12,7 @@ export default defineConfig({
   workers: 1,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
-    baseURL: "http://127.0.0.1:4173",
+    baseURL,
     browserName: "chromium",
     headless: true,
     locale: "en-US",
@@ -20,7 +23,7 @@ export default defineConfig({
   },
   webServer: {
     command: "./scripts/run-e2e",
-    url: "http://127.0.0.1:4173",
+    url: baseURL,
     reuseExistingServer: false,
     timeout: 120_000,
   },

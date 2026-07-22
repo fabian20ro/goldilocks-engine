@@ -10,4 +10,5 @@ if [ ! -x node_modules/.bin/vite ]; then
 fi
 
 npm run build
-exec npm run preview -- --host 127.0.0.1 --port 4173 --strictPort
+E2E_PORT=${E2E_PORT:-4173}
+exec npm run preview -- --host 127.0.0.1 --port "$E2E_PORT" --strictPort

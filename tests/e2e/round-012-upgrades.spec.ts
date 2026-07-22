@@ -144,7 +144,10 @@ test.describe("round 012 persistent upgrade economy and UX", () => {
     await page.locator("html[data-offline-ready='true']").waitFor();
     await context.setOffline(true);
     await page.reload({ waitUntil: "domcontentloaded" });
-    await page.getByRole("button", { name: "Build" }).click();
+    await page
+      .getByRole("navigation", { name: "Primary" })
+      .getByRole("button", { name: "Build", exact: true })
+      .click();
     await expect(page.getByTestId("slot-prepare")).toContainText(
       "Precision Cleaner",
     );

@@ -14,12 +14,29 @@ test.describe("verifier round 016 market feedback", () => {
     await page.setViewportSize({ width: 393, height: 850 });
     await page.goto("/");
 
-    for (const name of [
-      "Remove Basic Cleaner from Prepare and bypass position",
-      "Remove Quantized Model from Runtime and bypass position",
-      "Remove Smoke Check from Verify and bypass position",
-    ])
+    for (const [slotId, moduleName, name] of [
+      [
+        "prepare",
+        "Basic Cleaner",
+        "Remove Basic Cleaner from Prepare and bypass position",
+      ],
+      [
+        "runtime",
+        "Quantized Model",
+        "Remove Quantized Model from Runtime and bypass position",
+      ],
+      [
+        "verify",
+        "Smoke Check",
+        "Remove Smoke Check from Verify and bypass position",
+      ],
+    ] as const) {
+      await page
+        .getByTestId(`slot-${slotId}`)
+        .getByRole("button", { name: new RegExp(`^${moduleName}`) })
+        .click();
       await page.getByRole("button", { name }).click();
+    }
 
     await expect(page.getByLabel("Current warning and actions")).toContainText(
       "accepted tasks fail and pay $0 gross",

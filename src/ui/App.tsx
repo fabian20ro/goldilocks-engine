@@ -1,6 +1,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
@@ -44,6 +45,15 @@ import type {
   SimulationState,
 } from "../simulation/types";
 import { TIME_SPEEDS, useSimulation, type TimeSpeed } from "./useSimulation";
+import { DetailsSurface, StatusGauge } from "./commandDeck";
+import {
+  careerGlyph,
+  DecorativeGlyph,
+  glyphs,
+  navigationItems,
+  pipelineGlyph,
+  workloadGlyph,
+} from "./glyphs";
 
 type TabId = "build" | "jobs" | "career" | "upgrades" | "inspect";
 
@@ -235,26 +245,39 @@ function shouldShowTutorial(): boolean {
 function ResourceStrip({ state }: { state: SimulationState }) {
   const rig = getHardware(state.hardwareId);
   const values = [
-    { label: "Money", value: `$${formatNumber(state.resources.money)}` },
     {
+      glyph: glyphs.resource.money,
+      label: "Money",
+      value: `$${formatNumber(state.resources.money)}`,
+    },
+    {
+      glyph: glyphs.resource.time,
       label: "Sim age",
       value: `${formatNumber(getSimulationAgeHours(state), 1)}h`,
     },
     {
+      glyph: glyphs.resource.compute,
       label: "Compute CU",
       value: `${formatNumber((rig.compute * state.computeAllocation) / 100, 1)}/${rig.compute}`,
     },
     {
+      glyph: glyphs.resource.memory,
       label: "Memory use",
       value: `${formatNumber(state.metrics.memoryUsed, 1)}/${formatNumber(rig.memory, 1)}GB`,
     },
-    { label: "Rep", value: formatNumber(state.resources.reputation, 1) },
+    {
+      glyph: glyphs.resource.reputation,
+      label: "Rep",
+      value: formatNumber(state.resources.reputation, 1),
+    },
   ];
   return (
     <dl className="resource-strip" aria-label="Primary resources">
       {values.map((item) => (
         <div key={item.label}>
-          <dt>{item.label}</dt>
+          <dt>
+            <DecorativeGlyph>{item.glyph}</DecorativeGlyph> {item.label}
+          </dt>
           <dd>{item.value}</dd>
         </div>
       ))}
@@ -445,13 +468,18 @@ function WarningBanner({ state }: { state: SimulationState }) {
       aria-live="polite"
       aria-label="Current warning and actions"
     >
-      <span aria-hidden="true">{nominal ? "✓" : "!"}</span>
+      <DecorativeGlyph>
+        {nominal ? glyphs.status.passed : glyphs.status.warning}
+      </DecorativeGlyph>
       <div>
         <strong>{state.lastWarning}</strong>
-        <p>{guidance}</p>
-        <p className="navigation-hint">
-          Use the bottom tabs for Build, Jobs, Career, Upgrades, and Inspect.
-        </p>
+        <details>
+          <summary>Warning details and valid responses</summary>
+          <p>{guidance}</p>
+          <p className="navigation-hint">
+            Use the bottom tabs for Build, Jobs, Career, Upgrades, and Inspect.
+          </p>
+        </details>
       </div>
     </aside>
   );
@@ -541,25 +569,6 @@ function ModuleCard({
   );
 }
 
-function FlowConnector({
-  active,
-  reducedMotion,
-}: {
-  active: boolean;
-  reducedMotion: boolean;
-}) {
-  return (
-    <div
-      className={`flow-connector ${active ? "active" : ""} ${reducedMotion ? "still" : ""}`}
-      aria-hidden="true"
-    >
-      <span />
-      <span />
-      <span />
-    </div>
-  );
-}
-
 function Pipeline({
   state,
   selected,
@@ -599,13 +608,32 @@ function Pipeline({
         </span>
       </div>
 
+      <div className="dispatch-strip" aria-label="Live dispatch">
+        <span>
+          <DecorativeGlyph>{glyphs.status.active}</DecorativeGlyph>
+          {state.jobs.activeTask
+            ? getWorkload(state.jobs.activeTask.workloadId).name
+            : "Awaiting dispatch"}
+        </span>
+        <span>
+          {state.jobs.activeTask
+            ? `${Math.round(state.jobs.activeTask.progress * 100)}%`
+            : "0%"}
+        </span>
+        <span>{state.jobs.queued} queued</span>
+        <span>{getSlot(state.metrics.bottleneckSlotId).name}</span>
+      </div>
       {state.activeExpansionId ? (
         <p className="pipeline-scroll-hint">
-          Expanded: 8 stages. Scroll within this pipeline to reach Process 4–6
-          and Output.
+          Expanded: 8 stages. Process 4–6 and Output remain in this same ordered
+          rail; page scroll reaches every position.
         </p>
       ) : null}
-      <div className="pipeline" data-testid="pipeline">
+      <ol
+        className={`pipeline ${reducedMotion ? "still" : ""}`}
+        data-testid="pipeline"
+        aria-label={`${state.slots.length} stage ordered pipeline`}
+      >
         {state.slots.map((slotState, index) => {
           const slot = getSlot(slotState.slotId);
           const module = slotState.moduleId
@@ -618,14 +646,20 @@ function Pipeline({
           const failed = failureIndex === index;
           const propagated = failureIndex >= 0 && index > failureIndex;
           return (
-            <div className="pipeline-stage-group" key={slot.id}>
+            <li className="pipeline-stage-group" key={slot.id}>
               <div
                 className={`pipeline-slot ${compatible ? "compatible" : ""} ${failed ? "failed" : ""} ${propagated ? "propagated" : ""}`}
                 data-slot-id={slot.id}
                 data-testid={`slot-${slot.id}`}
               >
                 <div className="slot-meta">
-                  <span>{slot.name}</span>
+                  <span>
+                    <b>{index + 1}</b> ·{" "}
+                    <DecorativeGlyph>
+                      {pipelineGlyph(module?.role ?? "empty", slot.type)}
+                    </DecorativeGlyph>{" "}
+                    {slot.name}
+                  </span>
                   {state.jobs.queued > 0 && slot.id === queueSlot ? (
                     <span
                       className="queue-badge"
@@ -648,22 +682,13 @@ function Pipeline({
                       onSelect={onSelect}
                       onDragStart={onDragStart}
                     />
-                    {slot.type === "process" ? (
-                      <button
-                        type="button"
-                        className="bypass-action"
-                        onClick={() =>
-                          command({ type: "REMOVE_MODULE", slotId: slot.id })
-                        }
-                        aria-label={`Remove ${module.name} from ${slot.name} and bypass position`}
-                      >
-                        Remove / bypass
-                      </button>
-                    ) : null}
                   </>
                 ) : (
                   <div className="empty-module" role="status">
-                    <strong>Empty / bypassed</strong>
+                    <strong>
+                      <DecorativeGlyph>{glyphs.pipeline.empty}</DecorativeGlyph>{" "}
+                      Empty / bypassed
+                    </strong>
                     <small>
                       No memory, latency, cost, or processing effect.
                     </small>
@@ -679,10 +704,10 @@ function Pipeline({
                   </button>
                 ) : null}
                 {failed ? (
-                  <span className="failure-label">FAULT ORIGIN</span>
+                  <span className="failure-label">✕ FAULT ORIGIN</span>
                 ) : null}
                 {propagated ? (
-                  <span className="failure-label">OUTPUT REJECTED</span>
+                  <span className="failure-label">✕ OUTPUT REJECTED</span>
                 ) : null}
               </div>
               {slot.id === "runtime" ? (
@@ -706,16 +731,58 @@ function Pipeline({
                   </button>
                 </div>
               ) : null}
-              {index < state.slots.length - 1 ? (
-                <FlowConnector
-                  active={!state.jobs.paused && state.jobs.queued > 0}
-                  reducedMotion={reducedMotion}
-                />
-              ) : null}
-            </div>
+            </li>
           );
         })}
-      </div>
+      </ol>
+      {selected?.fromSlotId ? (
+        <DetailsSurface
+          title={getModule(selected.moduleId).name}
+          glyph={pipelineGlyph(getModule(selected.moduleId).role, "process")}
+          onClose={() => onSelect(selected.moduleId, selected.fromSlotId)}
+        >
+          <p>{getModule(selected.moduleId).description}</p>
+          <dl className="compact-details-grid">
+            <div>
+              <dt>Throughput</dt>
+              <dd>{getModule(selected.moduleId).throughput}/m</dd>
+            </div>
+            <div>
+              <dt>Memory</dt>
+              <dd>{getModule(selected.moduleId).memory} GB</dd>
+            </div>
+            <div>
+              <dt>Reliability</dt>
+              <dd>
+                {formatNumber(
+                  getModule(selected.moduleId).reliability * 100,
+                  1,
+                )}
+                %
+              </dd>
+            </div>
+            <div>
+              <dt>Operating cost</dt>
+              <dd>${getModule(selected.moduleId).costPerJob.toFixed(3)}/job</dd>
+            </div>
+          </dl>
+          <p>
+            Compatible positions are highlighted. Choose Snap here to replace or
+            move; the live inspector updates all resulting deltas.
+          </p>
+          <button
+            type="button"
+            className="danger-action"
+            aria-label={`Remove ${getModule(selected.moduleId).name} from ${getSlot(selected.fromSlotId).name} and bypass position`}
+            onClick={() => {
+              command({ type: "REMOVE_MODULE", slotId: selected.fromSlotId! });
+              onSelect(selected.moduleId, selected.fromSlotId);
+            }}
+          >
+            Remove / bypass {getSlot(selected.fromSlotId).name}
+          </button>
+        </DetailsSurface>
+      ) : null}
     </section>
   );
 }
@@ -786,6 +853,7 @@ function BuildView({
   onInstall: (slotId: string) => void;
   reducedMotion: boolean;
 }) {
+  const [presentation, setPresentation] = useState<"build" | "run">("build");
   const expansion = pipelineExpansions[0];
   const expansionOwned = expansion
     ? state.ownedExpansionIds.includes(expansion.id)
@@ -836,22 +904,51 @@ function BuildView({
             {state.metrics.dominantBottleneck}
           </strong>
         </div>
+        <div
+          className="presentation-toggle"
+          role="group"
+          aria-label="Pipeline presentation"
+        >
+          <button
+            type="button"
+            aria-pressed={presentation === "build"}
+            aria-label="Edit pipeline presentation"
+            onClick={() => setPresentation("build")}
+          >
+            🛠️ Edit
+          </button>
+          <button
+            type="button"
+            aria-pressed={presentation === "run"}
+            onClick={() => setPresentation("run")}
+          >
+            ▶ Run
+          </button>
+        </div>
       </section>
       <Pipeline
         state={state}
         command={command}
-        selected={selected}
-        onSelect={onSelect}
-        onDragStart={onDragStart}
-        onInstall={onInstall}
+        selected={presentation === "build" ? selected : null}
+        onSelect={presentation === "build" ? onSelect : () => undefined}
+        onDragStart={presentation === "build" ? onDragStart : () => undefined}
+        onInstall={presentation === "build" ? onInstall : () => undefined}
         reducedMotion={reducedMotion}
       />
-      <ModuleLibrary
-        state={state}
-        selected={selected}
-        onSelect={onSelect}
-        onDragStart={onDragStart}
-      />
+      {presentation === "build" ? (
+        <ModuleLibrary
+          state={state}
+          selected={selected}
+          onSelect={onSelect}
+          onDragStart={onDragStart}
+        />
+      ) : (
+        <p className="observation-note">
+          <DecorativeGlyph>{glyphs.resource.evidence}</DecorativeGlyph>{" "}
+          Observation presentation: worker progress, queue, stage state, and
+          settlement feedback remain live. Return to Build to edit the rail.
+        </p>
+      )}
     </>
   );
 }
@@ -1033,7 +1130,10 @@ function RigUpgradeCard({
                     ? `LOCKED · HOUR ${item.availableAfterHour}`
                     : "LOCKED · INSUFFICIENT FUNDS"}
           </span>
-          <h3 id={`rig-title-${item.id}`}>{item.name}</h3>
+          <h3 id={`rig-title-${item.id}`}>
+            <DecorativeGlyph>{glyphs.equipment.rig}</DecorativeGlyph>{" "}
+            {item.name}
+          </h3>
         </div>
         <strong className="upgrade-price">
           {item.purchaseCost === 0
@@ -1042,6 +1142,23 @@ function RigUpgradeCard({
         </strong>
       </div>
       <p>{item.description}</p>
+      <p
+        className="decision-deltas"
+        aria-label={`Key comparison with equipped ${current.name}`}
+      >
+        <span>
+          {item.compute - current.compute >= 0 ? "+" : ""}
+          {item.compute - current.compute} CU
+        </span>
+        <span>
+          {item.memory - current.memory >= 0 ? "+" : ""}
+          {item.memory - current.memory} GB
+        </span>
+        <span>
+          {item.watts - current.watts >= 0 ? "+" : ""}
+          {item.watts - current.watts} W
+        </span>
+      </p>
       <details className="upgrade-details" open={equipped || undefined}>
         <summary>Compare rig details and tradeoffs</summary>
         <dl className="stat-grid">
@@ -1155,13 +1272,37 @@ function ModuleUpgradeCard({
                   ? "AFFORDABLE"
                   : "LOCKED · INSUFFICIENT FUNDS"}
           </span>
-          <h3 id={`module-title-${item.id}`}>{item.name}</h3>
+          <h3 id={`module-title-${item.id}`}>
+            <DecorativeGlyph>
+              {pipelineGlyph(item.role, "process")}
+            </DecorativeGlyph>{" "}
+            {item.name}
+          </h3>
         </div>
         <strong className="upgrade-price">
           ${item.purchaseCost.toFixed(2)}
         </strong>
       </div>
       <p>{item.description}</p>
+      {comparison ? (
+        <p
+          className="decision-deltas"
+          aria-label={`Key comparison with ${comparison.name}`}
+        >
+          <span>
+            {item.throughput - comparison.throughput >= 0 ? "+" : ""}
+            {formatNumber(item.throughput - comparison.throughput, 1)}/m
+          </span>
+          <span>
+            {item.memory - comparison.memory >= 0 ? "+" : ""}
+            {formatNumber(item.memory - comparison.memory, 1)} GB
+          </span>
+          <span>
+            {item.costPerJob - comparison.costPerJob >= 0 ? "+" : ""}$
+            {formatNumber(item.costPerJob - comparison.costPerJob, 3)}/job
+          </span>
+        </p>
+      ) : null}
       <details className="upgrade-details" open={equipped || undefined}>
         <summary>Compare module details and tradeoffs</summary>
         <dl className="stat-grid module-stats">
@@ -1276,7 +1417,10 @@ function PipelineExpansionCard({
                   ? "AFFORDABLE"
                   : "LOCKED · INSUFFICIENT FUNDS"}
           </span>
-          <h3 id="expansion-title">{spec.name}</h3>
+          <h3 id="expansion-title">
+            <DecorativeGlyph>{glyphs.equipment.expansion}</DecorativeGlyph>{" "}
+            {spec.name}
+          </h3>
         </div>
         <strong className="upgrade-price">
           ${spec.purchaseCost.toFixed(2)}
@@ -1287,6 +1431,14 @@ function PipelineExpansionCard({
         <span>3 process positions</span>
         <span aria-hidden="true">→</span>
         <strong>6 process positions</strong>
+      </div>
+      <div
+        className="empty-position-symbols"
+        aria-label="Three new empty bypassed positions"
+      >
+        <span>◇ 4 · EMPTY</span>
+        <span>◇ 5 · EMPTY</span>
+        <span>◇ 6 · EMPTY</span>
       </div>
       <p>{spec.tradeoff}</p>
       <p className="purchase-reason">
@@ -1389,14 +1541,27 @@ function UpgradesView({
           </div>
         </div>
         <div className="upgrade-list">
-          {hardware.map((item) => (
-            <RigUpgradeCard
-              key={item.id}
-              state={state}
-              hardwareId={item.id}
-              command={command}
-            />
-          ))}
+          {[...hardware]
+            .sort((a, b) => {
+              const rank = (id: string, cost: number) =>
+                state.ownedHardwareIds.includes(id)
+                  ? 0
+                  : cost <= state.resources.money
+                    ? 1
+                    : 2;
+              return (
+                rank(a.id, a.purchaseCost) - rank(b.id, b.purchaseCost) ||
+                a.purchaseCost - b.purchaseCost
+              );
+            })
+            .map((item) => (
+              <RigUpgradeCard
+                key={item.id}
+                state={state}
+                hardwareId={item.id}
+                command={command}
+              />
+            ))}
         </div>
       </section>
       <section className="panel" aria-labelledby="module-store-title">
@@ -1407,8 +1572,20 @@ function UpgradesView({
           </div>
         </div>
         <div className="upgrade-list">
-          {modules
+          {[...modules]
             .filter((item) => item.purchaseCost > 0)
+            .sort((a, b) => {
+              const rank = (id: string, cost: number) =>
+                state.ownedModuleIds.includes(id)
+                  ? 0
+                  : cost <= state.resources.money
+                    ? 1
+                    : 2;
+              return (
+                rank(a.id, a.purchaseCost) - rank(b.id, b.purchaseCost) ||
+                a.purchaseCost - b.purchaseCost
+              );
+            })
             .map((item) => (
               <ModuleUpgradeCard
                 key={item.id}
@@ -1433,6 +1610,9 @@ function JobsView({
 }) {
   const [confirmClear, setConfirmClear] = useState(false);
   const waitingCount = state.jobs.waitingTasks.length;
+  const selectedWorkload = getWorkload(state.workloadId);
+  const selectedQuote = getWorkloadQuote(state, selectedWorkload.id);
+  const selectedMetrics = calculateMetrics(state);
   return (
     <>
       <section className="panel" aria-labelledby="workload-title">
@@ -1446,6 +1626,44 @@ function JobsView({
             {waitingCount} waiting
           </span>
         </div>
+        <article
+          className="dispatch-card selected-dispatch"
+          aria-label="Selected playable workload"
+        >
+          <div>
+            <DecorativeGlyph>
+              {workloadGlyph(selectedWorkload.id)}
+            </DecorativeGlyph>
+            <span>
+              <small>SELECTED · PLAYABLE NOW</small>
+              <strong>{selectedWorkload.name}</strong>
+              <em>{selectedWorkload.description}</em>
+            </span>
+            <b>${selectedQuote.grossQuote.toFixed(2)}</b>
+          </div>
+          <p>
+            Demand {selectedQuote.demandPercent}% · {selectedQuote.trend} ·{" "}
+            {selectedWorkload.computeDemand} CU /{" "}
+            {selectedWorkload.memoryDemand} GB ·{" "}
+            {Math.round(selectedMetrics.reliability * 100)}% modeled delivery
+          </p>
+          <button
+            type="button"
+            className="primary-action queue-one"
+            onClick={() => command({ type: "QUEUE_JOBS", count: 1 })}
+          >
+            Queue 1
+          </button>
+          <details>
+            <summary>Quote, cost, and uncertainty details</summary>
+            <p>
+              Queue-time gross quote ${selectedQuote.grossQuote.toFixed(2)} ·
+              configured operating cost $
+              {selectedMetrics.operatingCost.toFixed(3)}. Success pays the
+              locked quote; failure pays $0 gross. {selectedQuote.reason}
+            </p>
+          </details>
+        </article>
         <MoneyLoop state={state} />
         <p className="concept-note">
           <strong>CU = normalized Compute Units.</strong> Use CU to compare this
@@ -1482,6 +1700,9 @@ function JobsView({
               >
                 <span>
                   <strong>
+                    <DecorativeGlyph>
+                      {workloadGlyph(workload.id)}
+                    </DecorativeGlyph>{" "}
                     {workload.name} ·{" "}
                     {unlock.unlocked
                       ? `$${quote.grossQuote.toFixed(2)} quote`
@@ -1508,13 +1729,6 @@ function JobsView({
           })}
         </div>
         <div className="job-actions">
-          <button
-            type="button"
-            className="primary-action"
-            onClick={() => command({ type: "QUEUE_JOBS", count: 1 })}
-          >
-            Queue 1
-          </button>
           <button
             type="button"
             className="primary-action"
@@ -1894,7 +2108,7 @@ function CareerView({
   };
 
   return (
-    <>
+    <div className="career-deck">
       <section className="panel career-overview" aria-labelledby="career-title">
         <div className="section-heading">
           <div>
@@ -1960,7 +2174,7 @@ function CareerView({
         </p>
       </section>
 
-      <section className="panel" aria-labelledby="evening-title">
+      <section className="panel evening-panel" aria-labelledby="evening-title">
         <div className="section-heading">
           <div>
             <span className="eyebrow">Player-authored schedule</span>
@@ -1972,14 +2186,35 @@ function CareerView({
         </div>
         <div className="career-route-list">
           {bedroomCareerRoutes.map((route) => (
-            <label className="career-route" key={route.id}>
+            <div className="career-route" key={route.id}>
               <span>
-                <strong>{route.name}</strong>
+                <strong>
+                  <DecorativeGlyph>{careerGlyph(route.id)}</DecorativeGlyph>{" "}
+                  {route.name}
+                </strong>
                 <small>{route.description}</small>
                 <em>{route.opportunityCost}</em>
               </span>
               <span className="career-hours-control">
-                <span>hours</span>
+                <span
+                  className="hour-tokens"
+                  aria-label={`${route.name} hour allocation tokens`}
+                >
+                  {[1, 2, 3, 4].map((hour) => (
+                    <button
+                      key={hour}
+                      type="button"
+                      className={
+                        scheduleDraft[route.id] >= hour ? "filled" : ""
+                      }
+                      aria-label={`Allocate ${hour} hours to ${route.name}`}
+                      aria-pressed={scheduleDraft[route.id] === hour}
+                      onClick={() => updateRouteHours(route.id, hour)}
+                    >
+                      {scheduleDraft[route.id] >= hour ? "●" : "○"}
+                    </button>
+                  ))}
+                </span>
                 <input
                   type="number"
                   inputMode="decimal"
@@ -1996,7 +2231,7 @@ function CareerView({
                   }
                 />
               </span>
-            </label>
+            </div>
           ))}
         </div>
         <div className="career-actions">
@@ -2448,7 +2683,7 @@ function CareerView({
       </section>
 
       <DiagnosticMemory state={state} />
-    </>
+    </div>
   );
 }
 
@@ -2599,35 +2834,47 @@ function InspectView({
             Capture
           </button>
         </div>
-        <Comparison
-          metrics={state.metrics}
-          baseline={state.baselineMetrics}
-          label={state.baselineLabel}
-        />
-        <div className="pressure-grid">
-          <div
-            className={
-              state.metrics.memoryPressure > 1 ? "pressure danger" : "pressure"
-            }
-          >
-            <span>Memory pressure</span>
-            <strong>{formatNumber(state.metrics.memoryPressure * 100)}%</strong>
-          </div>
-          <div
-            className={
-              state.metrics.thermalPressure > 1 ? "pressure danger" : "pressure"
-            }
-          >
-            <span>Thermal pressure</span>
-            <strong>
-              {formatNumber(state.metrics.thermalPressure * 100)}%
-            </strong>
-          </div>
-          <div className="pressure">
-            <span>Observability</span>
-            <strong>{formatNumber(state.metrics.observability * 100)}%</strong>
-          </div>
+        <div className="instrument-grid" aria-label="Live instrument gauges">
+          <StatusGauge
+            label="Memory pressure"
+            value={state.metrics.memoryPressure * 100}
+            display={`${formatNumber(state.metrics.memoryPressure * 100)}%`}
+            tone={state.metrics.memoryPressure > 1 ? "failure" : "signal"}
+          />
+          <StatusGauge
+            label="Thermal pressure"
+            value={state.metrics.thermalPressure * 100}
+            display={`${formatNumber(state.metrics.thermalPressure * 100)}%`}
+            tone={state.metrics.thermalPressure > 1 ? "failure" : "warning"}
+          />
+          <StatusGauge
+            label="Observability / evidence"
+            value={state.metrics.observability * 100}
+            display={`${formatNumber(state.metrics.observability * 100)}%`}
+            tone="evidence"
+          />
+          <StatusGauge
+            label="Predicted / observed divergence"
+            value={Math.abs(
+              state.metrics.predictedQuality - state.metrics.observedQuality,
+            )}
+            display={formatNumber(
+              Math.abs(
+                state.metrics.predictedQuality - state.metrics.observedQuality,
+              ),
+              2,
+            )}
+            tone="evidence"
+          />
         </div>
+        <details className="metrics-disclosure" open>
+          <summary>Exact values and complete baseline comparison</summary>
+          <Comparison
+            metrics={state.metrics}
+            baseline={state.baselineMetrics}
+            label={state.baselineLabel}
+          />
+        </details>
       </section>
 
       <section className="panel" aria-labelledby="preset-title">
@@ -2773,6 +3020,14 @@ export function App() {
   const [reducedMotion, setReducedMotion] = useState(
     () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
+  const scrollRegionRef = useRef<HTMLDivElement>(null);
+  const tabScrollPositions = useRef<Record<TabId, number>>({
+    build: 0,
+    jobs: 0,
+    career: 0,
+    upgrades: 0,
+    inspect: 0,
+  });
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -2785,6 +3040,18 @@ export function App() {
     () => (selected ? getModule(selected.moduleId).name : null),
     [selected],
   );
+
+  const switchTab = (next: TabId) => {
+    const region = scrollRegionRef.current;
+    if (region) tabScrollPositions.current[tab] = region.scrollTop;
+    setTab(next);
+    requestAnimationFrame(() => {
+      scrollRegionRef.current?.scrollTo({
+        top: tabScrollPositions.current[next],
+        behavior: "auto",
+      });
+    });
+  };
 
   const onSelect = (moduleId: string, fromSlotId?: string) => {
     if (!state.ownedModuleIds.includes(moduleId)) return;
@@ -2955,7 +3222,7 @@ export function App() {
       <a className="skip-link" href="#main-content">
         Skip to controls
       </a>
-      <div className="app-scroll-region">
+      <div className="app-scroll-region" ref={scrollRegionRef}>
         <header className="app-header">
           <div className="brand-row">
             <div>
@@ -2988,11 +3255,10 @@ export function App() {
             </div>
           </div>
           <ResourceStrip state={state} />
-          <TimeSpeedControl value={timeSpeed} onChange={setTimeSpeed} />
         </header>
 
         <main id="main-content" className="main-content">
-          {showTutorial ? <QuickStart onDismiss={dismissTutorial} /> : null}
+          <TimeSpeedControl value={timeSpeed} onChange={setTimeSpeed} />
           <WarningBanner state={state} />
           <UpgradeFeedback state={state} />
           {selectedName ? (
@@ -3054,28 +3320,23 @@ export function App() {
               onUndoDelete={undoPresetDelete}
             />
           )}
+          {showTutorial ? <QuickStart onDismiss={dismissTutorial} /> : null}
         </main>
       </div>
 
       <nav className="bottom-nav" aria-label="Primary">
-        {(
-          [
-            ["build", "⌁", "Build"],
-            ["jobs", "▤", "Jobs"],
-            ["career", "◒", "Career"],
-            ["upgrades", "⬡", "Upgrades"],
-            ["inspect", "⌕", "Inspect"],
-          ] as const
-        ).map(([id, icon, label]) => (
+        {navigationItems.map(([id, icon, label]) => (
           <button
             type="button"
             key={id}
             className={tab === id ? "active" : ""}
             aria-current={tab === id ? "page" : undefined}
-            onClick={() => setTab(id)}
+            aria-label={label}
+            onClick={() => switchTab(id)}
           >
-            <span aria-hidden="true">{icon}</span>
+            <DecorativeGlyph>{icon}</DecorativeGlyph>
             {label}
+            {id === "build" && selectedName ? <small>1 pending</small> : null}
           </button>
         ))}
       </nav>

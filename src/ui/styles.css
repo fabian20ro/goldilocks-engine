@@ -485,9 +485,8 @@ h2 {
 }
 
 .selection-banner {
-  position: sticky;
-  z-index: 5;
-  top: 0.5rem;
+  position: relative;
+  z-index: 1;
   justify-content: space-between;
   border-color: #4f6d36;
   background: #1b2915;
@@ -528,6 +527,36 @@ h2 {
 
 .mission-card .bottleneck {
   color: var(--amber);
+}
+
+.presentation-toggle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(44px, 1fr));
+  gap: 0.25rem;
+  grid-column: 1 / -1;
+}
+
+.presentation-toggle button {
+  min-height: 44px;
+  border: 1px solid var(--line-bright);
+  border-radius: 0.4rem;
+  background: transparent;
+  color: var(--muted);
+}
+
+.presentation-toggle button[aria-pressed="true"] {
+  border-color: var(--acid);
+  background: #24351b;
+  color: var(--acid);
+}
+
+.observation-note {
+  padding: 0.65rem;
+  border: 1px solid var(--cyan);
+  border-radius: 0.5rem;
+  background: #102126;
+  color: var(--cyan);
+  font-size: 0.68rem;
 }
 
 .progress-track {
@@ -822,7 +851,10 @@ h2 {
 .snap-action {
   position: absolute;
   z-index: 2;
-  inset: 1.55rem 0.48rem 0.48rem;
+  right: 0.48rem;
+  bottom: 0.48rem;
+  width: min(7rem, 42%);
+  min-height: 44px;
   border: 1px dashed var(--acid);
   border-radius: 0.4rem;
   background: #152611ee;
@@ -2437,6 +2469,485 @@ h2 {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* D-012 command deck: shared compact shell, rails, cards, and instruments. */
+.semantic-glyph {
+  display: inline-grid;
+  min-width: 1.1em;
+  place-items: center;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-style: normal;
+  line-height: 1;
+}
+
+.app-header {
+  padding: 0.55rem 0.65rem 0.5rem;
+}
+
+.brand-row {
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.brand-kicker {
+  font-size: 0.52rem;
+}
+
+h1 {
+  margin-top: 0;
+  font-size: 0.92rem;
+}
+
+.header-actions {
+  flex-wrap: nowrap;
+  gap: 0.3rem;
+}
+
+.help-toggle,
+.motion-toggle {
+  min-height: 44px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.58rem;
+}
+
+.animation-control small {
+  display: block;
+  font-size: 0.48rem;
+}
+
+.resource-strip {
+  gap: 0.18rem;
+  margin-top: 0.45rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--line);
+}
+
+.resource-strip dt {
+  font-size: 0.49rem;
+}
+
+.resource-strip dd {
+  margin-top: 0.08rem;
+  font-size: clamp(0.61rem, 2.8vw, 0.72rem);
+}
+
+.main-content {
+  gap: 0.5rem;
+  padding: 0.5rem;
+}
+
+.time-controls {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.3rem;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  background: var(--panel);
+}
+
+.time-controls > div:first-child small {
+  display: none;
+}
+
+.time-controls > div:first-child strong {
+  display: block;
+  max-width: 3.7rem;
+  line-height: 1.1;
+}
+
+.speed-options {
+  flex: 1;
+  gap: 0.2rem;
+}
+
+.speed-options button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.2rem;
+}
+
+.warning-banner {
+  min-height: 2.75rem;
+  padding: 0.42rem 0.55rem;
+}
+
+.warning-banner details summary {
+  min-height: 24px;
+  color: #e6cda8;
+  cursor: pointer;
+  font-size: 0.62rem;
+}
+
+.warning-banner details[open] summary {
+  margin-bottom: 0.35rem;
+}
+
+.mission-card {
+  gap: 0.45rem;
+  padding: 0.55rem;
+}
+
+.mission-card strong {
+  font-size: 0.7rem;
+}
+
+.section-heading {
+  padding: 0.58rem 0.65rem;
+}
+
+.dispatch-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) repeat(3, auto);
+  gap: 0.3rem;
+  align-items: center;
+  padding: 0.38rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+  background: #0d1712;
+  color: var(--cyan);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.57rem;
+}
+
+.dispatch-strip span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pipeline {
+  display: grid;
+  max-height: none;
+  gap: 0.35rem;
+  overflow: visible;
+  margin: 0;
+  padding: 0.5rem;
+  list-style: none;
+}
+
+.pipeline-stage-group {
+  display: block;
+}
+
+.pipeline-slot {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0.3rem;
+}
+
+.slot-meta {
+  min-height: 1rem;
+  padding-bottom: 0.2rem;
+}
+
+.slot-meta b {
+  color: var(--acid);
+}
+
+.module-card {
+  min-height: 44px;
+  padding: 0.32rem 0.4rem;
+}
+
+.pipeline .module-code {
+  flex-basis: 2.3rem;
+  height: 2rem;
+}
+
+.pipeline .module-copy small {
+  white-space: nowrap;
+}
+
+.empty-module {
+  min-height: 44px;
+}
+
+.details-surface {
+  margin: 0.5rem;
+  border: 1px solid var(--cyan);
+  border-radius: 0.55rem;
+  background: var(--panel-raised);
+  box-shadow: 0 0.8rem 2rem #0007;
+}
+
+.details-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+  color: var(--cyan);
+}
+
+.details-heading button {
+  min-width: 4rem;
+  min-height: 44px;
+  border: 1px solid var(--line-bright);
+  border-radius: 0.4rem;
+  background: transparent;
+  color: inherit;
+}
+
+.details-body {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.65rem;
+  color: #cbd7cf;
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.compact-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.compact-details-grid div {
+  padding: 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+}
+
+.compact-details-grid dt {
+  color: var(--muted);
+  font-size: 0.58rem;
+}
+
+.compact-details-grid dd {
+  color: #fff;
+  font-weight: 700;
+}
+
+.dispatch-card {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.55rem;
+  padding: 0.6rem;
+  border: 1px solid var(--acid-dim);
+  border-radius: 0.55rem;
+  background: linear-gradient(135deg, #1c2a1b, #121b16);
+}
+
+.dispatch-card > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.dispatch-card > div > .semantic-glyph {
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--acid-dim);
+  border-radius: 0.45rem;
+  background: #24331c;
+  font-size: 1.15rem;
+}
+
+.dispatch-card span {
+  display: grid;
+  gap: 0.08rem;
+}
+
+.dispatch-card small,
+.dispatch-card em,
+.dispatch-card p,
+.dispatch-card details {
+  color: var(--muted);
+  font-size: 0.6rem;
+  line-height: 1.35;
+}
+
+.dispatch-card em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dispatch-card .queue-one {
+  width: 100%;
+}
+
+.hour-tokens {
+  display: grid;
+  grid-template-columns: repeat(4, 44px);
+  gap: 0.2rem;
+}
+
+.hour-tokens button {
+  width: 44px;
+  min-height: 44px;
+  border: 1px solid var(--line-bright);
+  border-radius: 50%;
+  background: #0d1611;
+  color: var(--muted);
+}
+
+.hour-tokens button.filled {
+  border-color: var(--acid);
+  background: #24351b;
+  color: var(--acid);
+}
+
+.career-deck {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.career-deck > * {
+  order: 3;
+}
+
+.career-deck > .evening-panel {
+  order: 1;
+}
+
+.career-deck > .career-overview {
+  order: 2;
+}
+
+.decision-deltas,
+.empty-position-symbols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.5rem 0.65rem;
+}
+
+.decision-deltas span,
+.empty-position-symbols span {
+  padding: 0.25rem 0.38rem;
+  border: 1px solid var(--line-bright);
+  border-radius: 1rem;
+  color: var(--cyan);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.58rem;
+}
+
+.empty-position-symbols span {
+  border-style: dashed;
+  color: var(--muted);
+}
+
+.instrument-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  padding: 0.65rem;
+}
+
+.status-gauge {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  background: #0e1712;
+  font-size: 0.62rem;
+}
+
+.status-gauge > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.3rem;
+}
+
+.gauge-track {
+  height: 0.45rem;
+  overflow: hidden;
+  border-radius: 1rem;
+  background: #27312c;
+}
+
+.gauge-track > span {
+  display: block;
+  height: 100%;
+  background: var(--acid);
+}
+
+.status-gauge.warning .gauge-track > span {
+  background: var(--amber);
+}
+.status-gauge.failure .gauge-track > span {
+  background: var(--red);
+}
+.status-gauge.evidence .gauge-track > span {
+  background: var(--cyan);
+}
+
+.metrics-disclosure {
+  margin: 0 0.65rem 0.65rem;
+}
+
+.metrics-disclosure summary {
+  min-height: 44px;
+  padding: 0.6rem;
+  border: 1px solid var(--line-bright);
+  border-radius: 0.4rem;
+  color: var(--cyan);
+  cursor: pointer;
+  font-size: 0.65rem;
+}
+
+.bottom-nav button small {
+  color: var(--amber);
+  font-size: 0.48rem;
+}
+
+@media (max-width: 350px) {
+  .brand-row {
+    flex-wrap: nowrap;
+  }
+  .header-actions {
+    width: auto;
+  }
+  .header-actions > .help-toggle,
+  .header-actions > .animation-control {
+    flex: 0 1 auto;
+  }
+  .help-toggle,
+  .motion-toggle {
+    max-width: 5.2rem;
+  }
+  .resource-strip .semantic-glyph {
+    display: none;
+  }
+  .time-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dispatch-strip {
+    grid-template-columns: minmax(0, 1fr) repeat(2, auto);
+  }
+  .dispatch-strip span:last-child {
+    display: none;
+  }
+  .instrument-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .hour-tokens {
+    grid-template-columns: repeat(4, minmax(44px, 1fr));
+  }
+  .mission-card {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .mission-card > div + div {
+    padding-top: 0;
+    padding-left: 0.45rem;
+    border-top: 0;
+    border-left: 1px solid var(--line);
+  }
+  .mission-card > .presentation-toggle {
+    padding-top: 0.35rem;
+    padding-left: 0;
+    border-top: 1px solid var(--line);
+    border-left: 0;
   }
 }
 
