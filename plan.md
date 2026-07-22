@@ -1029,6 +1029,252 @@ The same device expands in scope.
 - Optional haptics and audio
 - No time-critical tapping requirement
 
+### 20.5 Owner-authorized emoji command-deck rehaul
+
+Rehaul the complete current Bedroom interface without changing the deterministic
+simulation, economy, progression, persistence, endings, or bottom-navigation
+contract. The production interface uses code-native CSS, text, emoji, and
+Unicode symbols. Generated raster art, remote image assets, icon-font downloads,
+and a Webdings dependency are out of scope. The same emoji or symbol may and
+should be reused for interchangeable objects of the same semantic type.
+
+#### Visual language
+
+Preserve and formalize the initial terminal palette as reusable design tokens:
+
+- Background: `#080d0b` and `#0b110e`.
+- Standard and raised surfaces: `#111a16` and `#17221c`.
+- Structural borders: `#2b3b32` and `#4c6656`.
+- Primary signal/selection: acid lime `#b7f36b` with dim variant `#7fa94c`.
+- Constraint/warning: amber `#f0ad4e`.
+- Failure/destructive: red `#ff786d`.
+- Evidence/information: cyan `#75d5dc`.
+- Keyboard focus: `#f5d26c`.
+
+Apply the palette consistently across every page; this is one visual system,
+not a collection of page-specific themes. Color never carries status alone.
+Every colored state also has a visible label, symbol, pattern, shape, or line
+style.
+
+Create a central semantic glyph registry rather than scattering literal glyphs
+through view code. At minimum it covers:
+
+- Resources: money, simulated/personal time, compute, memory, reputation,
+  savings, electricity, and evidence.
+- Pipeline roles: input, preparation/cleaning, model/runtime, evaluation,
+  delivery/output, empty position, and bypass.
+- Status: active, queued, passed, paused, locked, owned, equipped, warning,
+  failure, direct cause, contributing condition, hypothesis, and unknown.
+- Navigation: Build, Jobs, Career, Upgrades, and Inspect.
+
+Emoji are an illustrative compression layer, not the accessible name. Decorative
+glyphs are hidden from assistive technology; every actionable or informative
+item retains a concise visible text label and an accurate programmatic name.
+Native platform emoji variation is acceptable because meaning is preserved by
+the label and interaction structure.
+
+#### Shared portrait shell
+
+- Replace the tall permanent header with a compact icon-led resource HUD.
+- Keep three to five decision-relevant resources visible; move definitions,
+  formulas, accounting precision, Help, animation preference, and secondary
+  controls into labeled disclosure.
+- Show the current objective and dominant bottleneck as one compact summary,
+  not a large two-column report.
+- Render the active warning as a concise anchored chip or one-line summary near
+  the affected object. Full guidance remains available through details.
+- Keep the five bottom tabs as the sole global page navigation.
+- Preserve exact 1×/4×/16×/64× simulation behavior, but place its compact
+  control with live-run context rather than consuming the permanent header.
+- Preserve the user animation/reduced-motion choice in a labeled Help/settings
+  disclosure; it remains visual-only and never changes simulation time.
+- Switching tabs starts at the meaningful top of the destination or restores
+  that tab's own prior scroll position deliberately; it must never inherit an
+  arbitrary offset from another page.
+
+At initial load, the compact HUD, objective/bottleneck summary, and the first
+actionable pipeline control are visible above bottom navigation at 320×693 and
+393×742 CSS pixels. On Jobs, the selected playable workload and Queue 1 action
+are visible without scrolling at those sizes. These requirements also hold
+without horizontal document overflow.
+
+#### Build and live-run synthesis
+
+Use the compact ordered rail as the shared pipeline grammar. Do not render
+decorative plumbing, large pipes, or a factory map.
+
+- Starter topology remains source + three process positions + sink: five total
+  ordered stages.
+- Workstation Expansion I remains the same single pipeline with six process
+  positions: eight total ordered stages.
+- Expansion purchase adds no compute, memory, hardware, second queue, or second
+  pipeline. It adds three positions only.
+- The three new positions begin visibly empty and bypassed. Empty positions
+  remain part of the order and add no module benefit or cost.
+- The rail presents every stage with stable number/order, role emoji, short
+  module name, and one currently decision-relevant status or stat.
+- At 320 CSS pixels, the expanded topology reflows or groups without a nested
+  vertical scroll trap, pinch zoom, clipped target, or document-level horizontal
+  overflow.
+
+Build is the editing presentation of that rail:
+
+- Tap, keyboard selection, and touch drag remain equivalent supported paths.
+- Selecting a stage exposes compatible owned modules, replace/move/bypass
+  actions, and before/after deltas in one contextual disclosure.
+- Repeated Remove/Bypass controls are not permanently rendered under every
+  stage; destructive/contextual actions appear only for the selected item.
+- The module inventory groups or filters owned/equipped, purchasable, and locked
+  content so the next valid choice is not buried in a complete catalogue.
+- Selecting an owned module from Upgrades leaves an explicit, accessible pending
+  selection and a labeled Build-tab indication without silently violating the
+  bottom-navigation-only routing rule.
+
+Run is an observation presentation of the same rail, not a new simulation mode
+or manual per-stage stepping mechanic:
+
+- The existing worker/tick engine remains sole authority for progress.
+- Active, queued, passed, bypassed, failed, and waiting stages use emoji/symbol,
+  label, and restrained CSS state changes.
+- A compact dispatch strip identifies the active workload, locked quote,
+  progress, queue count, and current stage.
+- Queue buildup appears as a count/stack immediately before the named
+  bottleneck; failures identify their propagation path without decorative pipes.
+- Payout, failure, equipment, and objective completion receive short localized
+  CSS/emoji feedback. Reduced motion replaces movement with an immediate state
+  change; no information depends on animation.
+
+#### Jobs — dispatch cards
+
+- Use warm, concise workload cards with a stable workload emoji, name, current
+  quote, demand/trend, and the one most relevant capacity/risk summary.
+- Keep the selected workload and persistent Queue 1 action in the initial thumb
+  zone; Queue 10, Pause/Resume, and clear-waiting remain available without
+  placing the entire workload catalogue before the primary action.
+- Show the active job as a compact ordered dispatch progression using the same
+  pipeline glyph registry.
+- Locked workloads are grouped after playable choices and show concise unlock
+  progress; they do not dominate the first decision.
+- Quote locking, actual configured cost, settlement precision, saturation, and
+  recovery text remain accessible through details and continue to use current
+  engine values without simplification or invention.
+
+#### Career — warm cards and finite-time tokens
+
+- Use the same palette and card grammar with stable emojis for freelance,
+  competition, product, and maintenance routes.
+- Each route summary shows one benefit, one opportunity cost, and current hour
+  allocation. Full route, economic, evidence, and unlock text is disclosed on
+  selection.
+- Make the finite four-hour evening visually tangible through large accessible
+  allocation controls/tokens while retaining current deterministic commands and
+  exact fractional-hour behavior.
+- Show projected money/progress/cost consequences adjacent to allocation and
+  keep Run evening as the singular high-emphasis action.
+- Retain the bedroom/original-computer emotional identity through text, emoji,
+  small CSS motifs, and tone; do not add character art or new narrative systems.
+
+#### Upgrades — comparison bench
+
+- Use reusable emoji for interchangeable hardware and module families; do not
+  require unique art per catalogue item.
+- Distinguish locked, affordable, owned, selected, and equipped through visible
+  words and programmatic states as well as color.
+- Put affordable/next useful purchases before distant catalogue goals while
+  retaining access to every item and exact requirement.
+- Compare a candidate against the equipped item through compact signed deltas
+  for applicable compute, memory, power/heat, reliability, operating cost,
+  throughput/latency, quality, and observability. The summary shows only the
+  most decision-relevant deltas; details contains the complete current data.
+- Render Workstation Expansion I as a symbolic `3 → 6` process-capacity change
+  with three empty-position symbols. Never imply it upgrades the rig's compute
+  or memory.
+
+#### Inspect — instrument console
+
+- Replace the spreadsheet as the initial hero with compact CSS gauges/bars for
+  memory, thermal pressure, observability/evidence, and predicted-versus-observed
+  divergence.
+- Keep exact values and the complete comparison table available through a
+  labeled details disclosure; no metric is removed from the player.
+- Render causal evidence using consistent text/symbol grammar: solid/direct,
+  dashed/contributing, dotted/hypothesis or unknown, each with a visible label.
+- Event summaries use the shared resource, stage, warning, and failure emojis.
+  Full direct cause, contributing condition, retained evidence, accounting, and
+  timestamp/event identity remain available on item selection.
+- Capture baseline, save/load configuration, delete confirmation, and undo retain
+  their current semantics and accessible labels.
+
+#### Item-level details and progressive disclosure
+
+Every module, stage, workload, rig, upgrade, resource, warning, career route,
+metric, evaluation result, ending, preset, and event that currently exposes
+decision-relevant text must keep that information available.
+
+- Tapping/clicking an item or activating it with the keyboard opens one labeled
+  in-flow details drawer, bottom sheet, popover, or native disclosure associated
+  with that item.
+- Exactly one primary item-details surface is open per view. Opening another
+  item replaces the prior details; repeated activation may close it.
+- The details surface includes the full current description, state, applicable
+  metrics, consequences, requirements, accounting/evidence qualification, and
+  contextual actions. It uses live simulation/catalog values, not duplicate
+  hard-coded prose.
+- Close/Escape restores focus to the originating control. Tab order remains
+  native and focus is never trapped unless a correctly labeled modal is truly
+  required.
+- Pointer, touch, keyboard, screen reader, 200% text, and reduced-motion paths
+  expose equivalent information and actions.
+- Summaries never become the only source of a warning, constraint, quote,
+  requirement, uncertainty qualification, or causal category.
+
+#### Implementation structure and scope
+
+- Extract the visual-language registry and reusable Resource HUD, Pipeline Rail,
+  Details surface, status gauge/bar, dispatch strip, comparison delta, item card,
+  and bottom navigation components from the current monolithic UI where useful.
+- Keep the deterministic engine, Worker protocol, persistence schemas, balances,
+  content catalogue, commands, and PWA update contract behaviorally unchanged
+  unless a UI integration defect requires the smallest compatible correction.
+- Do not add an art-generation pipeline, raster mock assets, remote fonts/icons,
+  canvas/PixiJS, audio, haptics, characters, new workloads, new purchases, new
+  endings, new navigation destinations, or new simulation commands.
+- The concept PNGs under `docs/ux-mocks/` are non-authoritative design references
+  only. Production acceptance is based on this section and executable behavior,
+  not pixel matching those images.
+
+#### Required verification evidence
+
+- Unit/component tests cover glyph-registry reuse, item selection/disclosure,
+  details replacement/close/focus restoration, live catalog values, and no
+  simulation mutation from presentation-only Build/Run switching.
+- Repository-pinned Playwright covers Build, Jobs, Career, Upgrades, and Inspect
+  at 320 and 393 CSS-pixel widths, including a 320×693 short viewport.
+- Browser evidence covers starter and expanded topology, three empty/bypassed
+  expansion positions, module install/replace/bypass, active job progression,
+  queue/payout/failure feedback, workload selection/queueing, career allocation,
+  upgrade comparison/equip, baseline/details, and event/postmortem disclosure.
+- Browser evidence covers tap, keyboard, representative CDP touch, 200% text,
+  reduced motion, no color-only meaning, 44 CSS-pixel actionable controls, no
+  horizontal document overflow, no nested expanded-pipeline scroll trap, reload,
+  offline reload, root scope, and GitHub Pages scope.
+- At both initial portrait sizes, automated geometry assertions prove the first
+  actionable pipeline control and the Jobs selected-workload/Queue 1 action are
+  above bottom navigation without prior vertical scrolling.
+- Existing unit/property/balance, migration, PWA update/recovery, root/Pages,
+  failure/replay, and canonical `./scripts/verify` checks remain green.
+- Fresh independent verification must include real screenshot inspection of all
+  five tabs in starter and Workstation states at both portrait widths; semantic
+  assertions alone cannot establish visual coherence.
+
+Completion evidence:
+
+> A fresh independent Verifier PASS demonstrates one coherent initial-color,
+> emoji/symbol command deck across all current views; an immediately actionable
+> portrait loop; accurate item-level details; a pipe-free single ordered
+> Workstation expansion; preserved simulation/persistence/PWA behavior; and the
+> complete canonical verification gate.
+
 ---
 
 ## 21. Emotional continuity
@@ -1680,6 +1926,14 @@ Owner-authorized Workstation Expansion I follow-up:
 22. Add clear-waiting-only semantics and fixed 64× time.
 23. Remove duplicate global page CTAs and add compact progressive disclosure.
 24. Run deterministic pacing/market sweeps and pinned portrait/accessibility/offline browser acceptance.
+
+Owner-authorized emoji command-deck rehaul:
+
+25. Extract the shared initial-color tokens, semantic emoji/symbol registry, compact resource HUD, ordered pipeline rail, item-details surface, gauges, dispatch strip, comparison deltas, and reusable cards.
+26. Recompose Build/live-run, Jobs, Career, Upgrades, and Inspect with the shared grammar and item-level progressive disclosure while preserving current commands and exact data.
+27. Make starter and Workstation topology immediately legible without decorative pipes or nested vertical scrolling; keep expansion positions empty/bypassed until explicitly configured.
+28. Move primary actions above the fold at required portrait sizes and relocate secondary Help, animation, time, accounting, evidence, and catalogue prose into accessible disclosure.
+29. Run component and pinned-browser UX/accessibility/geometry/screenshot evidence plus the complete canonical verification gate.
 
 Do not implement research, creators, fear, workforce, or endgame before the applicable pipeline requirements and automated quality evidence are complete.
 
