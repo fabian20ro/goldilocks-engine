@@ -24,17 +24,18 @@
 | Accessible live item details                                         | `DetailsSurface` and `ItemDetailsDisclosure`; view-wide replacement, Close/Escape focus-return, and live-value checks |
 | Build/live observation and unchanged Worker authority                | Presentation-only toggle snapshot equality; unchanged simulation/worker code; full property/balance suites            |
 | Jobs dispatch hierarchy                                              | Selected live card and Queue 1 geometry; workload/quote/queue/settlement regressions                                  |
-| Career warm cards and tangible four-hour allocation                  | Route glyphs, 44px tokens, exact fractional input; all 16 tokens measured at 320/393 and 200% text                    |
+| Career warm cards and tangible four-hour allocation                  | All 16 tokens and four exact inputs measured ≥44px and within route bounds at 320/393, normal and 200% text           |
 | Upgrade comparison bench                                             | One controlled live disclosure across every item type, signed deltas, ordering, and `3 → 6` empty-symbol contract     |
 | Inspect instrument console and retained exact evidence               | Four labeled CSS meters plus default-open exact comparison disclosure; baseline/preset/postmortem tests               |
 | Accessibility and portrait resilience                                | 44px controls, text/status labels independent of color, keyboard focus, reduced motion, touch, no horizontal overflow |
-| Persistence/PWA/root/Pages behavior unchanged                        | 116 root Playwright cases, 2 Pages/offline cases, migration/recovery/update suites                                    |
+| Persistence/PWA/root/Pages behavior unchanged                        | 117 root Playwright cases, 2 Pages/offline cases, migration/recovery/update suites                                    |
 
 ## Verifier findings resolved
 
 - **V-042:** Replaced independent rig/module native disclosures with one `UpgradesView`-owned selection across expansion, rigs, and modules. `ItemDetailsDisclosure` synchronizes summary activation, renders at most one open primary surface, preserves every live catalogue stat/text and contextual action, and supplies labeled Close plus Escape focus restoration. The committed verifier test and implementation-owned cross-item/Close/Escape regression succeed.
 - **V-043:** Reflowed every Career route and hour controller into explicit single-column grids. Four full-width `minmax(44px, 1fr)` tokens plus the exact numeric input remain inside 320/393px portraits and at 200% text without horizontal document overflow. Geometry checks cover all 16 route tokens.
-- Round-036 immutable report and verifier-authored regression remain untouched.
+- **V-044:** Removed the contradictory `@media (max-width: 350px)` two-column hour-controller override. The narrow-width cascade now preserves the base single-column stack, keeping every exact fractional numeric input full-width, at least 44px high/wide, and within its route at 320px/200% text. Implementation-owned geometry also covers every token and input at 320/393 in normal and scaled states.
+- Round-036/037 immutable reports and verifier-authored regressions remain untouched.
 
 ## Setup, startup, and verification commands
 
@@ -64,7 +65,7 @@ Focused command-deck verification and screenshot generation:
 
 ```sh
 npm exec vitest -- run --no-coverage src/ui/commandDeck.test.tsx
-E2E_PORT=4174 npm run test:e2e -- tests/e2e/verifier-round-036.spec.ts tests/e2e/command-deck.spec.ts
+E2E_PORT=4174 npm run test:e2e -- tests/e2e/verifier-round-036.spec.ts tests/e2e/verifier-round-037.spec.ts tests/e2e/command-deck.spec.ts
 ```
 
 The browser suite writes 22 inspection PNGs under `test-results/command-deck/`: all five tabs in starter and expanded state at 320×693 and 393×742, plus scrolled Career renders at 200% text for both widths.
@@ -88,7 +89,7 @@ E2E_PORT=4174 ./scripts/verify
 - `src/ui/glyphs.tsx` is the sole code-native semantic glyph registry; view code obtains repeated stage/navigation/workload glyphs from registry helpers.
 - `DetailsSurface`, `ItemDetailsDisclosure`, and `StatusGauge` are reusable accessible primitives. Upgrades owns one selected detail ID across every item type; synchronous controlled summary activation prevents native-toggle races, and labeled Close/Escape return focus without trapping it.
 - Remaining native disclosures describe one selected dispatch's qualification, one queue collection, global warning guidance, or the single exact Inspect table; they are supplemental view evidence, not competing item-level primary surfaces.
-- Career route and hour controls explicitly declare one-column grids. Token tracks use four flexible tracks with a 44px floor; exact numeric inputs use a separate full-width row with intrinsic width constrained to the card.
+- Career route and hour controls explicitly declare one-column grids in both base and `max-width: 350px` rules. Token tracks use four flexible tracks with a 44px floor; exact numeric inputs use a separate full-width row with intrinsic width constrained to the card.
 - Compact UI derives all prices, requirements, descriptions, metrics, quotes, accounting, evidence, and status from live catalogue/simulation state. No duplicate economy or causal model was introduced.
 - Build/Edit versus Run is local React presentation state only. It sends no simulation command and changes no persisted pipeline, workload, or hardware value.
 - Tab scroll restoration is explicit per destination rather than inheriting another view's arbitrary offset.
@@ -108,9 +109,9 @@ E2E_PORT=4174 ./scripts/verify
 
 - `npm exec vitest -- run --no-coverage src/ui/commandDeck.test.tsx` — succeeded, 3 tests.
 - `E2E_PORT=4174 npm run test:e2e -- tests/e2e/verifier-round-036.spec.ts --reporter=line` — succeeded, 2 tests.
-- `E2E_PORT=4174 npm run test:e2e -- tests/e2e/verifier-round-036.spec.ts tests/e2e/command-deck.spec.ts --reporter=line` — succeeded, 8 tests: view-wide disclosure replacement, labeled Close/Escape focus return, required 393px geometry, 320/393 full command-deck renders, and 320/393 200%-text Career geometry.
-- Visual inspection covered updated Career and Upgrades renders at both required widths, starter/expanded state, plus scaled Career renders. All four tokens remain whole; exact inputs stack below them.
-- Final `E2E_PORT=4174 ./scripts/verify` — succeeded, exit 0: fresh local setup; format, lint, typecheck; 26 unit/property files / 126 tests with coverage; numeric prototype; 20,001-seed upgrade, 41-seed progression, 101-seed Career, and 121-seed evaluation sweeps with zero failures; production build; 116 root Playwright cases; 2 Pages/offline cases.
+- `E2E_PORT=4174 npm run test:e2e -- tests/e2e/verifier-round-036.spec.ts tests/e2e/verifier-round-037.spec.ts tests/e2e/command-deck.spec.ts --reporter=line` — succeeded, 9 tests: disclosure replacement/Close/Escape, required 393px tokens, exact 320px/200%-text inputs, 320/393 full renders, and all Career controls at both widths in normal/scaled states.
+- Visual inspection covered updated Career renders at 320/393 in normal and 200%-text states. All four tokens remain whole; each exact input is a full-width second row inside its route.
+- Final `E2E_PORT=4174 ./scripts/verify` — succeeded, exit 0: fresh local setup; format, lint, typecheck; 26 unit/property files / 126 tests with coverage; numeric prototype; 20,001-seed upgrade, 41-seed progression, 101-seed Career, and 121-seed evaluation sweeps with zero failures; production build; 117 root Playwright cases; 2 Pages/offline cases.
 
 ## Checks not run
 

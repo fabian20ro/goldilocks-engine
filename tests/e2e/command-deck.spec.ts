@@ -69,6 +69,33 @@ async function assertInitialGeometry(page: Page) {
   ).toBe(0);
 }
 
+async function assertCareerControlGeometry(page: Page, viewportWidth: number) {
+  const tokens = page.locator(".hour-tokens button");
+  const inputs = page.locator('.career-route input[type="number"]');
+  await expect(tokens).toHaveCount(16);
+  await expect(inputs).toHaveCount(4);
+
+  for (const control of await tokens.or(inputs).all()) {
+    const geometry = await control.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      const route = element.closest(".career-route")?.getBoundingClientRect();
+      return {
+        width: box.width,
+        height: box.height,
+        left: box.left,
+        right: box.right,
+        routeLeft: route?.left ?? Number.NaN,
+        routeRight: route?.right ?? Number.NaN,
+      };
+    });
+    expect(geometry.width).toBeGreaterThanOrEqual(44);
+    expect(geometry.height).toBeGreaterThanOrEqual(44);
+    expect(geometry.left).toBeGreaterThanOrEqual(geometry.routeLeft);
+    expect(geometry.right).toBeLessThanOrEqual(geometry.routeRight);
+    expect(geometry.right).toBeLessThanOrEqual(viewportWidth);
+  }
+}
+
 async function activateExpansion(page: Page) {
   await expect
     .poll(() => page.evaluate((key) => localStorage.getItem(key), SAVE_KEY))
@@ -110,6 +137,8 @@ for (const viewport of [
     for (const tab of tabs) {
       await openTab(page, tab);
       await assertPortrait(page);
+      if (tab === "Career")
+        await assertCareerControlGeometry(page, viewport.width);
       await page.screenshot({
         path: `test-results/command-deck/${viewport.width}-starter-${tab.toLowerCase()}.png`,
       });
@@ -127,6 +156,8 @@ for (const viewport of [
     for (const tab of tabs) {
       await openTab(page, tab);
       await assertPortrait(page);
+      if (tab === "Career")
+        await assertCareerControlGeometry(page, viewport.width);
       await page.screenshot({
         path: `test-results/command-deck/${viewport.width}-expanded-${tab.toLowerCase()}.png`,
       });
@@ -245,28 +276,7 @@ for (const viewport of [
     });
     await openTab(page, "Career");
 
-    const tokens = page.locator(".hour-tokens button");
-    await expect(tokens).toHaveCount(16);
-    const geometry = await tokens.evaluateAll((buttons) =>
-      buttons.map((button) => {
-        const box = button.getBoundingClientRect();
-        return {
-          left: box.left,
-          right: box.right,
-          width: box.width,
-          height: box.height,
-        };
-      }),
-    );
-    expect(
-      geometry.every(
-        (box) =>
-          box.left >= 0 &&
-          box.right <= viewport.width &&
-          box.width >= 44 &&
-          box.height >= 44,
-      ),
-    ).toBe(true);
+    await assertCareerControlGeometry(page, viewport.width);
     expect(
       await page.evaluate(
         () =>
@@ -274,7 +284,7 @@ for (const viewport of [
           document.documentElement.clientWidth,
       ),
     ).toBe(true);
-    await tokens.first().scrollIntoViewIfNeeded();
+    await page.locator(".hour-tokens button").first().scrollIntoViewIfNeeded();
     await page.screenshot({
       path: `test-results/command-deck/${viewport.width}-career-200-percent.png`,
     });

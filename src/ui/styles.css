@@ -2409,7 +2409,7 @@ h2 {
   }
 
   .career-hours-control {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     align-items: center;
     text-align: left;
   }
