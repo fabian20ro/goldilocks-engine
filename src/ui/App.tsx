@@ -45,7 +45,11 @@ import type {
   SimulationState,
 } from "../simulation/types";
 import { TIME_SPEEDS, useSimulation, type TimeSpeed } from "./useSimulation";
-import { DetailsSurface, StatusGauge } from "./commandDeck";
+import {
+  DetailsSurface,
+  ItemDetailsDisclosure,
+  StatusGauge,
+} from "./commandDeck";
 import {
   careerGlyph,
   DecorativeGlyph,
@@ -1099,10 +1103,16 @@ function RigUpgradeCard({
   state,
   hardwareId,
   command,
+  detailOpen,
+  onOpenDetails,
+  onCloseDetails,
 }: {
   state: SimulationState;
   hardwareId: string;
   command: (command: SimulationCommand) => void;
+  detailOpen: boolean;
+  onOpenDetails: () => void;
+  onCloseDetails: () => void;
 }) {
   const item = getHardware(hardwareId);
   const equipped = state.hardwareId === item.id;
@@ -1159,8 +1169,13 @@ function RigUpgradeCard({
           {item.watts - current.watts} W
         </span>
       </p>
-      <details className="upgrade-details" open={equipped || undefined}>
-        <summary>Compare rig details and tradeoffs</summary>
+      <ItemDetailsDisclosure
+        summary="Compare rig details and tradeoffs"
+        title={item.name}
+        open={detailOpen}
+        onOpen={onOpenDetails}
+        onClose={onCloseDetails}
+      >
         <dl className="stat-grid">
           <div>
             <dt>Compute</dt>
@@ -1196,7 +1211,7 @@ function RigUpgradeCard({
             </dd>
           </div>
         </dl>
-      </details>
+      </ItemDetailsDisclosure>
       {!owned ? (
         <button
           type="button"
@@ -1242,11 +1257,17 @@ function ModuleUpgradeCard({
   moduleId,
   command,
   onChoose,
+  detailOpen,
+  onOpenDetails,
+  onCloseDetails,
 }: {
   state: SimulationState;
   moduleId: string;
   command: (command: SimulationCommand) => void;
   onChoose: (moduleId: string) => void;
+  detailOpen: boolean;
+  onOpenDetails: () => void;
+  onCloseDetails: () => void;
 }) {
   const item = getModule(moduleId);
   const owned = state.ownedModuleIds.includes(item.id);
@@ -1303,8 +1324,13 @@ function ModuleUpgradeCard({
           </span>
         </p>
       ) : null}
-      <details className="upgrade-details" open={equipped || undefined}>
-        <summary>Compare module details and tradeoffs</summary>
+      <ItemDetailsDisclosure
+        summary="Compare module details and tradeoffs"
+        title={item.name}
+        open={detailOpen}
+        onOpen={onOpenDetails}
+        onClose={onCloseDetails}
+      >
         <dl className="stat-grid module-stats">
           <div>
             <dt>Compatibility</dt>
@@ -1354,7 +1380,7 @@ function ModuleUpgradeCard({
             {formatNumber(item.costPerJob - comparison.costPerJob, 3)}/job.
           </p>
         ) : null}
-      </details>
+      </ItemDetailsDisclosure>
       {!owned ? (
         <button
           type="button"
@@ -1390,9 +1416,15 @@ function ModuleUpgradeCard({
 function PipelineExpansionCard({
   state,
   command,
+  detailOpen,
+  onOpenDetails,
+  onCloseDetails,
 }: {
   state: SimulationState;
   command: (command: SimulationCommand) => void;
+  detailOpen: boolean;
+  onOpenDetails: () => void;
+  onCloseDetails: () => void;
 }) {
   const spec = getPipelineExpansion("workstation-expansion-i");
   const owned = state.ownedExpansionIds.includes(spec.id);
@@ -1426,7 +1458,6 @@ function PipelineExpansionCard({
           ${spec.purchaseCost.toFixed(2)}
         </strong>
       </div>
-      <p>{spec.description}</p>
       <div className="capacity-route" aria-label="Pipeline capacity change">
         <span>3 process positions</span>
         <span aria-hidden="true">→</span>
@@ -1440,12 +1471,21 @@ function PipelineExpansionCard({
         <span>◇ 5 · EMPTY</span>
         <span>◇ 6 · EMPTY</span>
       </div>
-      <p>{spec.tradeoff}</p>
-      <p className="purchase-reason">
-        Three new positions begin empty/bypassed. Purchase never buys, clones,
-        or auto-fills a module. Owned modules remain movable across all active
-        compatible positions.
-      </p>
+      <ItemDetailsDisclosure
+        summary="Compare expansion details and tradeoffs"
+        title={spec.name}
+        open={detailOpen}
+        onOpen={onOpenDetails}
+        onClose={onCloseDetails}
+      >
+        <p>{spec.description}</p>
+        <p>{spec.tradeoff}</p>
+        <p className="purchase-reason">
+          Three new positions begin empty/bypassed. Purchase never buys, clones,
+          or auto-fills a module. Owned modules remain movable across all active
+          compatible positions.
+        </p>
+      </ItemDetailsDisclosure>
       {!owned ? (
         <button
           type="button"
@@ -1504,6 +1544,14 @@ function UpgradesView({
   command: (command: SimulationCommand) => void;
   onChooseModule: (moduleId: string) => void;
 }) {
+  const [selectedDetailId, setSelectedDetailId] = useState<string | null>(
+    `rig:${state.hardwareId}`,
+  );
+  const detailProps = (id: string) => ({
+    detailOpen: selectedDetailId === id,
+    onOpenDetails: () => setSelectedDetailId(id),
+    onCloseDetails: () => setSelectedDetailId(null),
+  });
   return (
     <>
       <section className="panel store-intro" aria-labelledby="upgrades-title">
@@ -1531,7 +1579,11 @@ function UpgradesView({
             <h2 id="pipeline-store-title">Workstation expansion</h2>
           </div>
         </div>
-        <PipelineExpansionCard state={state} command={command} />
+        <PipelineExpansionCard
+          state={state}
+          command={command}
+          {...detailProps("expansion:workstation-expansion-i")}
+        />
       </section>
       <section className="panel" aria-labelledby="rig-store-title">
         <div className="section-heading compact">
@@ -1560,6 +1612,7 @@ function UpgradesView({
                 state={state}
                 hardwareId={item.id}
                 command={command}
+                {...detailProps(`rig:${item.id}`)}
               />
             ))}
         </div>
@@ -1593,6 +1646,7 @@ function UpgradesView({
                 moduleId={item.id}
                 command={command}
                 onChoose={onChooseModule}
+                {...detailProps(`module:${item.id}`)}
               />
             ))}
         </div>

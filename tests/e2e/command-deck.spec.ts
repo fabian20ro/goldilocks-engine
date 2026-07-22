@@ -195,3 +195,88 @@ test("stage details replace, restore focus, and Build/Run is presentation-only",
   }, SAVE_KEY);
   expect(after).toBe(before);
 });
+
+test("upgrade details replace across every item type and restore origin focus", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 693 });
+  await page.goto("/");
+  await openTab(page, "Upgrades");
+
+  const openDetails = page.locator("article.upgrade-card details[open]");
+  await expect(openDetails).toHaveCount(1);
+
+  const expansionSummary = page.getByText(
+    "Compare expansion details and tradeoffs",
+  );
+  await expansionSummary.click();
+  await expect(openDetails).toHaveCount(1);
+  await expect(openDetails).toContainText(
+    "Three new positions begin empty/bypassed",
+  );
+
+  const moduleSummary = page
+    .getByText("Compare module details and tradeoffs")
+    .first();
+  await moduleSummary.click();
+  await expect(openDetails).toHaveCount(1);
+  await expect(openDetails).toContainText("Compatibility");
+  await openDetails.getByRole("button", { name: /Close .* details/ }).click();
+  await expect(openDetails).toHaveCount(0);
+  await expect(moduleSummary).toBeFocused();
+
+  await expansionSummary.click();
+  await page.keyboard.press("Escape");
+  await expect(openDetails).toHaveCount(0);
+  await expect(expansionSummary).toBeFocused();
+});
+
+for (const viewport of [
+  { width: 320, height: 693 },
+  { width: 393, height: 742 },
+]) {
+  test(`Career tokens stay visible at 200% text at ${viewport.width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+    await page.addStyleTag({
+      content: ":root { font-size: 200% !important; }",
+    });
+    await openTab(page, "Career");
+
+    const tokens = page.locator(".hour-tokens button");
+    await expect(tokens).toHaveCount(16);
+    const geometry = await tokens.evaluateAll((buttons) =>
+      buttons.map((button) => {
+        const box = button.getBoundingClientRect();
+        return {
+          left: box.left,
+          right: box.right,
+          width: box.width,
+          height: box.height,
+        };
+      }),
+    );
+    expect(
+      geometry.every(
+        (box) =>
+          box.left >= 0 &&
+          box.right <= viewport.width &&
+          box.width >= 44 &&
+          box.height >= 44,
+      ),
+    ).toBe(true);
+    expect(
+      await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth <=
+          document.documentElement.clientWidth,
+      ),
+    ).toBe(true);
+    await tokens.first().scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: `test-results/command-deck/${viewport.width}-career-200-percent.png`,
+    });
+  });
+}

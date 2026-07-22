@@ -1490,6 +1490,27 @@ h2 {
   border-top: 1px solid var(--line);
 }
 
+.upgrade-details-body {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.upgrade-details-body > p {
+  padding: 0 0.55rem;
+  color: var(--muted);
+  font-size: 0.64rem;
+  line-height: 1.5;
+}
+
+.details-close {
+  min-height: 44px;
+  margin: 0 0.55rem 0.55rem;
+  border: 1px solid var(--line-bright);
+  border-radius: 0.4rem;
+  background: transparent;
+  color: var(--cyan);
+}
+
 .capacity-route {
   display: flex;
   min-height: 2.75rem;
@@ -1997,7 +2018,7 @@ h2 {
 
 .career-route {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 5.15rem;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.65rem;
   align-items: center;
   min-width: 0;
@@ -2033,11 +2054,13 @@ h2 {
 
 .career-hours-control {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 0.22rem;
   color: var(--muted);
   font-family: "IBM Plex Mono", monospace;
   font-size: 0.55rem;
-  text-align: right;
+  text-align: left;
   text-transform: uppercase;
 }
 
@@ -2045,6 +2068,8 @@ h2 {
 .savings-controls input,
 .offline-policy-form input[type="number"] {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   min-height: 2.75rem;
   padding: 0.42rem;
   border: 1px solid var(--line-bright);
@@ -2775,12 +2800,13 @@ h1 {
 
 .hour-tokens {
   display: grid;
-  grid-template-columns: repeat(4, 44px);
+  width: 100%;
+  grid-template-columns: repeat(4, minmax(44px, 1fr));
   gap: 0.2rem;
 }
 
 .hour-tokens button {
-  width: 44px;
+  width: 100%;
   min-height: 44px;
   border: 1px solid var(--line-bright);
   border-radius: 50%;

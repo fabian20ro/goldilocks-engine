@@ -1,4 +1,11 @@
-import { useEffect, useRef, type ReactNode, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { DecorativeGlyph, type Glyph } from "./glyphs";
 
 export function DetailsSurface({
@@ -54,6 +61,78 @@ export function DetailsSurface({
       </div>
       <div className="details-body">{children}</div>
     </section>
+  );
+}
+
+export function ItemDetailsDisclosure({
+  summary,
+  title,
+  open,
+  onOpen,
+  onClose,
+  children,
+}: {
+  summary: string;
+  title: string;
+  open: boolean;
+  onOpen: () => void;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const summaryRef = useRef<HTMLElement>(null);
+  const closeAndRestore = useCallback(() => {
+    onClose();
+    requestAnimationFrame(() => summaryRef.current?.focus());
+  }, [onClose]);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      closeAndRestore();
+    };
+    document.addEventListener("keydown", escape);
+    return () => document.removeEventListener("keydown", escape);
+  }, [closeAndRestore, open]);
+
+  return (
+    <details
+      className="upgrade-details"
+      open={open}
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        event.stopPropagation();
+        closeAndRestore();
+      }}
+      onToggle={(event) => {
+        if (event.currentTarget.open && !open) onOpen();
+        if (!event.currentTarget.open && open) onClose();
+      }}
+    >
+      <summary
+        ref={summaryRef}
+        onClick={(event) => {
+          event.preventDefault();
+          if (open) onClose();
+          else onOpen();
+        }}
+      >
+        {summary}
+      </summary>
+      <div className="upgrade-details-body" aria-label={`${title} details`}>
+        {children}
+        <button
+          type="button"
+          className="details-close"
+          aria-label={`Close ${title} details`}
+          onClick={closeAndRestore}
+        >
+          Close details
+        </button>
+      </div>
+    </details>
   );
 }
 
