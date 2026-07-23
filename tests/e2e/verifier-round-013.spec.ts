@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { STARTER_QUEUE_NAME } from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 
@@ -110,7 +111,7 @@ test.describe("verifier round 013 persistence and configuration recovery", () =>
     ).not.toBe(staleDigest);
 
     await openPrimary(page, "Jobs");
-    await page.getByRole("button", { name: "Queue 1", exact: true }).click();
+    await page.getByRole("button", { name: STARTER_QUEUE_NAME }).click();
     await expect
       .poll(() =>
         page.evaluate((key) => {

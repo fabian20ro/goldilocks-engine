@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { beginStagePlacement, settleStarterJob } from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 
@@ -113,6 +114,7 @@ test.describe("round 015 task market and workstation expansion", () => {
     await page.setViewportSize({ width: 393, height: 850 });
     await page.goto("/");
     await openTab(page, "Jobs");
+    await settleStarterJob(page);
 
     await expect(
       page.locator(
@@ -124,7 +126,7 @@ test.describe("round 015 task market and workstation expansion", () => {
     ).toBeDisabled();
     await expect(
       page.getByRole("button", { name: /^Interactive Chat\. Current quote/ }),
-    ).toContainText(/demand \d+%/);
+    ).toHaveAccessibleName(/Demand \d+ percent/);
 
     await page.getByRole("button", { name: "Queue 10" }).click();
     await expect
@@ -232,10 +234,7 @@ test.describe("round 015 task market and workstation expansion", () => {
       "Empty / bypassed",
     );
 
-    await page
-      .getByTestId("slot-prepare")
-      .getByRole("button", { name: /^Basic Cleaner\. EQUIPPED\./ })
-      .click();
+    await beginStagePlacement(page, "Basic Cleaner", "prepare");
     await page
       .getByTestId("slot-process-4")
       .getByRole("button", { name: "Snap here" })

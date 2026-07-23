@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { placeLibraryModule, settleStarterJob } from "./helpers";
 
 function captureErrors(page: Page): string[] {
   const errors: string[] = [];
@@ -17,11 +18,15 @@ test.describe("verifier round 010 pressure-action boundaries", () => {
     await page.setViewportSize({ width: 393, height: 850 });
     await page.goto("/");
 
-    await page.locator('.module-library [data-module-id="full-model"]').click();
-    await page
-      .getByTestId("slot-runtime")
-      .getByRole("button", { name: "Snap here" })
-      .click();
+    await page.getByRole("button", { name: "Jobs" }).click();
+    await settleStarterJob(page);
+    await page.getByRole("button", { name: "Build" }).click();
+    await placeLibraryModule(
+      page,
+      "full-model",
+      "Full Precision Model",
+      "runtime",
+    );
     await page.getByRole("button", { name: "Jobs" }).click();
     const warning = page.getByLabel("Current warning and actions");
 
@@ -36,13 +41,12 @@ test.describe("verifier round 010 pressure-action boundaries", () => {
     // minimum-CU thermal boundary explicitly instead of relying on reload to
     // discard the preceding memory configuration.
     await page.getByRole("button", { name: "Build" }).click();
-    await page
-      .locator('.module-library [data-module-id="quantized-model"]')
-      .click();
-    await page
-      .getByTestId("slot-runtime")
-      .getByRole("button", { name: "Snap here" })
-      .click();
+    await placeLibraryModule(
+      page,
+      "quantized-model",
+      "Quantized Model",
+      "runtime",
+    );
     await expect(page.getByTestId("slot-runtime")).toContainText(
       "Quantized Model",
     );

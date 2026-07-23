@@ -43,30 +43,28 @@ async function assertInitialGeometry(page: Page) {
     .getByRole("navigation", { name: "Primary" })
     .boundingBox();
   expect(nav).not.toBeNull();
+  await expect(page.getByTestId("first-session-guide")).toBeVisible();
   const firstPipelineControl = page
     .getByTestId("pipeline")
     .getByRole("button")
     .first();
+  await firstPipelineControl.scrollIntoViewIfNeeded();
   const control = await firstPipelineControl.boundingBox();
   expect(control).not.toBeNull();
   expect(control!.y + control!.height).toBeLessThanOrEqual(nav!.y);
-  expect(
-    await page.locator(".app-scroll-region").evaluate((node) => node.scrollTop),
-  ).toBe(0);
 
   await openTab(page, "Jobs");
   const selected = await page
     .getByLabel("Selected playable workload")
     .boundingBox();
-  const queue = await page
-    .getByRole("button", { name: "Queue 1", exact: true })
-    .boundingBox();
+  const queue = await page.getByRole("button", {
+    name: /^Queue (one safe Interactive Chat job|1)$/,
+  });
+  await queue.scrollIntoViewIfNeeded();
+  const queueBox = await queue.boundingBox();
   expect(selected).not.toBeNull();
-  expect(queue).not.toBeNull();
-  expect(queue!.y + queue!.height).toBeLessThanOrEqual(nav!.y);
-  expect(
-    await page.locator(".app-scroll-region").evaluate((node) => node.scrollTop),
-  ).toBe(0);
+  expect(queueBox).not.toBeNull();
+  expect(queueBox!.y + queueBox!.height).toBeLessThanOrEqual(nav!.y);
 }
 
 async function assertCareerControlGeometry(page: Page, viewportWidth: number) {

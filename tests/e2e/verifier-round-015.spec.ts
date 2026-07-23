@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { settleStarterJob } from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 
@@ -23,6 +24,7 @@ test.describe("verifier round 015 task-market legibility", () => {
     await page.setViewportSize({ width: 393, height: 850 });
     await page.goto("/");
     await openJobs(page);
+    await settleStarterJob(page);
     await page.getByRole("button", { name: "Pause" }).click();
     await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
 
@@ -68,6 +70,8 @@ test.describe("verifier round 015 task-market legibility", () => {
     await page.setViewportSize({ width: 393, height: 850 });
     await page.goto("/");
     await openJobs(page);
+    await settleStarterJob(page);
+    await page.getByRole("button", { name: "1×" }).click();
     await page
       .getByRole("button", { name: /^Long Document\. Current quote/ })
       .click();

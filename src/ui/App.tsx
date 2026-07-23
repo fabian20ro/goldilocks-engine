@@ -64,8 +64,24 @@ type TabId = "build" | "jobs" | "career" | "upgrades" | "inspect";
 interface DragState {
   moduleId: string;
   fromSlotId?: string;
+  /** A library card must keep its native horizontal drawer pan until a drag is unambiguous. */
+  allowHorizontalPan: boolean;
   x: number;
   y: number;
+  originX: number;
+  originY: number;
+  dropSlotId?: string;
+  active: boolean;
+}
+
+interface PendingPlacement {
+  moduleId: string;
+  fromSlotId?: string;
+}
+
+interface ModuleDetail {
+  moduleId: string;
+  fromSlotId?: string;
 }
 
 interface SavedPreset {
@@ -83,6 +99,7 @@ interface SavedPreset {
 const PRESET_KEY = "goldilocks-pipeline-presets-v2";
 const LEGACY_PRESET_KEY = "goldilocks-pipeline-presets-v1";
 const TUTORIAL_KEY = "goldilocks-quick-start-dismissed-v1";
+const TARGET_KEY = "goldilocks-next-useful-target-v1";
 
 interface DeletedPreset {
   preset: SavedPreset;
@@ -123,6 +140,46 @@ function formatNumber(value: number, digits = 0): string {
   return new Intl.NumberFormat("en-US", {
     maximumFractionDigits: digits,
   }).format(value);
+}
+
+function loadUsefulTarget(): string | null {
+  try {
+    const value = localStorage.getItem(TARGET_KEY);
+    if (value === "dismissed") return null;
+    return value && modules.some((item) => item.id === value)
+      ? value
+      : "precision-cleaner";
+  } catch {
+    return "precision-cleaner";
+  }
+}
+
+function persistUsefulTarget(targetId: string | null): void {
+  try {
+    if (targetId === null) localStorage.setItem(TARGET_KEY, "dismissed");
+    else localStorage.setItem(TARGET_KEY, targetId);
+  } catch {
+    // Target choice is advisory; a storage failure must not affect the run.
+  }
+}
+
+function compatiblePositionCount(
+  state: SimulationState,
+  placement: PendingPlacement,
+): number {
+  const module = getModule(placement.moduleId);
+  return state.slots.filter(
+    (slot) =>
+      slot.slotId !== placement.fromSlotId &&
+      module.slotTypes.includes(getSlot(slot.slotId).type),
+  ).length;
+}
+
+function slotAtPoint(x: number, y: number) {
+  return document
+    .elementsFromPoint(x, y)
+    .map((element) => element.closest<HTMLElement>("[data-slot-id]"))
+    .find((slot) => slot !== null)?.dataset.slotId;
 }
 
 function actionSentence(actions: readonly string[]): string {
@@ -346,9 +403,10 @@ function QuickStart({ onDismiss }: { onDismiss: () => void }) {
           </p>
           <p className="tutorial-detail">
             Gross per success: Interactive Chat $1.40 · Batch Classification
-            $1.10 · Long Document $2.20 · Competition Training $0.20. These are
-            fresh-demand launch quotes. Repeated success saturates one workload,
-            while neglected demand recovers with simulated time.
+            $2.00 · Long Document $2.20 · Competition Training $0.20. These are
+            fresh-demand launch quotes. Accepted bursts lock falling quotes;
+            repeated success saturates one workload, while neglected demand
+            recovers with simulated time.
           </p>
         </li>
         <li>
@@ -373,8 +431,9 @@ function QuickStart({ onDismiss }: { onDismiss: () => void }) {
             throughput, latency, quality, running cost, and compatibility.
             Successful jobs fund purchases. Buying makes an item owned; it does
             not silently equip it. Equip an owned rig there, or choose an owned
-            module and add it to a highlighted compatible Build slot by tap or
-            touch-drag. Every faster or stronger option adds a constraint.
+            module's explicit Place in Build action, then choose a highlighted
+            compatible Build slot by tap or touch-drag. Every faster or stronger
+            option adds a constraint.
           </p>
           <p className="tutorial-detail">
             The cheapest module is reachable within five successful starter
@@ -398,6 +457,48 @@ function QuickStart({ onDismiss }: { onDismiss: () => void }) {
           </p>
         </li>
       </ol>
+    </section>
+  );
+}
+
+function FirstSessionGuide({ state }: { state: SimulationState }) {
+  const guide = state.firstSession;
+  if (guide.step === "complete") return null;
+  const starterTask = [state.jobs.activeTask, ...state.jobs.waitingTasks].find(
+    (task) => task?.id === guide.starterTaskId,
+  );
+  const content =
+    guide.step === "queue-starter"
+      ? {
+          eyebrow: "First session · step 1 of 3",
+          title: "Queue one safe Interactive Chat job",
+          body: "Jobs contains the only queue action. Interactive Chat is the reliable starter route; its live quote and cost remain visible before you accept it.",
+        }
+      : guide.step === "observe-settlement"
+        ? {
+            eyebrow: "First session · step 2 of 3",
+            title: "Observe that job settle",
+            body: starterTask
+              ? `${getWorkload(starterTask.workloadId).name} ${starterTask.id} is ${state.jobs.activeTask?.id === starterTask.id ? `${Math.round(starterTask.progress * 100)}% complete` : "waiting"}. Its locked quote will settle in Jobs; no follow-up was queued for you.`
+              : "The accepted starter job is resolving. Its exact locked quote, cost, and outcome stay in the Jobs settlement record.",
+          }
+        : {
+            eyebrow: "First session · step 3 of 3",
+            title: "Buy and explicitly install one meaningful module",
+            body: guide.purchasedModuleId
+              ? `${getModule(guide.purchasedModuleId).name} is owned. Use its named Place in Build action; purchase never equips it automatically.`
+              : "The settlement is recorded. Use the bottom Upgrades tab to compare a paid module, then place it explicitly in a compatible Build position.",
+          };
+  return (
+    <section
+      className="first-session-guide"
+      aria-live="polite"
+      aria-labelledby="first-session-guide-title"
+      data-testid="first-session-guide"
+    >
+      <span className="eyebrow">{content.eyebrow}</span>
+      <h2 id="first-session-guide-title">{content.title}</h2>
+      <p>{content.body}</p>
     </section>
   );
 }
@@ -541,7 +642,7 @@ function ModuleCard({
   const status = equipped
     ? "EQUIPPED"
     : owned
-      ? "OWNED · TAP/DRAG"
+      ? "OWNED · DETAILS / DRAG"
       : `LOCKED · BUY $${module.purchaseCost.toFixed(2)}`;
   return (
     <button
@@ -576,15 +677,21 @@ function ModuleCard({
 function Pipeline({
   state,
   selected,
-  onSelect,
+  detail,
+  onOpenDetails,
+  onCloseDetails,
+  onBeginPlacement,
   onDragStart,
   onInstall,
   command,
   reducedMotion,
 }: {
   state: SimulationState;
-  selected: { moduleId: string; fromSlotId?: string } | null;
-  onSelect: (moduleId: string, fromSlotId?: string) => void;
+  selected: PendingPlacement | null;
+  detail: ModuleDetail | null;
+  onOpenDetails: (moduleId: string, fromSlotId?: string) => void;
+  onCloseDetails: () => void;
+  onBeginPlacement: (moduleId: string, fromSlotId?: string) => void;
   onDragStart: (
     event: ReactPointerEvent,
     moduleId: string,
@@ -683,7 +790,7 @@ function Pipeline({
                         selected?.moduleId === module.id &&
                         selected.fromSlotId === slot.id
                       }
-                      onSelect={onSelect}
+                      onSelect={onOpenDetails}
                       onDragStart={onDragStart}
                     />
                   </>
@@ -739,51 +846,54 @@ function Pipeline({
           );
         })}
       </ol>
-      {selected?.fromSlotId ? (
+      {detail?.fromSlotId ? (
         <DetailsSurface
-          title={getModule(selected.moduleId).name}
-          glyph={pipelineGlyph(getModule(selected.moduleId).role, "process")}
-          onClose={() => onSelect(selected.moduleId, selected.fromSlotId)}
+          title={getModule(detail.moduleId).name}
+          glyph={pipelineGlyph(getModule(detail.moduleId).role, "process")}
+          onClose={onCloseDetails}
         >
-          <p>{getModule(selected.moduleId).description}</p>
+          <p>{getModule(detail.moduleId).description}</p>
           <dl className="compact-details-grid">
             <div>
               <dt>Throughput</dt>
-              <dd>{getModule(selected.moduleId).throughput}/m</dd>
+              <dd>{getModule(detail.moduleId).throughput}/m</dd>
             </div>
             <div>
               <dt>Memory</dt>
-              <dd>{getModule(selected.moduleId).memory} GB</dd>
+              <dd>{getModule(detail.moduleId).memory} GB</dd>
             </div>
             <div>
               <dt>Reliability</dt>
               <dd>
-                {formatNumber(
-                  getModule(selected.moduleId).reliability * 100,
-                  1,
-                )}
-                %
+                {formatNumber(getModule(detail.moduleId).reliability * 100, 1)}%
               </dd>
             </div>
             <div>
               <dt>Operating cost</dt>
-              <dd>${getModule(selected.moduleId).costPerJob.toFixed(3)}/job</dd>
+              <dd>${getModule(detail.moduleId).costPerJob.toFixed(3)}/job</dd>
             </div>
           </dl>
           <p>
-            Compatible positions are highlighted. Choose Snap here to replace or
-            move; the live inspector updates all resulting deltas.
+            Details do not change the pipeline. Start placement explicitly to
+            highlight compatible positions and inspect the resulting deltas.
           </p>
           <button
             type="button"
+            className="equip-action"
+            onClick={() => onBeginPlacement(detail.moduleId, detail.fromSlotId)}
+          >
+            Place {getModule(detail.moduleId).name} in Build
+          </button>
+          <button
+            type="button"
             className="danger-action"
-            aria-label={`Remove ${getModule(selected.moduleId).name} from ${getSlot(selected.fromSlotId).name} and bypass position`}
+            aria-label={`Remove ${getModule(detail.moduleId).name} from ${getSlot(detail.fromSlotId).name} and bypass position`}
             onClick={() => {
-              command({ type: "REMOVE_MODULE", slotId: selected.fromSlotId! });
-              onSelect(selected.moduleId, selected.fromSlotId);
+              command({ type: "REMOVE_MODULE", slotId: detail.fromSlotId! });
+              onCloseDetails();
             }}
           >
-            Remove / bypass {getSlot(selected.fromSlotId).name}
+            Remove / bypass {getSlot(detail.fromSlotId).name}
           </button>
         </DetailsSurface>
       ) : null}
@@ -794,12 +904,18 @@ function Pipeline({
 function ModuleLibrary({
   state,
   selected,
-  onSelect,
+  detail,
+  onOpenDetails,
+  onCloseDetails,
+  onBeginPlacement,
   onDragStart,
 }: {
   state: SimulationState;
-  selected: { moduleId: string; fromSlotId?: string } | null;
-  onSelect: (moduleId: string, fromSlotId?: string) => void;
+  selected: PendingPlacement | null;
+  detail: ModuleDetail | null;
+  onOpenDetails: (moduleId: string, fromSlotId?: string) => void;
+  onCloseDetails: () => void;
+  onBeginPlacement: (moduleId: string, fromSlotId?: string) => void;
   onDragStart: (
     event: ReactPointerEvent,
     moduleId: string,
@@ -811,11 +927,11 @@ function ModuleLibrary({
       <div className="section-heading compact">
         <div>
           <span className="eyebrow">Module drawer</span>
-          <h2 id="library-title">Drag or tap, then choose a slot</h2>
+          <h2 id="library-title">Inspect, then place in a slot</h2>
           <p className="section-note">
             Text labels show locked, owned, and equipped state. Locked cards
-            require purchase in the bottom Upgrades tab; owned cards can be
-            tapped or touch-dragged.
+            require purchase in the bottom Upgrades tab; tap opens details,
+            while touch-drag starts explicit placement.
           </p>
         </div>
       </div>
@@ -827,12 +943,84 @@ function ModuleLibrary({
             selected={selected?.moduleId === module.id && !selected.fromSlotId}
             owned={state.ownedModuleIds.includes(module.id)}
             equipped={state.slots.some((slot) => slot.moduleId === module.id)}
-            onSelect={onSelect}
+            onSelect={onOpenDetails}
             onDragStart={onDragStart}
           />
         ))}
       </div>
+      {detail && !detail.fromSlotId ? (
+        <DetailsSurface
+          title={getModule(detail.moduleId).name}
+          glyph={pipelineGlyph(getModule(detail.moduleId).role, "process")}
+          onClose={onCloseDetails}
+        >
+          <p>{getModule(detail.moduleId).description}</p>
+          <dl className="compact-details-grid">
+            <div>
+              <dt>Compatibility</dt>
+              <dd>{getModule(detail.moduleId).slotTypes.join("/")}</dd>
+            </div>
+            <div>
+              <dt>Throughput</dt>
+              <dd>{getModule(detail.moduleId).throughput}/m</dd>
+            </div>
+            <div>
+              <dt>Memory</dt>
+              <dd>{getModule(detail.moduleId).memory} GB</dd>
+            </div>
+            <div>
+              <dt>Reliability</dt>
+              <dd>
+                {formatNumber(getModule(detail.moduleId).reliability * 100, 1)}%
+              </dd>
+            </div>
+          </dl>
+          {state.ownedModuleIds.includes(detail.moduleId) ? (
+            <button
+              type="button"
+              className="equip-action"
+              onClick={() => onBeginPlacement(detail.moduleId)}
+            >
+              Place {getModule(detail.moduleId).name} in Build
+            </button>
+          ) : (
+            <p className="purchase-reason">
+              This module is locked. Details are informational; buy it in
+              Upgrades before placement is available.
+            </p>
+          )}
+        </DetailsSurface>
+      ) : null}
     </section>
+  );
+}
+
+function PlacementTray({
+  state,
+  placement,
+  onCancel,
+}: {
+  state: SimulationState;
+  placement: PendingPlacement | null;
+  onCancel: () => void;
+}) {
+  if (!placement) return null;
+  const module = getModule(placement.moduleId);
+  const compatible = compatiblePositionCount(state, placement);
+  return (
+    <aside className="placement-tray" role="status" aria-live="polite">
+      <div>
+        <span className="eyebrow">Placement ready</span>
+        <strong>Place {module.name}</strong>
+        <small>
+          {compatible} compatible position{compatible === 1 ? "" : "s"} · choose
+          Snap here or complete a touch-drag.
+        </small>
+      </div>
+      <button type="button" onClick={onCancel}>
+        Cancel placement
+      </button>
+    </aside>
   );
 }
 
@@ -840,15 +1028,23 @@ function BuildView({
   state,
   command,
   selected,
-  onSelect,
+  detail,
+  onOpenDetails,
+  onCloseDetails,
+  onBeginPlacement,
+  onCancelPlacement,
   onDragStart,
   onInstall,
   reducedMotion,
 }: {
   state: SimulationState;
   command: (command: SimulationCommand) => void;
-  selected: { moduleId: string; fromSlotId?: string } | null;
-  onSelect: (moduleId: string, fromSlotId?: string) => void;
+  selected: PendingPlacement | null;
+  detail: ModuleDetail | null;
+  onOpenDetails: (moduleId: string, fromSlotId?: string) => void;
+  onCloseDetails: () => void;
+  onBeginPlacement: (moduleId: string, fromSlotId?: string) => void;
+  onCancelPlacement: () => void;
   onDragStart: (
     event: ReactPointerEvent,
     moduleId: string,
@@ -934,18 +1130,37 @@ function BuildView({
         state={state}
         command={command}
         selected={presentation === "build" ? selected : null}
-        onSelect={presentation === "build" ? onSelect : () => undefined}
+        detail={presentation === "build" ? detail : null}
+        onOpenDetails={
+          presentation === "build" ? onOpenDetails : () => undefined
+        }
+        onCloseDetails={
+          presentation === "build" ? onCloseDetails : () => undefined
+        }
+        onBeginPlacement={
+          presentation === "build" ? onBeginPlacement : () => undefined
+        }
         onDragStart={presentation === "build" ? onDragStart : () => undefined}
         onInstall={presentation === "build" ? onInstall : () => undefined}
         reducedMotion={reducedMotion}
       />
       {presentation === "build" ? (
-        <ModuleLibrary
-          state={state}
-          selected={selected}
-          onSelect={onSelect}
-          onDragStart={onDragStart}
-        />
+        <>
+          <PlacementTray
+            state={state}
+            placement={selected}
+            onCancel={onCancelPlacement}
+          />
+          <ModuleLibrary
+            state={state}
+            selected={selected}
+            detail={detail}
+            onOpenDetails={onOpenDetails}
+            onCloseDetails={onCloseDetails}
+            onBeginPlacement={onBeginPlacement}
+            onDragStart={onDragStart}
+          />
+        </>
       ) : (
         <p className="observation-note">
           <DecorativeGlyph>{glyphs.resource.evidence}</DecorativeGlyph>{" "}
@@ -957,7 +1172,17 @@ function BuildView({
   );
 }
 
-function MoneyLoop({ state }: { state: SimulationState }) {
+function MoneyLoop({
+  state,
+  reducedMotion,
+  targetId,
+  onTargetChange,
+}: {
+  state: SimulationState;
+  reducedMotion: boolean;
+  targetId: string | null;
+  onTargetChange: (targetId: string | null) => void;
+}) {
   const workload = getWorkload(state.workloadId);
   const quote = getWorkloadQuote(state, workload.id);
   const offerMetrics = calculateMetrics({
@@ -995,6 +1220,28 @@ function MoneyLoop({ state }: { state: SimulationState }) {
   );
   const settlementCurrency = (amount: number) =>
     formatCurrencyMagnitude(amount, settlementCurrencyPrecision);
+  const targetOptions = modules
+    .filter(
+      (item) =>
+        item.purchaseCost > 0 && !state.ownedModuleIds.includes(item.id),
+    )
+    .sort((left, right) => left.purchaseCost - right.purchaseCost);
+  const target = targetOptions.find((item) => item.id === targetId) ?? null;
+  const celebration =
+    settlement?.completed === 1 && [1, 5, 12].includes(state.jobs.completed)
+      ? state.jobs.completed === 1
+        ? "First successful delivery recorded — no bonus applied."
+        : state.jobs.completed === 5
+          ? "Five successful deliveries recorded — no bonus applied."
+          : "Twelve successful deliveries recorded — no bonus applied."
+      : null;
+  const failureEvent =
+    settlement?.failed === 1
+      ? [...state.ledger].reverse().find((event) => event.kind === "failure")
+      : null;
+  const recoveryQuote = settlement
+    ? getWorkloadQuote(state, settlement.workloadId)
+    : null;
   return (
     <section className="money-loop" aria-labelledby="money-loop-title">
       <div className="money-loop-route" aria-label="Money loop">
@@ -1028,7 +1275,10 @@ function MoneyLoop({ state }: { state: SimulationState }) {
             completes the task.
           </small>
         </div>
-        <div className="settlement" aria-live="polite">
+        <div
+          className={`settlement ${settlement?.failed ? "failure" : ""} ${celebration ? "settlement-pulse" : ""}`}
+          aria-live="polite"
+        >
           <span className="eyebrow">Latest settlement</span>
           {settlement ? (
             <>
@@ -1051,12 +1301,73 @@ function MoneyLoop({ state }: { state: SimulationState }) {
                   ? " · Three decimals shown to preserve sub-cent accounting."
                   : ""}
               </small>
+              {celebration ? (
+                <p className="settlement-recognition">
+                  {celebration}
+                  {reducedMotion
+                    ? " Recorded immediately (reduced motion)."
+                    : ""}
+                </p>
+              ) : null}
+              {settlement.failed ? (
+                <p className="settlement-recovery">
+                  <strong>Failure record:</strong>{" "}
+                  {failureEvent?.directCause ??
+                    "Delivery did not clear the modeled reliability check."}{" "}
+                  Gross $0; configured cost remains visible above. Recovery
+                  forecast: {recoveryQuote?.trend ?? "steady"} quote $
+                  {recoveryQuote?.grossQuote.toFixed(2) ?? "0.00"} after time
+                  recovery. No recovery action was applied.
+                </p>
+              ) : null}
             </>
           ) : (
             <strong>No payout yet — queue a job.</strong>
           )}
         </div>
       </div>
+      <section className="next-target" aria-label="Next useful target">
+        <div>
+          <span className="eyebrow">Next useful target</span>
+          {target ? (
+            <strong>
+              {target.name} · ${target.purchaseCost.toFixed(2)} ·{" "}
+              {state.resources.money >= target.purchaseCost
+                ? "affordable now"
+                : `$${(target.purchaseCost - state.resources.money).toFixed(2)} remaining`}
+            </strong>
+          ) : targetOptions.length ? (
+            <strong>No target selected</strong>
+          ) : (
+            <strong>All paid modules owned</strong>
+          )}
+        </div>
+        {targetOptions.length ? (
+          <div className="target-controls">
+            <label>
+              <span className="visually-hidden">Next useful target</span>
+              <select
+                value={targetId ?? ""}
+                onChange={(event) =>
+                  onTargetChange(event.currentTarget.value || null)
+                }
+              >
+                <option value="">No target</option>
+                {targetOptions.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name} · ${item.purchaseCost.toFixed(2)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {target ? (
+              <button type="button" onClick={() => onTargetChange(null)}>
+                Dismiss target
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
       <p className="earnings-total">
         Run totals: ${state.jobs.grossEarned.toFixed(2)} gross earned · $
         {state.jobs.operatingCostsPaid.toFixed(2)} operating costs paid.
@@ -1397,14 +1708,12 @@ function ModuleUpgradeCard({
           className="equip-action"
           onClick={() => onChoose(item.id)}
         >
-          {equipped
-            ? `Reposition ${item.name} in Build`
-            : `Add ${item.name} in Build`}
+          Place {item.name} in Build
         </button>
       )}
       <p id={reasonId} className="purchase-reason">
         {owned
-          ? "Owned permanently for this run. Choose it, then Build highlights compatible replacement/reorder targets."
+          ? "Owned permanently for this run. Details stay informational; Place in Build is the explicit handoff that highlights compatible targets."
           : affordable
             ? "Affordable now. Buy once, then add it from Build."
             : `Need $${(item.purchaseCost - state.resources.money).toFixed(2)} more. Its cost and tradeoffs remain visible while locked.`}
@@ -1658,15 +1967,45 @@ function UpgradesView({
 function JobsView({
   state,
   command,
+  commandBatch,
+  reducedMotion,
+  usefulTarget,
+  onUsefulTargetChange,
 }: {
   state: SimulationState;
   command: (command: SimulationCommand) => void;
+  commandBatch: (commands: readonly SimulationCommand[]) => void;
+  reducedMotion: boolean;
+  usefulTarget: string | null;
+  onUsefulTargetChange: (targetId: string | null) => void;
 }) {
   const [confirmClear, setConfirmClear] = useState(false);
   const waitingCount = state.jobs.waitingTasks.length;
   const selectedWorkload = getWorkload(state.workloadId);
-  const selectedQuote = getWorkloadQuote(state, selectedWorkload.id);
-  const selectedMetrics = calculateMetrics(state);
+  const guidingStarter = state.firstSession.step === "queue-starter";
+  const observingStarter = state.firstSession.step === "observe-settlement";
+  const queueControlsLocked = guidingStarter || observingStarter;
+  const displayedWorkload = queueControlsLocked
+    ? getWorkload("interactive-chat")
+    : selectedWorkload;
+  const selectedQuote = getWorkloadQuote(state, displayedWorkload.id);
+  const selectedMetrics = calculateMetrics({
+    ...state,
+    workloadId: displayedWorkload.id,
+  });
+  const selectedOffer = estimateWorkloadOffer(selectedMetrics, selectedQuote);
+  const queueTenQuotes = Array.from(
+    { length: 10 },
+    (_, index) => getWorkloadQuote(state, state.workloadId, index).grossQuote,
+  );
+  const queueTenFirst = queueTenQuotes[0] ?? 0;
+  const queueTenLast = queueTenQuotes.at(-1) ?? 0;
+  const queueStarter = () => {
+    commandBatch([
+      { type: "SET_WORKLOAD", workloadId: "interactive-chat" },
+      { type: "QUEUE_JOBS", count: 1 },
+    ]);
+  };
   return (
     <>
       <section className="panel" aria-labelledby="workload-title">
@@ -1686,39 +2025,65 @@ function JobsView({
         >
           <div>
             <DecorativeGlyph>
-              {workloadGlyph(selectedWorkload.id)}
+              {workloadGlyph(displayedWorkload.id)}
             </DecorativeGlyph>
             <span>
-              <small>SELECTED · PLAYABLE NOW</small>
-              <strong>{selectedWorkload.name}</strong>
-              <em>{selectedWorkload.description}</em>
+              <small>
+                {guidingStarter
+                  ? "SAFE STARTER · STEP 1"
+                  : observingStarter
+                    ? "ACCEPTED STARTER · STEP 2"
+                    : "SELECTED · PLAYABLE NOW"}
+              </small>
+              <strong>{displayedWorkload.name}</strong>
+              <em>{displayedWorkload.description}</em>
             </span>
             <b>${selectedQuote.grossQuote.toFixed(2)}</b>
           </div>
           <p>
-            Demand {selectedQuote.demandPercent}% · {selectedQuote.trend} ·{" "}
-            {selectedWorkload.computeDemand} CU /{" "}
-            {selectedWorkload.memoryDemand} GB ·{" "}
-            {Math.round(selectedMetrics.reliability * 100)}% modeled delivery
+            {Math.round(selectedMetrics.reliability * 100)}% modeled delivery ·{" "}
+            {selectedOffer.expectedNet >= 0 ? "+" : "−"}$
+            {Math.abs(selectedOffer.expectedNet).toFixed(2)} expected after
+            cost. A failed delivery pays $0 gross.
           </p>
-          <button
-            type="button"
-            className="primary-action queue-one"
-            onClick={() => command({ type: "QUEUE_JOBS", count: 1 })}
-          >
-            Queue 1
-          </button>
+          {observingStarter ? (
+            <p className="starter-queue-note">
+              One Interactive Chat job is accepted. Observe its locked quote,
+              cost, and outcome below before queue controls unlock.
+            </p>
+          ) : (
+            <button
+              type="button"
+              className="primary-action queue-one"
+              onClick={
+                guidingStarter
+                  ? queueStarter
+                  : () => command({ type: "QUEUE_JOBS", count: 1 })
+              }
+            >
+              {guidingStarter
+                ? "Queue one safe Interactive Chat job"
+                : "Queue 1"}
+            </button>
+          )}
           <details>
             <summary>Quote, cost, and uncertainty details</summary>
             <p>
               Queue-time gross quote ${selectedQuote.grossQuote.toFixed(2)} ·
               configured operating cost $
               {selectedMetrics.operatingCost.toFixed(3)}. Success pays the
-              locked quote; failure pays $0 gross. {selectedQuote.reason}
+              locked quote; failure pays $0 gross. Demand{" "}
+              {selectedQuote.demandPercent}% {selectedQuote.trend}.{" "}
+              {selectedQuote.reason}
             </p>
           </details>
         </article>
-        <MoneyLoop state={state} />
+        <MoneyLoop
+          state={state}
+          reducedMotion={reducedMotion}
+          targetId={usefulTarget}
+          onTargetChange={onUsefulTargetChange}
+        />
         <p className="concept-note">
           <strong>CU = normalized Compute Units.</strong> Use CU to compare this
           rig's capacity with workload demand; CU is not a physical FLOPS
@@ -1727,6 +2092,7 @@ function JobsView({
         <div className="choice-list">
           {workloads.map((workload) => {
             const unlock = workloadUnlockProgress(state, workload.id);
+            const heldForStarter = queueControlsLocked;
             const quote = getWorkloadQuote(state, workload.id);
             const metrics = calculateMetrics({
               ...state,
@@ -1742,11 +2108,13 @@ function JobsView({
                 key={workload.id}
                 className={`${state.workloadId === workload.id ? "choice-card selected" : "choice-card"} ${unlock.unlocked ? "" : "locked"} ${risky ? "margin-warning" : ""}`}
                 aria-pressed={state.workloadId === workload.id}
-                disabled={!unlock.unlocked}
+                disabled={!unlock.unlocked || heldForStarter}
                 aria-label={
-                  unlock.unlocked
-                    ? `${workload.name}. Current quote $${quote.grossQuote.toFixed(2)}. Estimated cost $${metrics.operatingCost.toFixed(3)}. ${offer.guaranteedFailure ? "Guaranteed failure; expected gross is $0." : `Expected net ${estimatedNet >= 0 ? "plus" : "minus"} $${Math.abs(estimatedNet).toFixed(2)} at ${Math.round(metrics.reliability * 100)} percent modeled delivery.`} Demand ${quote.demandPercent} percent, ${quote.trend}.`
-                    : `${workload.name} locked. ${unlock.requirements.join("; ")}`
+                  heldForStarter
+                    ? `${workload.name} is available to compare, but the first-session route queues one Interactive Chat job before workload selection.`
+                    : unlock.unlocked
+                      ? `${workload.name}. Current quote $${quote.grossQuote.toFixed(2)}. Estimated cost $${metrics.operatingCost.toFixed(3)}. ${offer.guaranteedFailure ? "Guaranteed failure; expected gross is $0." : `Expected net ${estimatedNet >= 0 ? "plus" : "minus"} $${Math.abs(estimatedNet).toFixed(2)} at ${Math.round(metrics.reliability * 100)} percent modeled delivery.`} Demand ${quote.demandPercent} percent, ${quote.trend}.`
+                      : `${workload.name} locked. ${unlock.requirements.join("; ")}`
                 }
                 onClick={() =>
                   command({ type: "SET_WORKLOAD", workloadId: workload.id })
@@ -1764,7 +2132,9 @@ function JobsView({
                   </strong>
                   <small>
                     {unlock.unlocked
-                      ? `${workload.description} Estimated $${metrics.operatingCost.toFixed(3)} cost · ${estimatedNet >= 0 ? "+" : "−"}$${Math.abs(estimatedNet).toFixed(2)} expected net at ${Math.round(metrics.reliability * 100)}% modeled delivery · demand ${quote.demandPercent}% ${quote.trend}. ${offer.guaranteedFailure ? "Guaranteed failure: this configuration pays $0 gross." : ""} ${quote.reason}`
+                      ? offer.guaranteedFailure
+                        ? "Not safe in this configuration: delivery pays $0 gross."
+                        : `${Math.round(metrics.reliability * 100)}% modeled delivery · ${estimatedNet >= 0 ? "+" : "−"}$${Math.abs(estimatedNet).toFixed(2)} expected after cost.`
                       : `Requires ${unlock.requirements.join(" · ")}.`}
                   </small>
                   {unlock.unlocked && risky ? (
@@ -1775,21 +2145,27 @@ function JobsView({
                   ) : null}
                 </span>
                 <span className="choice-stat">
-                  {workload.computeDemand} CU · {workload.memoryDemand} GB ·{" "}
-                  {formatNumber(workload.rewardReputation, 2)} rep
+                  {workload.computeDemand} CU · {workload.memoryDemand} GB
                 </span>
               </button>
             );
           })}
         </div>
         <div className="job-actions">
-          <button
-            type="button"
-            className="primary-action"
-            onClick={() => command({ type: "QUEUE_JOBS", count: 10 })}
-          >
-            Queue 10
-          </button>
+          {!queueControlsLocked ? (
+            <button
+              type="button"
+              className="primary-action"
+              onClick={() => command({ type: "QUEUE_JOBS", count: 10 })}
+            >
+              Queue 10 · locks ${queueTenFirst.toFixed(2)} → $
+              {queueTenLast.toFixed(2)}
+            </button>
+          ) : (
+            <p className="starter-queue-note">
+              Batch queue controls unlock after this one starter job settles.
+            </p>
+          )}
           <button
             type="button"
             className="secondary-action"
@@ -3060,10 +3436,8 @@ export function App() {
   const { state, command, commandBatch, timeSpeed, setTimeSpeed } =
     useSimulation();
   const [tab, setTab] = useState<TabId>("build");
-  const [selected, setSelected] = useState<{
-    moduleId: string;
-    fromSlotId?: string;
-  } | null>(null);
+  const [selected, setSelected] = useState<PendingPlacement | null>(null);
+  const [moduleDetail, setModuleDetail] = useState<ModuleDetail | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [presets, setPresets] = useState<SavedPreset[]>(loadPresets);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -3071,10 +3445,14 @@ export function App() {
     null,
   );
   const [showTutorial, setShowTutorial] = useState(shouldShowTutorial);
+  const [usefulTarget, setUsefulTarget] = useState<string | null>(
+    loadUsefulTarget,
+  );
   const [reducedMotion, setReducedMotion] = useState(
     () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
   const scrollRegionRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<DragState | null>(null);
   const tabScrollPositions = useRef<Record<TabId, number>>({
     build: 0,
     jobs: 0,
@@ -3090,14 +3468,48 @@ export function App() {
     return () => media.removeEventListener("change", update);
   }, []);
 
+  useEffect(() => {
+    persistUsefulTarget(usefulTarget);
+  }, [usefulTarget]);
+
+  useEffect(() => {
+    if (!usefulTarget || !state.ownedModuleIds.includes(usefulTarget)) return;
+    const next = modules
+      .filter(
+        (item) =>
+          item.purchaseCost > 0 && !state.ownedModuleIds.includes(item.id),
+      )
+      .sort((left, right) => left.purchaseCost - right.purchaseCost)[0];
+    setUsefulTarget(next?.id ?? null);
+  }, [state.ownedModuleIds, usefulTarget]);
+
+  useEffect(() => {
+    if (!selected) return;
+    const module = modules.find((item) => item.id === selected.moduleId);
+    const compatible = module
+      ? compatiblePositionCount(state, selected) > 0
+      : false;
+    if (!module || !state.ownedModuleIds.includes(module.id) || !compatible) {
+      setSelected(null);
+      dragRef.current = null;
+      setDrag(null);
+    }
+  }, [selected, state]);
+
   const selectedName = useMemo(
     () => (selected ? getModule(selected.moduleId).name : null),
     [selected],
   );
 
-  const switchTab = (next: TabId) => {
+  const switchTab = (next: TabId, preservePlacement = false) => {
     const region = scrollRegionRef.current;
     if (region) tabScrollPositions.current[tab] = region.scrollTop;
+    setModuleDetail(null);
+    if (next !== "build" || !preservePlacement) {
+      setSelected(null);
+      setDrag(null);
+      dragRef.current = null;
+    }
     setTab(next);
     requestAnimationFrame(() => {
       scrollRegionRef.current?.scrollTo({
@@ -3107,13 +3519,15 @@ export function App() {
     });
   };
 
-  const onSelect = (moduleId: string, fromSlotId?: string) => {
+  const onOpenDetails = (moduleId: string, fromSlotId?: string) => {
     if (!state.ownedModuleIds.includes(moduleId)) return;
-    setSelected((current) =>
-      current?.moduleId === moduleId && current.fromSlotId === fromSlotId
-        ? null
-        : { moduleId, fromSlotId },
-    );
+    setModuleDetail({ moduleId, fromSlotId });
+  };
+
+  const beginPlacement = (moduleId: string, fromSlotId?: string) => {
+    if (!state.ownedModuleIds.includes(moduleId)) return;
+    setModuleDetail(null);
+    setSelected({ moduleId, fromSlotId });
   };
 
   const onInstall = (slotId: string) => {
@@ -3125,6 +3539,7 @@ export function App() {
       fromSlotId: selected.fromSlotId,
     });
     setSelected(null);
+    setModuleDetail(null);
   };
 
   const onDragStart = (
@@ -3134,30 +3549,98 @@ export function App() {
   ) => {
     if (event.pointerType === "mouse" && event.button !== 0) return;
     if (!state.ownedModuleIds.includes(moduleId)) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    setDrag({ moduleId, fromSlotId, x: event.clientX, y: event.clientY });
+    const allowHorizontalPan =
+      event.pointerType === "touch" &&
+      fromSlotId === undefined &&
+      event.currentTarget.closest(".module-library") !== null;
+    if (!allowHorizontalPan)
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } catch {
+        // Synthetic and assistive pointer events may not own a browser capture;
+        // the document-level move/up handlers still provide safe placement.
+      }
+    const nextDrag = {
+      moduleId,
+      fromSlotId,
+      allowHorizontalPan,
+      x: event.clientX,
+      y: event.clientY,
+      originX: event.clientX,
+      originY: event.clientY,
+      active: false,
+    };
+    dragRef.current = nextDrag;
+    setDrag(nextDrag);
   };
 
   const onPointerMove = (event: ReactPointerEvent) => {
-    if (!drag) return;
-    setDrag({ ...drag, x: event.clientX, y: event.clientY });
+    const currentDrag = dragRef.current;
+    if (!currentDrag) return;
+    const deltaX = event.clientX - currentDrag.originX;
+    const deltaY = event.clientY - currentDrag.originY;
+    const distance = Math.hypot(deltaX, deltaY);
+    if (!currentDrag.active && distance < 8) return;
+    if (
+      !currentDrag.active &&
+      currentDrag.allowHorizontalPan &&
+      Math.abs(deltaX) > Math.abs(deltaY)
+    ) {
+      // The library is a scrollable touch drawer. A horizontal swipe must pan
+      // it rather than becoming an accidental placement transaction.
+      dragRef.current = null;
+      setDrag(null);
+      return;
+    }
+    if (!currentDrag.active) {
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } catch {
+        // Continue with the app-level capture handlers when capture is absent.
+      }
+      beginPlacement(currentDrag.moduleId, currentDrag.fromSlotId);
+    }
+    event.preventDefault();
+    const nextDrag = {
+      ...currentDrag,
+      x: event.clientX,
+      y: event.clientY,
+      dropSlotId: slotAtPoint(event.clientX, event.clientY),
+      active: true,
+    };
+    dragRef.current = nextDrag;
+    setDrag(nextDrag);
   };
 
   const onPointerUp = (event: ReactPointerEvent) => {
-    if (!drag) return;
-    const target = document
-      .elementFromPoint(event.clientX, event.clientY)
-      ?.closest<HTMLElement>("[data-slot-id]");
-    if (target?.dataset.slotId) {
+    const currentDrag = dragRef.current;
+    if (!currentDrag) return;
+    if (!currentDrag.active) {
+      dragRef.current = null;
+      setDrag(null);
+      return;
+    }
+    event.preventDefault();
+    const slotId =
+      currentDrag.dropSlotId ?? slotAtPoint(event.clientX, event.clientY);
+    if (slotId) {
       command({
         type: "PLACE_MODULE",
-        moduleId: drag.moduleId,
-        slotId: target.dataset.slotId,
-        fromSlotId: drag.fromSlotId,
+        moduleId: currentDrag.moduleId,
+        slotId,
+        fromSlotId: currentDrag.fromSlotId,
       });
     }
+    dragRef.current = null;
     setDrag(null);
     setSelected(null);
+    setModuleDetail(null);
+  };
+
+  const onPointerCancel = () => {
+    if (dragRef.current?.active) setSelected(null);
+    dragRef.current = null;
+    setDrag(null);
   };
 
   const savePreset = () => {
@@ -3263,15 +3746,17 @@ export function App() {
     if (state.branchEnabled !== preset.branchEnabled)
       commands.push({ type: "TOGGLE_BRANCH" });
     commandBatch(commands);
+    setSelected(null);
+    setModuleDetail(null);
     setTab("build");
   };
 
   return (
     <div
-      className={`app-shell ${reducedMotion ? "motion-reduced" : ""} ${drag ? "dragging" : ""}`}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={() => setDrag(null)}
+      className={`app-shell ${reducedMotion ? "motion-reduced" : ""} ${drag?.active ? "dragging" : ""}`}
+      onPointerMoveCapture={onPointerMove}
+      onPointerUpCapture={onPointerUp}
+      onPointerCancelCapture={onPointerCancel}
     >
       <a className="skip-link" href="#main-content">
         Skip to controls
@@ -3315,30 +3800,31 @@ export function App() {
           <TimeSpeedControl value={timeSpeed} onChange={setTimeSpeed} />
           <WarningBanner state={state} />
           <UpgradeFeedback state={state} />
-          {selectedName ? (
-            <div className="selection-banner" role="status">
-              <span>
-                {selectedName} selected · compatible slots are highlighted; tap
-                Snap here or drag to replace/reorder.
-              </span>
-              <button type="button" onClick={() => setSelected(null)}>
-                Cancel
-              </button>
-            </div>
-          ) : null}
+          <FirstSessionGuide state={state} />
 
           {tab === "build" ? (
             <BuildView
               state={state}
               command={command}
               selected={selected}
-              onSelect={onSelect}
+              detail={moduleDetail}
+              onOpenDetails={onOpenDetails}
+              onCloseDetails={() => setModuleDetail(null)}
+              onBeginPlacement={beginPlacement}
+              onCancelPlacement={() => setSelected(null)}
               onDragStart={onDragStart}
               onInstall={onInstall}
               reducedMotion={reducedMotion}
             />
           ) : tab === "jobs" ? (
-            <JobsView state={state} command={command} />
+            <JobsView
+              state={state}
+              command={command}
+              commandBatch={commandBatch}
+              reducedMotion={reducedMotion}
+              usefulTarget={usefulTarget}
+              onUsefulTargetChange={setUsefulTarget}
+            />
           ) : tab === "career" ? (
             <CareerView
               state={state}
@@ -3353,10 +3839,8 @@ export function App() {
                 const equippedSlot = state.slots.find(
                   (slot) => slot.moduleId === moduleId,
                 );
-                setSelected({
-                  moduleId,
-                  fromSlotId: equippedSlot?.slotId,
-                });
+                beginPlacement(moduleId, equippedSlot?.slotId);
+                switchTab("build", true);
               }}
             />
           ) : (
@@ -3395,7 +3879,7 @@ export function App() {
         ))}
       </nav>
 
-      {drag ? (
+      {drag?.active ? (
         <div
           className="drag-ghost"
           style={{ left: drag.x, top: drag.y }}

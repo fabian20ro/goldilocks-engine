@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { placeLibraryModule, settleStarterJob } from "./helpers";
 
 function captureErrors(page: Page): string[] {
   const errors: string[] = [];
@@ -17,11 +18,15 @@ test.describe("verifier round 002 adversarial flows", () => {
     await page.setViewportSize({ width: 393, height: 742 });
     await page.goto("/");
 
-    await page.getByRole("button", { name: /Robust Evaluation/ }).click();
-    await page
-      .getByTestId("slot-verify")
-      .getByRole("button", { name: "Snap here" })
-      .click();
+    await page.getByRole("button", { name: "Jobs" }).click();
+    await settleStarterJob(page);
+    await page.getByRole("button", { name: "Build" }).click();
+    await placeLibraryModule(
+      page,
+      "robust-eval",
+      "Robust Evaluation",
+      "verify",
+    );
     await page.getByRole("button", { name: /Shadow evaluation/ }).click();
     await page.getByRole("button", { name: "Jobs" }).click();
     await page.getByRole("button", { name: /Long Document/ }).click();
@@ -31,14 +36,7 @@ test.describe("verifier round 002 adversarial flows", () => {
     await page.getByRole("button", { name: "Save current" }).click();
 
     await page.getByRole("button", { name: "Build" }).click();
-    await page
-      .getByRole("button", { name: /Smoke Check/ })
-      .last()
-      .click();
-    await page
-      .getByTestId("slot-verify")
-      .getByRole("button", { name: "Snap here" })
-      .click();
+    await placeLibraryModule(page, "smoke-check", "Smoke Check", "verify");
     await page.getByRole("button", { name: /Shadow evaluation/ }).click();
     await page.getByRole("button", { name: "Jobs" }).click();
     await page.getByRole("button", { name: /Interactive Chat/ }).click();
@@ -79,6 +77,7 @@ test.describe("verifier round 002 adversarial flows", () => {
     await context.setOffline(true);
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.getByRole("button", { name: "Jobs" }).click();
+    await settleStarterJob(page);
     await page.getByRole("button", { name: "Queue 10" }).click();
     await page.getByRole("button", { name: "Build" }).click();
     await expect(page.getByLabel(/jobs queued at bottleneck/)).toBeVisible();

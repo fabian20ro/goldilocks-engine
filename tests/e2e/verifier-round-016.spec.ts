@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { settleStarterJob } from "./helpers";
 
 async function openTab(page: Page, name: string) {
   await page
@@ -43,6 +44,7 @@ test.describe("verifier round 016 market feedback", () => {
     );
 
     await openTab(page, "Jobs");
+    await settleStarterJob(page);
     const card = page.getByRole("button", {
       name: /^Interactive Chat\. Current quote/,
     });
@@ -54,8 +56,7 @@ test.describe("verifier round 016 market feedback", () => {
     await expect(moneyLoop).not.toContainText(
       /\+\$\d+(?:\.\d+)? estimated net/,
     );
-    await expect(card).toContainText(
-      /guaranteed failure|−\$\d+(?:\.\d+)? net/i,
-    );
+    await expect(card).toContainText("Not safe in this configuration");
+    await expect(card).toHaveAccessibleName(/Guaranteed failure/);
   });
 });

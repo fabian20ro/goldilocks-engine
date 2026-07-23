@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { settleStarterJob } from "./helpers";
 
 function captureErrors(page: Page): string[] {
   const errors: string[] = [];
@@ -56,6 +57,7 @@ test.describe("verifier round 003 adversarial accessibility", () => {
     await page.setViewportSize({ width: 393, height: 742 });
     await page.goto("/");
     await page.getByRole("button", { name: "Jobs" }).click();
+    await settleStarterJob(page);
     await page.getByRole("button", { name: "Queue 10" }).click();
     await page.getByRole("button", { name: "Build" }).click();
     await page.getByRole("button", { name: "Animations on" }).click();
@@ -88,6 +90,7 @@ test.describe("verifier round 003 adversarial accessibility", () => {
     });
 
     await page.getByRole("button", { name: "Jobs" }).click();
+    await settleStarterJob(page);
     await page.getByRole("button", { name: /Long Document/ }).click();
     for (let index = 0; index < 10; index += 1)
       await page.getByRole("button", { name: "Queue 10" }).click();

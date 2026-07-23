@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { settleStarterJob } from "./helpers";
 
 const pagesPath = "/goldlocks-engine/";
 
@@ -140,6 +141,7 @@ test("the GitHub Pages build loads and remains worker-backed offline", async ({
     expect(path).toMatch(/^\/goldlocks-engine\//);
 
   await page.getByRole("button", { name: "Jobs" }).click();
+  await settleStarterJob(page);
   await page.getByRole("button", { name: "Queue 10" }).click();
   await page.getByRole("button", { name: "Build" }).click();
   await expect(page.getByLabel(/jobs queued at bottleneck/)).toBeVisible();

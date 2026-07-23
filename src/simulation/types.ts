@@ -61,6 +61,8 @@ export interface WorkloadSpec {
   minimumQuote: number;
   saturationPerSuccess: number;
   recoveryPerHour: number;
+  /** Work-specific delivery exposure applied to the pipeline's reliability. */
+  deliveryReliabilityMultiplier?: number;
   unlock: WorkloadUnlockRequirement;
 }
 
@@ -379,6 +381,24 @@ export interface SaveIntegrity {
   digest: string;
 }
 
+/**
+ * The compact, durable guide for a genuinely new local run. It records only
+ * completed player actions; it does not award money, alter quotes, or queue
+ * work on the player's behalf.
+ */
+export type FirstSessionStep =
+  | "queue-starter"
+  | "observe-settlement"
+  | "buy-and-install"
+  | "complete";
+
+export interface FirstSessionProgress {
+  step: FirstSessionStep;
+  starterTaskId: string | null;
+  observedSettlementTaskId: string | null;
+  purchasedModuleId: string | null;
+}
+
 export interface SimulationState {
   schemaVersion: typeof SCHEMA_VERSION;
   contentVersion: typeof CONTENT_VERSION;
@@ -402,6 +422,7 @@ export interface SimulationState {
   resources: Resources;
   career: CareerState;
   meta: MetaProgression;
+  firstSession: FirstSessionProgress;
   jobs: JobState;
   lastSettlement: JobSettlement | null;
   metrics: PipelineMetrics;

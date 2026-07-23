@@ -10,6 +10,7 @@ import {
 import {
   applyCommand,
   calculateMetrics,
+  createEstablishedScenarioState,
   createInitialState,
   estimateWorkloadOffer,
   getWorkloadQuote,
@@ -36,6 +37,113 @@ describe("deterministic simulation engine", () => {
     expect(state.ledger).toHaveLength(1);
   });
 
+  it("persists the finite first-session guide through real queue, settlement, buy, and placement commands", () => {
+    let state = createInitialState(702);
+    expect(state.firstSession).toEqual({
+      step: "queue-starter",
+      starterTaskId: null,
+      observedSettlementTaskId: null,
+      purchasedModuleId: null,
+    });
+
+    state = applyCommand(state, { type: "QUEUE_JOBS", count: 1 });
+    const starterTaskId = state.jobs.waitingTasks[0]?.id;
+    expect(state.firstSession).toMatchObject({
+      step: "observe-settlement",
+      starterTaskId,
+    });
+
+    state = tick(state, 60);
+    expect(state.lastSettlement?.taskId).toBe(starterTaskId);
+    expect(state.firstSession).toMatchObject({
+      step: "buy-and-install",
+      starterTaskId,
+      observedSettlementTaskId: starterTaskId,
+      purchasedModuleId: null,
+    });
+
+    state = applyCommand(
+      {
+        ...state,
+        resources: { ...state.resources, money: 4 },
+      },
+      { type: "BUY_MODULE", moduleId: "precision-cleaner" },
+    );
+    expect(state.firstSession).toMatchObject({
+      step: "buy-and-install",
+      purchasedModuleId: "precision-cleaner",
+    });
+    state = applyCommand(state, {
+      type: "PLACE_MODULE",
+      moduleId: "precision-cleaner",
+      slotId: "prepare",
+    });
+    expect(state.firstSession.step).toBe("complete");
+    expect(isStateValid(state)).toBe(true);
+  });
+
+  it("enforces the first-session queue order in the durable command contract", () => {
+    let state = createInitialState(704);
+    state = applyCommand(state, {
+      type: "SET_WORKLOAD",
+      workloadId: "batch-classification",
+    });
+    const nonstarter = applyCommand(state, { type: "QUEUE_JOBS", count: 1 });
+    expect(nonstarter.jobs.queued).toBe(0);
+    expect(nonstarter.firstSession.step).toBe("queue-starter");
+    expect(nonstarter.ledger.at(-1)?.message).toMatch(
+      /one Interactive Chat job/i,
+    );
+
+    state = applyCommand(nonstarter, {
+      type: "SET_WORKLOAD",
+      workloadId: "interactive-chat",
+    });
+    const batchAttempt = applyCommand(state, { type: "QUEUE_JOBS", count: 10 });
+    expect(batchAttempt.jobs.queued).toBe(0);
+    expect(batchAttempt.firstSession.step).toBe("queue-starter");
+
+    const accepted = applyCommand(batchAttempt, {
+      type: "QUEUE_JOBS",
+      count: 1,
+    });
+    expect(accepted.firstSession.step).toBe("observe-settlement");
+    const blockedUntilSettlement = applyCommand(accepted, {
+      type: "QUEUE_JOBS",
+      count: 1,
+    });
+    expect(blockedUntilSettlement.jobs.queued).toBe(1);
+    expect(blockedUntilSettlement.ledger.at(-1)?.message).toMatch(/settle/i);
+    expect(isStateValid(blockedUntilSettlement)).toBe(true);
+
+    const established = applyCommand(createEstablishedScenarioState(705), {
+      type: "QUEUE_JOBS",
+      count: 10,
+    });
+    expect(established.firstSession.step).toBe("complete");
+    expect(established.jobs.queued).toBe(10);
+    expect(isStateValid(established)).toBe(true);
+  });
+
+  it("adds a completed guide to schema-7 saves that predate it without discarding the run", () => {
+    const oldSave = JSON.parse(
+      JSON.stringify(createInitialState(703)),
+    ) as Record<string, unknown>;
+    delete oldSave.firstSession;
+
+    const restored = restoreSimulationState(oldSave, 703);
+    expect(restored.firstSession).toEqual({
+      step: "complete",
+      starterTaskId: "legacy-session",
+      observedSettlementTaskId: "legacy-session",
+      purchasedModuleId: "legacy-session",
+    });
+    expect(restored.migration.steps).toContain(
+      "schema-v7-first-session-guide-added",
+    );
+    expect(isStateValid(restored)).toBe(true);
+  });
+
   it("rejects an unknown runtime command discriminator as an exact no-op", () => {
     const initial = createInitialState(8);
 
@@ -58,7 +166,7 @@ describe("deterministic simulation engine", () => {
     const run = () =>
       commands.reduce(
         (state, command) => applyCommand(state, command),
-        createInitialState(99),
+        createEstablishedScenarioState(99),
       );
     const left = tick(run(), 60);
     const right = tick(run(), 60);
@@ -66,7 +174,7 @@ describe("deterministic simulation engine", () => {
   });
 
   it("settles successful workload payouts and operating costs visibly", () => {
-    const initial = createInitialState(7);
+    const initial = createEstablishedScenarioState(7);
     const queued = applyCommand(initial, { type: "QUEUE_JOBS", count: 5 });
     const settled = tick(queued, 60);
     const settlement = settled.lastSettlement;
@@ -98,7 +206,7 @@ describe("deterministic simulation engine", () => {
 
   it("keeps bounded time-speed tick schedules deterministic", () => {
     const run = (speed: 1 | 4 | 16 | 64) => {
-      let state = applyCommand(createInitialState(91), {
+      let state = applyCommand(createEstablishedScenarioState(91), {
         type: "QUEUE_JOBS",
         count: 40,
       });
@@ -151,7 +259,7 @@ describe("deterministic simulation engine", () => {
   });
 
   it("records capacity failures and prevents normal output", () => {
-    let state = createInitialState(13);
+    let state = createEstablishedScenarioState(13);
     state = applyCommand(state, {
       type: "SET_WORKLOAD",
       workloadId: "long-document",
@@ -534,7 +642,7 @@ describe("deterministic simulation engine", () => {
   });
 
   it("normalizes finite numeric ranges and malformed standalone seeds safely", () => {
-    const initial = createInitialState(5);
+    const initial = createEstablishedScenarioState(5);
     const allocation = applyCommand(initial, {
       type: "SET_COMPUTE_ALLOCATION",
       percent: Number.MAX_VALUE,
@@ -695,7 +803,7 @@ describe("deterministic simulation engine", () => {
   });
 
   it("keeps per-task workload identity and queue-time quotes, then clears waiting only", () => {
-    let state = createInitialState(73);
+    let state = createEstablishedScenarioState(73);
     state = applyCommand(state, { type: "QUEUE_JOBS", count: 3 });
     const accepted = [...state.jobs.waitingTasks];
     expect(accepted).toHaveLength(3);
@@ -748,7 +856,7 @@ describe("deterministic simulation engine", () => {
   });
 
   it("keeps current diagnostics on active work while selecting a future offer", () => {
-    let state = createInitialState(75);
+    let state = createEstablishedScenarioState(75);
     state = applyCommand(state, {
       type: "SET_WORKLOAD",
       workloadId: "long-document",
@@ -870,7 +978,7 @@ describe("deterministic simulation engine", () => {
   });
 
   it("migrates schema-v4 aggregate queued work into bounded task identities", () => {
-    const source = applyCommand(createInitialState(97), {
+    const source = applyCommand(createEstablishedScenarioState(97), {
       type: "QUEUE_JOBS",
       count: 3,
     });
@@ -904,7 +1012,7 @@ describe("deterministic simulation engine", () => {
   });
 
   it("migrates deployed schema-v5 saves into the bounded Bedroom Career loop", () => {
-    const source = applyCommand(createInitialState(191), {
+    const source = applyCommand(createEstablishedScenarioState(191), {
       type: "QUEUE_JOBS",
       count: 2,
     });

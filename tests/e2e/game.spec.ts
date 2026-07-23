@@ -1,5 +1,30 @@
 import { expect, test, type Page } from "@playwright/test";
 
+async function placeModule(page: Page, moduleName: string, slotId: string) {
+  await page
+    .getByRole("button", { name: new RegExp(`^${moduleName}\\.`) })
+    .click();
+  await page
+    .getByRole("button", { name: `Place ${moduleName} in Build` })
+    .click();
+  await page
+    .getByTestId(`slot-${slotId}`)
+    .getByRole("button", { name: "Snap here" })
+    .click();
+}
+
+async function observeStarterSettlement(page: Page) {
+  await page.getByRole("button", { name: "Jobs" }).click();
+  await page
+    .getByRole("button", { name: "Queue one safe Interactive Chat job" })
+    .click();
+  await page.getByRole("button", { name: "64×" }).click();
+  await expect(page.getByTestId("first-session-guide")).toContainText(
+    "step 3 of 3",
+    { timeout: 10_000 },
+  );
+}
+
 async function assertPortraitIntegrity(page: Page) {
   const dimensions = await page.evaluate(() => ({
     viewport: document.documentElement.clientWidth,
@@ -47,11 +72,9 @@ test.describe("portrait pipeline acceptance", () => {
   }) => {
     await page.setViewportSize({ width: 393, height: 742 });
     await page.goto("/");
-    await page.getByRole("button", { name: /Robust Evaluation/ }).click();
-    await page
-      .getByTestId("slot-verify")
-      .getByRole("button", { name: "Snap here" })
-      .click();
+    await observeStarterSettlement(page);
+    await page.getByRole("button", { name: "Build" }).click();
+    await placeModule(page, "Robust Evaluation", "verify");
     await expect(page.getByTestId("slot-verify")).toContainText(
       "Robust Evaluation",
     );
@@ -73,11 +96,9 @@ test.describe("portrait pipeline acceptance", () => {
   }) => {
     await page.setViewportSize({ width: 393, height: 742 });
     await page.goto("/");
-    await page.getByRole("button", { name: /Robust Evaluation/ }).click();
-    await page
-      .getByTestId("slot-verify")
-      .getByRole("button", { name: "Snap here" })
-      .click();
+    await observeStarterSettlement(page);
+    await page.getByRole("button", { name: "Build" }).click();
+    await placeModule(page, "Robust Evaluation", "verify");
     await page.getByRole("button", { name: "Jobs" }).click();
     await page.getByRole("button", { name: "Queue 10" }).click();
     await page.getByRole("button", { name: "Build" }).click();
@@ -175,11 +196,9 @@ test.describe("portrait pipeline acceptance", () => {
   }) => {
     await page.setViewportSize({ width: 393, height: 742 });
     await page.goto("/");
-    await page.getByRole("button", { name: /Full Precision Model/ }).click();
-    await page
-      .getByTestId("slot-runtime")
-      .getByRole("button", { name: "Snap here" })
-      .click();
+    await observeStarterSettlement(page);
+    await page.getByRole("button", { name: "Build" }).click();
+    await placeModule(page, "Full Precision Model", "runtime");
     await page.getByRole("button", { name: "Jobs" }).click();
     await page.getByRole("button", { name: /Long Document/ }).click();
     await page.getByRole("button", { name: "16×" }).click();
@@ -190,14 +209,7 @@ test.describe("portrait pipeline acceptance", () => {
       timeout: 12_000,
     });
     await expect(page.getByText("OUTPUT REJECTED").first()).toBeVisible();
-    await page
-      .getByRole("button", { name: /Quantized Model/ })
-      .last()
-      .click();
-    await page
-      .getByTestId("slot-runtime")
-      .getByRole("button", { name: "Snap here" })
-      .click();
+    await placeModule(page, "Quantized Model", "runtime");
     await expect(page.getByText("FAULT ORIGIN")).toHaveCount(0);
   });
 
@@ -244,6 +256,7 @@ test.describe("portrait pipeline acceptance", () => {
     });
     if (await corruptPreset.isVisible()) await corruptPreset.click();
     await page.getByRole("button", { name: "Jobs" }).click();
+    await observeStarterSettlement(page);
     await page.getByRole("button", { name: "Queue 10" }).click();
     await page.getByRole("button", { name: "Build" }).click();
     await expect(page.getByLabel(/jobs queued at bottleneck/)).toBeVisible();

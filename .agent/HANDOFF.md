@@ -1,45 +1,36 @@
-# Candidate handoff — Initial-color emoji command deck
+# Candidate handoff — first-session management refinement
 
 ## Implemented behavior summary
 
-- Rehauls the complete current Bedroom UI into one forest/acid/amber/cyan terminal command deck without changing simulation commands, engine behavior, balances, persistence schemas, content, progression, endings, or PWA behavior.
-- Adds a central reusable semantic glyph registry for resources, pipeline roles, states, navigation, career routes, workloads, and equipment. Glyphs are decorative; visible text and programmatic names retain meaning.
-- Replaces the tall report header with a compact icon-led five-resource HUD. Simulation speed sits with live context; Help, animation state, warning guidance, and exact information remain labeled.
-- Build uses one numbered, pipe-free ordered rail: five starter stages or eight expanded stages. Expansion still adds only three empty/bypassed positions. Build/Edit and Run are presentation-only views over the unchanged Worker authority.
-- Stage selection opens one live in-flow details surface with catalogue description, metrics, compatibility guidance, and contextual remove/bypass. Another selection replaces it; Close/Escape restores focus. Tap, keyboard, pointer drag, and CDP touch remain supported.
-- Jobs leads with one warm selected-work dispatch card and above-fold Queue 1 action; exact quotes, cost, uncertainty, queue identity, and the full playable/locked catalogue remain accessible.
-- Career leads with warm semantic route cards and four large finite-hour tokens while retaining fractional numeric allocation, exact outcomes, costs, policies, and progression. Every route uses a single-column control stack, so all tokens and the exact numeric input stay reachable at 320/393px and 200% text.
-- Upgrades sorts owned/affordable/locked choices, adds reusable family glyphs and signed comparison chips, and renders Workstation Expansion I as `3 → 6` plus three empty symbols. Expansion, rigs, and modules share exactly one view-owned live details surface; activating another replaces it, while labeled Close and Escape restore focus.
-- Inspect leads with CSS gauges for memory, thermal pressure, evidence, and predicted/observed divergence; the full exact comparison table, presets, event evidence, and postmortems remain available.
-- Bottom navigation remains the only global routing. Each tab deliberately restores its own scroll position. Pending Build selection has a visible tab indication.
-- Default deterministic test/start port remains `4173`; `E2E_PORT` provides a reproducible alternate loopback port when another local project owns the default.
+- Adds a finite durable rail for a genuinely new run: queue exactly one safe Interactive Chat task, observe its settlement, then buy and explicitly install a meaningful module. The current step survives reload and offline recovery; the completed rail disappears.
+- Enforces the first queue/settlement ordering in `applyCommand`, so direct Worker/runtime callers cannot bypass it with another workload, Queue 10, or a second queue before the starter settles. Invalid guide state safely recovers; existing schema-7 saves migrate as established sessions and reseal.
+- Separates Details from placement. Details only inspects; placement starts only from a named `Place … in Build` action. Build owns the pending tray and Snap targets; Jobs, Career, Inspect, Cancel/Escape, incompatible recovery, and completion clear it without mutating the pipeline.
+- Rebalances the early work market: Interactive Chat is reliable immediate income but demand falls quickly under reservations; Batch Classification offers a distinct positive expected route with lower delivery reliability and recoverable demand. Queue 10 and 64× remain available after the initial settlement but are not the dominant pre-purchase policy.
+- Adds restrained settlement/first-fifth-twelfth recognition, exact success/failure accounting, recovery language, and a persisted, dismissible next-affordable target. Reduced-motion mode labels the state immediately and cancels active transitions.
+- Makes module-library horizontal touch panning coexist with explicit vertical/non-horizontal placement drags. A short tap still opens Details; canceled touch drag makes no pipeline change.
+- Adds `createEstablishedScenarioState()` only for deterministic balance/regression scenarios; production startup always uses the guarded `createInitialState()` path.
 
 ## Plan requirements covered
 
-| Requirement                                                          | Evidence                                                                                                              |
-| -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| §20.5 / D-012 shared palette and reusable semantic glyph grammar     | `src/ui/glyphs.tsx`, CSS tokens, component registry test, five-tab starter/expanded screenshots                       |
-| Compact portrait shell and first actions above navigation            | `command-deck.spec.ts` geometry assertions at 320×693 and 393×742; existing 320/393/200%-text suites                  |
-| Pipe-free five/eight-stage topology, three empty expansion positions | Ordered `<ol>` rail; no flow connector; no nested rail scroll; expansion and offline regressions                      |
-| Accessible live item details                                         | `DetailsSurface` and `ItemDetailsDisclosure`; view-wide replacement, Close/Escape focus-return, and live-value checks |
-| Build/live observation and unchanged Worker authority                | Presentation-only toggle snapshot equality; unchanged simulation/worker code; full property/balance suites            |
-| Jobs dispatch hierarchy                                              | Selected live card and Queue 1 geometry; workload/quote/queue/settlement regressions                                  |
-| Career warm cards and tangible four-hour allocation                  | All 16 tokens and four exact inputs measured ≥44px and within route bounds at 320/393, normal and 200% text           |
-| Upgrade comparison bench                                             | One controlled live disclosure across every item type, signed deltas, ordering, and `3 → 6` empty-symbol contract     |
-| Inspect instrument console and retained exact evidence               | Four labeled CSS meters plus default-open exact comparison disclosure; baseline/preset/postmortem tests               |
-| Accessibility and portrait resilience                                | 44px controls, text/status labels independent of color, keyboard focus, reduced motion, touch, no horizontal overflow |
-| Persistence/PWA/root/Pages behavior unchanged                        | 117 root Playwright cases, 2 Pages/offline cases, migration/recovery/update suites                                    |
+| Requirement                                                         | Evidence                                                                                                    |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| §20.6/D-013 three-step queue → settlement → buy/install rail        | Durable `firstSession` state, engine guard/migration tests, `first-session.spec.ts` reload/offline coverage |
+| Explicit Build-scoped placement; Details does not place             | `App.tsx` transaction ownership and browser Details/Upgrades/Build/Cancel/Escape/touch tests                |
+| Two viable forecastable pre-purchase routes; no dominant safe batch | `firstSessionBalance.ts`, 41-seed route sweep, quote/demand UI, 20,001-seed purchase pacing sweep           |
+| Compact card hierarchy with exact accounting retained               | Workload accessible labels/Details, settlement ledger, money-loop and verifier-round-016 regression         |
+| Restrained accessible progress/failure/recovery feedback            | `MoneyLoop`, reduced-motion assertions, settlement/failure browser coverage                                 |
+| Portrait/touch/text/reload/offline/PWA regression protection        | Pinned 320/393 and 200%-text Playwright suites; root and Pages offline checks                               |
+| Independent reproducible verification                               | `scripts/setup`, `scripts/run`, `scripts/verify`, project-pinned Playwright and ignored local caches        |
 
 ## Verifier findings resolved
 
-- **V-042:** Replaced independent rig/module native disclosures with one `UpgradesView`-owned selection across expansion, rigs, and modules. `ItemDetailsDisclosure` synchronizes summary activation, renders at most one open primary surface, preserves every live catalogue stat/text and contextual action, and supplies labeled Close plus Escape focus restoration. The committed verifier test and implementation-owned cross-item/Close/Escape regression succeed.
-- **V-043:** Reflowed every Career route and hour controller into explicit single-column grids. Four full-width `minmax(44px, 1fr)` tokens plus the exact numeric input remain inside 320/393px portraits and at 200% text without horizontal document overflow. Geometry checks cover all 16 route tokens.
-- **V-044:** Removed the contradictory `@media (max-width: 350px)` two-column hour-controller override. The narrow-width cascade now preserves the base single-column stack, keeping every exact fractional numeric input full-width, at least 44px high/wide, and within its route at 320px/200% text. Implementation-owned geometry also covers every token and input at 320/393 in normal and scaled states.
-- Round-036/037 immutable reports and verifier-authored regressions remain untouched.
+- No verifier finding was unresolved at this implementer handoff. Immutable round-038 reports V-001 through V-044 resolved; retained regressions stay in the canonical suite.
+- This change specifically preserves formerly fragile boundaries covered by retained tests: V-009 manual reduced motion, V-010 module-drawer touch pan, V-042 single item-details surface, V-043/V-044 portrait Career controls, plus all persistence/PWA findings.
+- Added first-session engine and Playwright coverage rather than weakening existing regression intent. Established long-run balance scenarios now opt in through the documented fixture instead of silently bypassing the guide.
 
 ## Setup, startup, and verification commands
 
-Prerequisite: Node matching `package.json` (`^20.19.0 || >=22.12.0`). First setup needs network access for lockfile dependencies and Chromium.
+Prerequisite: Node matching `package.json` (`^20.19.0 || >=22.12.0`). First setup needs network access for the lockfile dependencies and pinned Chromium.
 
 ```sh
 ./scripts/setup
@@ -47,7 +38,7 @@ Prerequisite: Node matching `package.json` (`^20.19.0 || >=22.12.0`). First setu
 # http://127.0.0.1:4173
 ```
 
-Repository-local ignored caches:
+Repository-local ignored caches/artifacts:
 
 ```text
 npm:       .cache/npm
@@ -55,20 +46,20 @@ Chromium:  .cache/ms-playwright
 artifacts: playwright-report/, playwright-pages-report/, test-results/
 ```
 
-Linux browser libraries when needed:
+For Linux browser libraries when required:
 
 ```sh
 PLAYWRIGHT_INSTALL_DEPS=1 ./scripts/setup
 ```
 
-Focused command-deck verification and screenshot generation:
+Focused commands:
 
 ```sh
-npm exec vitest -- run --no-coverage src/ui/commandDeck.test.tsx
-E2E_PORT=4174 npm run test:e2e -- tests/e2e/verifier-round-036.spec.ts tests/e2e/verifier-round-037.spec.ts tests/e2e/command-deck.spec.ts
+npx vitest run src/simulation/engine.test.ts src/simulation/firstSessionBalance.test.ts --coverage.enabled=false
+npm run balance:first-session
+npm run test:e2e -- tests/e2e/first-session.spec.ts --reporter=line
+npm run test:e2e -- tests/e2e/verifier-round-004.spec.ts --reporter=line
 ```
-
-The browser suite writes 22 inspection PNGs under `test-results/command-deck/`: all five tabs in starter and expanded state at 320×693 and 393×742, plus scrolled Career renders at 200% text for both widths.
 
 Canonical full check:
 
@@ -76,46 +67,44 @@ Canonical full check:
 ./scripts/verify
 ```
 
-If port 4173 is occupied, the behaviorally identical explicit override is:
+`./scripts/verify` runs setup, format, lint, typecheck, unit/property coverage, all balance sweeps, production build, root Playwright, and Pages/offline Playwright. Playwright uses project-pinned Chromium from `.cache/ms-playwright`, starts deterministic `127.0.0.1:4173` loopback preview servers, waits for readiness, and cleans them up. No home cache, global package, existing browser profile, or in-app Browser is required.
+
+If port 4173 is occupied, use the behaviorally identical explicit override:
 
 ```sh
 E2E_PORT=4174 ./scripts/verify
 ```
 
-`./scripts/verify` runs fresh local setup, formatting, lint, typecheck, unit/property coverage, every deterministic balance sweep, production build, all root Playwright cases, and Pages/offline Playwright cases. Playwright starts loopback preview servers, waits for readiness, and tears them down. No global package, home-directory browser cache, existing profile, or in-app Browser is required.
-
 ## Important architectural decisions
 
-- `src/ui/glyphs.tsx` is the sole code-native semantic glyph registry; view code obtains repeated stage/navigation/workload glyphs from registry helpers.
-- `DetailsSurface`, `ItemDetailsDisclosure`, and `StatusGauge` are reusable accessible primitives. Upgrades owns one selected detail ID across every item type; synchronous controlled summary activation prevents native-toggle races, and labeled Close/Escape return focus without trapping it.
-- Remaining native disclosures describe one selected dispatch's qualification, one queue collection, global warning guidance, or the single exact Inspect table; they are supplemental view evidence, not competing item-level primary surfaces.
-- Career route and hour controls explicitly declare one-column grids in both base and `max-width: 350px` rules. Token tracks use four flexible tracks with a 44px floor; exact numeric inputs use a separate full-width row with intrinsic width constrained to the card.
-- Compact UI derives all prices, requirements, descriptions, metrics, quotes, accounting, evidence, and status from live catalogue/simulation state. No duplicate economy or causal model was introduced.
-- Build/Edit versus Run is local React presentation state only. It sends no simulation command and changes no persisted pipeline, workload, or hardware value.
-- Tab scroll restoration is explicit per destination rather than inheriting another view's arbitrary offset.
-- `E2E_PORT` changes test-server addressing only. The default remains deterministic `127.0.0.1:4173`, including Pages scope.
+- `SimulationState.firstSession` records only completed player actions; it grants no money, changes no quote, and queues no work automatically.
+- Old saves remain usable as completed, legacy first sessions. Malformed current guide data falls back safely rather than manufacturing a partially completed guide.
+- `createEstablishedScenarioState()` is a test/balance fixture, not a UI route or simulation command. It keeps non-onboarding scenarios explicit and reproducible.
+- Pending placement is React view state, never a simulation command. The engine receives only the explicit final `PLACE_MODULE` command.
+- Library touch gestures preserve native horizontal pan until drag direction is unambiguous; placement begins only after the normal movement threshold.
+- Workload quotes remain locked per accepted task. Reservation pressure is deterministic and visible before acceptance; delivery reliability can vary by workload without changing pipeline topology or settlement semantics.
 
 ## Known limitations and risks
 
-- Native emoji rendering varies by platform; labels and interaction structure preserve semantics.
-- Physical mobile thermal/battery behavior, non-Chromium engines, and actual assistive-technology speech output remain environmental residuals.
-- The Help and animation controls stay compactly visible to preserve existing first-session discoverability and 44px access; detailed tutorial content is progressive and placed after the current command view.
-- Exact comparison disclosure starts open to preserve existing direct table accessibility while gauges remain the initial Inspect hero.
-- Local storage denial leaves an in-memory session playable but cannot preserve state across reload.
-- No researchers/characters, creator/hype/fear systems, extra pipelines, startup/labor/laboratory content, narrative expansion, remote assets, generated raster art, audio, or haptics were added.
-- Implementer does not push, deploy, merge, or accept the candidate. Exact-SHA independent verification remains required.
+- The guide cannot guarantee a first task succeeds; a failed starter still records the observed settlement and the player can choose subsequent work before affording a module.
+- Existing established saves intentionally do not replay the new onboarding rail.
+- Native emoji rendering, physical touch feel, battery/thermal behavior, non-Chromium engines, and actual screen-reader speech remain environmental residual risks.
+- Local storage denial leaves an in-memory session playable but cannot persist reload state.
+- No Research, characters, creator/fear/audience systems, workforce/startup/laboratory content, extra pipelines, narrative expansion, remote assets, audio, or haptics were added.
 
 ## Checks executed before candidate handoff
 
-- `npm exec vitest -- run --no-coverage src/ui/commandDeck.test.tsx` — succeeded, 3 tests.
-- `E2E_PORT=4174 npm run test:e2e -- tests/e2e/verifier-round-036.spec.ts --reporter=line` — succeeded, 2 tests.
-- `E2E_PORT=4174 npm run test:e2e -- tests/e2e/verifier-round-036.spec.ts tests/e2e/verifier-round-037.spec.ts tests/e2e/command-deck.spec.ts --reporter=line` — succeeded, 9 tests: disclosure replacement/Close/Escape, required 393px tokens, exact 320px/200%-text inputs, 320/393 full renders, and all Career controls at both widths in normal/scaled states.
-- Visual inspection covered updated Career renders at 320/393 in normal and 200%-text states. All four tokens remain whole; each exact input is a full-width second row inside its route.
-- Final `E2E_PORT=4174 ./scripts/verify` — succeeded, exit 0: fresh local setup; format, lint, typecheck; 26 unit/property files / 126 tests with coverage; numeric prototype; 20,001-seed upgrade, 41-seed progression, 101-seed Career, and 121-seed evaluation sweeps with zero failures; production build; 117 root Playwright cases; 2 Pages/offline cases.
+- `npm run typecheck` — passed.
+- `npm test` — passed: 27 files, 135 tests; V8 coverage statements 88.2%, branches 85.07%, functions 94.62%, lines 91.58%.
+- `npm run balance` — passed: numeric prototype viable/non-dominant/tradeoffs; first-session 41 seeds/0 failures; upgrades 20,001/0 (worst module 4 successful jobs, rig 15); progression 41/0; Career 101/0; evaluation 121/0.
+- `npm run format:check`, `npm run lint`, `npm run build` — passed.
+- `npm run test:e2e -- --reporter=line` — passed: 126 root cases.
+- `npm run test:e2e:pages -- --reporter=line` — passed: 2 Pages/offline cases.
+- Final `./scripts/verify` — passed, exit 0: fresh local setup; format, lint, typecheck; 27 unit/property files / 135 tests; numeric prototype; 41-seed first-session, 20,001-seed upgrade, 41-seed progression, 101-seed Career, and 121-seed evaluation sweeps with zero failures; production build; 126 root Playwright cases; 2 Pages/offline cases.
 
 ## Checks not run
 
 - No push, deployment, live public URL validation, or GitHub Actions run; outside Implementer authority.
 - No physical-device, non-Chromium, battery/thermal, or platform screen-reader session; required hardware/services unavailable.
-- No manual play-duration or telemetry session; D-009 makes that optional feedback, not a release blocker.
-- Sandboxed Chromium launch fails on macOS Mach-port registration; repository-pinned Chromium checks above ran outside that sandbox with the same project-local browser/cache.
+- No manual play-duration or telemetry session; D-009 makes it optional feedback rather than a release blocker.
+- Sandboxed Chromium launch is unavailable on this macOS environment because of Mach-port registration; the required repository-pinned Chromium checks above run with project-local caches outside that sandbox.

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { settleStarterJob } from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 const LEGACY_SAVE_KEY = "goldilocks-simulation-save-v3";
@@ -72,7 +73,11 @@ test.describe("round 012 persistent upgrade economy and UX", () => {
     ).toBeDisabled();
     await page.getByRole("button", { name: "16×" }).click();
     await page.getByRole("button", { name: "Jobs" }).click();
-    await page.getByRole("button", { name: "Queue 10" }).click();
+    await settleStarterJob(page);
+    // The early economy is deliberately about choosing a few visible jobs;
+    // this keeps the upgrade pacing probe independent of an unattended batch.
+    for (let job = 0; job < 3; job += 1)
+      await page.getByRole("button", { name: "Queue 1", exact: true }).click();
     await expect
       .poll(() =>
         page.evaluate((key) => {
@@ -107,17 +112,11 @@ test.describe("round 012 persistent upgrade economy and UX", () => {
       "purchased for $4.00 and is now owned",
     );
     await page
-      .getByRole("button", { name: "Add Precision Cleaner in Build" })
+      .getByRole("button", { name: "Place Precision Cleaner in Build" })
       .click();
-    await expect(
-      page.getByRole("status").filter({
-        hasText: "Precision Cleaner selected",
-      }),
-    ).toContainText("compatible slots are highlighted");
-    await page
-      .getByRole("navigation", { name: "Primary" })
-      .getByRole("button", { name: "Build", exact: true })
-      .click();
+    await expect(page.locator(".placement-tray")).toContainText(
+      "Place Precision Cleaner",
+    );
     await expect(page.locator(".pipeline-slot.compatible")).toHaveCount(3);
     await page
       .getByTestId("slot-prepare")
@@ -137,7 +136,7 @@ test.describe("round 012 persistent upgrade economy and UX", () => {
     await openUpgrades(page);
     await expect(
       page.getByRole("button", {
-        name: "Reposition Precision Cleaner in Build",
+        name: "Place Precision Cleaner in Build",
       }),
     ).toBeVisible();
 

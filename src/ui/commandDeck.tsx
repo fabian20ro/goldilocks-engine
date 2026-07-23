@@ -23,10 +23,10 @@ export function DetailsSurface({
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const originRef = useRef<HTMLElement | null>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (document.activeElement instanceof HTMLElement)
       originRef.current = document.activeElement;
-  }, []);
+  }, [title]);
   useEffect(() => {
     const escape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;

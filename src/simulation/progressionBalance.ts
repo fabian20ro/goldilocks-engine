@@ -2,6 +2,7 @@ import { hardware, modules, pipelineExpansions, workloads } from "./catalog";
 import {
   applyCommand,
   calculateMetrics,
+  createEstablishedScenarioState,
   createInitialState,
   estimateWorkloadOffer,
   getSimulationAgeHours,
@@ -95,7 +96,10 @@ function buyIfAffordable(
 export function validateProgressionEconomy(
   seed: number,
 ): ProgressionBalanceResult {
-  let state = createInitialState(seed);
+  // This sweep evaluates long-run expansion pacing, not the newly protected
+  // first-session rail. The explicit established fixture keeps that distinction
+  // reproducible without exposing a player command that skips onboarding.
+  let state = createEstablishedScenarioState(seed);
   let firstModuleSuccess = Number.POSITIVE_INFINITY;
   let firstRigSuccess = Number.POSITIVE_INFINITY;
   let expansionHour = Number.POSITIVE_INFINITY;

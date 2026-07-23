@@ -1,4 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
+import {
+  placeLibraryModule,
+  settleStarterJob,
+  STARTER_QUEUE_NAME,
+} from "./helpers";
 
 function captureErrors(page: Page): string[] {
   const errors: string[] = [];
@@ -80,7 +85,7 @@ test.describe("round 009 first-session comprehension", () => {
       page.getByText(/Interactive Chat.*\$1\.40 gross/, { exact: false }),
     ).toBeVisible();
     await page.getByRole("button", { name: "16×" }).click();
-    await page.getByRole("button", { name: "Queue 1", exact: true }).click();
+    await page.getByRole("button", { name: STARTER_QUEUE_NAME }).click();
 
     await expect(page.getByText(/1 paid · 0 failed/)).toBeVisible({
       timeout: 10_000,
@@ -163,11 +168,15 @@ test.describe("round 009 first-session comprehension", () => {
   }) => {
     await page.setViewportSize({ width: 393, height: 850 });
     await page.goto("/");
-    await page.locator('.module-library [data-module-id="full-model"]').click();
-    await page
-      .getByTestId("slot-runtime")
-      .getByRole("button", { name: "Snap here" })
-      .click();
+    await page.getByRole("button", { name: "Jobs" }).click();
+    await settleStarterJob(page);
+    await page.getByRole("button", { name: "Build" }).click();
+    await placeLibraryModule(
+      page,
+      "full-model",
+      "Full Precision Model",
+      "runtime",
+    );
     await page.getByRole("button", { name: "Jobs" }).click();
     await page.getByRole("button", { name: /Long Document/ }).click();
     const warning = page.getByLabel("Current warning and actions");
@@ -187,13 +196,13 @@ test.describe("round 009 first-session comprehension", () => {
     await expect(warning).not.toContainText("Lower the reserve");
 
     await page.reload();
-    await page
-      .locator('.module-library [data-module-id="quantized-model"]')
-      .click();
-    await page
-      .getByTestId("slot-runtime")
-      .getByRole("button", { name: "Snap here" })
-      .click();
+    await page.getByRole("button", { name: "Build" }).click();
+    await placeLibraryModule(
+      page,
+      "quantized-model",
+      "Quantized Model",
+      "runtime",
+    );
     await page.getByRole("button", { name: "Jobs" }).click();
     await page.getByLabel("Memory reserve percentage").fill("0");
     await page.getByLabel("Compute budget percentage").fill("100");
@@ -231,7 +240,7 @@ test.describe("round 009 first-session comprehension", () => {
 
     await page.getByRole("button", { name: "16×" }).click();
     await page.getByRole("button", { name: "Jobs" }).click();
-    await page.getByRole("button", { name: "Queue 1", exact: true }).click();
+    await page.getByRole("button", { name: STARTER_QUEUE_NAME }).click();
     await expect(page.getByText(/1 paid · 0 failed/)).toBeVisible({
       timeout: 10_000,
     });

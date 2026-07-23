@@ -29,6 +29,8 @@ import {
   type CausalEvidenceSnapshot,
   type DiagnosticUnlockId,
   type EvaluationState,
+  type FirstSessionProgress,
+  type FirstSessionStep,
   type LedgerEvent,
   type CareerRoute,
   type CareerState,
@@ -100,6 +102,12 @@ export function getSimulationAgeHours(
 }
 const ROLE_ORDER = ["preparation", "model", "evaluation"] as const;
 const EVENT_KINDS = ["info", "success", "warning", "failure"] as const;
+const FIRST_SESSION_STEPS: readonly FirstSessionStep[] = [
+  "queue-starter",
+  "observe-settlement",
+  "buy-and-install",
+  "complete",
+];
 const BOTTLENECKS = [
   "memory pressure",
   "thermal throttling",
@@ -118,6 +126,65 @@ const round = (value: number, digits = 2): number =>
   Number(value.toFixed(digits));
 const isFiniteNumber = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value);
+
+function createInitialFirstSessionProgress(): FirstSessionProgress {
+  return {
+    step: "queue-starter",
+    starterTaskId: null,
+    observedSettlementTaskId: null,
+    purchasedModuleId: null,
+  };
+}
+
+function isFirstSessionProgressValid(
+  value: unknown,
+): value is FirstSessionProgress {
+  if (typeof value !== "object" || value === null) return false;
+  const progress = value as FirstSessionProgress;
+  const validId = (id: unknown) => id === null || isText(id, 128);
+  if (
+    !FIRST_SESSION_STEPS.includes(progress.step) ||
+    !validId(progress.starterTaskId) ||
+    !validId(progress.observedSettlementTaskId) ||
+    !validId(progress.purchasedModuleId)
+  )
+    return false;
+  switch (progress.step) {
+    case "queue-starter":
+      return (
+        progress.starterTaskId === null &&
+        progress.observedSettlementTaskId === null &&
+        progress.purchasedModuleId === null
+      );
+    case "observe-settlement":
+      return (
+        progress.starterTaskId !== null &&
+        progress.observedSettlementTaskId === null &&
+        progress.purchasedModuleId === null
+      );
+    case "buy-and-install":
+      return (
+        progress.starterTaskId !== null &&
+        progress.observedSettlementTaskId !== null
+      );
+    case "complete":
+      return (
+        progress.starterTaskId !== null &&
+        progress.observedSettlementTaskId !== null &&
+        progress.purchasedModuleId !== null
+      );
+  }
+}
+
+/** Existing saves predate the optional guide, so leave their established run alone. */
+function legacyFirstSessionProgress(): FirstSessionProgress {
+  return {
+    step: "complete",
+    starterTaskId: "legacy-session",
+    observedSettlementTaskId: "legacy-session",
+    purchasedModuleId: "legacy-session",
+  };
+}
 
 /**
  * Worker messages are structured-cloned runtime input, not TypeScript values.
@@ -395,14 +462,16 @@ export function calculateMetrics(
     1,
   );
   const hasModelStage = selectedModules.some((item) => item.role === "model");
+  const pipelineReliability =
+    moduleReliability *
+      selectedHardware.reliability *
+      orderFactor *
+      (memoryPressure > 1 ? 1 / memoryPressure : 1) +
+    activeTier.reliabilityBonus +
+    quantizationReliabilityBonus;
   const reliability = hasModelStage
     ? clamp(
-        moduleReliability *
-          selectedHardware.reliability *
-          orderFactor *
-          (memoryPressure > 1 ? 1 / memoryPressure : 1) +
-          activeTier.reliabilityBonus +
-          quantizationReliabilityBonus,
+        pipelineReliability * (workload.deliveryReliabilityMultiplier ?? 1),
         0.01,
         0.999,
       )
@@ -1530,10 +1599,14 @@ export function getWorkloadQuote(
     (isFiniteNumber(additionalReservations)
       ? Math.max(0, Math.trunc(additionalReservations))
       : 0);
+  const reservationCount = Math.max(0, Math.trunc(pendingReservations));
+  // A long burst reserves a finite local demand window. The increasing term
+  // makes a ten-job convenience queue legible but not a free dominant route;
+  // each accepted task still locks this exact displayed quote.
   const reservationPressure =
-    Math.max(0, Math.trunc(pendingReservations)) *
-    workload.saturationPerSuccess *
-    0.45;
+    reservationCount *
+    (1 + Math.max(0, reservationCount - 1)) *
+    workload.saturationPerSuccess;
   const effectiveLevel = clamp(demand.level - reservationPressure, 0, 1);
   const grossQuote = round(
     workload.minimumQuote +
@@ -1544,8 +1617,8 @@ export function getWorkloadQuote(
   const trend =
     difference > 0.004 ? "rising" : difference < -0.004 ? "falling" : "steady";
   const reason =
-    pendingReservations > 0
-      ? `${pendingReservations} accepted ${pendingReservations === 1 ? "task reserves" : "tasks reserve"} nearby demand; every task keeps its own quote.`
+    reservationCount > 0
+      ? `${reservationCount} accepted ${reservationCount === 1 ? "task reserves" : "tasks reserve"} nearby demand; later reservations fall faster, and every task keeps its own quote.`
       : trend === "falling"
         ? "Recent successful completions saturated this workload."
         : trend === "rising"
@@ -1697,6 +1770,7 @@ export function createInitialState(seed = 20260715): SimulationState {
     resources: { money: 0, timeHours: 4, electricityKwh: 0, reputation: 0 },
     career: createInitialCareerState(),
     meta: createInitialMetaProgression(),
+    firstSession: createInitialFirstSessionProgress(),
     jobs: {
       queued: 0,
       completed: 0,
@@ -1726,6 +1800,21 @@ export function createInitialState(seed = 20260715): SimulationState {
         "Pipeline initialized. Queue a workload, observe, then reconfigure.",
     }),
   );
+}
+
+/**
+ * Deterministic scenario fixture for balance tools and non-onboarding tests.
+ * Production startup always uses createInitialState(), whose durable rail is
+ * guarded by applyCommand. This fixture models an established pre-guide run
+ * without adding a production command that could skip player progression.
+ */
+export function createEstablishedScenarioState(
+  seed = 20260715,
+): SimulationState {
+  return sealSimulationState({
+    ...createInitialState(seed),
+    firstSession: legacyFirstSessionProgress(),
+  });
 }
 
 function updateSlots(
@@ -1841,6 +1930,14 @@ function applyValidCommand(
         baselineMetrics: previous,
         baselineLabel: "Before module change",
         failedModuleId: null,
+        firstSession:
+          state.firstSession.step === "buy-and-install" &&
+          state.firstSession.purchasedModuleId === module.id
+            ? {
+                ...state.firstSession,
+                step: "complete",
+              }
+            : state.firstSession,
       });
       return withUpgradeNotice(next, {
         kind: "info",
@@ -1964,21 +2061,27 @@ function applyValidCommand(
           kind: "warning",
           message: `${item.name} costs $${item.purchaseCost.toFixed(2)}; $${(item.purchaseCost - state.resources.money).toFixed(2)} more is required. No money was deducted.`,
         });
+      const purchased = {
+        ...state,
+        ownedModuleIds: [...state.ownedModuleIds, item.id],
+        resources: {
+          ...state.resources,
+          money: round(state.resources.money - item.purchaseCost, 3),
+        },
+        firstSession:
+          state.firstSession.step === "buy-and-install" &&
+          state.firstSession.purchasedModuleId === null
+            ? {
+                ...state.firstSession,
+                purchasedModuleId: item.id,
+              }
+            : state.firstSession,
+      };
       return recordCapitalCommitment(
-        withUpgradeNotice(
-          {
-            ...state,
-            ownedModuleIds: [...state.ownedModuleIds, item.id],
-            resources: {
-              ...state.resources,
-              money: round(state.resources.money - item.purchaseCost, 3),
-            },
-          },
-          {
-            kind: "success",
-            message: `${item.name} purchased for $${item.purchaseCost.toFixed(2)} and is now owned. Add it to a compatible ${item.slotTypes.join("/")} slot in Build; purchase deducted exactly once.`,
-          },
-        ),
+        withUpgradeNotice(purchased, {
+          kind: "success",
+          message: `${item.name} purchased for $${item.purchaseCost.toFixed(2)} and is now owned. Add it to a compatible ${item.slotTypes.join("/")} slot in Build; purchase deducted exactly once.`,
+        }),
         item.purchaseCost,
       );
     }
@@ -2119,6 +2222,21 @@ function applyValidCommand(
     }
     case "QUEUE_JOBS": {
       const requested = clamp(Math.trunc(command.count), 1, 50);
+      if (state.firstSession.step === "observe-settlement")
+        return appendEvent(state, {
+          kind: "warning",
+          message:
+            "First-session route: let the accepted Interactive Chat job settle before queueing more work.",
+        });
+      if (
+        state.firstSession.step === "queue-starter" &&
+        (state.workloadId !== "interactive-chat" || requested !== 1)
+      )
+        return appendEvent(state, {
+          kind: "warning",
+          message:
+            "First-session route: queue one Interactive Chat job from the guided Jobs action before using other workload or batch controls.",
+        });
       const count = Math.min(requested, MAX_QUEUED_TASKS - state.jobs.queued);
       if (count <= 0) return state;
       const tasks: QueuedTask[] = Array.from({ length: count }, (_, index) => {
@@ -2135,6 +2253,16 @@ function applyValidCommand(
       return appendEvent(
         {
           ...state,
+          firstSession:
+            state.firstSession.step === "queue-starter" &&
+            state.workloadId === "interactive-chat" &&
+            count === 1
+              ? {
+                  ...state.firstSession,
+                  step: "observe-settlement",
+                  starterTaskId: tasks[0]?.id ?? null,
+                }
+              : state.firstSession,
           jobs: {
             ...state.jobs,
             queued: state.jobs.queued + count,
@@ -2895,6 +3023,15 @@ function advanceTickQuantum(
           sample.value * (1 - taskMetrics.reliability + 0.001),
         )
       : null,
+    firstSession:
+      next.firstSession.step === "observe-settlement" &&
+      next.firstSession.starterTaskId === task.id
+        ? {
+            ...next.firstSession,
+            step: "buy-and-install",
+            observedSettlementTaskId: task.id,
+          }
+        : next.firstSession,
     lastSettlement: {
       tick: next.tick,
       workloadId: task.workloadId,
@@ -3570,6 +3707,7 @@ function isStateStructurallyValid(value: unknown): value is SimulationState {
       ) &&
       isCareerStateValid(state.career) &&
       isMetaProgressionValid(state.meta) &&
+      isFirstSessionProgressValid(state.firstSession) &&
       nonnegativeIntegers.every(
         (value) => Number.isSafeInteger(value) && value >= 0,
       ) &&
@@ -3740,6 +3878,12 @@ export function restoreSimulationState(
   if (typeof value !== "object" || value === null) return fallback;
   const record = value as Record<string, unknown>;
   if (record.schemaVersion === SCHEMA_VERSION) {
+    const storedFirstSession = record.firstSession;
+    if (
+      storedFirstSession !== undefined &&
+      !isFirstSessionProgressValid(storedFirstSession)
+    )
+      return fallback;
     const originalIntegrityValid =
       isIntegrityShapeValid(record.integrity) &&
       hasValidStateIntegrity(record as unknown as SimulationState);
@@ -3751,11 +3895,17 @@ export function restoreSimulationState(
         };
     let candidate = {
       ...record,
+      firstSession: storedFirstSession ?? legacyFirstSessionProgress(),
       migration,
       integrity: isIntegrityShapeValid(record.integrity)
         ? record.integrity
         : EMPTY_INTEGRITY,
     } as unknown as SimulationState;
+    if (storedFirstSession === undefined)
+      migration = withMigrationStep(
+        migration,
+        "schema-v7-first-session-guide-added",
+      );
     const structurallyValid = isStateStructurallyValid(candidate);
     const career =
       typeof candidate.career === "object" && candidate.career !== null
@@ -3868,9 +4018,13 @@ export function restoreSimulationState(
     const inheritedMigration = isMigrationMetadataValid(record.migration)
       ? record.migration
       : { sourceSchemaVersion: 6, steps: [] };
-    const migration = withMigrationStep(
+    let migration = withMigrationStep(
       inheritedMigration,
       "schema-6-to-7-evaluation-replay",
+    );
+    migration = withMigrationStep(
+      migration,
+      "schema-v7-first-session-guide-added",
     );
     const legacyCareer =
       typeof record.career === "object" && record.career !== null
@@ -3882,6 +4036,7 @@ export function restoreSimulationState(
       contentVersion: CONTENT_VERSION,
       migration,
       integrity: EMPTY_INTEGRITY,
+      firstSession: legacyFirstSessionProgress(),
       career: {
         ...legacyCareer,
         evaluation: createInitialEvaluationState(),
@@ -3902,12 +4057,17 @@ export function restoreSimulationState(
       "schema-5-to-6-bedroom-career",
     );
     migration = withMigrationStep(migration, "schema-6-to-7-evaluation-replay");
+    migration = withMigrationStep(
+      migration,
+      "schema-v7-first-session-guide-added",
+    );
     const candidate = {
       ...record,
       schemaVersion: SCHEMA_VERSION,
       contentVersion: CONTENT_VERSION,
       migration,
       integrity: EMPTY_INTEGRITY,
+      firstSession: legacyFirstSessionProgress(),
       career: createInitialCareerState(),
       meta: createInitialMetaProgression(),
     } as unknown as SimulationState;
@@ -3976,8 +4136,10 @@ export function restoreSimulationState(
       steps: [
         `schema-${legacySchema}-to-6-bedroom-career`,
         "schema-6-to-7-evaluation-replay",
+        "schema-v7-first-session-guide-added",
       ],
     },
+    firstSession: legacyFirstSessionProgress(),
     rngState: normalizeSeed(finiteOr(record.rngState, seed)),
     tick: Math.min(
       Number.MAX_SAFE_INTEGER,

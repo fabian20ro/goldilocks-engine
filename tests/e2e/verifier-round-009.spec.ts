@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { placeLibraryModule, settleStarterJob } from "./helpers";
 
 test.describe("verifier round 009 comprehension boundaries", () => {
   test("Quick Start explicitly maps thermal pressure to its valid control", async ({
@@ -19,11 +20,15 @@ test.describe("verifier round 009 comprehension boundaries", () => {
   }) => {
     await page.setViewportSize({ width: 393, height: 850 });
     await page.goto("/");
-    await page.locator('.module-library [data-module-id="full-model"]').click();
-    await page
-      .getByTestId("slot-runtime")
-      .getByRole("button", { name: "Snap here" })
-      .click();
+    await page.getByRole("button", { name: "Jobs" }).click();
+    await settleStarterJob(page);
+    await page.getByRole("button", { name: "Build" }).click();
+    await placeLibraryModule(
+      page,
+      "full-model",
+      "Full Precision Model",
+      "runtime",
+    );
     await page.getByRole("button", { name: "Jobs" }).click();
     await page.getByLabel("Memory reserve percentage").fill("0");
     await page.getByRole("button", { name: /Long Document/ }).click();
