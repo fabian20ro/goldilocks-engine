@@ -144,6 +144,53 @@ describe("deterministic simulation engine", () => {
     expect(isStateValid(restored)).toBe(true);
   });
 
+  it("fails closed when an unsealed current save fabricates advanced guide facts", () => {
+    const malformed = structuredClone(createInitialState(706));
+    malformed.ownedModuleIds = [
+      ...malformed.ownedModuleIds,
+      "precision-cleaner",
+    ];
+    malformed.jobs = { ...malformed.jobs, completed: 1 };
+    malformed.firstSession = {
+      step: "complete",
+      starterTaskId: "fabricated-starter",
+      observedSettlementTaskId: "fabricated-starter",
+      purchasedModuleId: "precision-cleaner",
+    };
+
+    const restored = restoreSimulationState(malformed, 706);
+    const bypassAttempt = applyCommand(restored, {
+      type: "QUEUE_JOBS",
+      count: 10,
+    });
+
+    expect(restored.firstSession.step).toBe("queue-starter");
+    expect(restored.ownedModuleIds).not.toContain("precision-cleaner");
+    expect(bypassAttempt.jobs.queued).toBe(0);
+    expect(isStateValid(restored)).toBe(true);
+  });
+
+  it("resets a cleared accepted starter into a durable retry state", () => {
+    let state = createInitialState(707);
+    state = applyCommand(state, { type: "QUEUE_JOBS", count: 1 });
+    state = applyCommand(state, { type: "CLEAR_WAITING_TASKS" });
+    state = restoreSimulationState(JSON.parse(JSON.stringify(state)), 707);
+
+    expect(state.firstSession).toEqual({
+      step: "queue-starter",
+      starterTaskId: null,
+      observedSettlementTaskId: null,
+      purchasedModuleId: null,
+    });
+    expect(state.jobs.activeTask).toBeNull();
+    expect(state.jobs.waitingTasks).toEqual([]);
+
+    const retry = applyCommand(state, { type: "QUEUE_JOBS", count: 1 });
+    expect(retry.jobs.queued).toBe(1);
+    expect(retry.firstSession.step).toBe("observe-settlement");
+    expect(isStateValid(retry)).toBe(true);
+  });
+
   it("rejects an unknown runtime command discriminator as an exact no-op", () => {
     const initial = createInitialState(8);
 

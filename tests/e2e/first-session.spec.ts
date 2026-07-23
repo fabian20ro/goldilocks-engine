@@ -203,6 +203,30 @@ test("touch-drag starts placement only after movement and cancellation changes n
   ).toBe(slotsBefore);
 });
 
+for (const cancellation of ["Escape", "Cancel placement"] as const) {
+  test(`${cancellation} clears pending placement and returns focus to its detail origin`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 393, height: 742 });
+    await page.goto("/");
+    const cleaner = page
+      .getByTestId("slot-prepare")
+      .getByRole("button", { name: /^Basic Cleaner/ });
+    await cleaner.click();
+    await page
+      .getByRole("button", { name: "Place Basic Cleaner in Build" })
+      .click();
+    const cancel = page.getByRole("button", { name: "Cancel placement" });
+    await expect(cancel).toBeVisible();
+
+    if (cancellation === "Escape") await page.keyboard.press("Escape");
+    else await cancel.click();
+
+    await expect(cancel).toHaveCount(0);
+    await expect(cleaner).toBeFocused();
+  });
+}
+
 test("reduced motion records first settlement without an animation-only cue", async ({
   page,
 }) => {

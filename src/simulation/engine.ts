@@ -186,6 +186,88 @@ function legacyFirstSessionProgress(): FirstSessionProgress {
   };
 }
 
+function isLegacyFirstSessionProgress(progress: FirstSessionProgress): boolean {
+  return (
+    progress.step === "complete" &&
+    progress.starterTaskId === "legacy-session" &&
+    progress.observedSettlementTaskId === "legacy-session" &&
+    progress.purchasedModuleId === "legacy-session"
+  );
+}
+
+/**
+ * A guide is persisted player progress, not an authorization flag. Its IDs
+ * must describe reachable simulation facts before a restored state may use
+ * them to relax the first-session command boundary.
+ */
+function hasCoherentFirstSessionProgress(state: SimulationState): boolean {
+  const progress = state.firstSession;
+  if (!isFirstSessionProgressValid(progress)) return false;
+  if (isLegacyFirstSessionProgress(progress)) return true;
+
+  const activeAndWaiting = [
+    ...(state.jobs.activeTask ? [state.jobs.activeTask] : []),
+    ...state.jobs.waitingTasks,
+  ];
+  const starterTask = activeAndWaiting.find(
+    (task) => task.id === progress.starterTaskId,
+  );
+  const hasObservedStarterSettlement =
+    progress.starterTaskId !== null &&
+    progress.observedSettlementTaskId === progress.starterTaskId &&
+    state.jobs.completed + state.jobs.failed > 0;
+  const purchasedModule = progress.purchasedModuleId
+    ? findModule(progress.purchasedModuleId)
+    : undefined;
+  const hasMeaningfulOwnedPurchase =
+    purchasedModule !== undefined &&
+    purchasedModule.purchaseCost > 0 &&
+    state.ownedModuleIds.includes(purchasedModule.id);
+
+  switch (progress.step) {
+    case "queue-starter":
+      return activeAndWaiting.length === 0;
+    case "observe-settlement":
+      return (
+        starterTask !== undefined &&
+        starterTask.workloadId === "interactive-chat" &&
+        activeAndWaiting.length === 1
+      );
+    case "buy-and-install":
+      return (
+        hasObservedStarterSettlement &&
+        (progress.purchasedModuleId === null || hasMeaningfulOwnedPurchase)
+      );
+    case "complete":
+      return hasObservedStarterSettlement && hasMeaningfulOwnedPurchase;
+  }
+}
+
+/**
+ * A current save with a broken integrity seal may be repaired and resealed for
+ * benign persistence damage, but it must not manufacture progress past the
+ * starter rail. Advanced guide stages need a concrete settlement record for
+ * the initial Interactive Chat task before repair can retain that progress.
+ */
+function hasSafeUnsealedFirstSessionProgress(state: SimulationState): boolean {
+  if (!hasCoherentFirstSessionProgress(state)) return false;
+  const progress = state.firstSession;
+  if (
+    progress.step === "queue-starter" ||
+    progress.step === "observe-settlement"
+  )
+    return true;
+  const settlement = state.lastSettlement;
+  return (
+    settlement !== null &&
+    progress.starterTaskId !== null &&
+    progress.observedSettlementTaskId === progress.starterTaskId &&
+    settlement.taskId === progress.starterTaskId &&
+    settlement.workloadId === "interactive-chat" &&
+    settlement.completed + settlement.failed === 1
+  );
+}
+
 /**
  * Worker messages are structured-cloned runtime input, not TypeScript values.
  * Keep the discriminator boundary explicit before an exhaustive command switch.
@@ -2279,9 +2361,18 @@ function applyValidCommand(
     case "CLEAR_WAITING_TASKS": {
       const count = state.jobs.waitingTasks.length;
       if (count === 0) return state;
+      const clearedGuidedStarter =
+        state.firstSession.step === "observe-settlement" &&
+        state.firstSession.starterTaskId !== null &&
+        state.jobs.waitingTasks.some(
+          (task) => task.id === state.firstSession.starterTaskId,
+        );
       return appendEvent(
         {
           ...state,
+          firstSession: clearedGuidedStarter
+            ? createInitialFirstSessionProgress()
+            : state.firstSession,
           jobs: {
             ...state.jobs,
             queued: state.jobs.activeTask ? 1 : 0,
@@ -2290,7 +2381,7 @@ function applyValidCommand(
         },
         {
           kind: "info",
-          message: `${count} waiting task${count === 1 ? "" : "s"} cleared. Active work, accepted demand, money, and payouts were unchanged; no refund or settlement occurred.`,
+          message: `${count} waiting task${count === 1 ? "" : "s"} cleared.${clearedGuidedStarter ? " The first-session guide reset so you can queue one new safe starter." : ""} Active work, accepted demand, money, and payouts were unchanged; no refund or settlement occurred.`,
         },
       );
     }
@@ -3707,7 +3798,6 @@ function isStateStructurallyValid(value: unknown): value is SimulationState {
       ) &&
       isCareerStateValid(state.career) &&
       isMetaProgressionValid(state.meta) &&
-      isFirstSessionProgressValid(state.firstSession) &&
       nonnegativeIntegers.every(
         (value) => Number.isSafeInteger(value) && value >= 0,
       ) &&
@@ -3729,6 +3819,7 @@ function isStateStructurallyValid(value: unknown): value is SimulationState {
       state.jobs.queued ===
         state.jobs.waitingTasks.length + (state.jobs.activeTask ? 1 : 0) &&
       state.jobs.processingCarry === (state.jobs.activeTask?.progress ?? 0) &&
+      hasCoherentFirstSessionProgress(state) &&
       Number.isSafeInteger(state.jobs.nextTaskSequence) &&
       state.jobs.nextTaskSequence >= 1 &&
       new Set(taskIds).size === taskIds.length &&
@@ -3907,6 +3998,13 @@ export function restoreSimulationState(
         "schema-v7-first-session-guide-added",
       );
     const structurallyValid = isStateStructurallyValid(candidate);
+    if (
+      storedFirstSession !== undefined &&
+      !originalIntegrityValid &&
+      structurallyValid &&
+      !hasSafeUnsealedFirstSessionProgress(candidate)
+    )
+      return fallback;
     const career =
       typeof candidate.career === "object" && candidate.career !== null
         ? candidate.career

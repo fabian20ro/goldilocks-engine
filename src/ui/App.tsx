@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -3453,6 +3454,8 @@ export function App() {
   );
   const scrollRegionRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
+  const detailOriginRef = useRef<HTMLElement | null>(null);
+  const placementOriginRef = useRef<HTMLElement | null>(null);
   const tabScrollPositions = useRef<Record<TabId, number>>({
     build: 0,
     jobs: 0,
@@ -3460,6 +3463,23 @@ export function App() {
     upgrades: 0,
     inspect: 0,
   });
+
+  const clearPlacement = useCallback((restoreFocus = false) => {
+    const origin = placementOriginRef.current;
+    placementOriginRef.current = null;
+    setSelected(null);
+    setDrag(null);
+    dragRef.current = null;
+    if (!restoreFocus || !origin) return;
+    requestAnimationFrame(() => {
+      if (origin.isConnected) origin.focus();
+    });
+  }, []);
+
+  const closeDetails = useCallback(() => {
+    detailOriginRef.current = null;
+    setModuleDetail(null);
+  }, []);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -3490,11 +3510,21 @@ export function App() {
       ? compatiblePositionCount(state, selected) > 0
       : false;
     if (!module || !state.ownedModuleIds.includes(module.id) || !compatible) {
-      setSelected(null);
-      dragRef.current = null;
-      setDrag(null);
+      clearPlacement();
     }
-  }, [selected, state]);
+  }, [clearPlacement, selected, state]);
+
+  useEffect(() => {
+    if (!selected) return;
+    const cancelPlacement = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      clearPlacement(true);
+    };
+    document.addEventListener("keydown", cancelPlacement);
+    return () => document.removeEventListener("keydown", cancelPlacement);
+  }, [clearPlacement, selected]);
 
   const selectedName = useMemo(
     () => (selected ? getModule(selected.moduleId).name : null),
@@ -3504,11 +3534,9 @@ export function App() {
   const switchTab = (next: TabId, preservePlacement = false) => {
     const region = scrollRegionRef.current;
     if (region) tabScrollPositions.current[tab] = region.scrollTop;
-    setModuleDetail(null);
+    closeDetails();
     if (next !== "build" || !preservePlacement) {
-      setSelected(null);
-      setDrag(null);
-      dragRef.current = null;
+      clearPlacement();
     }
     setTab(next);
     requestAnimationFrame(() => {
@@ -3521,11 +3549,21 @@ export function App() {
 
   const onOpenDetails = (moduleId: string, fromSlotId?: string) => {
     if (!state.ownedModuleIds.includes(moduleId)) return;
+    detailOriginRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
     setModuleDetail({ moduleId, fromSlotId });
   };
 
   const beginPlacement = (moduleId: string, fromSlotId?: string) => {
     if (!state.ownedModuleIds.includes(moduleId)) return;
+    placementOriginRef.current =
+      detailOriginRef.current ??
+      (document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null);
+    detailOriginRef.current = null;
     setModuleDetail(null);
     setSelected({ moduleId, fromSlotId });
   };
@@ -3538,7 +3576,7 @@ export function App() {
       slotId,
       fromSlotId: selected.fromSlotId,
     });
-    setSelected(null);
+    clearPlacement();
     setModuleDetail(null);
   };
 
@@ -3549,6 +3587,9 @@ export function App() {
   ) => {
     if (event.pointerType === "mouse" && event.button !== 0) return;
     if (!state.ownedModuleIds.includes(moduleId)) return;
+    detailOriginRef.current = null;
+    placementOriginRef.current =
+      event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
     const allowHorizontalPan =
       event.pointerType === "touch" &&
       fromSlotId === undefined &&
@@ -3631,16 +3672,16 @@ export function App() {
         fromSlotId: currentDrag.fromSlotId,
       });
     }
-    dragRef.current = null;
-    setDrag(null);
-    setSelected(null);
+    clearPlacement();
     setModuleDetail(null);
   };
 
   const onPointerCancel = () => {
-    if (dragRef.current?.active) setSelected(null);
-    dragRef.current = null;
-    setDrag(null);
+    if (dragRef.current?.active) clearPlacement();
+    else {
+      dragRef.current = null;
+      setDrag(null);
+    }
   };
 
   const savePreset = () => {
@@ -3746,8 +3787,8 @@ export function App() {
     if (state.branchEnabled !== preset.branchEnabled)
       commands.push({ type: "TOGGLE_BRANCH" });
     commandBatch(commands);
-    setSelected(null);
-    setModuleDetail(null);
+    clearPlacement();
+    closeDetails();
     setTab("build");
   };
 
@@ -3809,9 +3850,9 @@ export function App() {
               selected={selected}
               detail={moduleDetail}
               onOpenDetails={onOpenDetails}
-              onCloseDetails={() => setModuleDetail(null)}
+              onCloseDetails={closeDetails}
               onBeginPlacement={beginPlacement}
-              onCancelPlacement={() => setSelected(null)}
+              onCancelPlacement={() => clearPlacement(true)}
               onDragStart={onDragStart}
               onInstall={onInstall}
               reducedMotion={reducedMotion}
