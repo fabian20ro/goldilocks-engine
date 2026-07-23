@@ -28,6 +28,24 @@ import {
   type SimulationState,
 } from "./types";
 
+function completeFirstSession(seed: number): SimulationState {
+  let state = createInitialState(seed);
+  state = applyCommand(state, { type: "QUEUE_JOBS", count: 1 });
+  state = tick(state, 60);
+  state = applyCommand(
+    {
+      ...state,
+      resources: { ...state.resources, money: 4 },
+    },
+    { type: "BUY_MODULE", moduleId: "precision-cleaner" },
+  );
+  return applyCommand(state, {
+    type: "PLACE_MODULE",
+    moduleId: "precision-cleaner",
+    slotId: "prepare",
+  });
+}
+
 describe("deterministic simulation engine", () => {
   it("creates a valid, operable default pipeline", () => {
     const state = createInitialState(7);
@@ -130,8 +148,11 @@ describe("deterministic simulation engine", () => {
       JSON.stringify(createInitialState(703)),
     ) as Record<string, unknown>;
     delete oldSave.firstSession;
+    const integrityValidPreGuideSave = sealSimulationState(
+      oldSave as unknown as SimulationState,
+    );
 
-    const restored = restoreSimulationState(oldSave, 703);
+    const restored = restoreSimulationState(integrityValidPreGuideSave, 703);
     expect(restored.firstSession).toEqual({
       step: "complete",
       starterTaskId: "legacy-session",
@@ -141,6 +162,84 @@ describe("deterministic simulation engine", () => {
     expect(restored.migration.steps).toContain(
       "schema-v7-first-session-guide-added",
     );
+    expect(isStateValid(restored)).toBe(true);
+  });
+
+  it("fails closed when a current save deletes the first-session guide before resealing", () => {
+    const staleCurrentSave = JSON.parse(
+      JSON.stringify(createInitialState(708)),
+    ) as Record<string, unknown>;
+    delete staleCurrentSave.firstSession;
+
+    const restored = restoreSimulationState(staleCurrentSave, 708);
+    const batchAttempt = applyCommand(restored, {
+      type: "QUEUE_JOBS",
+      count: 10,
+    });
+
+    expect(restored.firstSession.step).toBe("queue-starter");
+    expect(batchAttempt.jobs.queued).toBe(0);
+    expect(isStateValid(restored)).toBe(true);
+  });
+
+  it("requires installed topology to repair an unsealed completed guide", () => {
+    let forged = createInitialState(709);
+    forged = applyCommand(forged, { type: "QUEUE_JOBS", count: 1 });
+    forged = tick(forged, 60);
+    const starterTaskId = forged.firstSession.starterTaskId;
+    forged = {
+      ...forged,
+      ownedModuleIds: [...forged.ownedModuleIds, "precision-cleaner"],
+      firstSession: {
+        step: "complete",
+        starterTaskId,
+        observedSettlementTaskId: starterTaskId,
+        purchasedModuleId: "precision-cleaner",
+      },
+    };
+
+    const restored = restoreSimulationState(forged, 709);
+    const batchAttempt = applyCommand(restored, {
+      type: "QUEUE_JOBS",
+      count: 10,
+    });
+
+    expect(restored.firstSession.step).toBe("queue-starter");
+    expect(restored.ownedModuleIds).not.toContain("precision-cleaner");
+    expect(batchAttempt.jobs.queued).toBe(0);
+  });
+
+  it("repairs an integrity-stale completed guide when its recorded module remains installed", () => {
+    const completed = completeFirstSession(710);
+    const damaged = { ...completed, lastUpgradeNotice: null };
+    const restored = restoreSimulationState(damaged, 710);
+    const batchAttempt = applyCommand(restored, {
+      type: "QUEUE_JOBS",
+      count: 10,
+    });
+
+    expect(restored.firstSession).toMatchObject({
+      step: "complete",
+      purchasedModuleId: "precision-cleaner",
+    });
+    expect(batchAttempt.jobs.queued).toBe(10);
+    expect(isStateValid(restored)).toBe(true);
+  });
+
+  it("keeps a sealed completed guide valid after legitimate later module removal", () => {
+    const completed = completeFirstSession(710);
+    const reconfigured = applyCommand(completed, {
+      type: "REMOVE_MODULE",
+      slotId: "prepare",
+    });
+    const restored = restoreSimulationState(reconfigured, 710);
+
+    expect(reconfigured.firstSession.step).toBe("complete");
+    expect(
+      reconfigured.slots.find((slot) => slot.slotId === "prepare")?.moduleId,
+    ).toBeNull();
+    expect(isStateValid(reconfigured)).toBe(true);
+    expect(restored.firstSession.step).toBe("complete");
     expect(isStateValid(restored)).toBe(true);
   });
 

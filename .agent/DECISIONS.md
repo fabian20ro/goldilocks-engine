@@ -146,3 +146,11 @@
 - **Reason:** The rail is a durable command authorization boundary, so field-shaped state must not convert save repair into a Queue 10 bypass or a restart-persistent deadlock. Cancellation must preserve keyboard continuation after an explicit placement action.
 - **Evidence policy:** Candidate-owned engine tests plus immutable round-039 verifier unit/browser regressions cover fabricated current guide data, clear/reload/retry recovery, Escape, and explicit Cancel at 393px. The canonical verification command remains required.
 - **Reversal condition:** Relax this fail-closed recovery or focus-return rule only through explicit product direction with updated deterministic, persistence, and browser evidence.
+
+## D-016 — Integrity-authoritative completed-guide recovery
+
+- **Decision:** A schema-7 record missing `firstSession` is eligible for the documented pre-guide migration only when its original integrity seal validates before migration supplies the legacy-complete sentinel. An integrity-stale record missing that field falls back to a fresh guided run.
+- **Recovery boundary:** An integrity-stale current record claiming `complete` must corroborate the recorded meaningful paid module through both owned inventory and a compatible currently installed pipeline slot, in addition to D-015's starter settlement evidence. Mere ownership cannot recover the Queue 10 relaxation. A valid original integrity seal remains authoritative historical evidence of the completed buy/install objective, so legitimate later removal or replacement of that module remains valid and reloadable.
+- **Reason:** This separates authentic pre-guide saves and legitimate post-onboarding reconfiguration from field-deletion or ownership-only recovery bypasses, without turning the finite onboarding objective into a permanently pinned pipeline topology.
+- **Evidence policy:** Candidate-owned engine tests and immutable round-040 verifier unit/browser regressions cover stale missing-guide fallback, sealed legacy migration, uninstalled ownership forgery, topology-backed stale recovery, and sealed later reconfiguration. Canonical verification remains required.
+- **Reversal condition:** Change the seal authority, legacy migration, or recovery corroboration rule only through explicit product direction with updated persistence and browser evidence.

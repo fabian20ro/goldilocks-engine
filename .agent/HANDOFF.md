@@ -3,7 +3,7 @@
 ## Implemented behavior summary
 
 - Adds a finite durable rail for a genuinely new run: queue exactly one safe Interactive Chat task, observe its settlement, then buy and explicitly install a meaningful module. The current step survives reload and offline recovery; the completed rail disappears.
-- Enforces the first queue/settlement ordering in `applyCommand`, so direct Worker/runtime callers cannot bypass it with another workload, Queue 10, or a second queue before the starter settles. Current guide state must match reachable task, settlement, and paid-module facts before recovery can reseal it; fabricated or uncorroborated progress falls back safely. Clearing the only waiting starter atomically resets the rail to Queue 1, including after reload.
+- Enforces the first queue/settlement ordering in `applyCommand`, so direct Worker/runtime callers cannot bypass it with another workload, Queue 10, or a second queue before the starter settles. Current guide state must match reachable task and settlement facts before recovery can reseal it; integrity-stale completed state also needs its recorded meaningful paid module in the live pipeline topology. A missing guide migrates as legacy only from an originally integrity-valid pre-guide save. Fabricated or uncorroborated progress falls back safely. Clearing the only waiting starter atomically resets the rail to Queue 1, including after reload.
 - Separates Details from placement. Details only inspects; placement starts only from a named `Place … in Build` action. Build owns the pending tray and Snap targets; Jobs, Career, Inspect, Cancel/Escape, incompatible recovery, and completion clear it without mutating the pipeline. Escape and explicit Cancel return focus to the Build module control that opened Details.
 - Rebalances the early work market: Interactive Chat is reliable immediate income but demand falls quickly under reservations; Batch Classification offers a distinct positive expected route with lower delivery reliability and recoverable demand. Queue 10 and 64× remain available after the initial settlement but are not the dominant pre-purchase policy.
 - Adds restrained settlement/first-fifth-twelfth recognition, exact success/failure accounting, recovery language, and a persisted, dismissible next-affordable target. Reduced-motion mode labels the state immediately and cancels active transitions.
@@ -27,7 +27,8 @@
 - **V-045:** State validation now checks first-session IDs against reachable queue/task, settlement, and paid-module facts. An unsealed advanced current guide also needs a matching recorded Interactive Chat settlement; otherwise restore falls back to the safe Queue 1 rail instead of resealing a Queue 10 bypass.
 - **V-046:** `CLEAR_WAITING_TASKS` detects removal of the accepted waiting starter and atomically returns the guide to `queue-starter`, so serialized/reloaded state accepts a fresh Queue 1 retry.
 - **V-047:** Build placement records its Details-origin control. Escape and explicit Cancel clear the tray/Snap targets and return keyboard focus to that control.
-- Immutable round-039 verifier regressions remain unchanged. Candidate-owned engine and browser cases add coverage rather than weakening regression intent; retained V-009/V-010/V-042/V-043/V-044 and persistence/PWA tests remain in the canonical suite.
+- **V-048:** Missing `firstSession` migrates only when the original schema-7 record has a valid integrity seal; an integrity-stale deletion recovers to the safe Queue 1 rail. An integrity-stale `complete` guide needs the recorded paid module both owned and installed before restore can retain it. Validly sealed completed saves remain authoritative after later legitimate pipeline reconfiguration.
+- Immutable round-039 and round-040 verifier regressions remain unchanged. Candidate-owned engine cases add coverage rather than weakening regression intent; retained V-009/V-010/V-042/V-043/V-044 and persistence/PWA tests remain in the canonical suite.
 
 ## Setup, startup, and verification commands
 
@@ -56,9 +57,9 @@ PLAYWRIGHT_INSTALL_DEPS=1 ./scripts/setup
 Focused commands:
 
 ```sh
-npx vitest run src/simulation/engine.test.ts src/simulation/firstSessionBalance.test.ts --coverage.enabled=false
+npx vitest run src/simulation/engine.test.ts src/simulation/verifierRound039.test.ts src/simulation/verifierRound040.test.ts
 npm run balance:first-session
-E2E_PORT=4174 npm run test:e2e -- tests/e2e/verifier-round-039.spec.ts tests/e2e/first-session.spec.ts --reporter=line
+E2E_PORT=4174 npm run test:e2e -- tests/e2e/verifier-round-039.spec.ts tests/e2e/verifier-round-040.spec.ts tests/e2e/first-session.spec.ts --reporter=line
 ```
 
 Canonical full check:
@@ -78,7 +79,7 @@ E2E_PORT=4174 ./scripts/verify
 ## Important architectural decisions
 
 - `SimulationState.firstSession` records only completed player actions; it grants no money, changes no quote, and queues no work automatically.
-- Old schema-7 saves without a guide remain usable as completed legacy sessions. Field-shaped current guide data must corroborate live pipeline facts; unsealed advanced progress without a matching starter settlement falls back safely rather than manufacturing a partially completed guide.
+- Old schema-7 saves without a guide remain usable as completed legacy sessions only when their original integrity seal validates before migration. Field-shaped current guide data must corroborate live pipeline facts; an integrity-stale completed guide also needs its recorded paid module installed, while a validly sealed completion remains valid after later module removal or replacement.
 - `createEstablishedScenarioState()` is a test/balance fixture, not a UI route or simulation command. It keeps non-onboarding scenarios explicit and reproducible.
 - Pending placement is React view state, never a simulation command. The engine receives only the explicit final `PLACE_MODULE` command.
 - Library touch gestures preserve native horizontal pan until drag direction is unambiguous; placement begins only after the normal movement threshold.
@@ -88,17 +89,19 @@ E2E_PORT=4174 ./scripts/verify
 
 - The guide cannot guarantee a first task succeeds; a failed starter still records the observed settlement and the player can choose subsequent work before affording a module.
 - Existing established saves intentionally do not replay the new onboarding rail.
-- A current save whose integrity is damaged after later guided activity but cannot corroborate its original starter settlement recovers to a fresh guided run rather than risking a bypass; validly sealed long-running saves are unaffected.
+- A current save whose integrity is damaged after later guided activity but cannot corroborate its original starter settlement and, for a completed guide, its installed paid module, recovers to a fresh guided run rather than risking a bypass; validly sealed long-running saves are unaffected.
 - Native emoji rendering, physical touch feel, battery/thermal behavior, non-Chromium engines, and actual screen-reader speech remain environmental residual risks.
 - Local storage denial leaves an in-memory session playable but cannot persist reload state.
 - No Research, characters, creator/fear/audience systems, workforce/startup/laboratory content, extra pipelines, narrative expansion, remote assets, audio, or haptics were added.
 
 ## Checks executed before candidate handoff
 
-- `npx vitest run src/simulation/engine.test.ts src/simulation/verifierRound039.test.ts --coverage.enabled=false` — passed: 2 files / 48 tests.
-- `npm run typecheck`, `npm run lint`, and `npm run format:check` — passed.
-- `E2E_PORT=4174 npm run test:e2e -- tests/e2e/verifier-round-039.spec.ts tests/e2e/first-session.spec.ts --reporter=line` — passed: 12/12 browser cases, including V-045 through V-047 regressions and candidate-owned focus tests.
-- Final `E2E_PORT=4174 ./scripts/verify` — passed, exit 0 (captured in an operating-system temporary log after the first tool stream detached): fresh local setup; format, lint, typecheck; 28 unit/property files / 139 tests; numeric prototype; first-session 41/0, upgrades 20,001/0 (worst module at 4 successful jobs, rig at 15), progression 41/0, Career 101/0, and evaluation 121/0; production build; 133/133 root Playwright cases; 2/2 Pages/offline cases.
+- `npx vitest run src/simulation/engine.test.ts src/simulation/verifierRound039.test.ts src/simulation/verifierRound040.test.ts` — passed: 3 files / 55 tests.
+- `npx vitest run src/simulation/verifierRound031.test.ts --coverage.enabled=false` — passed: 1 file / 5 tests.
+- `npm run test` — passed: 29 unit/property files / 146 tests. `npm run typecheck` and `npx prettier --check src/simulation/engine.ts src/simulation/engine.test.ts` also passed.
+- `E2E_PORT=4174 npm run test:e2e -- tests/e2e/verifier-round-039.spec.ts tests/e2e/verifier-round-040.spec.ts tests/e2e/first-session.spec.ts --reporter=line` — passed: 16/16 browser cases, including V-045 through V-048 regressions and candidate-owned onboarding coverage.
+- One earlier canonical attempt overlapped other streamed runs and timed out the existing round-031 deterministic test at 5.624 seconds. It was not accepted as evidence. After confirming no lingering verification process and rerunning that test plus the whole unit suite cleanly, one isolated canonical run passed.
+- Final `E2E_PORT=4174 ./scripts/verify` — passed, exit 0 (isolated host run captured in an operating-system temporary log): fresh local setup; format, lint, typecheck; 29 unit/property files / 146 tests; numeric prototype; first-session 41/0, upgrades 20,001/0 (worst module at 4 successful jobs, rig at 15), progression 41/0, Career 101/0, and evaluation 121/0; production build; 137/137 root Playwright cases; 2/2 Pages/offline cases.
 
 ## Checks not run
 

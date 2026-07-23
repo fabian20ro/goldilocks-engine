@@ -244,6 +244,26 @@ function hasCoherentFirstSessionProgress(state: SimulationState): boolean {
 }
 
 /**
+ * An intact save seal is authoritative historical evidence that the player
+ * explicitly installed the recorded module. A damaged current save has no
+ * such proof, so its completed guide needs the live topology as corroboration
+ * before recovery may retain the Queue 10 boundary relaxation.
+ */
+function hasInstalledFirstSessionPurchase(state: SimulationState): boolean {
+  const progress = state.firstSession;
+  const purchasedModule = progress.purchasedModuleId
+    ? findModule(progress.purchasedModuleId)
+    : undefined;
+  return (
+    progress.step === "complete" &&
+    purchasedModule !== undefined &&
+    purchasedModule.purchaseCost > 0 &&
+    state.ownedModuleIds.includes(purchasedModule.id) &&
+    state.slots.some((slot) => slot.moduleId === purchasedModule.id)
+  );
+}
+
+/**
  * A current save with a broken integrity seal may be repaired and resealed for
  * benign persistence damage, but it must not manufacture progress past the
  * starter rail. Advanced guide stages need a concrete settlement record for
@@ -262,6 +282,7 @@ function hasSafeUnsealedFirstSessionProgress(state: SimulationState): boolean {
     settlement !== null &&
     progress.starterTaskId !== null &&
     progress.observedSettlementTaskId === progress.starterTaskId &&
+    (progress.step !== "complete" || hasInstalledFirstSessionPurchase(state)) &&
     settlement.taskId === progress.starterTaskId &&
     settlement.workloadId === "interactive-chat" &&
     settlement.completed + settlement.failed === 1
@@ -3978,6 +3999,11 @@ export function restoreSimulationState(
     const originalIntegrityValid =
       isIntegrityShapeValid(record.integrity) &&
       hasValidStateIntegrity(record as unknown as SimulationState);
+    // Missing guide state is a documented pre-guide schema-7 migration only
+    // when the original record proves it was not deleted after persistence.
+    // Do this before substituting the legacy-complete sentinel below.
+    if (storedFirstSession === undefined && !originalIntegrityValid)
+      return fallback;
     let migration = isMigrationMetadataValid(record.migration)
       ? record.migration
       : {
