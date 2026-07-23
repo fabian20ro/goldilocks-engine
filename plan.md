@@ -1126,9 +1126,10 @@ Build is the editing presentation of that rail:
   stage; destructive/contextual actions appear only for the selected item.
 - The module inventory groups or filters owned/equipped, purchasable, and locked
   content so the next valid choice is not buried in a complete catalogue.
-- Selecting an owned module from Upgrades leaves an explicit, accessible pending
-  selection and a labeled Build-tab indication without silently violating the
-  bottom-navigation-only routing rule.
+- Activating an explicit placement action for an owned module in Upgrades leaves
+  an accessible pending transaction and labeled Build-tab indication for the
+  direct Upgrades-to-Build handoff. Opening item Details alone never starts
+  placement, and section 20.6 governs cancellation and unrelated navigation.
 
 Run is an observation presentation of the same rail, not a new simulation mode
 or manual per-stage stepping mechanic:
@@ -1274,6 +1275,143 @@ Completion evidence:
 > portrait loop; accurate item-level details; a pipe-free single ordered
 > Workstation expansion; preserved simulation/persistence/PWA behavior; and the
 > complete canonical verification gate.
+
+### 20.6 Owner-authorized first-session management refinement
+
+The deployed command deck is accepted as the coherent visual and interaction
+foundation. The dated expert observation in
+`.agent/playtests/2026-07-23-command-deck-ux-expert.md` records no P0 defect,
+rates consistency `8/10`, and identifies weaker early fun (`5.5/10`) and return
+pull (`4.5/10`). Treat those scores as one bounded expert heuristic, not
+population evidence or a replacement for automated acceptance.
+
+Complete this refinement before Milestone 4 Research. It may change current
+onboarding, UI state ownership, early workload/contract balance, summaries, and
+localized feedback. It must preserve quote locking, exact settlement
+accounting, advance risk disclosure, deterministic simulation, causal evidence,
+the one-pipeline topology, the shared command-deck grammar, and every
+persistence/PWA contract.
+
+#### First-session action rail
+
+- Stage the first session as three visible, sequential objectives: queue one
+  safe starter job, observe its settlement, then buy and install one meaningful
+  module.
+- Before the first settlement, emphasize only the current step and its reason.
+  Keep advanced explanations available through the existing Help and item
+  Details surfaces rather than deleting them.
+- Respect bottom-navigation-only routing. A first-step prompt may highlight the
+  Jobs tab and the selected Queue 1 action, but must not add a duplicate
+  cross-page navigation button.
+- After each step, replace it with the next objective and a concise explanation
+  of what changed. The rail is finite onboarding, not a permanent quest feed.
+- The first-session rail must resume accurately after reload/offline recovery
+  and must never duplicate a payout, purchase, installation, or simulation
+  command.
+
+#### Inspection versus placement
+
+- Opening module or upgrade Details never starts placement.
+- Placement begins only from an explicit, accurately named action such as
+  `Place in Build`.
+- An explicit selection made in Upgrades may survive the direct
+  Upgrades-to-Build handoff so the Build tab can expose compatible positions.
+- Entering Jobs, Career, or Inspect; completing placement; activating Cancel; or
+  restoring an incompatible save clears the pending placement transaction and
+  every Snap target.
+- While placement is active, Build owns one compact sticky tray naming the
+  module, compatible-position count, and Cancel action. Other views show no
+  placement controls. The Build badge indicates only an actual pending
+  placement transaction, never ordinary item inspection.
+- Tap, keyboard, and touch-drag paths remain equivalent. Cancellation and tab
+  switching do not mutate the pipeline.
+
+#### Early decision cadence and viable forks
+
+- Before the first meaningful module purchase, expose at least two materially
+  viable and forecastable operational routes. They may use existing workloads,
+  bounded contract modifiers, demand timing, or configuration choices; they do
+  not require a new currency, resource, pipeline, or navigation destination.
+- At least one route favors reliable immediate income. At least one alternative
+  offers a distinct positive expected payoff with an honest, recoverable
+  constraint such as pressure, evidence, latency, demand, or operating cost.
+- Do not present every alternative to the safe starter route as guaranteed loss.
+  A warning may identify risk but must distinguish unfavorable, conditionally
+  viable, and impossible-on-current-configuration outcomes.
+- Queue 10 and 64x remain supported conveniences, but repeatedly batching the
+  initial safe job with no reconfiguration or workload decision must not remain
+  the universally dominant route through the first meaningful purchase.
+- Demand saturation/recovery remains deterministic and visible. It should create
+  a reason to reconsider the next job without becoming a hidden punishment or
+  forcing time-critical tapping.
+- Failure recovery remains player-directed. A contextual suggestion may name a
+  viable recovery action and its forecast, but never auto-queue, auto-spend, or
+  suppress the loss.
+
+#### Scan hierarchy and accounting
+
+- Each default workload, module, upgrade, and Career card leads with one primary
+  decision metric and plain outcome language.
+- Compact money summaries use a consistent human-readable currency precision.
+  Exact internal amounts, quote bases, configured cost, net settlement, and
+  rounding qualification remain available in Details, Inspect, and the
+  settlement ledger.
+- Secondary compute, memory, pressure, evidence, reliability, and causal values
+  remain live and accessible through Details. Simplifying the summary must not
+  hide a warning, uncertainty, incompatibility, or material tradeoff.
+- Preserve the current expert-friendly density in Inspect; do not move the
+  complete spreadsheet back into every primary card.
+
+#### Restrained reward and progress feedback
+
+- Give successful settlement a short localized visual/emoji pulse linking the
+  completed job, money change, demand change, and next affordable target.
+- Add presentation-only recognition at the first, fifth, and twelfth successful
+  jobs. These milestones grant no hidden money, quality, reputation, or
+  progression bonus unless a later explicit design decision authorizes one.
+- Show progress toward the next currently useful affordable purchase using live
+  price and money values. The player can change or dismiss the target; the UI
+  does not claim one objectively correct upgrade.
+- Failure feedback remains visually distinct and immediately names gross payout,
+  paid cost, direct cause or uncertainty, and one optional recovery forecast.
+- Reduced motion replaces pulses or movement with an immediate labeled state
+  change. Do not add casino-style particles, streak pressure, loot-box
+  presentation, audio dependence, or time-critical input.
+
+#### Scope and acceptance
+
+- No new researcher, creator, fear, audience, workforce, startup, laboratory,
+  extra-pipeline, or narrative system is part of this refinement.
+- If bounded contract modifiers are used to create viable forks, they reuse
+  current workload identity, locked-quote settlement, demand, configured cost,
+  Worker commands, and ledger semantics. Version and migrate any durable state.
+- Deterministic scenarios demonstrate two viable pre-purchase routes, no
+  universally dominant no-intervention safe-job batching policy, honest
+  forecast labels, and recovery after a deliberately accepted loss.
+- Component/browser tests prove Details never creates placement; explicit
+  Upgrades-to-Build placement survives only its intended handoff; Jobs, Career,
+  and Inspect clear placement without pipeline mutation; Cancel/Escape restore
+  focus; reload/offline/malformed state recovers safely.
+- Pinned Playwright at 320x693 and 393x742 plus 200% text proves the current
+  onboarding step, selected Queue 1 action, Build placement tray, primary card
+  metric, next-affordable progress, and settlement feedback remain readable,
+  reachable, and free of horizontal overflow.
+- Existing deterministic, balance, migration, ending/replay, accessibility,
+  root/Pages, PWA update/recovery, and canonical checks remain green.
+- When a fresh independent game-UX playthrough is run, it should exercise queue,
+  settlement, first purchase, placement, a failed alternative, recovery, and all
+  five tabs. Its findings and ratings are optional diagnostic evidence under
+  D-009, never an advancement or numeric release gate.
+- A fresh independent Verifier PASS and successful exact-SHA deployment remain
+  mandatory.
+
+Completion evidence:
+
+> Deterministic and browser evidence demonstrates an action-forward first
+> session, Build-scoped placement, at least two forecastable viable routes before
+> the first purchase, legible summaries with exact details preserved, and
+> restrained progress feedback. Optional expert playthroughs may refine these
+> requirements but are not required to establish completion.
 
 ---
 
@@ -1712,6 +1850,26 @@ Most important post-run prompt:
 
 Compare the player's explanation with the simulation's supported explanation. A mismatch signals communication or causal-model failure.
 
+### 28.1 Accepted 2026-07-23 command-deck observation
+
+The immutable observation is
+`.agent/playtests/2026-07-23-command-deck-ux-expert.md`. It is an AI-assisted
+expert heuristic session on the deployed accepted build, not a representative
+human sample. It observed the complete current navigation, eleven successful
+starter jobs, one purchase/install, one forecast failure, recovery, and Inspect.
+
+Accepted product signals:
+
+- Preserve the coherent terminal identity, locked quotes, transparent
+  settlement, explicit speed semantics, warnings, equipment deltas, and causal
+  evidence.
+- Address P1 safe-batching dominance, cross-tab placement leakage, and
+  explanation-heavy onboarding before Research.
+- Address P2 initial scan density and restrained settlement feedback without
+  hiding exact values or adopting casino presentation.
+- Do not interpret the `5.5/10` fun or `4.5/10` return-pull ratings as long-term
+  retention measurement. Re-evaluate after the bounded section 20.6 changes.
+
 ---
 
 ## 29. Implementation milestones
@@ -1821,6 +1979,25 @@ Completion evidence:
 
 > Fixed failure/replay scenarios and accessible postmortem assertions show supported causes, uncertainty labels, and at least one materially different viable response.
 
+### Milestone 3.5 — First-session management refinement
+
+Complete section 20.6 before adding Research:
+
+- Three-step queue, settle, buy/install first-session rail
+- Explicit Build-scoped placement separated from Details inspection
+- At least two viable, forecastable pre-purchase operational routes
+- No universally dominant zero-intervention safe-job batching path
+- Simpler default card hierarchy with exact accounting retained in Details
+- Restrained settlement, milestone, recovery, and next-affordable feedback
+
+Completion evidence:
+
+> Deterministic economy scenarios, pinned portrait/browser acceptance, and
+> independent verification demonstrate that the first purchase is reached
+> through meaningful management choices rather than passive batching, while
+> preserving the game's transparent causal and accounting contracts. Optional
+> expert playthroughs supplement this evidence under D-009.
+
 ### Milestone 4 — Research
 
 Add:
@@ -1831,10 +2008,16 @@ Add:
 - First original researcher characters
 - Team collaboration
 - First legendary archetype
+- Short player-authored research goals that leave a clear pending decision
+- Inspect evidence that unlocks or changes strategic options rather than only
+  explaining past outcomes
 
 Completion evidence:
 
-> Deterministic research scenarios demonstrate question-dependent prerequisites, risks, useful failures, and outcomes that cannot be reproduced by undifferentiated point accumulation.
+> Deterministic research scenarios demonstrate question-dependent prerequisites,
+> risks, useful failures, and outcomes that cannot be reproduced by
+> undifferentiated point accumulation; returning players can identify a pending
+> research decision rather than only a resource grind.
 
 ### Milestone 5 — Hype and fear
 
@@ -1935,7 +2118,29 @@ Owner-authorized emoji command-deck rehaul:
 28. Move primary actions above the fold at required portrait sizes and relocate secondary Help, animation, time, accounting, evidence, and catalogue prose into accessible disclosure.
 29. Run component and pinned-browser UX/accessibility/geometry/screenshot evidence plus the complete canonical verification gate.
 
-Do not implement research, creators, fear, workforce, or endgame before the applicable pipeline requirements and automated quality evidence are complete.
+Owner-authorized first-session management refinement:
+
+30. Record the accepted expert observation and preserve the command deck's
+    trust, causal, accounting, and visual strengths as regression requirements.
+31. Implement the finite queue, settle, buy/install first-session rail without
+    duplicate global navigation.
+32. Separate item Details from explicit placement and scope pending placement to
+    the direct Upgrades-to-Build handoff and Build view.
+33. Create at least two deterministic, forecastable, viable pre-purchase routes
+    and rebalance safe Queue 10/64x batching so it is useful but not universally
+    dominant.
+34. Simplify primary card summaries while preserving exact live values,
+    warnings, and qualifications through Details, Inspect, and settlement.
+35. Add restrained settlement, milestone, recovery, and next-affordable
+    feedback with reduced-motion equivalence and no hidden rewards.
+36. Run deterministic decision-cadence/balance scenarios, pinned portrait and
+    PWA browser coverage, canonical verification, fresh independent
+    verification, and exact-SHA deployment; optionally repeat the diagnostic
+    expert playthrough under D-009.
+
+Do not implement research, creators, fear, workforce, or endgame before the
+applicable pipeline requirements, section 20.6 first-session refinement, and
+automated quality evidence are complete.
 
 ---
 
@@ -2055,7 +2260,10 @@ Do not add before first-release automated validation, fresh independent Verifier
 
 ### Compelling thesis, weak game
 
-Mitigation: Pipeline Toy deterministic/balance/browser quality evidence before narrative implementation; optional feedback may prioritize follow-up work.
+Mitigation: Pipeline Toy deterministic/balance/browser quality evidence before
+narrative implementation; section 20.6 explicitly tests early decision cadence,
+viable routes, and the first-purchase loop before Research. Optional feedback
+may prioritize follow-up work.
 
 ### Multiple shallow games
 
@@ -2087,7 +2295,14 @@ Mitigation: durable constraints; replaceable brand/framework content.
 
 ### Portrait UI becomes a dashboard wall
 
-Mitigation: strict main-screen rule and progressive disclosure.
+Mitigation: strict main-screen rule, one primary decision metric per summary,
+exact values in Details/Inspect, and progressive disclosure.
+
+### Fast-forward replaces management
+
+Mitigation: retain fixed deterministic speeds as convenience, but prove at
+least two viable early routes and prevent no-intervention safe-job batching from
+remaining universally dominant through the first meaningful purchase.
 
 ### Idle play punishes absence
 
