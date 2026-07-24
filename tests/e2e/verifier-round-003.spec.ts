@@ -92,11 +92,16 @@ test.describe("verifier round 003 adversarial accessibility", () => {
     await page.getByRole("button", { name: "Jobs" }).click();
     await settleStarterJob(page);
     await page.getByRole("button", { name: /Long Document/ }).click();
+    // settleStarterJob intentionally leaves 64× selected. Freeze it before
+    // constructing this exact stress backlog so real time cannot consume work.
+    await page.getByRole("button", { name: "Pause" }).click();
+    await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
     for (let index = 0; index < 10; index += 1)
       await page.getByRole("button", { name: "Queue 10" }).click();
-    await page.getByRole("button", { name: "Pause" }).click();
     await page.getByRole("button", { name: "Build" }).click();
-    await expect(page.getByLabel(/99 jobs queued at bottleneck/)).toBeVisible();
+    await expect(
+      page.getByLabel(/100 jobs queued at bottleneck/),
+    ).toBeVisible();
 
     for (const view of ["Build", "Jobs", "Inspect"] as const) {
       await page.getByRole("button", { name: view, exact: true }).click();

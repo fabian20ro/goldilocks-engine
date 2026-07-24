@@ -88,6 +88,8 @@ describe("verifier round 031: evaluation evidence boundaries", () => {
     expect(isStateValid(restored)).toBe(true);
   });
 
+  // Keep the complete 17-seed × 120-step corpus: hosted coverage workers can
+  // exceed Vitest's default five-second budget without changing its result.
   it("keeps mixed evaluation, failure, replay, and timing commands deterministic", () => {
     const commands: readonly SimulationCommand[] = [
       { type: "RUN_PUBLIC_EVALUATION" },
@@ -121,7 +123,7 @@ describe("verifier round 031: evaluation evidence boundaries", () => {
 
       expect(play()).toEqual(play());
     }
-  });
+  }, 20_000);
 
   it("freezes an ending within a Worker batch until an explicit reset", () => {
     const switches: SimulationCommand[] = Array.from(
