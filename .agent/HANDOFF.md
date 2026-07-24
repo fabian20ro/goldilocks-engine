@@ -1,7 +1,10 @@
-# Candidate handoff — round 044 Jobs portrait safety reserve
+# Candidate handoff — round 046 verification-stability repair
 
 ## Implemented behavior summary
 
+- No production, simulation, styling, or product-test behavior changes. Preserves
+  the verifier-owned V-054/V-055 determinism repairs while retaining the
+  round-044 product candidate unchanged.
 - Keeps the durable three-step first-session rail: one safe Interactive Chat
   job, its observed settlement, then a meaningful paid module purchase and
   explicit compatible Build installation. The command boundary remains the
@@ -29,6 +32,11 @@
 - Retains the verifier's deterministic 1× + paused active-task clear assertion
   and its independent reload proof for task ID and locked quote. The product
   clear path, time model, and persisted Worker state are unchanged.
+- Keeps the complete 17-seed × 120-step mixed evaluation corpus and every
+  validity/equality assertion under a scoped 20-second Vitest timeout. Keeps
+  the 320px/200%-text dynamic Jobs stress test paused and visibly resumable
+  before its ten Queue 10 actions, yielding an exact 100-job backlog before
+  Build, overflow, and page-error assertions.
 - Preserves Build-scoped explicit placement, Details inspection boundaries,
   Cancel/Escape focus return, Worker authority, touch/drag behavior, exact
   accounting, persistence, PWA/update, Career, evaluation, and replay behavior.
@@ -43,6 +51,7 @@
 | §20.5 Jobs dispatch safety reserve                              | Candidate-owned raw Queue 1/selected-label clearance check at 320×693 and 393×742                               |
 | Explicit Build-only placement and Details boundary              | Build transaction ownership plus Details/Cancel/Escape/touch/focus browser coverage                             |
 | PWA/root/Pages offline and deterministic browser verification   | Pinned Playwright, local ignored caches, root update suite, Pages/offline suite, `scripts/verify`               |
+| §27 reproducible verification stability                         | Scoped V-054 corpus timeout; paused exact-backlog V-055 browser regression; canonical and focused commands      |
 
 ## Verifier findings resolved
 
@@ -62,6 +71,13 @@
 - **V-053:** Retained verifier-owned tests stabilize the active-task assertion
   at 1× with the task paused, then independently prove its ID and locked quote
   survive clear-waiting and reload. Repeated focused coverage remains green.
+- **V-054:** Retains the verifier-owned 20-second timeout only for the complete
+  17-seed × 120-step evaluation corpus. The command schedule, per-step
+  validity checks, and cross-run equality assertions are unchanged.
+- **V-055:** Retains the verifier-owned 320px/200%-text dynamic-content
+  regression that pauses, confirms Resume, queues ten Queue 10 bursts, then
+  verifies an exact 100-job bottleneck backlog before its existing
+  Build/Jobs/Inspect overflow and page-error assertions.
 - Retained V-039, V-040, and V-041 verifier tests/reports remain unchanged.
   Candidate-owned engine and command-deck tests add regression coverage without
   weakening existing checks.
@@ -94,6 +110,8 @@ PLAYWRIGHT_INSTALL_DEPS=1 ./scripts/setup
 Focused recovery, clearance, and portrait regression checks:
 
 ```sh
+npx vitest run --coverage.enabled=false src/simulation/verifierRound031.test.ts --reporter=verbose --testTimeout=5000
+E2E_PORT=4174 npm run test:e2e -- tests/e2e/verifier-round-003.spec.ts --grep 'stressed dynamic content' --repeat-each=20 --reporter=dot
 E2E_PORT=4174 npm run test:e2e -- tests/e2e/jobs-portrait-margin.spec.ts tests/e2e/command-deck.spec.ts tests/e2e/verifier-round-041.spec.ts tests/e2e/verifier-round-043.spec.ts
 E2E_PORT=4174 npm run test:e2e -- tests/e2e/round-015-expansion.spec.ts --grep 'shows eight workloads and preserves accepted task identity while clearing only waiting work' --repeat-each=20
 E2E_PORT=4174 npm run test:e2e -- tests/e2e/jobs-portrait-margin.spec.ts tests/e2e/verifier-round-042.spec.ts tests/e2e/verifier-round-025.spec.ts tests/e2e/verifier-round-026.spec.ts
@@ -132,6 +150,9 @@ E2E_PORT=4174 ./scripts/verify
 - D-018 scopes a short-portrait spacing reserve to Jobs only. The tab-specific
   main-content class avoids changing Build's raw-primary ordering or the normal
   393×742 rhythm; the 8px floor is geometry-tested rather than inferred.
+- V-054 and V-055 are verifier-owned test-determinism changes only: the scoped
+  timeout and pause/Resume sequencing do not alter simulation, persistence, or
+  UI production behavior.
 - `createEstablishedScenarioState()` remains a deterministic test/balance
   fixture only; production startup always uses `createInitialState()`.
 - Pending placement remains React view state. The engine receives only the final
@@ -154,15 +175,14 @@ E2E_PORT=4174 ./scripts/verify
 
 ## Checks executed before candidate handoff
 
-- `npm run format:check`; `npm run lint`; `npm run typecheck` — passed.
-- `E2E_PORT=4174 npm run test:e2e -- tests/e2e/jobs-portrait-margin.spec.ts tests/e2e/command-deck.spec.ts tests/e2e/verifier-round-041.spec.ts tests/e2e/verifier-round-043.spec.ts --reporter=line` — passed: 15/15.
-- `E2E_PORT=4174 npm run test:e2e -- tests/e2e/round-015-expansion.spec.ts --grep 'shows eight workloads and preserves accepted task identity while clearing only waiting work' --repeat-each=20 --reporter=dot` — passed: 20 repeated cases, no failed tests.
-- `E2E_PORT=4174 npm run test:e2e -- tests/e2e/jobs-portrait-margin.spec.ts tests/e2e/verifier-round-042.spec.ts tests/e2e/verifier-round-025.spec.ts tests/e2e/verifier-round-026.spec.ts --reporter=line` — passed: 9/9.
-- Final isolated `E2E_PORT=4174 ./scripts/verify` — passed, exit 0: fresh
-  setup; format, lint, typecheck; 31 unit/property files / 153 tests;
-  first-session 41/0, upgrades 20,001/0, progression 41/0, Career 101/0, and
-  evaluation 121/0; production build; 149/149 root Playwright cases; 2/2
-  Pages/offline cases.
+- `npx vitest run --coverage.enabled=false src/simulation/verifierRound031.test.ts --reporter=verbose --testTimeout=5000` — passed: 5/5;
+  the complete mixed 17×120 corpus completed in 599ms.
+- `E2E_PORT=4174 ./scripts/verify` — setup, format, lint, typecheck,
+  31 unit/property files / 153 tests, first-session 41/0, upgrades 20,001/0,
+  progression 41/0, Career 101/0, evaluation 121/0, and production build
+  completed. It exited 1 when sandboxed pinned Chromium could not register its
+  macOS Mach port before any root or Pages test body ran; this is infrastructure
+  evidence, not a product assertion failure.
 
 ## Checks not run
 
@@ -170,6 +190,7 @@ E2E_PORT=4174 ./scripts/verify
   outside Implementer authority.
 - No physical-device, non-Chromium, battery/thermal, or platform screen-reader
   session; required hardware/services unavailable.
-- Sandboxed Chromium launch is unavailable on this macOS environment because of
-  Mach-port registration. Required repository-pinned Chromium checks above ran
-  with project-local caches through scoped host access.
+- The focused V-055 browser repeat command above did not execute: its scoped
+  host-Chromium request was automatically rejected because the environment
+  usage limit had been reached. Sandboxed Chromium is likewise unavailable on
+  this macOS environment because of Mach-port registration before page creation.
