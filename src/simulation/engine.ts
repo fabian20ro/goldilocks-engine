@@ -264,10 +264,61 @@ function hasInstalledFirstSessionPurchase(state: SimulationState): boolean {
 }
 
 /**
+ * The purchase event is the durable accounting record emitted by BUY_MODULE.
+ * Keep its text in one place: stale-save recovery must verify the same exact
+ * event that the command boundary writes, rather than infer a purchase from
+ * current cash, inventory, or a module's position in the pipeline.
+ */
+function modulePurchaseLedgerMessage(moduleId: string): string | null {
+  const item = findModule(moduleId);
+  if (!item || item.purchaseCost <= 0) return null;
+  return `${item.name} purchased for $${item.purchaseCost.toFixed(2)} and is now owned. Add it to a compatible ${item.slotTypes.join("/")} slot in Build; purchase deducted exactly once.`;
+}
+
+function hasRecordedFirstSessionPurchase(state: SimulationState): boolean {
+  const purchasedModuleId = state.firstSession.purchasedModuleId;
+  if (!purchasedModuleId) return false;
+  const message = modulePurchaseLedgerMessage(purchasedModuleId);
+  return (
+    message !== null &&
+    state.ledger.some(
+      (event) => event.kind === "success" && event.message === message,
+    )
+  );
+}
+
+/**
+ * Settlement events retain the accepted task ID, unlike lastSettlement, which
+ * intentionally advances as later work completes. A damaged save may use this
+ * bounded historical record to repair the starter rail only while that record
+ * is still retained; an intact integrity seal remains authoritative once old
+ * ledger events roll out of the window.
+ */
+function hasRecordedStarterSettlement(
+  state: SimulationState,
+  starterTaskId: string | null,
+): boolean {
+  if (!starterTaskId) return false;
+  const taskPrefix = `${getWorkload("interactive-chat").name} task ${starterTaskId} `;
+  return state.ledger.some(
+    (event) =>
+      (event.kind === "success" &&
+        event.message.startsWith(`${taskPrefix}completed;`)) ||
+      (event.kind === "failure" &&
+        (event.message.startsWith(`${taskPrefix}failed before delivery:`) ||
+          event.message.startsWith(
+            `${taskPrefix}produced unstable output and was rejected.`,
+          ))),
+  );
+}
+
+/**
  * A current save with a broken integrity seal may be repaired and resealed for
  * benign persistence damage, but it must not manufacture progress past the
- * starter rail. Advanced guide stages need a concrete settlement record for
- * the initial Interactive Chat task before repair can retain that progress.
+ * starter rail. Advanced guide stages need retained command/accounting records
+ * for both the starter settlement and any paid first module before repair can
+ * retain that progress. Current inventory, topology, and lastSettlement alone
+ * are all mutable snapshots, not proof that those commands happened.
  */
 function hasSafeUnsealedFirstSessionProgress(state: SimulationState): boolean {
   if (!hasCoherentFirstSessionProgress(state)) return false;
@@ -277,15 +328,19 @@ function hasSafeUnsealedFirstSessionProgress(state: SimulationState): boolean {
     progress.step === "observe-settlement"
   )
     return true;
-  const settlement = state.lastSettlement;
+  const hasStarterSettlement =
+    state.firstSession.starterTaskId !== null &&
+    state.firstSession.observedSettlementTaskId ===
+      state.firstSession.starterTaskId &&
+    hasRecordedStarterSettlement(state, state.firstSession.starterTaskId);
+  if (!hasStarterSettlement) return false;
+  if (
+    state.firstSession.purchasedModuleId !== null &&
+    !hasRecordedFirstSessionPurchase(state)
+  )
+    return false;
   return (
-    settlement !== null &&
-    progress.starterTaskId !== null &&
-    progress.observedSettlementTaskId === progress.starterTaskId &&
-    (progress.step !== "complete" || hasInstalledFirstSessionPurchase(state)) &&
-    settlement.taskId === progress.starterTaskId &&
-    settlement.workloadId === "interactive-chat" &&
-    settlement.completed + settlement.failed === 1
+    progress.step !== "complete" || hasInstalledFirstSessionPurchase(state)
   );
 }
 
@@ -2183,7 +2238,7 @@ function applyValidCommand(
       return recordCapitalCommitment(
         withUpgradeNotice(purchased, {
           kind: "success",
-          message: `${item.name} purchased for $${item.purchaseCost.toFixed(2)} and is now owned. Add it to a compatible ${item.slotTypes.join("/")} slot in Build; purchase deducted exactly once.`,
+          message: modulePurchaseLedgerMessage(item.id)!,
         }),
         item.purchaseCost,
       );

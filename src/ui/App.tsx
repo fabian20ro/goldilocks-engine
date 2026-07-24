@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
+  type ReactNode,
 } from "react";
 import {
   bedroomCareerRoutes,
@@ -591,6 +592,23 @@ function WarningBanner({ state }: { state: SimulationState }) {
   );
 }
 
+function SecondaryControls({
+  state,
+  timeSpeed,
+  onTimeSpeedChange,
+}: {
+  state: SimulationState;
+  timeSpeed: TimeSpeed;
+  onTimeSpeedChange: (speed: number) => void;
+}) {
+  return (
+    <div className="secondary-controls">
+      <TimeSpeedControl value={timeSpeed} onChange={onTimeSpeedChange} />
+      <WarningBanner state={state} />
+    </div>
+  );
+}
+
 function Delta({
   current,
   baseline,
@@ -1037,6 +1055,7 @@ function BuildView({
   onDragStart,
   onInstall,
   reducedMotion,
+  secondaryControls,
 }: {
   state: SimulationState;
   command: (command: SimulationCommand) => void;
@@ -1053,6 +1072,7 @@ function BuildView({
   ) => void;
   onInstall: (slotId: string) => void;
   reducedMotion: boolean;
+  secondaryControls: ReactNode;
 }) {
   const [presentation, setPresentation] = useState<"build" | "run">("build");
   const expansion = pipelineExpansions[0];
@@ -1145,6 +1165,7 @@ function BuildView({
         onInstall={presentation === "build" ? onInstall : () => undefined}
         reducedMotion={reducedMotion}
       />
+      {secondaryControls}
       {presentation === "build" ? (
         <>
           <PlacementTray
@@ -3792,6 +3813,14 @@ export function App() {
     setTab("build");
   };
 
+  const secondaryControls = (
+    <SecondaryControls
+      state={state}
+      timeSpeed={timeSpeed}
+      onTimeSpeedChange={setTimeSpeed}
+    />
+  );
+
   return (
     <div
       className={`app-shell ${reducedMotion ? "motion-reduced" : ""} ${drag?.active ? "dragging" : ""}`}
@@ -3838,10 +3867,9 @@ export function App() {
         </header>
 
         <main id="main-content" className="main-content">
-          <TimeSpeedControl value={timeSpeed} onChange={setTimeSpeed} />
-          <WarningBanner state={state} />
-          <UpgradeFeedback state={state} />
+          {tab !== "build" ? secondaryControls : null}
           <FirstSessionGuide state={state} />
+          <UpgradeFeedback state={state} />
 
           {tab === "build" ? (
             <BuildView
@@ -3856,6 +3884,7 @@ export function App() {
               onDragStart={onDragStart}
               onInstall={onInstall}
               reducedMotion={reducedMotion}
+              secondaryControls={secondaryControls}
             />
           ) : tab === "jobs" ? (
             <JobsView

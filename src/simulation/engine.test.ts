@@ -182,7 +182,7 @@ describe("deterministic simulation engine", () => {
     expect(isStateValid(restored)).toBe(true);
   });
 
-  it("requires installed topology to repair an unsealed completed guide", () => {
+  it("requires a paid purchase ledger record to repair an unsealed installed guide", () => {
     let forged = createInitialState(709);
     forged = applyCommand(forged, { type: "QUEUE_JOBS", count: 1 });
     forged = tick(forged, 60);
@@ -190,6 +190,14 @@ describe("deterministic simulation engine", () => {
     forged = {
       ...forged,
       ownedModuleIds: [...forged.ownedModuleIds, "precision-cleaner"],
+    };
+    forged = applyCommand(forged, {
+      type: "PLACE_MODULE",
+      moduleId: "precision-cleaner",
+      slotId: "prepare",
+    });
+    forged = {
+      ...forged,
       firstSession: {
         step: "complete",
         starterTaskId,
@@ -206,11 +214,18 @@ describe("deterministic simulation engine", () => {
 
     expect(restored.firstSession.step).toBe("queue-starter");
     expect(restored.ownedModuleIds).not.toContain("precision-cleaner");
+    expect(
+      restored.slots.find((slot) => slot.slotId === "prepare")?.moduleId,
+    ).toBe("basic-cleaner");
     expect(batchAttempt.jobs.queued).toBe(0);
   });
 
-  it("repairs an integrity-stale completed guide when its recorded module remains installed", () => {
-    const completed = completeFirstSession(710);
+  it("repairs an integrity-stale completed guide from retained starter and purchase records after later work", () => {
+    let completed = completeFirstSession(710);
+    const starterTaskId = completed.firstSession.starterTaskId;
+    completed = applyCommand(completed, { type: "QUEUE_JOBS", count: 1 });
+    completed = tick(completed, 60);
+    expect(completed.lastSettlement?.taskId).not.toBe(starterTaskId);
     const damaged = { ...completed, lastUpgradeNotice: null };
     const restored = restoreSimulationState(damaged, 710);
     const batchAttempt = applyCommand(restored, {
@@ -223,6 +238,25 @@ describe("deterministic simulation engine", () => {
       purchasedModuleId: "precision-cleaner",
     });
     expect(batchAttempt.jobs.queued).toBe(10);
+    expect(isStateValid(restored)).toBe(true);
+  });
+
+  it("repairs an integrity-stale paid first purchase before explicit installation", () => {
+    let purchased = createInitialState(711);
+    purchased = applyCommand(purchased, { type: "QUEUE_JOBS", count: 1 });
+    purchased = tick(purchased, 60);
+    purchased = applyCommand(
+      { ...purchased, resources: { ...purchased.resources, money: 4 } },
+      { type: "BUY_MODULE", moduleId: "precision-cleaner" },
+    );
+    const damaged = { ...purchased, lastUpgradeNotice: null };
+    const restored = restoreSimulationState(damaged, 711);
+
+    expect(restored.firstSession).toMatchObject({
+      step: "buy-and-install",
+      purchasedModuleId: "precision-cleaner",
+    });
+    expect(restored.ownedModuleIds).toContain("precision-cleaner");
     expect(isStateValid(restored)).toBe(true);
   });
 

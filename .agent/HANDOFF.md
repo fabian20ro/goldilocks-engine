@@ -1,38 +1,60 @@
-# Candidate handoff — first-session management refinement
+# Candidate handoff — round 042 first-session recovery and portrait repair
 
 ## Implemented behavior summary
 
-- Adds a finite durable rail for a genuinely new run: queue exactly one safe Interactive Chat task, observe its settlement, then buy and explicitly install a meaningful module. The current step survives reload and offline recovery; the completed rail disappears.
-- Enforces the first queue/settlement ordering in `applyCommand`, so direct Worker/runtime callers cannot bypass it with another workload, Queue 10, or a second queue before the starter settles. Current guide state must match reachable task and settlement facts before recovery can reseal it; integrity-stale completed state also needs its recorded meaningful paid module in the live pipeline topology. A missing guide migrates as legacy only from an originally integrity-valid pre-guide save. Fabricated or uncorroborated progress falls back safely. Clearing the only waiting starter atomically resets the rail to Queue 1, including after reload.
-- Separates Details from placement. Details only inspects; placement starts only from a named `Place … in Build` action. Build owns the pending tray and Snap targets; Jobs, Career, Inspect, Cancel/Escape, incompatible recovery, and completion clear it without mutating the pipeline. Escape and explicit Cancel return focus to the Build module control that opened Details.
-- Rebalances the early work market: Interactive Chat is reliable immediate income but demand falls quickly under reservations; Batch Classification offers a distinct positive expected route with lower delivery reliability and recoverable demand. Queue 10 and 64× remain available after the initial settlement but are not the dominant pre-purchase policy.
-- Adds restrained settlement/first-fifth-twelfth recognition, exact success/failure accounting, recovery language, and a persisted, dismissible next-affordable target. Reduced-motion mode labels the state immediately and cancels active transitions.
-- Makes module-library horizontal touch panning coexist with explicit vertical/non-horizontal placement drags. A short tap still opens Details; canceled touch drag makes no pipeline change.
-- Adds `createEstablishedScenarioState()` only for deterministic balance/regression scenarios; production startup always uses the guarded `createInitialState()` path.
+- Keeps the durable three-step first-session rail: one safe Interactive Chat
+  job, its observed settlement, then a meaningful paid module purchase and
+  explicit compatible Build installation. The command boundary remains the
+  authority; guide progress survives reload/offline recovery and disappears
+  after completion.
+- Makes integrity-stale recovery ledger-correlated. Advanced guide progress now
+  requires the retained exact starter-settlement record; a named first module
+  additionally requires the exact `BUY_MODULE` accounting record. A stale
+  completed guide still requires that module to be both owned and installed.
+  Mutable cash, inventory, pipeline topology, and later `lastSettlement` are
+  not treated as proof of the required commands.
+- Keeps valid integrity seals authoritative for legacy migration and legitimate
+  later reconfiguration. A stale save whose bounded ledger no longer retains
+  the required onboarding records safely falls back to Queue 1 rather than
+  granting progress.
+- Keeps the normal Build portrait order primary-first: objective and pipeline
+  controls precede time/warning controls. At enlarged text, a container query
+  moves the secondary controls near the header and uses a compact two-column
+  speed grid, keeping every speed button tappable above fixed navigation.
+  Non-Build tabs retain their established top-of-content secondary controls.
+- Preserves Build-scoped explicit placement, Details inspection boundaries,
+  Cancel/Escape focus return, Worker authority, touch/drag behavior, exact
+  accounting, persistence, PWA/update, Career, evaluation, and replay behavior.
 
 ## Plan requirements covered
 
-| Requirement                                                         | Evidence                                                                                                              |
-| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| §20.6/D-013 three-step queue → settlement → buy/install rail        | Durable `firstSession` state, semantic recovery tests, clear/reload/retry tests, and `first-session.spec.ts` coverage |
-| Explicit Build-scoped placement; Details does not place             | `App.tsx` transaction ownership and browser Details/Upgrades/Build/Cancel/Escape/touch/focus tests                    |
-| Two viable forecastable pre-purchase routes; no dominant safe batch | `firstSessionBalance.ts`, 41-seed route sweep, quote/demand UI, 20,001-seed purchase pacing sweep                     |
-| Compact card hierarchy with exact accounting retained               | Workload accessible labels/Details, settlement ledger, money-loop and verifier-round-016 regression                   |
-| Restrained accessible progress/failure/recovery feedback            | `MoneyLoop`, reduced-motion assertions, settlement/failure browser coverage                                           |
-| Portrait/touch/text/reload/offline/PWA regression protection        | Pinned 320/393 and 200%-text Playwright suites; root and Pages offline checks                                         |
-| Independent reproducible verification                               | `scripts/setup`, `scripts/run`, `scripts/verify`, project-pinned Playwright and ignored local caches                  |
+| Requirement                                                     | Evidence                                                                                                        |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| §20.6 / D-013 three-step queue → settlement → buy/install rail  | Durable `firstSession` state; command guards; ledger-correlated recovery; engine, balance, and browser coverage |
+| §20.6 malformed/reload/offline recovery and exact-once purchase | Stale forgery, real purchase, later-work, restore, and browser regressions                                      |
+| §20.5 compact portrait command deck                             | Raw 320×693 and 393×742 geometry; 320/393 touch, text scaling, keyboard, and reduced-motion suites              |
+| Explicit Build-only placement and Details boundary              | Build transaction ownership plus Details/Cancel/Escape/touch/focus browser coverage                             |
+| PWA/root/Pages offline and deterministic browser verification   | Pinned Playwright, local ignored caches, root update suite, Pages/offline suite, `scripts/verify`               |
 
 ## Verifier findings resolved
 
-- **V-045:** State validation now checks first-session IDs against reachable queue/task, settlement, and paid-module facts. An unsealed advanced current guide also needs a matching recorded Interactive Chat settlement; otherwise restore falls back to the safe Queue 1 rail instead of resealing a Queue 10 bypass.
-- **V-046:** `CLEAR_WAITING_TASKS` detects removal of the accepted waiting starter and atomically returns the guide to `queue-starter`, so serialized/reloaded state accepts a fresh Queue 1 retry.
-- **V-047:** Build placement records its Details-origin control. Escape and explicit Cancel clear the tray/Snap targets and return keyboard focus to that control.
-- **V-048:** Missing `firstSession` migrates only when the original schema-7 record has a valid integrity seal; an integrity-stale deletion recovers to the safe Queue 1 rail. An integrity-stale `complete` guide needs the recorded paid module both owned and installed before restore can retain it. Validly sealed completed saves remain authoritative after later legitimate pipeline reconfiguration.
-- Immutable round-039 and round-040 verifier regressions remain unchanged. Candidate-owned engine cases add coverage rather than weakening regression intent; retained V-009/V-010/V-042/V-043/V-044 and persistence/PWA tests remain in the canonical suite.
+- **V-049:** A fabricated owned/installed module no longer validates stale
+  `buy-and-install` or `complete` progress. Recovery requires the exact durable
+  paid-purchase ledger event written by `BUY_MODULE`.
+- **V-050:** Legitimate paid progress no longer depends on mutable
+  `lastSettlement`. Recovery finds the original starter settlement in the
+  ledger, so later jobs do not erase a valid completed rail.
+- **V-051:** The raw initial 320×693 Build view now keeps resource HUD,
+  objective, and first pipeline control above fixed Primary navigation without
+  programmatic scrolling. Jobs retains its initial dispatch/Queue 1 geometry.
+- Retained V-039, V-040, and V-041 verifier tests/reports remain unchanged.
+  Candidate-owned engine and command-deck tests add regression coverage without
+  weakening existing checks.
 
 ## Setup, startup, and verification commands
 
-Prerequisite: Node matching `package.json` (`^20.19.0 || >=22.12.0`). First setup needs network access for the lockfile dependencies and pinned Chromium.
+Prerequisite: Node matching `package.json` (`^20.19.0 || >=22.12.0`). First
+setup needs network access for lockfile dependencies and pinned Chromium.
 
 ```sh
 ./scripts/setup
@@ -54,12 +76,11 @@ For Linux browser libraries when required:
 PLAYWRIGHT_INSTALL_DEPS=1 ./scripts/setup
 ```
 
-Focused commands:
+Focused recovery and portrait regression check:
 
 ```sh
-npx vitest run src/simulation/engine.test.ts src/simulation/verifierRound039.test.ts src/simulation/verifierRound040.test.ts
-npm run balance:first-session
-E2E_PORT=4174 npm run test:e2e -- tests/e2e/verifier-round-039.spec.ts tests/e2e/verifier-round-040.spec.ts tests/e2e/first-session.spec.ts --reporter=line
+npx vitest run src/simulation/engine.test.ts src/simulation/verifierRound039.test.ts src/simulation/verifierRound040.test.ts src/simulation/verifierRound041.test.ts --coverage.enabled=false
+E2E_PORT=4174 npm run test:e2e -- tests/e2e/round-015-expansion.spec.ts tests/e2e/verifier-round-025.spec.ts tests/e2e/verifier-round-026.spec.ts tests/e2e/command-deck.spec.ts tests/e2e/verifier-round-041.spec.ts
 ```
 
 Canonical full check:
@@ -68,7 +89,12 @@ Canonical full check:
 ./scripts/verify
 ```
 
-`./scripts/verify` runs setup, format, lint, typecheck, unit/property coverage, all balance sweeps, production build, root Playwright, and Pages/offline Playwright. Playwright uses project-pinned Chromium from `.cache/ms-playwright`, starts deterministic `127.0.0.1:4173` loopback preview servers, waits for readiness, and cleans them up. No home cache, global package, existing browser profile, or in-app Browser is required.
+`./scripts/verify` runs setup, format, lint, typecheck, unit/property coverage,
+all balance sweeps, production build, root Playwright, and Pages/offline
+Playwright. Playwright uses project-pinned Chromium from
+`.cache/ms-playwright`, starts deterministic `127.0.0.1:4173` loopback preview
+servers, waits for readiness, and cleans them up. No home cache, global package,
+existing browser profile, or in-app Browser is required.
 
 If port 4173 is occupied, use the behaviorally identical explicit override:
 
@@ -78,34 +104,51 @@ E2E_PORT=4174 ./scripts/verify
 
 ## Important architectural decisions
 
-- `SimulationState.firstSession` records only completed player actions; it grants no money, changes no quote, and queues no work automatically.
-- Old schema-7 saves without a guide remain usable as completed legacy sessions only when their original integrity seal validates before migration. Field-shaped current guide data must corroborate live pipeline facts; an integrity-stale completed guide also needs its recorded paid module installed, while a validly sealed completion remains valid after later module removal or replacement.
-- `createEstablishedScenarioState()` is a test/balance fixture, not a UI route or simulation command. It keeps non-onboarding scenarios explicit and reproducible.
-- Pending placement is React view state, never a simulation command. The engine receives only the explicit final `PLACE_MODULE` command.
-- Library touch gestures preserve native horizontal pan until drag direction is unambiguous; placement begins only after the normal movement threshold.
-- Workload quotes remain locked per accepted task. Reservation pressure is deterministic and visible before acceptance; delivery reliability can vary by workload without changing pipeline topology or settlement semantics.
+- `modulePurchaseLedgerMessage()` is the single source for the durable paid
+  purchase event and recovery matcher; command recording and repair cannot drift
+  apart through duplicate formatting.
+- D-017 intentionally trusts a valid integrity seal for historical completed
+  progress, but treats an invalid seal as a bounded-evidence repair problem.
+  If retained proof has rolled out, fail closed to a fresh rail.
+- Time/warning controls form one `SecondaryControls` component. Build renders it
+  after the initial pipeline in normal text; container-query ordering makes its
+  controls reachable at 200% text without changing simulation state or routing.
+- `createEstablishedScenarioState()` remains a deterministic test/balance
+  fixture only; production startup always uses `createInitialState()`.
+- Pending placement remains React view state. The engine receives only the final
+  explicit `PLACE_MODULE` command.
 
 ## Known limitations and risks
 
-- The guide cannot guarantee a first task succeeds; a failed starter still records the observed settlement and the player can choose subsequent work before affording a module.
-- Existing established saves intentionally do not replay the new onboarding rail.
-- A current save whose integrity is damaged after later guided activity but cannot corroborate its original starter settlement and, for a completed guide, its installed paid module, recovers to a fresh guided run rather than risking a bypass; validly sealed long-running saves are unaffected.
-- Native emoji rendering, physical touch feel, battery/thermal behavior, non-Chromium engines, and actual screen-reader speech remain environmental residual risks.
-- Local storage denial leaves an in-memory session playable but cannot persist reload state.
-- No Research, characters, creator/fear/audience systems, workforce/startup/laboratory content, extra pipelines, narrative expansion, remote assets, audio, or haptics were added.
+- A stale damaged save whose required bounded ledger records have rolled out
+  resets to a fresh guided run; validly sealed long-running saves remain valid.
+- The guide cannot guarantee a starter success. Failed starter settlement still
+  records the observed outcome and permits later work before a module is
+  affordable.
+- Native emoji rendering, physical touch feel, battery/thermal behavior,
+  non-Chromium engines, actual screen-reader speech, and local-storage denial
+  remain environmental residual risks. Storage denial leaves an in-memory
+  session playable but cannot persist reload state.
+- No Research, characters, creator/fear/audience systems, workforce/startup/
+  laboratory content, extra pipelines, narrative expansion, remote assets,
+  audio, or haptics were added.
 
 ## Checks executed before candidate handoff
 
-- `npx vitest run src/simulation/engine.test.ts src/simulation/verifierRound039.test.ts src/simulation/verifierRound040.test.ts` — passed: 3 files / 55 tests.
-- `npx vitest run src/simulation/verifierRound031.test.ts --coverage.enabled=false` — passed: 1 file / 5 tests.
-- `npm run test` — passed: 29 unit/property files / 146 tests. `npm run typecheck` and `npx prettier --check src/simulation/engine.ts src/simulation/engine.test.ts` also passed.
-- `E2E_PORT=4174 npm run test:e2e -- tests/e2e/verifier-round-039.spec.ts tests/e2e/verifier-round-040.spec.ts tests/e2e/first-session.spec.ts --reporter=line` — passed: 16/16 browser cases, including V-045 through V-048 regressions and candidate-owned onboarding coverage.
-- One earlier canonical attempt overlapped other streamed runs and timed out the existing round-031 deterministic test at 5.624 seconds. It was not accepted as evidence. After confirming no lingering verification process and rerunning that test plus the whole unit suite cleanly, one isolated canonical run passed.
-- Final `E2E_PORT=4174 ./scripts/verify` — passed, exit 0 (isolated host run captured in an operating-system temporary log): fresh local setup; format, lint, typecheck; 29 unit/property files / 146 tests; numeric prototype; first-session 41/0, upgrades 20,001/0 (worst module at 4 successful jobs, rig at 15), progression 41/0, Career 101/0, and evaluation 121/0; production build; 137/137 root Playwright cases; 2/2 Pages/offline cases.
+- `npx vitest run src/simulation/engine.test.ts src/simulation/verifierRound039.test.ts src/simulation/verifierRound040.test.ts src/simulation/verifierRound041.test.ts --coverage.enabled=false` — passed: 4 files / 59 tests.
+- `npm run typecheck` — passed.
+- `E2E_PORT=4174 npm run test:e2e -- tests/e2e/round-015-expansion.spec.ts tests/e2e/verifier-round-025.spec.ts tests/e2e/verifier-round-026.spec.ts tests/e2e/command-deck.spec.ts tests/e2e/verifier-round-041.spec.ts` — passed: 20/20 browser cases.
+- Final isolated `E2E_PORT=4174 ./scripts/verify` — passed, exit 0: fresh local setup; format, lint, typecheck; 30 unit/property files / 150 tests; first-session 41/0, upgrades 20,001/0, progression 41/0, Career 101/0, evaluation 121/0; production build; 143/143 root Playwright cases; 2/2 Pages/offline cases.
+- An earlier pre-fix canonical run exited 1 for V-026 geometry and the affected
+  round-015 clear-queue flow. It is not evidence for this candidate; the final
+  isolated run above was completed after correction.
 
 ## Checks not run
 
-- No push, deployment, live public URL validation, or GitHub Actions run; outside Implementer authority.
-- No physical-device, non-Chromium, battery/thermal, or platform screen-reader session; required hardware/services unavailable.
-- No manual play-duration or telemetry session; D-009 makes it optional feedback rather than a release blocker.
-- Sandboxed Chromium launch is unavailable on this macOS environment because of Mach-port registration; the required repository-pinned Chromium checks above run with project-local caches outside that sandbox.
+- No push, deployment, live public URL validation, or GitHub Actions run;
+  outside Implementer authority.
+- No physical-device, non-Chromium, battery/thermal, or platform screen-reader
+  session; required hardware/services unavailable.
+- Sandboxed Chromium launch is unavailable on this macOS environment because of
+  Mach-port registration. Required repository-pinned Chromium checks above ran
+  with project-local caches through scoped host access.

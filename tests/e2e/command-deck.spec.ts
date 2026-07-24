@@ -39,28 +39,45 @@ async function assertPortrait(page: Page) {
 }
 
 async function assertInitialGeometry(page: Page) {
+  expect(
+    await page
+      .locator(".app-scroll-region")
+      .evaluate((region) => region.scrollTop),
+  ).toBe(0);
   const nav = await page
     .getByRole("navigation", { name: "Primary" })
     .boundingBox();
   expect(nav).not.toBeNull();
+  const resources = await page.getByLabel("Primary resources").boundingBox();
+  const objective = await page
+    .getByLabel("Current objective and bottleneck")
+    .boundingBox();
   await expect(page.getByTestId("first-session-guide")).toBeVisible();
   const firstPipelineControl = page
     .getByTestId("pipeline")
     .getByRole("button")
     .first();
-  await firstPipelineControl.scrollIntoViewIfNeeded();
   const control = await firstPipelineControl.boundingBox();
+  expect(resources).not.toBeNull();
+  expect(objective).not.toBeNull();
   expect(control).not.toBeNull();
+  expect(resources!.y).toBeGreaterThanOrEqual(0);
+  expect(objective!.y).toBeGreaterThanOrEqual(0);
+  expect(control!.y).toBeGreaterThanOrEqual(0);
   expect(control!.y + control!.height).toBeLessThanOrEqual(nav!.y);
 
   await openTab(page, "Jobs");
+  expect(
+    await page
+      .locator(".app-scroll-region")
+      .evaluate((region) => region.scrollTop),
+  ).toBe(0);
   const selected = await page
     .getByLabel("Selected playable workload")
     .boundingBox();
   const queue = await page.getByRole("button", {
     name: /^Queue (one safe Interactive Chat job|1)$/,
   });
-  await queue.scrollIntoViewIfNeeded();
   const queueBox = await queue.boundingBox();
   expect(selected).not.toBeNull();
   expect(queueBox).not.toBeNull();

@@ -355,6 +355,8 @@ h2 {
 }
 
 .main-content {
+  container-name: main-content;
+  container-type: inline-size;
   display: grid;
   width: 100%;
   min-width: 0;
@@ -365,6 +367,33 @@ h2 {
 .main-content > * {
   min-width: 0;
   max-width: 100%;
+}
+
+.secondary-controls {
+  display: grid;
+  gap: inherit;
+}
+
+/*
+ * At 200% text the same physical portrait width has substantially less usable
+ * vertical space. Keep the simulation speed/tap target near the header there;
+ * normal portrait flow still prioritizes the guide and first primary action.
+ */
+@container main-content (max-width: 13em) {
+  .secondary-controls {
+    order: -1;
+  }
+
+  .main-content .time-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .main-content .speed-options {
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(44px, 1fr));
+    gap: 0.15rem;
+  }
 }
 
 .quick-start {
