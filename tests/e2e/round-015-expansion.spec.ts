@@ -128,6 +128,10 @@ test.describe("round 015 task market and workstation expansion", () => {
       page.getByRole("button", { name: /^Interactive Chat\. Current quote/ }),
     ).toHaveAccessibleName(/Demand \d+ percent/);
 
+    // The assertion below is about clear semantics, not whether 64x work may
+    // naturally settle while the confirmation is being operated. Freeze an
+    // already-active task so its identity is a stable comparison target.
+    await page.getByRole("button", { name: "1×" }).click();
     await page.getByRole("button", { name: "Queue 10" }).click();
     await expect
       .poll(() =>
@@ -142,6 +146,8 @@ test.describe("round 015 task market and workstation expansion", () => {
         }, SAVE_KEY),
       )
       .toBe(true);
+    await page.getByRole("button", { name: "Pause" }).click();
+    await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
     const beforeClear = await page.evaluate((key) => {
       const state = JSON.parse(localStorage.getItem(key) ?? "null") as {
         jobs: {
