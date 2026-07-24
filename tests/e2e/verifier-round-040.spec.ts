@@ -40,6 +40,7 @@ test("an unsealed current save cannot delete its guide to unlock starter batches
 
 test("an unsealed settled starter cannot fabricate an uninstalled purchase", async ({
   page,
+  browser,
 }) => {
   await page.setViewportSize({ width: 393, height: 742 });
   await page.goto("/");
@@ -62,7 +63,7 @@ test("an unsealed settled starter cannot fabricate an uninstalled purchase", asy
     )
     .toBe("buy-and-install");
 
-  await page.evaluate((key) => {
+  const forgedSave = await page.evaluate((key) => {
     const persisted = JSON.parse(localStorage.getItem(key) ?? "null") as {
       firstSession: {
         step: string;
@@ -82,13 +83,42 @@ test("an unsealed settled starter cannot fabricate an uninstalled purchase", asy
       observedSettlementTaskId: persisted.firstSession.starterTaskId,
       purchasedModuleId: "precision-cleaner",
     };
-    localStorage.setItem(key, JSON.stringify(persisted));
+    return JSON.stringify(persisted);
   }, SAVE_KEY);
-  await page.reload();
 
-  await expect(page.getByTestId("first-session-guide")).toContainText(
-    "step 1 of 3",
-  );
+  // A reload races the original Worker, whose last valid response can overwrite
+  // an injected localStorage value during unload. Seed a fresh browser context
+  // before the app starts so this probe verifies the forged snapshot itself.
+  const restored = await browser.newContext({
+    viewport: { width: 393, height: 742 },
+  });
+  try {
+    await restored.addInitScript(
+      ({ key, serialized }) => localStorage.setItem(key, serialized),
+      { key: SAVE_KEY, serialized: forgedSave },
+    );
+    const restoredPage = await restored.newPage();
+    const errors: string[] = [];
+    restoredPage.on("pageerror", (error) => errors.push(error.message));
+    restoredPage.on("console", (message) => {
+      if (message.type() === "error") errors.push(message.text());
+    });
+    await restoredPage.goto("/");
+
+    await expect(restoredPage.getByTestId("first-session-guide")).toContainText(
+      "step 1 of 3",
+    );
+    await restoredPage
+      .getByRole("navigation", { name: "Primary" })
+      .getByRole("button", { name: "Jobs", exact: true })
+      .click();
+    await expect(
+      restoredPage.getByRole("button", { name: "Queue 10" }),
+    ).toHaveCount(0);
+    expect(errors).toEqual([]);
+  } finally {
+    await restored.close();
+  }
 });
 
 test("clearing a paused starter resets its rail after reload at 320px", async ({
