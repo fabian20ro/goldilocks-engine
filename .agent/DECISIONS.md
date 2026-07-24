@@ -162,3 +162,25 @@
 - **Reason:** This distinguishes a fabricated owned/installed module from a real paid module command while preserving benign stale-save recovery after later settlements overwrite `lastSettlement`.
 - **Evidence policy:** Candidate-owned engine tests plus immutable round-041 verifier unit/browser regressions cover forged ownership, forged installed completion, pending paid purchase, later-work recovery, raw 320×693 and 393×742 geometry, and existing first-session/migration paths. Canonical verification remains required.
 - **Reversal condition:** Change the required retained records, bounded-history fallback, or integrity authority only through explicit product direction with updated deterministic and browser recovery evidence.
+
+## D-018 — Short-portrait Jobs navigation safety reserve
+
+- **Decision:** At the raw 320×693 Jobs entry state, the selected playable
+  workload label and Queue 1 action must retain at least 8 CSS pixels of
+  measured clearance above fixed Primary navigation. The same measurement is
+  retained at 393×742. Equality at the navigation boundary is not sufficient.
+- **Layout boundary:** Only narrow, short Jobs content contracts its inherited
+  main-flow spacing. Build ordering, normal 393×742 rhythm, time-speed
+  semantics, Worker authority, and bottom-tab routing remain unchanged.
+- **Reason:** Exact Ubuntu evidence for V-052 showed a 1.078125px Queue 1
+  overlap despite a macOS boundary pass. A quantitative reserve makes the
+  required raw portrait affordance robust to platform font metrics rather than
+  relying on subpixel coincidence.
+- **Evidence policy:** Candidate-owned pinned Playwright measures raw
+  `.app-scroll-region` position and both selected-workload and Queue-action
+  clearance at 320×693 and 393×742. Retained 200%-text, short-portrait,
+  command-deck, clear-waiting, reload, offline, and canonical checks remain
+  mandatory.
+- **Reversal condition:** Change the 8px floor or short-portrait spacing only
+  through explicit product direction backed by cross-platform portrait and
+  accessibility evidence.

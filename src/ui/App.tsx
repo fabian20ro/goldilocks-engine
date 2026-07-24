@@ -3866,7 +3866,7 @@ export function App() {
           <ResourceStrip state={state} />
         </header>
 
-        <main id="main-content" className="main-content">
+        <main id="main-content" className={`main-content ${tab}-content`}>
           {tab !== "build" ? secondaryControls : null}
           <FirstSessionGuide state={state} />
           <UpgradeFeedback state={state} />

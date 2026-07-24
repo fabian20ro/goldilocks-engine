@@ -1,4 +1,4 @@
-# Candidate handoff — round 042 first-session recovery and portrait repair
+# Candidate handoff — round 044 Jobs portrait safety reserve
 
 ## Implemented behavior summary
 
@@ -22,6 +22,13 @@
   moves the secondary controls near the header and uses a compact two-column
   speed grid, keeping every speed button tappable above fixed navigation.
   Non-Build tabs retain their established top-of-content secondary controls.
+- Gives raw short/narrow Jobs content a measured navigation reserve. At
+  320×693 the selected workload label and Queue 1 now sit at least 8 CSS pixels
+  above fixed Primary navigation; the 393×742 route retains the same measured
+  floor without changing its normal command-deck spacing.
+- Retains the verifier's deterministic 1× + paused active-task clear assertion
+  and its independent reload proof for task ID and locked quote. The product
+  clear path, time model, and persisted Worker state are unchanged.
 - Preserves Build-scoped explicit placement, Details inspection boundaries,
   Cancel/Escape focus return, Worker authority, touch/drag behavior, exact
   accounting, persistence, PWA/update, Career, evaluation, and replay behavior.
@@ -33,6 +40,7 @@
 | §20.6 / D-013 three-step queue → settlement → buy/install rail  | Durable `firstSession` state; command guards; ledger-correlated recovery; engine, balance, and browser coverage |
 | §20.6 malformed/reload/offline recovery and exact-once purchase | Stale forgery, real purchase, later-work, restore, and browser regressions                                      |
 | §20.5 compact portrait command deck                             | Raw 320×693 and 393×742 geometry; 320/393 touch, text scaling, keyboard, and reduced-motion suites              |
+| §20.5 Jobs dispatch safety reserve                              | Candidate-owned raw Queue 1/selected-label clearance check at 320×693 and 393×742                               |
 | Explicit Build-only placement and Details boundary              | Build transaction ownership plus Details/Cancel/Escape/touch/focus browser coverage                             |
 | PWA/root/Pages offline and deterministic browser verification   | Pinned Playwright, local ignored caches, root update suite, Pages/offline suite, `scripts/verify`               |
 
@@ -47,6 +55,13 @@
 - **V-051:** The raw initial 320×693 Build view now keeps resource HUD,
   objective, and first pipeline control above fixed Primary navigation without
   programmatic scrolling. Jobs retains its initial dispatch/Queue 1 geometry.
+- **V-052:** Jobs now uses a short-portrait reserve instead of boundary
+  equality. A candidate-owned raw geometry regression requires 8px clearance
+  for both the selected workload label and Queue 1; the 320×693 layout gains at
+  least 12px before the dispatch section while 393×742 is unchanged.
+- **V-053:** Retained verifier-owned tests stabilize the active-task assertion
+  at 1× with the task paused, then independently prove its ID and locked quote
+  survive clear-waiting and reload. Repeated focused coverage remains green.
 - Retained V-039, V-040, and V-041 verifier tests/reports remain unchanged.
   Candidate-owned engine and command-deck tests add regression coverage without
   weakening existing checks.
@@ -76,11 +91,12 @@ For Linux browser libraries when required:
 PLAYWRIGHT_INSTALL_DEPS=1 ./scripts/setup
 ```
 
-Focused recovery and portrait regression check:
+Focused recovery, clearance, and portrait regression checks:
 
 ```sh
-npx vitest run src/simulation/engine.test.ts src/simulation/verifierRound039.test.ts src/simulation/verifierRound040.test.ts src/simulation/verifierRound041.test.ts --coverage.enabled=false
-E2E_PORT=4174 npm run test:e2e -- tests/e2e/round-015-expansion.spec.ts tests/e2e/verifier-round-025.spec.ts tests/e2e/verifier-round-026.spec.ts tests/e2e/command-deck.spec.ts tests/e2e/verifier-round-041.spec.ts
+E2E_PORT=4174 npm run test:e2e -- tests/e2e/jobs-portrait-margin.spec.ts tests/e2e/command-deck.spec.ts tests/e2e/verifier-round-041.spec.ts tests/e2e/verifier-round-043.spec.ts
+E2E_PORT=4174 npm run test:e2e -- tests/e2e/round-015-expansion.spec.ts --grep 'shows eight workloads and preserves accepted task identity while clearing only waiting work' --repeat-each=20
+E2E_PORT=4174 npm run test:e2e -- tests/e2e/jobs-portrait-margin.spec.ts tests/e2e/verifier-round-042.spec.ts tests/e2e/verifier-round-025.spec.ts tests/e2e/verifier-round-026.spec.ts
 ```
 
 Canonical full check:
@@ -113,6 +129,9 @@ E2E_PORT=4174 ./scripts/verify
 - Time/warning controls form one `SecondaryControls` component. Build renders it
   after the initial pipeline in normal text; container-query ordering makes its
   controls reachable at 200% text without changing simulation state or routing.
+- D-018 scopes a short-portrait spacing reserve to Jobs only. The tab-specific
+  main-content class avoids changing Build's raw-primary ordering or the normal
+  393×742 rhythm; the 8px floor is geometry-tested rather than inferred.
 - `createEstablishedScenarioState()` remains a deterministic test/balance
   fixture only; production startup always uses `createInitialState()`.
 - Pending placement remains React view state. The engine receives only the final
@@ -135,13 +154,15 @@ E2E_PORT=4174 ./scripts/verify
 
 ## Checks executed before candidate handoff
 
-- `npx vitest run src/simulation/engine.test.ts src/simulation/verifierRound039.test.ts src/simulation/verifierRound040.test.ts src/simulation/verifierRound041.test.ts --coverage.enabled=false` — passed: 4 files / 59 tests.
-- `npm run typecheck` — passed.
-- `E2E_PORT=4174 npm run test:e2e -- tests/e2e/round-015-expansion.spec.ts tests/e2e/verifier-round-025.spec.ts tests/e2e/verifier-round-026.spec.ts tests/e2e/command-deck.spec.ts tests/e2e/verifier-round-041.spec.ts` — passed: 20/20 browser cases.
-- Final isolated `E2E_PORT=4174 ./scripts/verify` — passed, exit 0: fresh local setup; format, lint, typecheck; 30 unit/property files / 150 tests; first-session 41/0, upgrades 20,001/0, progression 41/0, Career 101/0, evaluation 121/0; production build; 143/143 root Playwright cases; 2/2 Pages/offline cases.
-- An earlier pre-fix canonical run exited 1 for V-026 geometry and the affected
-  round-015 clear-queue flow. It is not evidence for this candidate; the final
-  isolated run above was completed after correction.
+- `npm run format:check`; `npm run lint`; `npm run typecheck` — passed.
+- `E2E_PORT=4174 npm run test:e2e -- tests/e2e/jobs-portrait-margin.spec.ts tests/e2e/command-deck.spec.ts tests/e2e/verifier-round-041.spec.ts tests/e2e/verifier-round-043.spec.ts --reporter=line` — passed: 15/15.
+- `E2E_PORT=4174 npm run test:e2e -- tests/e2e/round-015-expansion.spec.ts --grep 'shows eight workloads and preserves accepted task identity while clearing only waiting work' --repeat-each=20 --reporter=dot` — passed: 20 repeated cases, no failed tests.
+- `E2E_PORT=4174 npm run test:e2e -- tests/e2e/jobs-portrait-margin.spec.ts tests/e2e/verifier-round-042.spec.ts tests/e2e/verifier-round-025.spec.ts tests/e2e/verifier-round-026.spec.ts --reporter=line` — passed: 9/9.
+- Final isolated `E2E_PORT=4174 ./scripts/verify` — passed, exit 0: fresh
+  setup; format, lint, typecheck; 31 unit/property files / 153 tests;
+  first-session 41/0, upgrades 20,001/0, progression 41/0, Career 101/0, and
+  evaluation 121/0; production build; 149/149 root Playwright cases; 2/2
+  Pages/offline cases.
 
 ## Checks not run
 
