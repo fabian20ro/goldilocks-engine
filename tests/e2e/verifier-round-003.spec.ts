@@ -1,6 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import { settleStarterJob } from "./helpers";
 
+const SAVE_KEY = "goldilocks-simulation-save-v4";
+
 function captureErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(`page: ${error.message}`));
@@ -8,6 +10,25 @@ function captureErrors(page: Page): string[] {
     if (message.type() === "error") errors.push(`console: ${message.text()}`);
   });
   return errors;
+}
+
+function readPersistedJobs(page: Page) {
+  return page.evaluate((key) => {
+    const persisted = JSON.parse(localStorage.getItem(key) ?? "null") as {
+      jobs: {
+        activeTask: unknown;
+        paused: boolean;
+        queued: number;
+        waitingTasks: unknown[];
+      };
+    };
+    return {
+      activeTask: persisted.jobs.activeTask,
+      paused: persisted.jobs.paused,
+      queued: persisted.jobs.queued,
+      waitingTaskCount: persisted.jobs.waitingTasks.length,
+    };
+  }, SAVE_KEY);
 }
 
 test.describe("verifier round 003 adversarial accessibility", () => {
@@ -96,12 +117,23 @@ test.describe("verifier round 003 adversarial accessibility", () => {
     // constructing this exact stress backlog so real time cannot consume work.
     await page.getByRole("button", { name: "Pause" }).click();
     await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
-    for (let index = 0; index < 10; index += 1)
+    for (let index = 0; index < 10; index += 1) {
       await page.getByRole("button", { name: "Queue 10" }).click();
+      await expect
+        .poll(() => readPersistedJobs(page).then((jobs) => jobs.queued))
+        .toBe(Math.min((index + 1) * 10, 99));
+    }
+    expect(await readPersistedJobs(page)).toEqual({
+      activeTask: null,
+      paused: true,
+      queued: 99,
+      waitingTaskCount: 99,
+    });
     await page.getByRole("button", { name: "Build" }).click();
-    await expect(
-      page.getByLabel(/100 jobs queued at bottleneck/),
-    ).toBeVisible();
+    await expect(page.getByLabel("99 jobs queued at bottleneck")).toBeVisible();
+    await expect(page.getByLabel("100 jobs queued at bottleneck")).toHaveCount(
+      0,
+    );
 
     for (const view of ["Build", "Jobs", "Inspect"] as const) {
       await page.getByRole("button", { name: view, exact: true }).click();
