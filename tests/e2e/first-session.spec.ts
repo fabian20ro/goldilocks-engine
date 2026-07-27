@@ -21,18 +21,33 @@ async function waitForSave(page: Page) {
     .not.toBeNull();
 }
 
-async function setSavedMoney(page: Page, money: number) {
-  await page.evaluate(
-    ({ key, value }) => {
-      const state = JSON.parse(localStorage.getItem(key) ?? "null") as {
-        resources: { money: number };
-      };
-      state.resources.money = value;
-      localStorage.setItem(key, JSON.stringify(state));
-    },
-    { key: SAVE_KEY, value: money },
+async function setSavedMoney(page: Page, money: number): Promise<Page> {
+  const [serialized, viewport] = await Promise.all([
+    page.evaluate((key) => localStorage.getItem(key), SAVE_KEY),
+    page.evaluate(() => ({
+      width: window.innerWidth,
+      height: window.innerHeight,
+    })),
+  ]);
+  if (serialized === null)
+    throw new Error("Expected a persisted simulation state");
+
+  const state = JSON.parse(serialized) as { resources: { money: number } };
+  state.resources.money = money;
+
+  // A live dedicated Worker can persist its older snapshot during reload.
+  // Stop that page first, then seed the saved fixture before the next app boot.
+  const context = page.context();
+  await page.close();
+  await context.addInitScript(
+    ({ key, saved }) => localStorage.setItem(key, saved),
+    { key: SAVE_KEY, saved: JSON.stringify(state) },
   );
-  await page.reload();
+  const restoredPage = await context.newPage();
+  await restoredPage.setViewportSize(viewport);
+  await restoredPage.goto("/");
+  await waitForSave(restoredPage);
+  return restoredPage;
 }
 
 test("first-session rail survives reload and placement requires an explicit handoff", async ({
@@ -62,11 +77,14 @@ test("first-session rail survives reload and placement requires an explicit hand
   await page.getByRole("button", { name: "64×" }).click();
   await waitForGuideStep(page, "step 3 of 3");
 
-  await setSavedMoney(page, 4);
+  page = await setSavedMoney(page, 4);
+  await waitForGuideStep(page, "step 3 of 3");
   await openTab(page, "Upgrades");
-  await page
-    .getByRole("button", { name: "Buy Precision Cleaner for $4.00" })
-    .click();
+  const buyPrecisionCleaner = page.getByRole("button", {
+    name: "Buy Precision Cleaner for $4.00",
+  });
+  await expect(buyPrecisionCleaner).toBeEnabled();
+  await buyPrecisionCleaner.click();
   await page
     .getByRole("button", { name: "Place Precision Cleaner in Build" })
     .click();

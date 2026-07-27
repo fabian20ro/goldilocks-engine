@@ -1,9 +1,22 @@
-# Candidate handoff — round 048 delivery-pipeline hardening
+# Candidate handoff — round 049 first-session fixture stabilization
 
 ## Implemented behavior summary
 
-- Product, game, Career scheduling, PWA behavior, UI, styles, fixtures, and
-  immutable verifier tests are unchanged.
+- Product, game, Career scheduling, PWA behavior, UI, styles, and immutable
+  verifier tests are unchanged; the candidate-owned first-session Playwright
+  fixture is the only product-adjacent source change.
+- The first-session Playwright fixture no longer writes synthetic money into a
+  live page immediately before reload. It captures the durable step-3 save,
+  closes the page to terminate its dedicated Worker, then seeds that exact
+  fixture before the next page boot while preserving the portrait viewport.
+  The test explicitly re-proves the restored step-3 rail and that the real
+  Precision Cleaner purchase action is enabled before retaining every existing
+  Buy → Place → Build handoff assertion.
+- Hosted exact-SHA Verify run `30309731209` exposed the old fixture race:
+  root browser/PWA had one failure, while 154/155 root cases and all other
+  hosted lanes passed. Its artifact showed the old Worker overwrote the
+  synthetic `$4.00` with the real `$1.33` settlement during reload. No product
+  or simulation behavior changed to address this test/tooling defect.
 - Hosted Verify is split into five explicit parallel lanes: static/unit/build
   plus production audit; deterministic balances; early 320px portrait and
   reduced-motion smoke; complete root browser/PWA; and Pages/offline. A small
@@ -34,12 +47,17 @@
 | §27 reproducible complete verification                                                 | `./scripts/verify`; lane contract unit tests; exact frozen-SHA metadata and aggregate gate                           |
 | Browser/PWA deterministic checking                                                     | Pinned `@playwright/test`; loopback servers; repository-local Chromium cache; root and Pages suites remain canonical |
 | Portrait, touch, text scale, reduced motion, persistence, reload, and offline coverage | Early 320px smoke plus retained complete root (155 cases) and Pages/offline (2 cases) Playwright lanes               |
+| §20.6 durable first-session resume and explicit purchase/install handoff               | Rebooted step-3 fixture, enabled paid-module assertion, and retained explicit placement/cancellation coverage        |
 | Reproducible hosted delivery                                                           | Node 22 with `checkout/setup-node@v6`; official Node-24-generation artifact and Pages actions; per-lane evidence     |
 | Production dependency security gate                                                    | `npm audit --omit=dev --audit-level=high` in local canonical and hosted static/unit/build lane                       |
 
 ## Verifier findings resolved
 
 - No unresolved verifier finding IDs existed at this candidate’s starting SHA.
+- Hosted run `30309731209` did not create an immutable verifier finding ID, but
+  its sole root-lane failure is resolved by the deterministic fixture boundary
+  above. The test does not add a sleep, retry, timeout increase, or weaker
+  assertion.
 - The old workflow-contract unit test expected one `canonical` job and
   `upload-artifact@v4`; it now asserts the complete five-lane contract,
   aggregate results, local cache policy, canonical audit, and Pages/action
@@ -104,9 +122,8 @@ E2E_PORT=4174 ./scripts/verify
 Focused commands used for this delivery change:
 
 ```sh
-E2E_PORT=4174 npm run test:e2e -- tests/e2e/game.spec.ts --grep 'renders and remains reachable at 320px|honors reduced motion and remains usable at 150% text scale' --reporter=line
-E2E_PORT=4174 npm run test:e2e -- tests/e2e/verifier-round-028.spec.ts --repeat-each=20 --reporter=line
-npx vitest run --coverage.enabled=false src/test/verifyWorkflow.test.ts --reporter=verbose
+E2E_PORT=4174 npm run test:e2e -- tests/e2e/first-session.spec.ts --grep 'first-session rail survives reload and placement requires an explicit handoff' --repeat-each=20 --reporter=dot
+E2E_PORT=4174 ./scripts/verify
 ```
 
 ## Important architectural decisions
@@ -127,6 +144,10 @@ npx vitest run --coverage.enabled=false src/test/verifyWorkflow.test.ts --report
   ranges and upgrades its nested `minimatch`/`brace-expansion` path. ESLint 10
   is the only audit-proposed remaining fix and is deliberately not taken as a
   major/forced dependency change.
+- The first-session test fixture takes its synthetic persisted-state boundary
+  only after terminating the page-owned Worker. This prevents a stale response
+  from winning a same-page reload race while continuing to exercise the real
+  restore, purchase, and placement commands.
 
 ## Known limitations and risks
 
@@ -137,6 +158,9 @@ npx vitest run --coverage.enabled=false src/test/verifyWorkflow.test.ts --report
 - The historical Pages A-to-B miss did not reproduce: hosted attempt 2 and
   40/40 local transitions passed. It remains a monitored residual rather than
   a reason to weaken strict PWA convergence evidence.
+- A fresh hosted run for this candidate SHA has not been launched. The exact
+  prior hosted failure was inspected from its retained Playwright artifact;
+  local focused and canonical checks cover the repaired deterministic fixture.
 - The separate observed Career scheduling behavior is outside this delivery
   hardening scope and was not changed.
 - Physical-device, non-Chromium, battery/thermal, and platform screen-reader
@@ -144,24 +168,18 @@ npx vitest run --coverage.enabled=false src/test/verifyWorkflow.test.ts --report
 
 ## Checks executed before candidate handoff
 
-- `npm audit --omit=dev --audit-level=high` — passed: 0 vulnerabilities.
-- Full `npm audit --json` before and after the dev-tool update — 11 high to 5
-  high, all development dependency findings; command exits nonzero by npm
-  design when findings exist.
-- `INSTALL_PLAYWRIGHT=0 ./scripts/setup` — passed; fresh locked install without
-  browser download.
-- `npm run lint && npm run typecheck && npm run build && npm audit --omit=dev --audit-level=high` — passed.
-- `ruby -e 'require "yaml"; ...'` for both workflows and the composite action — parsed successfully.
-- Focused 320px/reduced-motion command above — passed: 2/2.
-- Exact stale-worker probe above — passed: 40/40 in 1.4 minutes.
-- `XDG_CACHE_HOME=/private/tmp/goldlocks-gh-cache gh run view 30305202912 --attempt 2 ...` — successful exact-SHA hosted rerun; canonical job started 2026-07-27 21:12:26 UTC and completed 21:23:47 UTC.
-- `E2E_PORT=4174 ./scripts/verify` — passed, exit 0: format; lint; typecheck;
-  31 unit/property files / 154 tests; all deterministic sweeps; build;
-  production audit; 155/155 root Playwright; 2/2 Pages/offline.
+- `XDG_CACHE_HOME=/private/tmp/goldlocks-gh-cache gh run view 30309731209 --log-failed` — inspected the exact hosted root-lane failure and retained artifact. The failure snapshot showed `$1.33` after a stale Worker overwrote the test's `$4.00` seed.
+- `npx prettier --check tests/e2e/first-session.spec.ts` — passed.
+- Focused command above — passed 20/20 repetitions after the final restored-step assertion; post-run process audit found no Vite or Playwright process.
+- `E2E_PORT=4174 ./scripts/verify` — passed: format; lint; typecheck; 31
+  unit/property files / 154 tests; numeric plus first-session, 20,001-seed
+  upgrade, progression, Career, and evaluation balance sweeps with zero
+  failures; build; production audit (0 vulnerabilities); 155/155 root
+  Playwright; 2/2 Pages/offline.
 
 ## Checks not run
 
-- No push, deployment, or candidate GitHub Actions run; those require external
-  branch/repository state beyond this Implementer turn.
+- No push, deployment, or fresh candidate GitHub Actions run; those require
+  external branch/repository state beyond this Implementer turn.
 - No physical-device or non-Chromium session; required hardware/services are
   unavailable.
