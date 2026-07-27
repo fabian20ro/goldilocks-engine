@@ -1,6 +1,31 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Browser, type Page } from "@playwright/test";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
+
+async function openSavedStateBeforeBoot(browser: Browser, saved: string) {
+  const context = await browser.newContext({
+    viewport: { width: 393, height: 742 },
+    serviceWorkers: "allow",
+    locale: "en-US",
+    timezoneId: "Europe/Bucharest",
+  });
+  await context.addInitScript(
+    ({ key, serialized, marker }) => {
+      // Do not mask a later reload with the fixture; only app boot receives it.
+      if (sessionStorage.getItem(marker) === "seeded") return;
+      sessionStorage.setItem(marker, "seeded");
+      localStorage.setItem(key, serialized);
+    },
+    {
+      key: SAVE_KEY,
+      serialized: saved,
+      marker: "verifier-round-041-preboot-save",
+    },
+  );
+  const page = await context.newPage();
+  await page.goto("/");
+  return { context, page };
+}
 
 for (const viewport of [
   { width: 320, height: 693 },
@@ -77,12 +102,16 @@ for (const viewport of [
 
 test("a damaged save cannot use a forged installed module to skip the first purchase", async ({
   page,
+  browser,
 }) => {
   const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
-  });
+  const observeErrors = (observedPage: Page) => {
+    observedPage.on("pageerror", (error) => errors.push(error.message));
+    observedPage.on("console", (message) => {
+      if (message.type() === "error") errors.push(message.text());
+    });
+  };
+  observeErrors(page);
 
   await page.setViewportSize({ width: 393, height: 742 });
   await page.goto("/");
@@ -105,7 +134,7 @@ test("a damaged save cannot use a forged installed module to skip the first purc
     )
     .toBe("buy-and-install");
 
-  await page.evaluate((key) => {
+  const forgedSave = await page.evaluate((key) => {
     const persisted = JSON.parse(localStorage.getItem(key) ?? "null") as {
       firstSession: {
         step: string;
@@ -131,23 +160,33 @@ test("a damaged save cannot use a forged installed module to skip the first purc
       observedSettlementTaskId: persisted.firstSession.starterTaskId,
       purchasedModuleId: "precision-cleaner",
     };
-    localStorage.setItem(key, JSON.stringify(persisted));
+    return JSON.stringify(persisted);
   }, SAVE_KEY);
-  await page.reload();
 
-  await expect(page.getByTestId("first-session-guide")).toContainText(
-    "step 1 of 3",
-  );
-  await page
-    .getByRole("navigation", { name: "Primary" })
-    .getByRole("button", { name: "Jobs", exact: true })
-    .click();
-  await expect(page.getByRole("button", { name: "Queue 10" })).toHaveCount(0);
+  // A live page's Worker can overwrite localStorage while that page reloads.
+  // Seed the forged record into an isolated context before the application boots.
+  const restored = await openSavedStateBeforeBoot(browser, forgedSave);
+  try {
+    observeErrors(restored.page);
+    await expect(
+      restored.page.getByTestId("first-session-guide"),
+    ).toContainText("step 1 of 3");
+    await restored.page
+      .getByRole("navigation", { name: "Primary" })
+      .getByRole("button", { name: "Jobs", exact: true })
+      .click();
+    await expect(
+      restored.page.getByRole("button", { name: "Queue 10" }),
+    ).toHaveCount(0);
+  } finally {
+    await restored.context.close();
+  }
   expect(errors).toEqual([]);
 });
 
 test("a real first purchase survives benign stale-save recovery after later work", async ({
   page,
+  browser,
 }) => {
   await page.setViewportSize({ width: 393, height: 742 });
   await page.goto("/");
@@ -214,14 +253,22 @@ test("a real first purchase survives benign stale-save recovery after later work
     .click();
   await expect(page.getByTestId("first-session-guide")).toHaveCount(0);
 
-  await page.evaluate((key) => {
+  const staleSave = await page.evaluate((key) => {
     const persisted = JSON.parse(localStorage.getItem(key) ?? "null") as {
       lastUpgradeNotice: unknown;
     };
     persisted.lastUpgradeNotice = null;
-    localStorage.setItem(key, JSON.stringify(persisted));
+    return JSON.stringify(persisted);
   }, SAVE_KEY);
-  await page.reload();
 
-  await expect(page.getByTestId("first-session-guide")).toHaveCount(0);
+  // This nearby stale-save regression has the same live-Worker boundary.
+  // Its pass condition would otherwise also pass if the intended damage lost.
+  const restored = await openSavedStateBeforeBoot(browser, staleSave);
+  try {
+    await expect(restored.page.getByTestId("first-session-guide")).toHaveCount(
+      0,
+    );
+  } finally {
+    await restored.context.close();
+  }
 });

@@ -111,31 +111,52 @@ async function assertCareerControlGeometry(page: Page, viewportWidth: number) {
   }
 }
 
-async function activateExpansion(page: Page) {
+async function activateExpansion(page: Page): Promise<Page> {
   await expect
     .poll(() => page.evaluate((key) => localStorage.getItem(key), SAVE_KEY))
     .not.toBeNull();
-  await page.evaluate(
-    ({ key }) => {
-      const state = JSON.parse(localStorage.getItem(key) ?? "null") as {
-        resources: { money: number };
-      };
-      state.resources.money = 45;
-      localStorage.setItem(key, JSON.stringify(state));
+  const [saved, viewport] = await Promise.all([
+    page.evaluate((key) => localStorage.getItem(key), SAVE_KEY),
+    page.evaluate(() => ({
+      width: window.innerWidth,
+      height: window.innerHeight,
+    })),
+  ]);
+  if (saved === null) throw new Error("Expected a persisted simulation state");
+
+  const state = JSON.parse(saved) as { resources: { money: number } };
+  state.resources.money = 45;
+
+  // Closing the source page terminates its Worker before this synthetic save
+  // reaches the next app boot, preventing an unload-time stale overwrite.
+  const context = page.context();
+  await page.close();
+  await context.addInitScript(
+    ({ key, serialized, marker }) => {
+      if (sessionStorage.getItem(marker) === "seeded") return;
+      sessionStorage.setItem(marker, "seeded");
+      localStorage.setItem(key, serialized);
     },
-    { key: SAVE_KEY },
+    {
+      key: SAVE_KEY,
+      serialized: JSON.stringify(state),
+      marker: "command-deck-expansion-seeded",
+    },
   );
-  await page.reload();
-  await openTab(page, "Upgrades");
-  await page
+  const restoredPage = await context.newPage();
+  await restoredPage.setViewportSize(viewport);
+  await restoredPage.goto("/");
+  await openTab(restoredPage, "Upgrades");
+  await restoredPage
     .getByRole("button", {
       name: "Buy Workstation Expansion I for $45.00",
     })
     .click();
-  await page
+  await restoredPage
     .getByRole("button", { name: "Activate six-position pipeline" })
     .click();
-  await openTab(page, "Build");
+  await openTab(restoredPage, "Build");
+  return restoredPage;
 }
 
 for (const viewport of [
@@ -159,7 +180,7 @@ for (const viewport of [
       });
     }
 
-    await activateExpansion(page);
+    page = await activateExpansion(page);
     await expect(
       page.getByTestId("pipeline").locator(".pipeline-slot"),
     ).toHaveCount(8);
