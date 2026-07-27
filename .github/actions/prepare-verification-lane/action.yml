@@ -1,0 +1,50 @@
+name: Prepare verification lane
+description: Record a checked-out candidate's identity and install locked dependencies.
+
+inputs:
+  lane:
+    description: Stable lane name used for evidence paths.
+    required: true
+  install-playwright:
+    description: Whether this lane needs the pinned Chromium browser (0 or 1).
+    required: false
+    default: "0"
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node
+      uses: actions/setup-node@v6
+      with:
+        node-version: 22
+        cache: npm
+        cache-dependency-path: package-lock.json
+
+    - name: Record exact candidate identity
+      shell: bash
+      env:
+        LANE: ${{ inputs.lane }}
+      run: |
+        set -euo pipefail
+        actual="$(git rev-parse HEAD)"
+        test "$actual" = "$GITHUB_SHA"
+        evidence_dir="$GITHUB_WORKSPACE/.cache/verification/$LANE"
+        mkdir -p "$evidence_dir"
+        {
+          printf 'candidate_sha=%s\n' "$actual"
+          printf 'lane=%s\n' "$LANE"
+          printf 'workflow=%s\n' "$GITHUB_WORKFLOW"
+          printf 'run_id=%s\n' "$GITHUB_RUN_ID"
+          printf 'run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
+          printf 'runner_os=%s\n' "$RUNNER_OS"
+          printf 'node=%s\n' "$(node --version)"
+          printf 'npm=%s\n' "$(npm --version)"
+        } > "$evidence_dir/metadata.txt"
+        printf 'VERIFICATION_EVIDENCE_DIR=%s\n' "$evidence_dir" >> "$GITHUB_ENV"
+        cat "$evidence_dir/metadata.txt" >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Install locked dependencies
+      shell: bash
+      env:
+        INSTALL_PLAYWRIGHT: ${{ inputs.install-playwright }}
+      run: ./scripts/setup

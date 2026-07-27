@@ -1,92 +1,59 @@
-# Candidate handoff — round 047 acknowledged queue-cap repair
+# Candidate handoff — round 048 delivery-pipeline hardening
 
 ## Implemented behavior summary
 
-- No production, simulation, styling, or queue-semantics change. The canonical
-  V-055 browser stress test now waits for each persisted Worker acknowledgement
-  and asserts the engine's intentional 99-task cap.
-- Keeps the durable three-step first-session rail: one safe Interactive Chat
-  job, its observed settlement, then a meaningful paid module purchase and
-  explicit compatible Build installation. The command boundary remains the
-  authority; guide progress survives reload/offline recovery and disappears
-  after completion.
-- Makes integrity-stale recovery ledger-correlated. Advanced guide progress now
-  requires the retained exact starter-settlement record; a named first module
-  additionally requires the exact `BUY_MODULE` accounting record. A stale
-  completed guide still requires that module to be both owned and installed.
-  Mutable cash, inventory, pipeline topology, and later `lastSettlement` are
-  not treated as proof of the required commands.
-- Keeps valid integrity seals authoritative for legacy migration and legitimate
-  later reconfiguration. A stale save whose bounded ledger no longer retains
-  the required onboarding records safely falls back to Queue 1 rather than
-  granting progress.
-- Keeps the normal Build portrait order primary-first: objective and pipeline
-  controls precede time/warning controls. At enlarged text, a container query
-  moves the secondary controls near the header and uses a compact two-column
-  speed grid, keeping every speed button tappable above fixed navigation.
-  Non-Build tabs retain their established top-of-content secondary controls.
-- Gives raw short/narrow Jobs content a measured navigation reserve. At
-  320×693 the selected workload label and Queue 1 now sit at least 8 CSS pixels
-  above fixed Primary navigation; the 393×742 route retains the same measured
-  floor without changing its normal command-deck spacing.
-- Retains the verifier's deterministic 1× + paused active-task clear assertion
-  and its independent reload proof for task ID and locked quote. The product
-  clear path, time model, and persisted Worker state are unchanged.
-- Keeps the complete 17-seed × 120-step mixed evaluation corpus and every
-  validity/equality assertion under a scoped 20-second Vitest timeout. Keeps
-  the 320px/200%-text dynamic Jobs stress test paused and visibly resumable
-  before its ten Queue 10 actions, awaiting each Worker update and yielding the
-  exact 99-job cap before Build, overflow, and page-error assertions.
-- Preserves Build-scoped explicit placement, Details inspection boundaries,
-  Cancel/Escape focus return, Worker authority, touch/drag behavior, exact
-  accounting, persistence, PWA/update, Career, evaluation, and replay behavior.
+- Product, game, Career scheduling, PWA behavior, UI, styles, fixtures, and
+  immutable verifier tests are unchanged.
+- Hosted Verify is split into five explicit parallel lanes: static/unit/build
+  plus production audit; deterministic balances; early 320px portrait and
+  reduced-motion smoke; complete root browser/PWA; and Pages/offline. A small
+  aggregate job fails unless every lane succeeds.
+- Every verification lane checks out the event SHA, records and asserts its
+  exact `GITHUB_SHA`, uses ignored repository-local npm/Chromium/XDG caches,
+  and uploads lane-specific evidence. The shared composite action eliminates
+  repeated Node setup, frozen-SHA metadata, and locked dependency installation
+  across all five lanes.
+- `./scripts/verify` remains the complete local canonical command and now also
+  gates `npm audit --omit=dev --audit-level=high` before browser checks.
+- Pages uses `actions/configure-pages@v6`,
+  `actions/upload-pages-artifact@v5`, and `actions/deploy-pages@v5`.
+  Verification artifacts use `actions/upload-artifact@v7`; checkout and Node
+  setup remain `@v6`.
+- `typescript-eslint` is updated from 8.19.1 to compatible 8.65.0. Full npm
+  audit findings fall from 11 high dev-only findings to 5; production audit is
+  clean.
+- Hosted run `30305202912` attempt 1 missed strict Pages A-to-B convergence
+  once. Its exact-SHA attempt 2 succeeded; a local 20-repeat root/Pages probe
+  passed 40/40. The strict test remains unchanged; no timeout or assertion was
+  weakened.
 
 ## Plan requirements covered
 
-| Requirement                                                     | Evidence                                                                                                        |
-| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| §20.6 / D-013 three-step queue → settlement → buy/install rail  | Durable `firstSession` state; command guards; ledger-correlated recovery; engine, balance, and browser coverage |
-| §20.6 malformed/reload/offline recovery and exact-once purchase | Stale forgery, real purchase, later-work, restore, and browser regressions                                      |
-| §20.5 compact portrait command deck                             | Raw 320×693 and 393×742 geometry; 320/393 touch, text scaling, keyboard, and reduced-motion suites              |
-| §20.5 Jobs dispatch safety reserve                              | Candidate-owned raw Queue 1/selected-label clearance check at 320×693 and 393×742                               |
-| Explicit Build-only placement and Details boundary              | Build transaction ownership plus Details/Cancel/Escape/touch/focus browser coverage                             |
-| PWA/root/Pages offline and deterministic browser verification   | Pinned Playwright, local ignored caches, root update suite, Pages/offline suite, `scripts/verify`               |
-| §27 reproducible verification stability                         | Scoped V-054 corpus timeout; acknowledged 99-cap V-055 browser regression; canonical and focused commands       |
+| Requirement                                                                            | Evidence                                                                                                             |
+| -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| §27 reproducible complete verification                                                 | `./scripts/verify`; lane contract unit tests; exact frozen-SHA metadata and aggregate gate                           |
+| Browser/PWA deterministic checking                                                     | Pinned `@playwright/test`; loopback servers; repository-local Chromium cache; root and Pages suites remain canonical |
+| Portrait, touch, text scale, reduced motion, persistence, reload, and offline coverage | Early 320px smoke plus retained complete root (155 cases) and Pages/offline (2 cases) Playwright lanes               |
+| Reproducible hosted delivery                                                           | Node 22 with `checkout/setup-node@v6`; official Node-24-generation artifact and Pages actions; per-lane evidence     |
+| Production dependency security gate                                                    | `npm audit --omit=dev --audit-level=high` in local canonical and hosted static/unit/build lane                       |
 
 ## Verifier findings resolved
 
-- **V-049:** A fabricated owned/installed module no longer validates stale
-  `buy-and-install` or `complete` progress. Recovery requires the exact durable
-  paid-purchase ledger event written by `BUY_MODULE`.
-- **V-050:** Legitimate paid progress no longer depends on mutable
-  `lastSettlement`. Recovery finds the original starter settlement in the
-  ledger, so later jobs do not erase a valid completed rail.
-- **V-051:** The raw initial 320×693 Build view now keeps resource HUD,
-  objective, and first pipeline control above fixed Primary navigation without
-  programmatic scrolling. Jobs retains its initial dispatch/Queue 1 geometry.
-- **V-052:** Jobs now uses a short-portrait reserve instead of boundary
-  equality. A candidate-owned raw geometry regression requires 8px clearance
-  for both the selected workload label and Queue 1; the 320×693 layout gains at
-  least 12px before the dispatch section while 393×742 is unchanged.
-- **V-053:** Retained verifier-owned tests stabilize the active-task assertion
-  at 1× with the task paused, then independently prove its ID and locked quote
-  survive clear-waiting and reload. Repeated focused coverage remains green.
-- **V-054:** Retains the verifier-owned 20-second timeout only for the complete
-  17-seed × 120-step evaluation corpus. The command schedule, per-step
-  validity checks, and cross-run equality assertions are unchanged.
-- **V-055:** The canonical 320px/200%-text dynamic-content regression pauses,
-  confirms Resume, waits for persisted Worker acknowledgement after each of ten
-  Queue 10 requests, and asserts the intentional exact 99-task queue cap. It
-  retains the Build/Jobs/Inspect overflow and page-error assertions, including
-  proof that no impossible 100-job bottleneck label appears.
-- Retained V-039, V-040, and V-041 verifier tests/reports remain unchanged.
-  Candidate-owned engine and command-deck tests add regression coverage without
-  weakening existing checks.
+- No unresolved verifier finding IDs existed at this candidate’s starting SHA.
+- The old workflow-contract unit test expected one `canonical` job and
+  `upload-artifact@v4`; it now asserts the complete five-lane contract,
+  aggregate results, local cache policy, canonical audit, and Pages/action
+  versions.
+- Hosted exact-SHA run `30305202912` attempt 1 was diagnosed rather than
+  papered over. Attempt 2 was successful for
+  `d4c408cb63fc42c7b7f962c63aeab7175f1dd0c6`, so no product or test semantic
+  change was invented.
 
 ## Setup, startup, and verification commands
 
-Prerequisite: Node matching `package.json` (`^20.19.0 || >=22.12.0`). First
-setup needs network access for lockfile dependencies and pinned Chromium.
+Prerequisite: Node matching `package.json`
+(`^20.19.0 || >=22.12.0`). First setup needs network access for lockfile
+dependencies and pinned Chromium.
 
 ```sh
 ./scripts/setup
@@ -94,104 +61,107 @@ setup needs network access for lockfile dependencies and pinned Chromium.
 # http://127.0.0.1:4173
 ```
 
-Repository-local ignored caches/artifacts:
+Repository-local ignored caches and artifacts:
 
 ```text
 npm:       .cache/npm
 Chromium:  .cache/ms-playwright
-artifacts: playwright-report/, playwright-pages-report/, test-results/
+XDG cache: .cache/xdg
+evidence:  .cache/verification/
+artifacts: coverage/, playwright-report/, playwright-pages-report/, test-results/
 ```
 
-For Linux browser libraries when required:
+For Linux browser libraries when needed:
 
 ```sh
 PLAYWRIGHT_INSTALL_DEPS=1 ./scripts/setup
 ```
 
-Focused recovery, clearance, and portrait regression checks:
+The hosted static/balance lanes reuse setup without downloading Chromium:
 
 ```sh
-npx vitest run --coverage.enabled=false src/simulation/verifierRound031.test.ts --reporter=verbose --testTimeout=5000
-E2E_PORT=4174 npm run test:e2e -- tests/e2e/verifier-round-003.spec.ts --grep 'stressed dynamic content' --repeat-each=5 --reporter=line
-E2E_PORT=4174 npm run test:e2e -- tests/e2e/verifier-round-046.spec.ts --repeat-each=5 --reporter=line
-E2E_PORT=4174 npm run test:e2e -- tests/e2e/jobs-portrait-margin.spec.ts tests/e2e/command-deck.spec.ts tests/e2e/verifier-round-041.spec.ts tests/e2e/verifier-round-043.spec.ts
-E2E_PORT=4174 npm run test:e2e -- tests/e2e/round-015-expansion.spec.ts --grep 'shows eight workloads and preserves accepted task identity while clearing only waiting work' --repeat-each=20
-E2E_PORT=4174 npm run test:e2e -- tests/e2e/jobs-portrait-margin.spec.ts tests/e2e/verifier-round-042.spec.ts tests/e2e/verifier-round-025.spec.ts tests/e2e/verifier-round-026.spec.ts
+INSTALL_PLAYWRIGHT=0 ./scripts/setup
 ```
 
-Canonical full check:
+Canonical full verification:
 
 ```sh
 ./scripts/verify
 ```
 
-`./scripts/verify` runs setup, format, lint, typecheck, unit/property coverage,
-all balance sweeps, production build, root Playwright, and Pages/offline
-Playwright. Playwright uses project-pinned Chromium from
-`.cache/ms-playwright`, starts deterministic `127.0.0.1:4173` loopback preview
-servers, waits for readiness, and cleans them up. No home cache, global package,
-existing browser profile, or in-app Browser is required.
+`./scripts/verify` runs fresh locked setup; format; lint; typecheck;
+unit/property coverage; deterministic balances; production build; production
+dependency audit; root Playwright; and Pages/offline Playwright. It starts
+deterministic `127.0.0.1:4173` loopback previews and cleans them up. It needs no
+home cache, global package, existing browser, or browser profile.
 
-If port 4173 is occupied, use the behaviorally identical explicit override:
+If port 4173 is occupied:
 
 ```sh
 E2E_PORT=4174 ./scripts/verify
 ```
 
+Focused commands used for this delivery change:
+
+```sh
+E2E_PORT=4174 npm run test:e2e -- tests/e2e/game.spec.ts --grep 'renders and remains reachable at 320px|honors reduced motion and remains usable at 150% text scale' --reporter=line
+E2E_PORT=4174 npm run test:e2e -- tests/e2e/verifier-round-028.spec.ts --repeat-each=20 --reporter=line
+npx vitest run --coverage.enabled=false src/test/verifyWorkflow.test.ts --reporter=verbose
+```
+
 ## Important architectural decisions
 
-- `modulePurchaseLedgerMessage()` is the single source for the durable paid
-  purchase event and recovery matcher; command recording and repair cannot drift
-  apart through duplicate formatting.
-- D-017 intentionally trusts a valid integrity seal for historical completed
-  progress, but treats an invalid seal as a bounded-evidence repair problem.
-  If retained proof has rolled out, fail closed to a fresh rail.
-- Time/warning controls form one `SecondaryControls` component. Build renders it
-  after the initial pipeline in normal text; container-query ordering makes its
-  controls reachable at 200% text without changing simulation state or routing.
-- D-018 scopes a short-portrait spacing reserve to Jobs only. The tab-specific
-  main-content class avoids changing Build's raw-primary ordering or the normal
-  393×742 rhythm; the 8px floor is geometry-tested rather than inferred.
-- V-054 and V-055 are test-determinism changes only: the scoped timeout and
-  pause/Resume plus persisted-acknowledgement sequencing do not alter
-  simulation, persistence, UI, or the intentional 99-task queue cap.
-- `createEstablishedScenarioState()` remains a deterministic test/balance
-  fixture only; production startup always uses `createInitialState()`.
-- Pending placement remains React view state. The engine receives only the final
-  explicit `PLACE_MODULE` command.
+- The repository-local composite action is intentionally narrow: it removes
+  repeated Node setup, SHA evidence, and setup invocation across five lanes.
+  Each job still performs its own visible `checkout@v6`, because a local action
+  cannot be loaded before checkout.
+- The workflow reuses existing package scripts and `scripts/setup`; it does not
+  create a second verification framework. `INSTALL_PLAYWRIGHT=0` only avoids a
+  browser download for lanes that do not launch a browser; local setup defaults
+  to installing pinned Chromium.
+- The static lane runs all static/unit/build checks from the canonical command;
+  balances, portrait smoke, full root browser/PWA, and Pages/offline each have
+  an independently useful log/report artifact. The aggregate gate is the
+  required-status surface.
+- `typescript-eslint` 8.65.0 supports the declared Node/ESLint/TypeScript
+  ranges and upgrades its nested `minimatch`/`brace-expansion` path. ESLint 10
+  is the only audit-proposed remaining fix and is deliberately not taken as a
+  major/forced dependency change.
 
 ## Known limitations and risks
 
-- A stale damaged save whose required bounded ledger records have rolled out
-  resets to a fresh guided run; validly sealed long-running saves remain valid.
-- The guide cannot guarantee a starter success. Failed starter settlement still
-  records the observed outcome and permits later work before a module is
-  affordable.
-- Native emoji rendering, physical touch feel, battery/thermal behavior,
-  non-Chromium engines, actual screen-reader speech, and local-storage denial
-  remain environmental residual risks. Storage denial leaves an in-memory
-  session playable but cannot persist reload state.
-- No Research, characters, creator/fear/audience systems, workforce/startup/
-  laboratory content, extra pipelines, narrative expansion, remote assets,
-  audio, or haptics were added.
+- `npm audit --omit=dev --audit-level=high` reports zero vulnerabilities. Full
+  audit still reports five high dev-only findings in ESLint 9’s `minimatch` /
+  `brace-expansion` chain; npm proposes ESLint 10, a major update. No
+  `npm audit fix --force` was used.
+- The historical Pages A-to-B miss did not reproduce: hosted attempt 2 and
+  40/40 local transitions passed. It remains a monitored residual rather than
+  a reason to weaken strict PWA convergence evidence.
+- The separate observed Career scheduling behavior is outside this delivery
+  hardening scope and was not changed.
+- Physical-device, non-Chromium, battery/thermal, and platform screen-reader
+  sessions remain environmental residuals.
 
 ## Checks executed before candidate handoff
 
-- `npx vitest run --coverage.enabled=false src/simulation/verifierRound031.test.ts --reporter=verbose --testTimeout=5000` — passed: 5/5; the complete mixed 17×120 corpus completed in 578ms.
-- `E2E_PORT=4174 npm run test:e2e -- tests/e2e/verifier-round-003.spec.ts --grep 'stressed dynamic content' --repeat-each=5 --reporter=line` — passed: 5/5.
-- `E2E_PORT=4174 npm run test:e2e -- tests/e2e/verifier-round-003.spec.ts --reporter=line` — passed: 3/3, retaining target-size and reduced-motion checks.
-- `E2E_PORT=4174 npm run test:e2e -- tests/e2e/verifier-round-046.spec.ts --repeat-each=5 --reporter=line` — passed: 5/5; immutable verifier-owned 99-cap probe unchanged.
-- `E2E_PORT=4174 ./scripts/verify` — passed, exit 0: fresh setup; format,
-  lint, typecheck; 31 unit/property files / 153 tests; first-session 41/0,
-  upgrades 20,001/0, progression 41/0, Career 101/0, evaluation 121/0;
-  production build; 154/154 root Playwright cases; 2/2 Pages/offline cases.
+- `npm audit --omit=dev --audit-level=high` — passed: 0 vulnerabilities.
+- Full `npm audit --json` before and after the dev-tool update — 11 high to 5
+  high, all development dependency findings; command exits nonzero by npm
+  design when findings exist.
+- `INSTALL_PLAYWRIGHT=0 ./scripts/setup` — passed; fresh locked install without
+  browser download.
+- `npm run lint && npm run typecheck && npm run build && npm audit --omit=dev --audit-level=high` — passed.
+- `ruby -e 'require "yaml"; ...'` for both workflows and the composite action — parsed successfully.
+- Focused 320px/reduced-motion command above — passed: 2/2.
+- Exact stale-worker probe above — passed: 40/40 in 1.4 minutes.
+- `XDG_CACHE_HOME=/private/tmp/goldlocks-gh-cache gh run view 30305202912 --attempt 2 ...` — successful exact-SHA hosted rerun; canonical job started 2026-07-27 21:12:26 UTC and completed 21:23:47 UTC.
+- `E2E_PORT=4174 ./scripts/verify` — passed, exit 0: format; lint; typecheck;
+  31 unit/property files / 154 tests; all deterministic sweeps; build;
+  production audit; 155/155 root Playwright; 2/2 Pages/offline.
 
 ## Checks not run
 
-- No push, deployment, live public URL validation, or GitHub Actions run;
-  outside Implementer authority.
-- No physical-device, non-Chromium, battery/thermal, or platform screen-reader
-  session; required hardware/services unavailable.
-- Sandboxed Chromium remains unavailable on this macOS environment because of
-  Mach-port registration before page creation. The listed focused and canonical
-  pinned-browser commands ran successfully through scoped host access.
+- No push, deployment, or candidate GitHub Actions run; those require external
+  branch/repository state beyond this Implementer turn.
+- No physical-device or non-Chromium session; required hardware/services are
+  unavailable.

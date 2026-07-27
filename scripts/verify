@@ -24,6 +24,7 @@ run_step npm run typecheck
 run_step npm run test
 run_step npm run balance
 run_step npm run build
+run_step npm audit --omit=dev --audit-level=high
 run_step npm run test:e2e
 run_step npm run test:e2e:pages
 

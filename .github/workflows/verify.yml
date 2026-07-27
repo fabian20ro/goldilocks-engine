@@ -13,58 +13,219 @@ concurrency:
   group: verify-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  npm_config_cache: ${{ github.workspace }}/.cache/npm
+  PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/ms-playwright
+  PLAYWRIGHT_INSTALL_DEPS: "1"
+  XDG_CACHE_HOME: ${{ github.workspace }}/.cache/xdg
+
 jobs:
-  canonical:
-    name: Canonical verification (${{ github.sha }})
+  static-unit-build:
+    name: Static, unit, and build (${{ github.sha }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    env:
-      npm_config_cache: ${{ github.workspace }}/.cache/npm
-      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/ms-playwright
-      PLAYWRIGHT_INSTALL_DEPS: "1"
-      XDG_CACHE_HOME: ${{ github.workspace }}/.cache/xdg
+    timeout-minutes: 20
     steps:
       - name: Check out frozen candidate
         uses: actions/checkout@v6
 
-      - name: Set up Node
-        uses: actions/setup-node@v6
+      - name: Prepare static, unit, and build lane
+        uses: ./.github/actions/prepare-verification-lane
         with:
-          node-version: 22
-          cache: npm
+          lane: static-unit-build
 
-      - name: Record exact candidate identity
+      - name: Run static checks, unit tests, build, and production audit
         shell: bash
         run: |
           set -euo pipefail
-          actual="$(git rev-parse HEAD)"
-          test "$actual" = "$GITHUB_SHA"
-          mkdir -p .cache/verification
-          {
-            printf 'candidate_sha=%s\n' "$actual"
-            printf 'workflow=%s\n' "$GITHUB_WORKFLOW"
-            printf 'run_id=%s\n' "$GITHUB_RUN_ID"
-            printf 'run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
-            printf 'runner_os=%s\n' "$RUNNER_OS"
-            printf 'node=%s\n' "$(node --version)"
-            printf 'npm=%s\n' "$(npm --version)"
-          } > .cache/verification/metadata.txt
-          cat .cache/verification/metadata.txt >> "$GITHUB_STEP_SUMMARY"
+          log="$VERIFICATION_EVIDENCE_DIR/checks.log"
+          : > "$log"
+          run_logged() {
+            "$@" 2>&1 | tee -a "$log"
+          }
+          run_logged npm run format:check
+          run_logged npm run lint
+          run_logged npm run typecheck
+          run_logged npm run test
+          run_logged npm run build
+          run_logged npm audit --omit=dev --audit-level=high
 
-      - name: Run canonical complete verification
-        run: ./scripts/verify
-
-      - name: Upload verification evidence
+      - name: Upload static, unit, and build evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: verification-evidence-${{ github.sha }}
+          name: verify-static-unit-build-${{ github.sha }}
           path: |
-            .cache/verification
-            playwright-report
-            playwright-pages-report
-            test-results
+            .cache/verification/static-unit-build
             coverage
           if-no-files-found: error
           include-hidden-files: true
           retention-days: 14
+
+  balances:
+    name: Deterministic balances (${{ github.sha }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out frozen candidate
+        uses: actions/checkout@v6
+
+      - name: Prepare deterministic balances lane
+        uses: ./.github/actions/prepare-verification-lane
+        with:
+          lane: balances
+
+      - name: Run deterministic balance sweeps
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run balance 2>&1 | tee "$VERIFICATION_EVIDENCE_DIR/balances.log"
+
+      - name: Upload deterministic balance evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: verify-balances-${{ github.sha }}
+          path: .cache/verification/balances
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 14
+
+  portrait-smoke:
+    name: Early 320px portrait smoke (${{ github.sha }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out frozen candidate
+        uses: actions/checkout@v6
+
+      - name: Prepare 320px portrait smoke lane
+        uses: ./.github/actions/prepare-verification-lane
+        with:
+          lane: portrait-smoke
+          install-playwright: "1"
+
+      - name: Run 320px portrait and reduced-motion smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run test:e2e -- tests/e2e/game.spec.ts --grep 'renders and remains reachable at 320px|honors reduced motion and remains usable at 150% text scale' --reporter=line 2>&1 | tee "$VERIFICATION_EVIDENCE_DIR/portrait-smoke.log"
+
+      - name: Upload 320px portrait smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: verify-portrait-smoke-${{ github.sha }}
+          path: |
+            .cache/verification/portrait-smoke
+            playwright-report
+            test-results
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 14
+
+  root-browser-pwa:
+    name: Root browser and PWA (${{ github.sha }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out frozen candidate
+        uses: actions/checkout@v6
+
+      - name: Prepare root browser and PWA lane
+        uses: ./.github/actions/prepare-verification-lane
+        with:
+          lane: root-browser-pwa
+          install-playwright: "1"
+
+      - name: Run complete root browser and PWA suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run test:e2e 2>&1 | tee "$VERIFICATION_EVIDENCE_DIR/root-browser-pwa.log"
+
+      - name: Upload root browser and PWA evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: verify-root-browser-pwa-${{ github.sha }}
+          path: |
+            .cache/verification/root-browser-pwa
+            playwright-report
+            test-results
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 14
+
+  pages-offline:
+    name: Pages and offline (${{ github.sha }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out frozen candidate
+        uses: actions/checkout@v6
+
+      - name: Prepare Pages and offline lane
+        uses: ./.github/actions/prepare-verification-lane
+        with:
+          lane: pages-offline
+          install-playwright: "1"
+
+      - name: Run complete Pages and offline suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run test:e2e:pages 2>&1 | tee "$VERIFICATION_EVIDENCE_DIR/pages-offline.log"
+
+      - name: Upload Pages and offline evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: verify-pages-offline-${{ github.sha }}
+          path: |
+            .cache/verification/pages-offline
+            playwright-pages-report
+            test-results
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 14
+
+  aggregate:
+    name: Verification aggregate (${{ github.sha }})
+    if: always()
+    needs:
+      - static-unit-build
+      - balances
+      - portrait-smoke
+      - root-browser-pwa
+      - pages-offline
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out frozen candidate
+        uses: actions/checkout@v6
+
+      - name: Require every verification lane
+        shell: bash
+        env:
+          STATIC_UNIT_BUILD: ${{ needs.static-unit-build.result }}
+          BALANCES: ${{ needs.balances.result }}
+          PORTRAIT_SMOKE: ${{ needs.portrait-smoke.result }}
+          ROOT_BROWSER_PWA: ${{ needs.root-browser-pwa.result }}
+          PAGES_OFFLINE: ${{ needs.pages-offline.result }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$GITHUB_SHA"
+          {
+            printf 'candidate_sha=%s\n' "$actual"
+            printf 'static_unit_build=%s\n' "$STATIC_UNIT_BUILD"
+            printf 'balances=%s\n' "$BALANCES"
+            printf 'portrait_smoke=%s\n' "$PORTRAIT_SMOKE"
+            printf 'root_browser_pwa=%s\n' "$ROOT_BROWSER_PWA"
+            printf 'pages_offline=%s\n' "$PAGES_OFFLINE"
+          } >> "$GITHUB_STEP_SUMMARY"
+          test "$STATIC_UNIT_BUILD" = success
+          test "$BALANCES" = success
+          test "$PORTRAIT_SMOKE" = success
+          test "$ROOT_BROWSER_PWA" = success
+          test "$PAGES_OFFLINE" = success
