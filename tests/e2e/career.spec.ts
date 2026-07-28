@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 
@@ -18,6 +18,45 @@ async function openCareer(page: Page): Promise<void> {
   ).toBeVisible();
 }
 
+async function openTab(page: Page, name: string): Promise<void> {
+  await page
+    .getByRole("navigation", { name: "Primary" })
+    .getByRole("button", { name, exact: true })
+    .click();
+}
+
+async function waitForHumanPacedWorkerTicks(page: Page): Promise<void> {
+  // The Worker ticks every 500ms. Wait through two real publications rather
+  // than asserting immediately after an input change.
+  await page.waitForTimeout(1_150);
+}
+
+async function touchTap(page: Page, target: Locator): Promise<void> {
+  await target.scrollIntoViewIfNeeded();
+  const box = await target.boundingBox();
+  if (!box) throw new Error("Expected a visible Career hour token");
+  const session = await page.context().newCDPSession(page);
+  const point = { x: box.x + box.width / 2, y: box.y + box.height / 2, id: 1 };
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [point],
+  });
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  });
+  await session.detach();
+}
+
+async function expectFreelanceDraft(page: Page, hours: number): Promise<void> {
+  await expect(page.getByLabel("Freelance delivery evening hours")).toHaveValue(
+    String(hours),
+  );
+  await expect(
+    page.getByText(new RegExp(`^Scheduled: ${hours.toFixed(2)}h\\.`)),
+  ).toBeVisible();
+}
+
 async function savedCareer(page: Page): Promise<{
   schemaVersion?: number;
   migration?: { steps?: string[] };
@@ -25,8 +64,12 @@ async function savedCareer(page: Page): Promise<{
     schedule?: {
       completedEvenings?: number;
       allocations?: Record<string, number>;
+      day?: number;
+      hoursRemaining?: number;
     };
     freelanceHours?: number;
+    competition?: { progress?: number };
+    product?: { buildProgress?: number };
     offlinePolicy?: {
       enabled?: boolean;
       lastReport?: { appliedHours?: number };
@@ -230,5 +273,176 @@ test.describe("Bedroom Developer career acceptance", () => {
         document.documentElement.clientWidth,
     );
     expect(overflow).toBe(false);
+  });
+
+  for (const { width, height } of [
+    { width: 320, height: 693 },
+    { width: 393, height: 742 },
+  ]) {
+    test(`keeps a human-paced App-session draft through Worker ticks, speed, pause, and tabs at ${width}px`, async ({
+      page,
+    }) => {
+      const errors: string[] = [];
+      page.on("pageerror", (error) => errors.push(error.message));
+      page.on("console", (message) => {
+        if (message.type() === "error") errors.push(message.text());
+      });
+      await page.setViewportSize({ width, height });
+      await page.goto("/");
+      await waitForSavedState(page);
+      await openCareer(page);
+
+      const freelance = page.getByLabel("Freelance delivery evening hours");
+      await freelance.focus();
+      await page.keyboard.press("ControlOrMeta+A");
+      await page.keyboard.type("3");
+      await expectFreelanceDraft(page, 3);
+
+      await waitForHumanPacedWorkerTicks(page);
+      await expectFreelanceDraft(page, 3);
+
+      await page.getByRole("button", { name: "64×" }).click();
+      await waitForHumanPacedWorkerTicks(page);
+      await page.getByRole("button", { name: "1×" }).click();
+      await expectFreelanceDraft(page, 3);
+
+      await openTab(page, "Jobs");
+      await page.getByRole("button", { name: "Pause" }).click();
+      await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
+      await waitForHumanPacedWorkerTicks(page);
+      await openTab(page, "Inspect");
+      await waitForHumanPacedWorkerTicks(page);
+      await openTab(page, "Upgrades");
+      await openCareer(page);
+      await expectFreelanceDraft(page, 3);
+
+      const competitionToken = page.getByRole("button", {
+        name: "Allocate 1 hours to Bedroom Benchmark Cup",
+      });
+      await touchTap(page, competitionToken);
+      await expect(
+        page.getByLabel("Bedroom Benchmark Cup evening hours"),
+      ).toHaveValue("1");
+      await expect(page.getByText(/^Scheduled: 4\.00h\./)).toBeVisible();
+      await waitForHumanPacedWorkerTicks(page);
+      await expect(freelance).toHaveValue("3");
+      await expect(page.getByText(/^Scheduled: 4\.00h\./)).toBeVisible();
+      expect(errors).toEqual([]);
+    });
+  }
+
+  test("keeps drafts session-only, then records exactly one completed evening and its durable outcome", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 393, height: 742 });
+    await page.goto("/");
+    await waitForSavedState(page);
+    await openCareer(page);
+
+    const freelance = page.getByLabel("Freelance delivery evening hours");
+    await freelance.fill("3");
+    await waitForHumanPacedWorkerTicks(page);
+    await expectFreelanceDraft(page, 3);
+    expect(
+      (await savedCareer(page)).career?.schedule?.allocations?.freelance,
+    ).toBe(0);
+
+    await page.reload();
+    await openCareer(page);
+    await expectFreelanceDraft(page, 0);
+
+    await page.getByLabel("Freelance delivery evening hours").fill("3");
+    await page
+      .getByRole("button", {
+        name: "Allocate 1 hours to Bedroom Benchmark Cup",
+      })
+      .click();
+    await expect(page.getByText(/^Scheduled: 4\.00h\./)).toBeVisible();
+    await page.getByRole("button", { name: "Run scheduled evening" }).click();
+    await expect
+      .poll(
+        async () =>
+          (await savedCareer(page)).career?.schedule?.completedEvenings,
+      )
+      .toBe(1);
+
+    const completed = await savedCareer(page);
+    expect(completed.career?.schedule).toMatchObject({
+      completedEvenings: 1,
+      day: 2,
+      hoursRemaining: 4,
+      allocations: {
+        freelance: 0,
+        competition: 0,
+        product: 0,
+        maintenance: 0,
+      },
+    });
+    expect(completed.career?.freelanceHours).toBe(3);
+    expect(completed.career?.competition?.progress).toBeGreaterThan(0);
+    expect(completed.career?.product?.buildProgress).toBe(0);
+    await expectFreelanceDraft(page, 0);
+    await waitForHumanPacedWorkerTicks(page);
+    expect((await savedCareer(page)).career?.schedule?.completedEvenings).toBe(
+      1,
+    );
+
+    await page.reload();
+    await openCareer(page);
+    await expectFreelanceDraft(page, 0);
+    const reloaded = await savedCareer(page);
+    expect(reloaded.career?.schedule?.completedEvenings).toBe(1);
+    expect(reloaded.career?.freelanceHours).toBe(3);
+    await expect(page.getByText(/gross from 3\.00h/)).toBeVisible();
+  });
+
+  test("shows a Worker rejection without replacing the current valid draft", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 393, height: 742 });
+    await page.goto("/");
+    await waitForSavedState(page);
+    await openCareer(page);
+    await page.getByRole("button", { name: "Run scheduled evening" }).click();
+    await expect(page.locator(".career-schedule-feedback")).toContainText(
+      /Worker rejected the scheduled evening:.*No evening was run/i,
+    );
+    await expectFreelanceDraft(page, 0);
+  });
+
+  test("recovers a malformed durable Career schedule without reviving a draft", async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.setViewportSize({ width: 393, height: 742 });
+    await page.goto("/");
+    await waitForSavedState(page);
+    await page.evaluate((key) => {
+      const saved = JSON.parse(localStorage.getItem(key) ?? "null") as {
+        career?: { schedule?: { allocations?: Record<string, unknown> } };
+      };
+      if (!saved.career?.schedule?.allocations)
+        throw new Error("Expected a Career schedule fixture");
+      saved.career.schedule.allocations = {
+        freelance: 4,
+        competition: 4,
+        product: 4,
+        maintenance: 4,
+      };
+      localStorage.setItem(key, JSON.stringify(saved));
+    }, SAVE_KEY);
+
+    await page.reload();
+    await waitForSavedState(page);
+    await openCareer(page);
+    await expectFreelanceDraft(page, 0);
+    expect((await savedCareer(page)).career?.schedule?.allocations).toEqual({
+      freelance: 0,
+      competition: 0,
+      product: 0,
+      maintenance: 0,
+    });
+    expect(errors).toEqual([]);
   });
 });

@@ -184,3 +184,34 @@
 - **Reversal condition:** Change the 8px floor or short-portrait spacing only
   through explicit product direction backed by cross-platform portrait and
   accessibility evidence.
+
+## D-019 — App-session Career schedule draft
+
+- **Decision:** The four-route Career composer is an App-session-only draft.
+  The Worker remains authoritative for committed schedule, outcomes,
+  persistence, restore, reset, replay, and rejection messages. An unfinished
+  draft is never written to storage and is not a Worker command on its own.
+- **Synchronization boundary:** Initialize from the restored Worker schedule at
+  app-session start. Ignore ordinary Worker publication identity, ticks,
+  speed/pause changes, and tab remounts. Replace the draft only after a Worker
+  confirms a completed evening, a reset/replay, or a run ending. A reload may
+  discard an unrun draft and restore only the durable Worker schedule.
+- **Command boundary:** Running an evening sends the existing ordered batch of
+  all four `SET_EVENING_ALLOCATION` commands followed by one `RUN_EVENING`.
+  Local quarter-hour/cap validation makes that batch finite and bounded; no
+  Redux/Zustand/XState, schema change, extra persistence key, or new Worker
+  command is introduced.
+- **Failure boundary:** A Worker rejection leaves the valid local draft intact
+  and remains visible in the Career composer until a later successful evening
+  closes it.
+- **Reason:** Worker ticks structured-clone nested allocation objects. Syncing
+  a view-local draft from that object identity erased player work roughly every
+  500ms, including between ordinary human-paced edits.
+- **Evidence policy:** Candidate unit, Worker/protocol, durable-publication,
+  and pinned Playwright coverage exercise cloned tick publications, 1×/64×,
+  paused Jobs, tab visits, keyboard/touch entry, reload, malformed restore,
+  rejection, one atomic durable evening, 320/393 portraits, and repeated
+  human-paced interaction.
+- **Reversal condition:** Change this ownership or persistence boundary only
+  through explicit product direction with equivalent Worker, persistence, and
+  browser evidence.

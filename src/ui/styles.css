@@ -2282,6 +2282,17 @@ h2 {
   grid-column: 1 / -1;
 }
 
+.career-schedule-feedback {
+  margin: 0 0.75rem 0.75rem;
+  padding: 0.65rem;
+  border: 1px solid #8f6731;
+  border-radius: 0.4rem;
+  background: #251d12;
+  color: #ffd3a2;
+  font-size: 0.66rem;
+  line-height: 1.42;
+}
+
 .career-project-grid {
   display: grid;
   gap: 1px;

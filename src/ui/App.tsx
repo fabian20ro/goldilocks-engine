@@ -53,6 +53,12 @@ import {
   StatusGauge,
 } from "./commandDeck";
 import {
+  createCareerScheduleCommandBatch,
+  latestCareerScheduleWorkerRejection,
+  type CareerScheduleDraft,
+  useCareerScheduleDraft,
+} from "./careerScheduleDraft";
+import {
   careerGlyph,
   DecorativeGlyph,
   glyphs,
@@ -2503,16 +2509,19 @@ function CareerView({
   state,
   command,
   commandBatch,
+  scheduleDraft,
+  scheduledDraftHours,
+  onScheduleDraftChange,
 }: {
   state: SimulationState;
   command: (command: SimulationCommand) => void;
   commandBatch: (commands: readonly SimulationCommand[]) => void;
+  scheduleDraft: CareerScheduleDraft;
+  scheduledDraftHours: number;
+  onScheduleDraftChange: (route: CareerRoute, value: number) => void;
 }) {
   const career = state.career;
   const [savingsAmount, setSavingsAmount] = useState(1);
-  const [scheduleDraft, setScheduleDraft] = useState<
-    Record<CareerRoute, number>
-  >(() => ({ ...career.schedule.allocations }));
   const [offlineDraft, setOfflineDraft] = useState(() => ({
     enabled: career.offlinePolicy.enabled,
     maxHours: career.offlinePolicy.maxHours,
@@ -2521,42 +2530,13 @@ function CareerView({
     minReliability: career.offlinePolicy.minReliability,
   }));
 
-  useEffect(() => {
-    setScheduleDraft({ ...career.schedule.allocations });
-  }, [career.schedule.allocations, career.schedule.completedEvenings]);
-
   if (career.runEnding)
     return <RunEndingView state={state} command={command} />;
 
   const conclusion = independentRunReadiness(state);
-
-  const updateRouteHours = (route: CareerRoute, value: number) => {
-    if (!Number.isFinite(value)) return;
-    setScheduleDraft((draft) => {
-      const otherHours = (Object.keys(draft) as CareerRoute[]).reduce(
-        (total, candidate) =>
-          total + (candidate === route ? 0 : draft[candidate]),
-        0,
-      );
-      return {
-        ...draft,
-        [route]: Math.max(0, Math.min(4 - otherHours, value)),
-      };
-    });
-  };
-  const scheduledDraftHours = Object.values(scheduleDraft).reduce(
-    (total, hours) => total + hours,
-    0,
-  );
+  const workerScheduleRejection = latestCareerScheduleWorkerRejection(state);
   const runDraft = () => {
-    commandBatch([
-      ...bedroomCareerRoutes.map((route) => ({
-        type: "SET_EVENING_ALLOCATION" as const,
-        route: route.id,
-        hours: scheduleDraft[route.id],
-      })),
-      { type: "RUN_EVENING" },
-    ]);
+    commandBatch(createCareerScheduleCommandBatch(scheduleDraft));
   };
 
   return (
@@ -2661,7 +2641,7 @@ function CareerView({
                       }
                       aria-label={`Allocate ${hour} hours to ${route.name}`}
                       aria-pressed={scheduleDraft[route.id] === hour}
-                      onClick={() => updateRouteHours(route.id, hour)}
+                      onClick={() => onScheduleDraftChange(route.id, hour)}
                     >
                       {scheduleDraft[route.id] >= hour ? "●" : "○"}
                     </button>
@@ -2676,7 +2656,7 @@ function CareerView({
                   value={scheduleDraft[route.id]}
                   aria-label={`${route.name} evening hours`}
                   onChange={(event) =>
-                    updateRouteHours(
+                    onScheduleDraftChange(
                       route.id,
                       event.currentTarget.valueAsNumber,
                     )
@@ -2695,6 +2675,12 @@ function CareerView({
             currently equipped rig, local model, and configured pipeline costs.
           </p>
         </div>
+        {workerScheduleRejection ? (
+          <p className="career-schedule-feedback" role="status">
+            <strong>Worker rejected the scheduled evening:</strong>{" "}
+            {workerScheduleRejection}
+          </p>
+        ) : null}
       </section>
 
       <section className="panel" aria-labelledby="funding-title">
@@ -3457,6 +3443,9 @@ function InspectView({
 export function App() {
   const { state, command, commandBatch, timeSpeed, setTimeSpeed } =
     useSimulation();
+  // CareerView is conditionally mounted by tab. Keep this unsubmitted schedule
+  // at App scope so Worker ticks and tab visits cannot erase player edits.
+  const careerScheduleDraft = useCareerScheduleDraft(state);
   const [tab, setTab] = useState<TabId>("build");
   const [selected, setSelected] = useState<PendingPlacement | null>(null);
   const [moduleDetail, setModuleDetail] = useState<ModuleDetail | null>(null);
@@ -3900,6 +3889,9 @@ export function App() {
               state={state}
               command={command}
               commandBatch={commandBatch}
+              scheduleDraft={careerScheduleDraft.draft}
+              scheduledDraftHours={careerScheduleDraft.scheduledHours}
+              onScheduleDraftChange={careerScheduleDraft.setRouteHours}
             />
           ) : tab === "upgrades" ? (
             <UpgradesView

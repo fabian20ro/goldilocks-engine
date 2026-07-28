@@ -15,6 +15,11 @@ import {
   SAVE_KEY,
   useSimulation,
 } from "./useSimulation";
+import {
+  createCareerScheduleCommandBatch,
+  normalizeCareerScheduleDraft,
+  replaceCareerScheduleHours,
+} from "./careerScheduleDraft";
 
 class FakeWorker {
   static instances: FakeWorker[] = [];
@@ -164,6 +169,63 @@ describe("durable Worker state publication", () => {
     ).toBe("basic-cleaner");
     expect(document.documentElement.dataset.offlineReady).toBe("true");
 
+    unmount();
+  });
+
+  it("persists a full Career evening only after its one Worker batch completes", async () => {
+    const { result, unmount } = renderHook(() => useSimulation());
+    const worker = FakeWorker.instances[0];
+    if (!worker) throw new Error("Expected the simulation Worker");
+
+    const initial = createInitialState(2031);
+    act(() => worker.emit({ type: "STATE", state: initial }));
+    const draft = replaceCareerScheduleHours(
+      replaceCareerScheduleHours(
+        normalizeCareerScheduleDraft(initial.career.schedule.allocations),
+        "freelance",
+        3,
+      ),
+      "competition",
+      1,
+    );
+    const commands = createCareerScheduleCommandBatch(draft);
+
+    act(() => result.current.commandBatch(commands));
+    const batch = worker.requests.at(-1);
+    expect(batch?.type).toBe("COMMAND_BATCH");
+    if (!batch || batch.type !== "COMMAND_BATCH")
+      throw new Error("Expected one Career command batch");
+    expect(batch.commands).toEqual(commands);
+    const beforeCompletion = JSON.parse(
+      localStorage.getItem(SAVE_KEY) ?? "null",
+    ) as typeof initial;
+    expect(beforeCompletion.career.schedule.completedEvenings).toBe(0);
+    expect(beforeCompletion.career.freelanceHours).toBe(0);
+
+    const completed = reduceWorkerRequest(initial, batch);
+    act(() => {
+      worker.emit({
+        type: "STATE",
+        state: completed,
+        requestId: batch.requestId,
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.state.career.schedule.completedEvenings).toBe(1);
+    });
+    const durable = JSON.parse(
+      localStorage.getItem(SAVE_KEY) ?? "null",
+    ) as typeof completed;
+    expect(durable).toEqual(result.current.state);
+    expect(durable.career.freelanceHours).toBe(3);
+    expect(durable.career.competition.progress).toBeGreaterThan(0);
+    expect(durable.career.schedule.allocations).toEqual({
+      freelance: 0,
+      competition: 0,
+      product: 0,
+      maintenance: 0,
+    });
     unmount();
   });
 
