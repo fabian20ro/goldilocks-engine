@@ -423,6 +423,82 @@ test.describe("Bedroom Developer career acceptance", () => {
     );
   });
 
+  test("visibly holds a failed Career save until a later Worker persistence retry succeeds", async ({
+    page,
+  }) => {
+    await page.addInitScript((key) => {
+      const state = window as Window & {
+        __careerPersistenceFailure?: { failWrites: boolean };
+      };
+      const originalSetItem = Storage.prototype.setItem;
+      state.__careerPersistenceFailure = { failWrites: false };
+      Object.defineProperty(Storage.prototype, "setItem", {
+        configurable: true,
+        value(this: Storage, candidateKey: string, value: string): void {
+          if (
+            candidateKey === key &&
+            state.__careerPersistenceFailure?.failWrites
+          )
+            throw new DOMException(
+              "storage quota exhausted",
+              "QuotaExceededError",
+            );
+          originalSetItem.call(this, candidateKey, value);
+        },
+      });
+    }, SAVE_KEY);
+
+    await page.setViewportSize({ width: 393, height: 742 });
+    await page.goto("/");
+    await waitForSavedState(page);
+    await openCareer(page);
+    await page.getByLabel("Freelance delivery evening hours").fill("4");
+    await page.evaluate(() => {
+      const state = window as Window & {
+        __careerPersistenceFailure?: { failWrites: boolean };
+      };
+      if (!state.__careerPersistenceFailure)
+        throw new Error("Expected Career persistence failure fixture");
+      state.__careerPersistenceFailure.failWrites = true;
+    });
+
+    const run = page.getByRole("button", { name: "Run scheduled evening" });
+    await run.click();
+    await expect(page.getByText("Night 2", { exact: true })).toBeVisible();
+    await expect(run).toBeDisabled();
+    await expect(
+      page.getByText(/Saving is temporarily unavailable/i),
+    ).toBeVisible();
+    await waitForHumanPacedWorkerTicks(page);
+    expect((await savedCareer(page)).career?.schedule?.completedEvenings).toBe(
+      0,
+    );
+
+    await page.evaluate(() => {
+      const state = window as Window & {
+        __careerPersistenceFailure?: { failWrites: boolean };
+      };
+      if (!state.__careerPersistenceFailure)
+        throw new Error("Expected Career persistence recovery fixture");
+      state.__careerPersistenceFailure.failWrites = false;
+    });
+    await expect
+      .poll(
+        async () =>
+          (await savedCareer(page)).career?.schedule?.completedEvenings,
+      )
+      .toBe(1);
+    await expect(run).toBeEnabled();
+    await expect(
+      page.getByText(/Saving is temporarily unavailable/i),
+    ).toBeHidden();
+    await page.reload();
+    await openCareer(page);
+    expect((await savedCareer(page)).career?.schedule?.completedEvenings).toBe(
+      1,
+    );
+  });
+
   test("shows a Worker rejection without replacing the current valid draft", async ({
     page,
   }) => {

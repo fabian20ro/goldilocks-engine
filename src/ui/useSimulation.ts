@@ -29,6 +29,9 @@ export const OFFLINE_SAVED_AT_KEY = "goldilocks-simulation-offline-saved-at-v1";
 const isTimeSpeed = (value: number): value is TimeSpeed =>
   TIME_SPEEDS.some((speed) => speed === value);
 
+const isDurableRequestId = (value: unknown): value is number =>
+  typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+
 function loadSavedState(): unknown {
   try {
     const serialized =
@@ -86,11 +89,16 @@ export function useSimulation() {
   );
   const workerRef = useRef<Worker | null>(null);
   const nextRequestIdRef = useRef(1);
+  // A later Worker publication includes every command processed before it.
+  // Keep that watermark separate from the last *persisted* acknowledgement.
+  const highestWorkerRequestIdRef = useRef(0);
   const initialOfflineHoursRef = useRef(offlineElapsedHours());
   const initialOfflineAppliedRef = useRef(false);
   const speedRef = useRef<TimeSpeed>(1);
   const [timeSpeed, setTimeSpeedState] = useState<TimeSpeed>(1);
   const [lastDurableRequestId, setLastDurableRequestId] = useState(0);
+  const [hasDurablePersistenceFailure, setHasDurablePersistenceFailure] =
+    useState(false);
 
   const postDurableRequest = useCallback((request: DurableWorkerRequest) => {
     const worker = workerRef.current;
@@ -110,18 +118,25 @@ export function useSimulation() {
     worker.addEventListener(
       "message",
       (event: MessageEvent<WorkerResponse>) => {
+        if (isDurableRequestId(event.data.requestId))
+          highestWorkerRequestIdRef.current = Math.max(
+            highestWorkerRequestIdRef.current,
+            event.data.requestId,
+          );
         const durable = persistBeforePublish(
           event.data.state,
           persistState,
           setState,
         );
         acknowledgeDurableState(event.data.requestId, durable);
-        if (
-          Number.isSafeInteger(event.data.requestId) &&
-          (event.data.requestId ?? 0) > 0
-        )
+        setHasDurablePersistenceFailure(!durable);
+        // A Worker response is not itself a durable acknowledgement. Only a
+        // successful write may release Career's exact-once Run lock. A later
+        // persisted tick/response safely covers every previously observed
+        // command because this Worker processes requests in order.
+        if (durable && highestWorkerRequestIdRef.current > 0)
           setLastDurableRequestId((current) =>
-            Math.max(current, event.data.requestId ?? 0),
+            Math.max(current, highestWorkerRequestIdRef.current),
           );
         if (
           !initialOfflineAppliedRef.current &&
@@ -184,6 +199,7 @@ export function useSimulation() {
     state,
     command,
     commandBatch,
+    hasDurablePersistenceFailure,
     lastDurableRequestId,
     timeSpeed,
     setTimeSpeed,

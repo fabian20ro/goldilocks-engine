@@ -1,4 +1,4 @@
-# Candidate handoff — round 052 Career scheduling repair
+# Candidate handoff — round 053 Career durable-save recovery
 
 ## Implemented behavior summary
 
@@ -21,6 +21,10 @@
   its batch and stays disabled until its own durable Worker request ID is
   acknowledged. Rapid pointer/click activation cannot enqueue a second evening;
   an acknowledged Worker rejection releases the control and retains the draft.
+- A Worker response now counts as a Career acknowledgement only after its state
+  writes successfully to storage. A failed save keeps the in-memory outcome
+  and Run lock, visibly reports automatic retry, and accepts a later persisted
+  ordered Worker publication as recovery without reposting the evening.
 - Worker schedule rejection is visible in Career and leaves the valid local
   draft intact. A later completed evening clears that rejection.
 - No state library, schema/storage key, Worker command, simulation rule, or
@@ -36,6 +40,7 @@
 | Quarter-hour/cap/full/zero replacement behavior          | `careerScheduleDraft.test.tsx` pure-helper coverage                                                                                               |
 | Rejection remains visible without draft loss             | hook/browser failure-recovery test; acknowledgment releases Run without clearing the draft                                                        |
 | Singular exact-once Run activation                       | request-ID hook regression; candidate browser assertion and retained verifier double-activation repeats                                           |
+| Storage-failure acknowledgement/recovery                 | candidate hook + 393px browser `QuotaExceededError` recovery; immutable V-059 unit/browser regression                                             |
 | Portrait/input/accessibility/session behavior            | 320×693 and 393×742 keyboard/touch/tick/speed/pause/tab tests; retained 200%-text/reduced-motion/control geometry checks                          |
 | Reload/outcome/persistence/malformed recovery            | candidate browser test proves pre-run draft discard, exactly one durable completed evening, post-run reload; malformed test proves blank recovery |
 | Human-paced regression evidence                          | 393px Worker-tick flow repeated 25/25 without retries or weakened assertions                                                                      |
@@ -50,7 +55,12 @@
   four-route-plus-Run batch as one schedule replacement. Candidate and retained
   verifier unit/protocol coverage restore 4h competition, revise to 4h
   freelance, and complete exactly one freelance evening.
-- Immutable rounds 001–051 and verifier-owned regressions remain unchanged.
+- V-059 — failed durable save: a Worker response no longer advances the Career
+  acknowledgement watermark when persistence fails. The visible in-memory
+  outcome remains locked until a later successfully persisted ordered Worker
+  publication proves it durable; candidate and retained verifier coverage force
+  storage failure and recovery without a duplicate evening.
+- Immutable rounds 001–052 and verifier-owned regressions remain unchanged.
 
 ## Setup, startup, browser, and verification commands
 
@@ -89,11 +99,13 @@ E2E_PORT=4174 ./scripts/verify
 Focused Career commands:
 
 ```sh
-npx vitest run src/ui/careerScheduleDraft.test.tsx src/ui/useSimulation.test.tsx src/ui/verifierRound051.test.ts src/simulation/workerProtocol.test.ts --coverage.enabled=false --reporter=dot
+npx vitest run src/ui/careerScheduleDraft.test.tsx src/ui/useSimulation.test.tsx src/ui/verifierRound051.test.ts src/ui/verifierRound052.test.tsx src/simulation/workerProtocol.test.ts --coverage.enabled=false --reporter=dot
 E2E_PORT=4181 npm run test:e2e -- tests/e2e/career.spec.ts --reporter=dot
 E2E_PORT=4182 npm run test:e2e -- tests/e2e/career.spec.ts --grep "human-paced.*393px" --repeat-each=25 --reporter=dot
 E2E_PORT=4183 npm run test:e2e -- tests/e2e/verifier-round-051.spec.ts --repeat-each=10 --reporter=dot
 E2E_PORT=4184 npm run test:e2e -- tests/e2e/career.spec.ts --grep "serializes rapid Run activation" --repeat-each=25 --reporter=dot
+E2E_PORT=4185 npm run test:e2e -- tests/e2e/career.spec.ts tests/e2e/verifier-round-052.spec.ts --reporter=dot
+E2E_PORT=4186 npm run test:e2e -- tests/e2e/career.spec.ts tests/e2e/verifier-round-052.spec.ts --grep "failed Career save|failed durable persistence" --repeat-each=10 --reporter=dot
 ```
 
 `@playwright/test` is pinned in `package.json`; `npm run test:e2e` uses only
@@ -118,13 +130,19 @@ every browser command above.
 - `useSimulation` exposes only a monotonic acknowledgement of already-persisted
   durable Worker request IDs. Career uses that existing protocol response to
   release its UI-only exact-once lock after success or rejection.
+- D-020 separates a Worker response from durable acknowledgement. The
+  acknowledgement watermark advances only after storage succeeds; a later
+  persisted ordered Worker snapshot covers the failed request and releases its
+  lock without another command.
 
 ## Known limitations and risks
 
 - No physical mobile device, non-Chromium engine, native screen-reader speech,
   battery/thermal, or storage-quota interruption run was available. Pinned
   Chromium covers required portrait, touch, keyboard, scaling, motion,
-  persistence, reload, offline, and failure/recovery paths.
+  persistence, reload, offline, and failure/recovery paths; an injected
+  `QuotaExceededError` covers the storage-failure boundary rather than a
+  physical quota exhaustion.
 - Full `npm audit` still reports five high development-only ESLint-chain
   findings. Canonical production audit (`--omit=dev --audit-level=high`) is
   clean; no forced major audit fix was applied.
@@ -133,21 +151,24 @@ every browser command above.
 
 ## Checks executed before handoff
 
-- Red baseline Chromium probe at 393×742 — confirmed `3.00h → 0.00h` after
-  1.15 seconds/two Worker ticks.
-- Focused hook/Worker/durable-publication plus retained verifier unit tests —
-  22/22 passed.
-- Candidate Career browser suite — 11/11 passed.
-- Retained verifier V-057 browser regression — 10/10 passed.
-- Human-paced 393px candidate flow — 25/25 passed in 2.9 minutes after the
-  repaired exact-once and restored-schedule paths.
-- `./scripts/run` — Vite ready at `127.0.0.1:4173` in 161ms; loopback GET
+- Red V-059 baseline — immutable verifier unit and 393×742 browser probes both
+  showed an enabled Run control after a `QuotaExceededError` save failure.
+- Focused hook/Worker/durable-publication plus retained V-051/V-052 verifier
+  unit tests — 25/25 passed.
+- Candidate Career browser suite plus immutable V-059 browser regression —
+  13/13 passed.
+- Candidate and immutable V-059 `QuotaExceededError` failure/recovery probes —
+  20/20 repeated browser runs passed.
+- Retained V-057 rapid Run regression — 10/10 repeated browser runs passed.
+- Human-paced 393px candidate flow — 25/25 passed after the repaired durable
+  acknowledgement path.
+- `./scripts/run` — Vite ready at `127.0.0.1:4173` in 125ms; loopback GET
   returned HTTP 200; Ctrl-C stopped it and the next GET returned connection
   refused (`000`).
 - `E2E_PORT=4174 ./scripts/verify` — completed successfully from fresh `npm ci`:
-  format; lint; typecheck; 33 unit/property files / 168 tests; numeric,
+  format; lint; typecheck; 34 unit/property files / 171 tests; numeric,
   first-session, 20,001-seed upgrade, progression, Career, and evaluation
-  balances; build; production audit (0 vulnerabilities); 169/169 root E2E;
+  balances; build; production audit (0 vulnerabilities); 171/171 root E2E;
   2/2 Pages/offline E2E.
 
 ## Checks not run

@@ -227,3 +227,29 @@
 - **Reversal condition:** Change this ownership or persistence boundary only
   through explicit product direction with equivalent Worker, persistence, and
   browser evidence.
+
+## D-020 — Storage-confirmed Career Run acknowledgement
+
+- **Decision:** A Worker `STATE` response and a durable acknowledgement are
+  distinct. A Career Run remains in flight after an in-memory response whose
+  save fails; its request ID advances the App-session exact-once lock only
+  after a successful persistence write has published a state that includes the
+  request.
+- **Recovery boundary:** Worker responses are ordered. Therefore a later
+  successfully persisted Worker response, including a normal tick publication,
+  safely acknowledges every previously observed request ID represented by that
+  snapshot. This clears the Run lock without reposting the evening. While a
+  save is failing, Career visibly explains that it is retrying, keeps Run
+  disabled, and preserves the in-memory result so freeing storage can recover
+  automatically.
+- **Reason:** Treating every Worker response as durable allowed a failed
+  localStorage write to unlock Run and invite a duplicate evening even though
+  the first result would disappear on reload.
+- **Evidence policy:** Candidate hook coverage and pinned 393px Playwright
+  force `QuotaExceededError`, prove Run remains locked until a later persisted
+  Worker state, check the visible recovery message, and retain
+  the immutable round-052 verifier unit/browser regression. Canonical
+  verification remains required.
+- **Reversal condition:** Change the response/persistence distinction or the
+  retry acknowledgement watermark only through explicit product direction with
+  equivalent deterministic, storage-failure, and browser recovery evidence.

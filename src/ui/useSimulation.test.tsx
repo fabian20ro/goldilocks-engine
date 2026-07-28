@@ -19,6 +19,7 @@ import {
   createCareerScheduleCommandBatch,
   normalizeCareerScheduleDraft,
   replaceCareerScheduleHours,
+  useCareerScheduleDraft,
 } from "./careerScheduleDraft";
 
 class FakeWorker {
@@ -81,6 +82,16 @@ class MemoryStorage implements Storage {
 
   setItem(key: string, value: string): void {
     this.values.set(key, value);
+  }
+}
+
+class FlakyStorage extends MemoryStorage {
+  failWrites = false;
+
+  override setItem(key: string, value: string): void {
+    if (this.failWrites && key === SAVE_KEY)
+      throw new DOMException("storage quota exhausted", "QuotaExceededError");
+    super.setItem(key, value);
   }
 }
 
@@ -227,6 +238,77 @@ describe("durable Worker state publication", () => {
       product: 0,
       maintenance: 0,
     });
+    unmount();
+  });
+
+  it("keeps Career Run locked until a later persisted Worker state covers a failed save", async () => {
+    const storage = new FlakyStorage();
+    vi.stubGlobal("localStorage", storage);
+    const { result, unmount } = renderHook(() => {
+      const simulation = useSimulation();
+      const schedule = useCareerScheduleDraft(
+        simulation.state,
+        simulation.lastDurableRequestId,
+      );
+      return { simulation, schedule };
+    });
+    const worker = FakeWorker.instances[0];
+    if (!worker) throw new Error("Expected the simulation Worker");
+    const initial = createInitialState(2033);
+
+    act(() => worker.emit({ type: "STATE", state: initial }));
+    setOfflineShellReady(true);
+    act(() => result.current.schedule.setRouteHours("freelance", 4));
+    act(() => {
+      expect(
+        result.current.schedule.runScheduledEvening(
+          result.current.simulation.commandBatch,
+        ),
+      ).toBe(true);
+    });
+    const batch = worker.requests.at(-1);
+    if (!batch || batch.type !== "COMMAND_BATCH")
+      throw new Error("Expected one Career command batch");
+
+    storage.failWrites = true;
+    const completed = reduceWorkerRequest(initial, batch);
+    act(() => {
+      worker.emit({
+        type: "STATE",
+        state: completed,
+        requestId: batch.requestId,
+      });
+    });
+
+    await waitFor(() => {
+      expect(
+        result.current.simulation.state.career.schedule.completedEvenings,
+      ).toBe(1);
+    });
+    expect(result.current.simulation.lastDurableRequestId).toBe(0);
+    expect(result.current.simulation.hasDurablePersistenceFailure).toBe(true);
+    expect(result.current.schedule.isRunPending).toBe(true);
+    expect(document.documentElement.dataset.offlineReady).toBe("false");
+    expect(
+      JSON.parse(storage.getItem(SAVE_KEY) ?? "null").career.schedule
+        .completedEvenings,
+    ).toBe(0);
+
+    storage.failWrites = false;
+    // A normal later tick publication contains this completed command state.
+    act(() => worker.emit({ type: "STATE", state: completed }));
+
+    await waitFor(() => {
+      expect(result.current.simulation.lastDurableRequestId).toBe(
+        batch.requestId,
+      );
+      expect(result.current.simulation.hasDurablePersistenceFailure).toBe(
+        false,
+      );
+      expect(result.current.schedule.isRunPending).toBe(false);
+    });
+    expect(document.documentElement.dataset.offlineReady).toBe("true");
+    expect(JSON.parse(storage.getItem(SAVE_KEY) ?? "null")).toEqual(completed);
     unmount();
   });
 

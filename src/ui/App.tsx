@@ -2510,6 +2510,7 @@ function CareerView({
   scheduleDraft,
   scheduledDraftHours,
   onScheduleDraftChange,
+  hasDurablePersistenceFailure,
   isRunPending,
   onRunScheduledEvening,
 }: {
@@ -2518,6 +2519,7 @@ function CareerView({
   scheduleDraft: CareerScheduleDraft;
   scheduledDraftHours: number;
   onScheduleDraftChange: (route: CareerRoute, value: number) => void;
+  hasDurablePersistenceFailure: boolean;
   isRunPending: boolean;
   onRunScheduledEvening: () => boolean;
 }) {
@@ -2670,6 +2672,11 @@ function CareerView({
             className="primary-action"
             disabled={isRunPending}
             aria-busy={isRunPending || undefined}
+            aria-describedby={
+              hasDurablePersistenceFailure
+                ? "career-persistence-recovery"
+                : undefined
+            }
             onClick={onRunScheduledEvening}
           >
             Run scheduled evening
@@ -2679,6 +2686,17 @@ function CareerView({
             currently equipped rig, local model, and configured pipeline costs.
           </p>
         </div>
+        {hasDurablePersistenceFailure ? (
+          <p
+            id="career-persistence-recovery"
+            className="career-schedule-feedback"
+            role="status"
+          >
+            <strong>Saving is temporarily unavailable.</strong> This tab is
+            retrying the latest Worker state. Keep it open and free storage; a
+            submitted evening stays locked until its result is stored.
+          </p>
+        ) : null}
         {workerScheduleRejection ? (
           <p className="career-schedule-feedback" role="status">
             <strong>Worker rejected the scheduled evening:</strong>{" "}
@@ -3449,6 +3467,7 @@ export function App() {
     state,
     command,
     commandBatch,
+    hasDurablePersistenceFailure,
     lastDurableRequestId,
     timeSpeed,
     setTimeSpeed,
@@ -3904,6 +3923,7 @@ export function App() {
               scheduleDraft={careerScheduleDraft.draft}
               scheduledDraftHours={careerScheduleDraft.scheduledHours}
               onScheduleDraftChange={careerScheduleDraft.setRouteHours}
+              hasDurablePersistenceFailure={hasDurablePersistenceFailure}
               isRunPending={careerScheduleDraft.isRunPending}
               onRunScheduledEvening={() =>
                 careerScheduleDraft.runScheduledEvening(commandBatch)
