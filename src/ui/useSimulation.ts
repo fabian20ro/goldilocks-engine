@@ -90,13 +90,15 @@ export function useSimulation() {
   const initialOfflineAppliedRef = useRef(false);
   const speedRef = useRef<TimeSpeed>(1);
   const [timeSpeed, setTimeSpeedState] = useState<TimeSpeed>(1);
+  const [lastDurableRequestId, setLastDurableRequestId] = useState(0);
 
   const postDurableRequest = useCallback((request: DurableWorkerRequest) => {
     const worker = workerRef.current;
-    if (!worker) return;
+    if (!worker) return null;
     const requestId = nextRequestIdRef.current++;
     markDurableCommandPending(requestId);
     worker.postMessage({ ...request, requestId } as WorkerRequest);
+    return requestId;
   }, []);
 
   useEffect(() => {
@@ -114,6 +116,13 @@ export function useSimulation() {
           setState,
         );
         acknowledgeDurableState(event.data.requestId, durable);
+        if (
+          Number.isSafeInteger(event.data.requestId) &&
+          (event.data.requestId ?? 0) > 0
+        )
+          setLastDurableRequestId((current) =>
+            Math.max(current, event.data.requestId ?? 0),
+          );
         if (
           !initialOfflineAppliedRef.current &&
           savedStateRef.current !== undefined &&
@@ -150,7 +159,7 @@ export function useSimulation() {
 
   const command = useCallback(
     (next: SimulationCommand) => {
-      postDurableRequest({
+      return postDurableRequest({
         type: "COMMAND",
         command: next,
       });
@@ -160,7 +169,7 @@ export function useSimulation() {
 
   const commandBatch = useCallback(
     (commands: readonly SimulationCommand[]) => {
-      postDurableRequest({ type: "COMMAND_BATCH", commands });
+      return postDurableRequest({ type: "COMMAND_BATCH", commands });
     },
     [postDurableRequest],
   );
@@ -171,5 +180,12 @@ export function useSimulation() {
     setTimeSpeedState(next);
   }, []);
 
-  return { state, command, commandBatch, timeSpeed, setTimeSpeed };
+  return {
+    state,
+    command,
+    commandBatch,
+    lastDurableRequestId,
+    timeSpeed,
+    setTimeSpeed,
+  };
 }

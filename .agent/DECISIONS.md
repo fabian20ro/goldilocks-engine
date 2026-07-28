@@ -201,6 +201,18 @@
   Local quarter-hour/cap validation makes that batch finite and bounded; no
   Redux/Zustand/XState, schema change, extra persistence key, or new Worker
   command is introduced.
+- **Atomic revision boundary:** A runtime-valid complete Career batch contains
+  each route exactly once followed by `RUN_EVENING`. The Worker applies that
+  known batch against an empty unpublished allocation schedule, then publishes
+  only its final outcome. This lets a valid restored schedule be revised
+  without an intermediate overbook rejection or partial durable schedule;
+  unrelated command batches retain their established ordering semantics.
+- **Exact-once UI boundary:** The existing durable Worker request ID is returned
+  to the Career controller. It synchronously locks the singular Run control
+  before posting and unlocks only after that request or a later monotonic
+  acknowledgement is persisted and published. The lock is App-session UI state,
+  not a simulation command or persistence field; a Worker rejection releases it
+  while retaining the draft.
 - **Failure boundary:** A Worker rejection leaves the valid local draft intact
   and remains visible in the Career composer until a later successful evening
   closes it.

@@ -53,7 +53,6 @@ import {
   StatusGauge,
 } from "./commandDeck";
 import {
-  createCareerScheduleCommandBatch,
   latestCareerScheduleWorkerRejection,
   type CareerScheduleDraft,
   useCareerScheduleDraft,
@@ -2508,17 +2507,19 @@ function RunEndingView({
 function CareerView({
   state,
   command,
-  commandBatch,
   scheduleDraft,
   scheduledDraftHours,
   onScheduleDraftChange,
+  isRunPending,
+  onRunScheduledEvening,
 }: {
   state: SimulationState;
   command: (command: SimulationCommand) => void;
-  commandBatch: (commands: readonly SimulationCommand[]) => void;
   scheduleDraft: CareerScheduleDraft;
   scheduledDraftHours: number;
   onScheduleDraftChange: (route: CareerRoute, value: number) => void;
+  isRunPending: boolean;
+  onRunScheduledEvening: () => boolean;
 }) {
   const career = state.career;
   const [savingsAmount, setSavingsAmount] = useState(1);
@@ -2535,9 +2536,6 @@ function CareerView({
 
   const conclusion = independentRunReadiness(state);
   const workerScheduleRejection = latestCareerScheduleWorkerRejection(state);
-  const runDraft = () => {
-    commandBatch(createCareerScheduleCommandBatch(scheduleDraft));
-  };
 
   return (
     <div className="career-deck">
@@ -2667,7 +2665,13 @@ function CareerView({
           ))}
         </div>
         <div className="career-actions">
-          <button type="button" className="primary-action" onClick={runDraft}>
+          <button
+            type="button"
+            className="primary-action"
+            disabled={isRunPending}
+            aria-busy={isRunPending || undefined}
+            onClick={onRunScheduledEvening}
+          >
             Run scheduled evening
           </button>
           <p>
@@ -3441,11 +3445,20 @@ function InspectView({
 }
 
 export function App() {
-  const { state, command, commandBatch, timeSpeed, setTimeSpeed } =
-    useSimulation();
+  const {
+    state,
+    command,
+    commandBatch,
+    lastDurableRequestId,
+    timeSpeed,
+    setTimeSpeed,
+  } = useSimulation();
   // CareerView is conditionally mounted by tab. Keep this unsubmitted schedule
   // at App scope so Worker ticks and tab visits cannot erase player edits.
-  const careerScheduleDraft = useCareerScheduleDraft(state);
+  const careerScheduleDraft = useCareerScheduleDraft(
+    state,
+    lastDurableRequestId,
+  );
   const [tab, setTab] = useState<TabId>("build");
   const [selected, setSelected] = useState<PendingPlacement | null>(null);
   const [moduleDetail, setModuleDetail] = useState<ModuleDetail | null>(null);
@@ -3888,10 +3901,13 @@ export function App() {
             <CareerView
               state={state}
               command={command}
-              commandBatch={commandBatch}
               scheduleDraft={careerScheduleDraft.draft}
               scheduledDraftHours={careerScheduleDraft.scheduledHours}
               onScheduleDraftChange={careerScheduleDraft.setRouteHours}
+              isRunPending={careerScheduleDraft.isRunPending}
+              onRunScheduledEvening={() =>
+                careerScheduleDraft.runScheduledEvening(commandBatch)
+              }
             />
           ) : tab === "upgrades" ? (
             <UpgradesView

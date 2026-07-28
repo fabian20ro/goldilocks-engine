@@ -9,7 +9,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   applyCommand,
   createInitialState,
@@ -123,6 +123,37 @@ describe("App-session Career schedule draft", () => {
     ]);
   });
 
+  it("replaces a valid restored schedule before running its revised draft", () => {
+    let scheduled = applyCommand(createInitialState(4058), {
+      type: "SET_EVENING_ALLOCATION",
+      route: "competition",
+      hours: 4,
+    });
+    scheduled = restoreSimulationState(
+      JSON.parse(JSON.stringify(scheduled)),
+      scheduled.seed,
+    );
+    const revised = replaceCareerScheduleHours(
+      replaceCareerScheduleHours(
+        normalizeCareerScheduleDraft(scheduled.career.schedule.allocations),
+        "competition",
+        0,
+      ),
+      "freelance",
+      4,
+    );
+
+    const completed = reduceWorkerRequest(scheduled, {
+      type: "COMMAND_BATCH",
+      commands: createCareerScheduleCommandBatch(revised),
+    });
+
+    expect(completed.career.schedule.completedEvenings).toBe(1);
+    expect(completed.career.freelanceHours).toBe(4);
+    expect(completed.career.competition.progress).toBe(0);
+    expect(completed.career.schedule.allocations).toEqual(emptyDraft);
+  });
+
   it("keeps unsubmitted edits through Worker ticks, pause publications, and ordinary rerenders", () => {
     const initial = createInitialState(4053);
     const { result, rerender } = renderHook(
@@ -216,6 +247,78 @@ describe("App-session Career schedule draft", () => {
       commands: createCareerScheduleCommandBatch(result.current.draft),
     });
     expect(latestCareerScheduleWorkerRejection(completed)).toBeNull();
+  });
+
+  it("submits one Run batch until its own durable Worker acknowledgement", async () => {
+    const initial = createInitialState(4059);
+    const submit = vi.fn().mockReturnValueOnce(41).mockReturnValueOnce(42);
+    const { result, rerender } = renderHook(
+      ({ state, acknowledgedRequestId }) =>
+        useCareerScheduleDraft(state, acknowledgedRequestId),
+      {
+        initialProps: {
+          state: initial,
+          acknowledgedRequestId: 0,
+        },
+      },
+    );
+    act(() => result.current.setRouteHours("freelance", 4));
+
+    act(() => {
+      expect(result.current.runScheduledEvening(submit)).toBe(true);
+      expect(result.current.runScheduledEvening(submit)).toBe(false);
+    });
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(result.current.isRunPending).toBe(true);
+
+    const commands = submit.mock.calls[0]?.[0];
+    if (!commands) throw new Error("Expected one Career command batch");
+    const completed = reduceWorkerRequest(initial, {
+      type: "COMMAND_BATCH",
+      commands,
+    });
+    rerender({ state: completed, acknowledgedRequestId: 41 });
+    await waitFor(() => expect(result.current.isRunPending).toBe(false));
+
+    act(() => {
+      expect(result.current.runScheduledEvening(submit)).toBe(true);
+    });
+    expect(submit).toHaveBeenCalledTimes(2);
+  });
+
+  it("releases the singular Run action after an acknowledged Worker rejection", async () => {
+    const initial = createInitialState(4060);
+    const submit = vi.fn().mockReturnValueOnce(51).mockReturnValueOnce(52);
+    const { result, rerender } = renderHook(
+      ({ state, acknowledgedRequestId }) =>
+        useCareerScheduleDraft(state, acknowledgedRequestId),
+      {
+        initialProps: {
+          state: initial,
+          acknowledgedRequestId: 0,
+        },
+      },
+    );
+
+    act(() => expect(result.current.runScheduledEvening(submit)).toBe(true));
+    const commands = submit.mock.calls[0]?.[0];
+    if (!commands)
+      throw new Error("Expected one rejected Career command batch");
+    const rejected = reduceWorkerRequest(initial, {
+      type: "COMMAND_BATCH",
+      commands,
+    });
+    expect(latestCareerScheduleWorkerRejection(rejected)).toMatch(
+      /No evening was run/i,
+    );
+
+    rerender({ state: rejected, acknowledgedRequestId: 51 });
+    await waitFor(() => expect(result.current.isRunPending).toBe(false));
+    act(() => {
+      result.current.setRouteHours("freelance", 4);
+      expect(result.current.runScheduledEvening(submit)).toBe(true);
+    });
+    expect(submit).toHaveBeenCalledTimes(2);
   });
 
   it("keeps the App-owned draft when the Career tab unmounts", () => {

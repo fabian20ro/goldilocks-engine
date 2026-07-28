@@ -150,6 +150,47 @@ describe("simulation worker numeric protocol", () => {
     expect(isStateValid(completed)).toBe(true);
   });
 
+  it("atomically replaces a restored Career schedule before running a revision", () => {
+    const initial = createInitialState(2032);
+    const scheduled = reduceWorkerRequest(initial, {
+      type: "COMMAND",
+      command: {
+        type: "SET_EVENING_ALLOCATION",
+        route: "competition",
+        hours: 4,
+      },
+    });
+    const restored = reduceWorkerRequest(initial, {
+      type: "INIT",
+      savedState: JSON.parse(JSON.stringify(scheduled)),
+    });
+
+    const completed = reduceWorkerRequest(restored, {
+      type: "COMMAND_BATCH",
+      commands: [
+        { type: "SET_EVENING_ALLOCATION", route: "freelance", hours: 4 },
+        {
+          type: "SET_EVENING_ALLOCATION",
+          route: "competition",
+          hours: 0,
+        },
+        { type: "SET_EVENING_ALLOCATION", route: "product", hours: 0 },
+        {
+          type: "SET_EVENING_ALLOCATION",
+          route: "maintenance",
+          hours: 0,
+        },
+        { type: "RUN_EVENING" },
+      ],
+    });
+
+    expect(completed.career.schedule.completedEvenings).toBe(1);
+    expect(completed.career.freelanceHours).toBe(4);
+    expect(completed.career.competition.progress).toBe(0);
+    expect(completed.ledger.at(-1)?.message).toMatch(/Evening 1 closed/i);
+    expect(isStateValid(completed)).toBe(true);
+  });
+
   it("rejects an entire batch when a nested runtime command is malformed", () => {
     const initial = createInitialState(2028);
     const request = {

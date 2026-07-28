@@ -214,6 +214,7 @@ describe("durable Worker state publication", () => {
     await waitFor(() => {
       expect(result.current.state.career.schedule.completedEvenings).toBe(1);
     });
+    expect(result.current.lastDurableRequestId).toBe(batch.requestId);
     const durable = JSON.parse(
       localStorage.getItem(SAVE_KEY) ?? "null",
     ) as typeof completed;

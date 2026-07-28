@@ -396,6 +396,33 @@ test.describe("Bedroom Developer career acceptance", () => {
     await expect(page.getByText(/gross from 3\.00h/)).toBeVisible();
   });
 
+  test("serializes rapid Run activation into one durable evening", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 393, height: 742 });
+    await page.goto("/");
+    await waitForSavedState(page);
+    await openCareer(page);
+
+    await page.getByLabel("Freelance delivery evening hours").fill("4");
+    const run = page.getByRole("button", { name: "Run scheduled evening" });
+    await run.evaluate((button) => {
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    await expect
+      .poll(
+        async () =>
+          (await savedCareer(page)).career?.schedule?.completedEvenings,
+      )
+      .toBe(1);
+    await waitForHumanPacedWorkerTicks(page);
+    expect((await savedCareer(page)).career?.schedule?.completedEvenings).toBe(
+      1,
+    );
+  });
+
   test("shows a Worker rejection without replacing the current valid draft", async ({
     page,
   }) => {
@@ -408,6 +435,14 @@ test.describe("Bedroom Developer career acceptance", () => {
       /Worker rejected the scheduled evening:.*No evening was run/i,
     );
     await expectFreelanceDraft(page, 0);
+    await page.getByLabel("Freelance delivery evening hours").fill("4");
+    await page.getByRole("button", { name: "Run scheduled evening" }).click();
+    await expect
+      .poll(
+        async () =>
+          (await savedCareer(page)).career?.schedule?.completedEvenings,
+      )
+      .toBe(1);
   });
 
   test("recovers a malformed durable Career schedule without reviving a draft", async ({

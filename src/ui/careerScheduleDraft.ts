@@ -7,6 +7,9 @@ import type {
 
 /** One App-session draft; the Worker owns only the committed evening schedule. */
 export type CareerScheduleDraft = Record<CareerRoute, number>;
+export type CareerScheduleBatchSubmitter = (
+  commands: readonly SimulationCommand[],
+) => number | null;
 
 export const CAREER_DRAFT_ROUTES: readonly CareerRoute[] = [
   "freelance",
@@ -119,6 +122,7 @@ export function latestCareerScheduleWorkerRejection(
 
 export function useCareerScheduleDraft(
   state: Pick<SimulationState, "seed" | "career" | "meta">,
+  lastDurableRequestId = 0,
 ) {
   const workerAllocations = state.career.schedule.allocations;
   const boundary = careerScheduleDraftBoundary(state);
@@ -126,6 +130,8 @@ export function useCareerScheduleDraft(
   const [draft, setDraft] = useState<CareerScheduleDraft>(() =>
     normalizeCareerScheduleDraft(workerAllocations),
   );
+  const pendingRunRequestId = useRef<number | null>(null);
+  const [isRunPending, setIsRunPending] = useState(false);
 
   useEffect(() => {
     if (lastBoundary.current === boundary) return;
@@ -137,9 +143,46 @@ export function useCareerScheduleDraft(
     setDraft((current) => replaceCareerScheduleHours(current, route, value));
   }, []);
 
+  useEffect(() => {
+    const requestId = pendingRunRequestId.current;
+    if (requestId === null || requestId < 1 || lastDurableRequestId < requestId)
+      return;
+    pendingRunRequestId.current = null;
+    setIsRunPending(false);
+  }, [lastDurableRequestId]);
+
+  const runScheduledEvening = useCallback(
+    (submitBatch: CareerScheduleBatchSubmitter): boolean => {
+      // Set the ref before posting so two synchronous pointer/click events can
+      // never enqueue two Worker batches before React disables the control.
+      if (pendingRunRequestId.current !== null) return false;
+      pendingRunRequestId.current = -1;
+      setIsRunPending(true);
+      const requestId = submitBatch(createCareerScheduleCommandBatch(draft));
+      if (
+        requestId === null ||
+        !Number.isSafeInteger(requestId) ||
+        requestId < 1
+      ) {
+        pendingRunRequestId.current = null;
+        setIsRunPending(false);
+        return false;
+      }
+      pendingRunRequestId.current = requestId;
+      if (lastDurableRequestId >= requestId) {
+        pendingRunRequestId.current = null;
+        setIsRunPending(false);
+      }
+      return true;
+    },
+    [draft, lastDurableRequestId],
+  );
+
   return {
     draft,
     scheduledHours: useMemo(() => careerScheduleDraftHours(draft), [draft]),
     setRouteHours,
+    isRunPending,
+    runScheduledEvening,
   };
 }
