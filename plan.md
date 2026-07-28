@@ -7,6 +7,20 @@ Initial product: Bedroom Developer to Local AI Laboratory
 Target platform: portrait-first mobile web/PWA  
 Long-term destination: a pluralist, Culture-like post-scarcity civilization
 
+Current accepted baseline (2026-07-28):
+
+- Milestones 0 through 3.5, the initial-color emoji command deck, the
+  first-session management refinement, and the parallel exact-SHA delivery
+  pipeline are implemented.
+- Independent verification round 050 accepted candidate
+  `2f4dbac80f0468920ab53fe56d212bd4262a3cb1`; verifier commit
+  `fbf3559fe1e01c80da65928e12aa6a19a8848675` passed the hosted five-lane
+  verification aggregate and was deployed by GitHub Pages at that exact SHA.
+- A subsequent owner-directed live exploratory session found a current P0
+  interaction defect: Career hour allocations are overwritten by periodic
+  Worker state publication before a human can run the evening. Section 20.7 is
+  the required stabilization program before Milestone 4 Research.
+
 ---
 
 ## 1. Product thesis
@@ -1413,6 +1427,371 @@ Completion evidence:
 > restrained progress feedback. Optional expert playthroughs may refine these
 > requirements but are not required to establish completion.
 
+### 20.7 Post-acceptance Bedroom stabilization program
+
+Complete this program before Milestone 4 Research. It corrects the live Career
+interaction defect, reduces the remaining Career/Build scan burden, and
+standardizes cross-screen presentation without introducing a new simulation
+system.
+
+The accepted command deck, deterministic Worker, one-pipeline topology,
+queue-time quote locking, exact settlement accounting, causal evidence,
+persistence schema, PWA contract, and bottom-navigation grammar remain the
+foundation. The implementation should favor explicit local ownership and small
+domain-specific helpers over new frameworks or broad refactors.
+
+#### Observed defect and acceptance gap
+
+The deployed Career editor currently copies
+`career.schedule.allocations` into a React `scheduleDraft` whenever the Worker
+publishes a new allocations object. Periodic ticks therefore overwrite a
+player's local edit with the persisted zero allocation. Tapping an hour token,
+typing a number, or pausing Jobs may appear to work momentarily, then return to
+zero before `Run scheduled evening` can commit the plan.
+
+Existing browser acceptance filled the controls and immediately activated Run
+within the same short automation sequence. It did not deliberately wait across
+one or more periodic Worker publications. The test therefore established the
+atomic command path but did not establish human-paced edit stability.
+
+Treat this as a P0 interaction-correctness defect:
+
+- The deterministic Career calculations are not presumed incorrect.
+- The current atomic allocation-plus-run Worker batch remains the desired
+  commit boundary.
+- Passing an immediate fill-and-run test is insufficient evidence.
+- Research, new content, and wider visual polish remain blocked until a
+  human-paced schedule can be authored and executed.
+
+#### State-ownership contract
+
+Use three explicit ownership levels:
+
+1. **Worker state** is authoritative for committed simulation state, completed
+   evenings, route outcomes, resources, persistence, and recovery.
+2. **Career editor draft** is authoritative for the not-yet-run evening during
+   the current browser session.
+3. **Catalog-derived projection** is a pure presentation of the current draft
+   against the latest Worker-owned rig, pipeline, model, and resources. It
+   never becomes a second simulation.
+
+Required draft behavior:
+
+- Initialize from the restored Worker schedule when the application session
+  starts.
+- Preserve edits across periodic ticks, durable state acknowledgements,
+  Pause/Resume, speed changes, and ordinary Career rerenders.
+- Preserve edits across bottom-tab visits during the same browser session so a
+  player can inspect equipment or evidence and return without losing the
+  schedule.
+- Reset from Worker state after a successfully completed evening, a run reset,
+  an ending/replay transition, or an incompatible/malformed restore.
+- If an evening command is rejected, preserve the valid local draft and show
+  the Worker-owned rejection rather than silently clearing the editor.
+- A browser reload before Run may discard the uncommitted draft and restore the
+  last durable Worker schedule. Do not add a new persistence field only to save
+  an uncommitted form.
+- Continue to submit all four finite route allocations followed by
+  `RUN_EVENING` in one `COMMAND_BATCH`. Do not send partial schedule commands on
+  every tap or keystroke.
+- Do not derive draft-reset behavior from the referential identity of nested
+  Worker objects. A fresh object with unchanged semantic state is not a reset
+  event.
+
+Recommended implementation boundary:
+
+- Extract a small `useCareerScheduleDraft` domain hook or equivalent
+  App-lifetime controller, mounted above conditional tab content.
+- Keep quarter-hour clamping, total-hour calculation, reset rules, and command
+  construction in that boundary or in pure adjacent helpers.
+- Pass the resulting values and callbacks into `CareerView`; keep the view
+  responsible for rendering, focus, and accessible control labels.
+- Do not add Redux, Zustand, XState, a second Worker, a general form framework,
+  or a new simulation command for this single editor.
+- Do not create a generic draft-management abstraction unless a second proven
+  editor requires the same lifecycle.
+
+#### Phase 0 — Contract freeze and failing regression
+
+Purpose: make the production observation reproducible before changing behavior.
+This is the diagnostic opening of the Phase 1 implementation goal, not a
+standalone release candidate: preserve the red-before/green-after evidence, but
+do not hand off or commit a final branch state with a deliberately failing
+canonical test.
+
+Implementation:
+
+- Add candidate-owned regression coverage to the established Career browser
+  suite rather than relying on a verifier-only file.
+- Record the intended UI-session draft lifecycle in code comments only where
+  the ownership boundary is otherwise non-obvious.
+- Capture the current deployed failure at both hour tokens and exact numeric
+  inputs.
+- Confirm that the Worker batch itself remains deterministic and atomic.
+
+Required verification:
+
+- At 393x742, enter `3.00h` freelance, wait through at least two normal Worker
+  tick publications, then verify the control and `Scheduled` total still show
+  `3.00h` before Run.
+- Repeat with `1.00h` competition added after another deliberate tick interval;
+  verify `4.00h` total and `0.00h` unallocated.
+- Exercise the equivalent token path rather than only numeric `fill`.
+- Demonstrate the pre-fix regression fails for the expected reset reason, not
+  because of selector timing, browser launch, or unrelated persistence.
+- Unit-test the existing Worker `COMMAND_BATCH` with all four allocations plus
+  Run: exactly one evening completes, the requested route outcomes occur, and
+  allocations reset only after completion.
+
+Exit gate:
+
+> The failure is reproducible at human pace and the intended state-ownership
+> contract is executable without changing Career rules or persistence.
+
+#### Phase 1 — Career scheduling correctness
+
+Purpose: restore the central player-authored evening action.
+
+Implementation:
+
+- Move draft ownership out of the tick-driven mirror effect.
+- Keep route updates finite, quarter-hour aligned, nonnegative, and bounded by
+  the shared four-hour total.
+- Preserve draft values across tab switches and live Worker publications.
+- Use the current one-batch commit path; keep Worker persistence authoritative.
+- After a successful run, reset the editor to the next empty four-hour evening
+  only when the returned state confirms completion.
+- Keep input, token, keyboard, pointer, and touch paths semantically equivalent.
+- Keep the Run action singular and prevent presentation effects from issuing a
+  simulation command.
+
+Targeted verification:
+
+- Pure/unit tests: quarter-hour clamp, route replacement, total cap, full
+  allocation, zero allocation, and deterministic command construction.
+- Component tests: periodic prop updates with unchanged completed-evening
+  identity cannot erase the draft; a confirmed completion resets it; rejected
+  completion retains it; unmounting only the Career tab content does not lose
+  the App-session draft.
+- Worker integration: allocation batch plus Run is ordered, atomic from the UI
+  perspective, durable before publication, and produces no partial persisted
+  schedule.
+- Browser tests at 320x693 and 393x742:
+  - numeric and token allocation;
+  - at least two tick intervals between edits and Run;
+  - running and Jobs-paused states;
+  - 1x and 64x speed;
+  - Career -> Inspect/Upgrades -> Career draft retention;
+  - keyboard-only edit and activation;
+  - representative touch activation;
+  - successful route-specific money/progress outcome;
+  - exactly one completed evening and one durable outcome;
+  - post-completion empty next-evening editor;
+  - pre-Run reload restores the durable schedule, not a fabricated draft;
+  - post-Run reload retains the completed outcome;
+  - malformed schedule recovery remains fail-safe.
+- Accessibility/geometry: 44 CSS-pixel targets, visible focus, programmatic
+  names, 200% text, reduced motion, no horizontal document overflow, and Run
+  reachable above fixed navigation after the composer is brought into view.
+
+Phase verification gate:
+
+- Targeted tests pass repeatedly, including at least 25 human-paced edit
+  repetitions on the repository-pinned browser.
+- Full `./scripts/verify` passes from clean setup.
+- A fresh independent Verifier challenges tick timing, tab switching, command
+  ordering, persistence, and malformed recovery and reports `PASS`.
+- The accepted verifier SHA is pushed, the hosted verification aggregate passes
+  on that exact SHA, GitHub Pages deploys that exact SHA, and the live Career
+  flow is smoke-tested without resetting the owner's existing save.
+
+Exit gate:
+
+> A player can author, inspect, revise, run, and durably observe one four-hour
+> evening at human pace while the simulation is running or paused.
+
+#### Phase 2 — Career action hierarchy and outcome feedback
+
+Purpose: make the now-correct Career loop faster to understand and operate.
+
+Implementation:
+
+- Place the evening composer immediately after a compact Career objective and
+  resource summary; do not require the full lifetime-stat block before the
+  current action.
+- Lead each route with its stable emoji, current allocation, one primary
+  benefit, and one opportunity cost.
+- Keep full descriptions, exact economics, unlock requirements, model/rig
+  effects, and evidence qualifications in the existing one-at-a-time Details
+  surface.
+- Show projected route consequences adjacent to the active draft. Projections
+  must use existing calculation/catalog values and be labeled as estimates
+  where outcomes are not guaranteed.
+- Keep `Run scheduled evening` as the only high-emphasis commit action. Show the
+  four-hour total, unallocated time, and any blocking reason beside it.
+- After completion, show a compact localized result: hours used, money/progress
+  gained, electricity/operating cost, relevant constraint, and next available
+  decision.
+- Collapse lifetime totals, exit checklist detail, savings controls, model and
+  quantization controls, and offline-policy configuration into clear sections
+  ordered by current usefulness. Do not remove them.
+- Preserve the forest/acid/amber/cyan palette and shared glyph registry; add no
+  raster art, icon package, new page, or new mechanic.
+
+Verification:
+
+- Component tests prove route summaries and projections use live catalog/state
+  values; Details replacement and focus restoration retain section 20.5 rules.
+- Screenshot deck covers empty, partially allocated, fully allocated,
+  completed, rejected, locked-route, and exit-ready Career states at 320 and
+  393 widths.
+- Geometry assertions prove the objective, four-hour total, first route
+  controls, and Run action are reachable without a nested scroll area or
+  document-level horizontal overflow.
+- Browser coverage includes 100%/200% text, reduced motion, touch, keyboard,
+  screen-reader names, tab-return draft retention, and all disclosure sections.
+- Currency summaries use the shared display precision while exact thousandths
+  remain available in Details/Inspect and the ledger.
+- Deterministic Career balance and all retained Phase 1 correctness checks stay
+  green.
+
+Exit gate:
+
+> A new or returning player can identify tonight's budget, allocate it, predict
+> the main consequences, run it, and understand the result without reading the
+> complete Career report.
+
+#### Phase 3 — Build and Upgrades density reduction
+
+Purpose: reduce catalogue length and repeated actions while preserving the
+accepted command-deck interaction grammar.
+
+Implementation:
+
+- Keep the ordered pipeline rail and current selected-stage context visible
+  before the full inventory.
+- Group module inventory into compact `Owned`, `Affordable/available`, and
+  `Locked` sections using current ownership and requirements.
+- Default to the next actionable subset; retain an explicit route to every
+  catalogue item.
+- Show repeated replace/remove/bypass actions only for the selected stage or
+  selected item, not beneath every module.
+- Reuse the existing Details surface and comparison-delta component. Do not add
+  a second drawer system.
+- Keep explicit `Place in Build`, pending-placement tray, cancellation, focus
+  restoration, compatibility, touch drag, and one-pipeline rules unchanged.
+- Keep Workstation Expansion I represented as `3 -> 6` process capacity with
+  empty/bypassed positions; do not imply compute or memory gains.
+- Extract a component or selector only when it removes demonstrated duplication
+  across Build and Upgrades. Do not build a generic inventory framework for
+  deferred Research or laboratory content.
+
+Verification:
+
+- Component tests cover grouping order, live affordability, ownership,
+  compatibility, locked requirements, selection, Details replacement, and
+  comparison values.
+- Browser tests cover starter and expanded workstations, empty positions,
+  purchase, explicit placement, replace/move/bypass, Cancel/Escape, tab
+  cancellation, keyboard, representative touch drag, and focus return.
+- Screenshot/geometry evidence covers owned-small, catalogue-rich, and expanded
+  states at 320x693 and 393x742 with 100%/200% text.
+- Assert no nested vertical scroll trap, no document-level horizontal overflow,
+  no obscured sticky tray, and no actionable target below 44 CSS pixels.
+- Retained first-session, queue, quote, preset, malformed-save, offline, PWA,
+  and Career suites remain green.
+
+Exit gate:
+
+> The selected pipeline decision and next valid inventory choices are visible
+> before distant catalogue content, while every exact item detail and existing
+> placement path remains available.
+
+#### Phase 4 — Cross-screen consistency and release hardening
+
+Purpose: close presentation inconsistencies and establish the stable foundation
+for Research.
+
+Implementation:
+
+- Route all compact money summaries through the existing shared currency
+  formatter. Define one display policy for HUD, cards, progress targets, and
+  settlement summaries; preserve exact accounting in Details/Inspect/ledger.
+- Audit glyph reuse, status language, card headings, warning placement, Details
+  behavior, focus return, bottom-tab scroll behavior, and reduced-motion
+  equivalence across Build, Jobs, Career, Upgrades, and Inspect.
+- Keep Inspect intentionally information-dense but make its first viewport
+  prioritize bottleneck, baseline delta, and latest causal evidence.
+- Remove only proven duplicate prose or controls. Do not introduce a design
+  system rewrite, localization framework, audio, haptics, generated images, or
+  Research-facing abstractions.
+- Update canonical tests and documentation in the same changes that establish
+  a durable behavior; do not leave acceptance knowledge only in an ad hoc
+  script or verifier report.
+
+Verification:
+
+- Static/unit/component checks cover the shared formatter, glyph registry,
+  Details semantics, and any extracted selector/helper.
+- Full screenshot matrix: five tabs x starter/expanded state x 320/393 widths,
+  plus representative 200% text states. Inspect original-resolution images, not
+  only DOM assertions.
+- Cross-platform hosted 320px geometry remains an early independent lane.
+- Run the complete canonical gate: format, lint, typecheck, unit/property,
+  deterministic balances, production build/audit, root browser/PWA, and
+  Pages/offline.
+- Require zero production dependency vulnerabilities. Development-only
+  advisories may remain only when documented and when the safe resolution
+  requires an independently planned major toolchain migration.
+- Require fresh independent Verifier `PASS`, a successful hosted five-lane
+  aggregate at the exact verifier SHA, exact-SHA Pages deployment, live
+  `build-info.json`, and a clean local/remote branch match.
+- Run one focused live expert playthrough on the exact deployed build:
+  author/run a Career evening, queue/settle a job, inspect an outcome,
+  compare/place an upgrade, reload/resume, and visit all five tabs. Record
+  findings as an immutable optional observation; do not convert its ratings
+  into an unplanned release threshold.
+
+Exit gate:
+
+> The exact deployed build has no known P0 interaction defect, maintains one
+> coherent command-deck grammar across all five tabs, and passes independent
+> deterministic, browser, accessibility, persistence, offline, and deployment
+> evidence.
+
+#### Sequencing, commits, and verification discipline
+
+- Implement phases in order. Phase 1 correctness may not be hidden inside a
+  large visual refactor.
+- Treat Phase 0 plus Phase 1 as one correctness implementation goal. Phases 2,
+  3, and 4 each begin from a clean accepted verifier commit and end in a frozen
+  candidate SHA.
+- Use the repository Implementer-Verifier protocol for each phase. Preserve
+  immutable findings and exact commit handoffs.
+- A verifier failure creates the next narrow repair round; do not weaken a
+  valid test, retry a nondeterministic test into green, or fold unrelated work
+  into the repair.
+- Candidate-owned regression coverage belongs in the established domain test
+  suites. Verifier-owned adversarial evidence may remain separate and
+  immutable.
+- Keep `./scripts/run`, `./scripts/setup`, and `./scripts/verify` canonical.
+  New phase-specific commands supplement; they do not replace the full gate.
+- Prefer pure selectors/calculations and existing shared components. Extract
+  only proven repetition. No speculative architecture for deferred milestones.
+- Preserve user saves and unrelated working-tree changes. Never use a migration
+  when the required behavior is transient UI-session state.
+
+#### Research readiness decision
+
+After Phase 4, review evidence rather than automatically beginning Research.
+Milestone 4 may start only when:
+
+- Career scheduling is stable at human pace on the exact deployed build.
+- Career and Build primary decisions are discoverable at required portrait
+  sizes without hiding exact information.
+- No unresolved verifier finding or hosted required check remains.
+- The owner explicitly authorizes the Research implementation goal.
+
 ---
 
 ## 21. Emotional continuity
@@ -1998,6 +2377,25 @@ Completion evidence:
 > preserving the game's transparent causal and accounting contracts. Optional
 > expert playthroughs supplement this evidence under D-009.
 
+### Milestone 3.6 — Bedroom interaction stabilization
+
+Complete section 20.7 before adding Research:
+
+- Career schedule draft ownership that survives Worker ticks and tab switching
+- Human-paced, atomic four-route evening execution and durable outcome
+- Career action hierarchy and result feedback
+- Build/Upgrades catalogue density reduction using existing Details grammar
+- Shared compact currency precision and cross-screen consistency
+- Exact-SHA independent verification and deployment
+
+Completion evidence:
+
+> Candidate-owned regression tests, deterministic Worker checks, repeated
+> human-paced portrait browser flows, screenshot inspection, the complete
+> canonical gate, fresh independent verification, hosted lane aggregation, and
+> exact-SHA deployment demonstrate a stable Bedroom management foundation with
+> no known P0 interaction defect.
+
 ### Milestone 4 — Research
 
 Add:
@@ -2138,9 +2536,33 @@ Owner-authorized first-session management refinement:
     verification, and exact-SHA deployment; optionally repeat the diagnostic
     expert playthrough under D-009.
 
+Post-acceptance Bedroom stabilization:
+
+37. Add a human-paced Career regression that spans periodic Worker publications
+    and proves the existing immediate fill-and-run coverage gap.
+38. Move the uncommitted Career schedule into an App-session draft boundary;
+    preserve it across ticks and tabs and commit all allocations plus Run in the
+    existing atomic Worker batch.
+39. Verify route clamping, quarter hours, rejected/successful runs, reset
+    boundaries, persistence, malformed recovery, 1x/64x, paused/running,
+    keyboard/touch, 320/393, 200% text, and repeated human-paced execution.
+40. Reorder Career around tonight's composer, compact projections, singular Run
+    action, localized outcome feedback, and progressive lifetime/offline
+    details without changing simulation rules.
+41. Reduce Build/Upgrades catalogue density through existing selection,
+    grouping, comparison, Details, and placement components; preserve every
+    item and exact requirement.
+42. Standardize compact currency precision, glyph/status language, Details,
+    focus, scroll, and reduced-motion behavior across all five tabs.
+43. Run each phase through clean candidate, canonical verification, fresh
+    independent verifier, hosted exact-SHA aggregate, exact-SHA Pages
+    deployment, and live smoke evidence. Record optional expert observations
+    immutably.
+
 Do not implement research, creators, fear, workforce, or endgame before the
-applicable pipeline requirements, section 20.6 first-session refinement, and
-automated quality evidence are complete.
+applicable pipeline requirements, section 20.6 first-session refinement,
+section 20.7 Bedroom stabilization, and automated quality evidence are
+complete.
 
 ---
 
