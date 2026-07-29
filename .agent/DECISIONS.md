@@ -280,3 +280,26 @@
 - **Reversal condition:** Change route availability, projection authority, or
   locked-state interpretation only through explicit product direction with
   corresponding deterministic and browser evidence.
+
+## D-022 — Response-bound Career completion feedback
+
+- **Decision:** A submitted Career projection belongs only to its exact Worker
+  response ID. A response that does not complete an evening invalidates that
+  projection immediately; it can never be consumed by a later command. A
+  direct safe-offline action captures its own pre-command snapshot and renders
+  a compact result only from its own completed Worker response and durable
+  acknowledgement.
+- **Durability boundary:** This response identity is presentation lifecycle
+  state only. D-020's persisted acknowledgement remains the authority for
+  unlocking the singular Career Run action; no Worker command, durable state,
+  schema, ledger behavior, route availability, or balance changes.
+- **Reason:** A rejected zero-hour batch previously remained pending and
+  mislabeled a later safe-offline four-hour completion as zero hours and zero
+  money.
+- **Evidence policy:** Candidate-owned repeated Playwright and immutable
+  round-055 V-061 regression exercise rejected submission followed by safe
+  offline completion; retained persistence, recovery, and canonical checks
+  remain required.
+- **Reversal condition:** Change completion-feedback attribution only through
+  explicit product direction with equivalent response-ordering, durable-save,
+  rejection, and offline-recovery evidence.

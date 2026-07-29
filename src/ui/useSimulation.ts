@@ -96,6 +96,11 @@ export function useSimulation() {
   const initialOfflineAppliedRef = useRef(false);
   const speedRef = useRef<TimeSpeed>(1);
   const [timeSpeed, setTimeSpeedState] = useState<TimeSpeed>(1);
+  // This identifies the exact Worker response currently published in memory.
+  // It is intentionally separate from the durable acknowledgement watermark.
+  const [lastWorkerRequestId, setLastWorkerRequestId] = useState<number | null>(
+    null,
+  );
   const [lastDurableRequestId, setLastDurableRequestId] = useState(0);
   const [hasDurablePersistenceFailure, setHasDurablePersistenceFailure] =
     useState(false);
@@ -118,6 +123,8 @@ export function useSimulation() {
     worker.addEventListener(
       "message",
       (event: MessageEvent<WorkerResponse>) => {
+        if (isDurableRequestId(event.data.requestId))
+          setLastWorkerRequestId(event.data.requestId);
         if (isDurableRequestId(event.data.requestId))
           highestWorkerRequestIdRef.current = Math.max(
             highestWorkerRequestIdRef.current,
@@ -200,6 +207,7 @@ export function useSimulation() {
     command,
     commandBatch,
     hasDurablePersistenceFailure,
+    lastWorkerRequestId,
     lastDurableRequestId,
     timeSpeed,
     setTimeSpeed,

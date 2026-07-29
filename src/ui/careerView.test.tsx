@@ -32,6 +32,7 @@ describe("Career Phase 2 action hierarchy", () => {
         hasDurablePersistenceFailure={false}
         isRunBlocked={false}
         onRunScheduledEvening={() => true}
+        onApplySafeOfflinePolicyNow={vi.fn()}
       />,
     );
 
@@ -68,6 +69,7 @@ describe("Career Phase 2 action hierarchy", () => {
         hasDurablePersistenceFailure={false}
         isRunBlocked={false}
         onRunScheduledEvening={() => true}
+        onApplySafeOfflinePolicyNow={vi.fn()}
       />,
     );
     expect(
@@ -89,6 +91,7 @@ describe("Career Phase 2 action hierarchy", () => {
         hasDurablePersistenceFailure={false}
         isRunBlocked={false}
         onRunScheduledEvening={() => true}
+        onApplySafeOfflinePolicyNow={vi.fn()}
       />,
     );
 

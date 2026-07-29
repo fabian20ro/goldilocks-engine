@@ -1,4 +1,8 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import {
+  createInitialState,
+  sealSimulationState,
+} from "../../src/simulation/engine";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 
@@ -102,6 +106,26 @@ async function savedCareer(page: Page): Promise<{
       };
     };
   }, SAVE_KEY);
+}
+
+function safeOfflineReadySave(): string {
+  const state = createInitialState(56_061);
+  return JSON.stringify(
+    sealSimulationState({
+      ...state,
+      career: {
+        ...state.career,
+        offlinePolicy: {
+          ...state.career.offlinePolicy,
+          enabled: true,
+          maxHours: 4,
+          maxElectricityCost: 5,
+          maxOperatingCost: 5,
+          minReliability: 0.7,
+        },
+      },
+    }),
+  );
 }
 
 async function assertPortraitControls(page: Page): Promise<void> {
@@ -264,6 +288,46 @@ test.describe("Bedroom Developer career acceptance", () => {
       page.getByLabel("Enable safe offline freelance"),
     ).toBeChecked();
     await context.setOffline(false);
+  });
+
+  test("clears a rejected schedule projection before reporting a later safe offline completion", async ({
+    page,
+  }) => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
+    await page.setViewportSize({ width: 393, height: 742 });
+    await page.addInitScript(
+      ({ key, value }) => localStorage.setItem(key, value),
+      { key: SAVE_KEY, value: safeOfflineReadySave() },
+    );
+    await page.goto("/");
+    await waitForSavedState(page);
+    await openCareer(page);
+
+    await page.getByRole("button", { name: "Run scheduled evening" }).click();
+    await expect(page.locator(".career-schedule-feedback")).toContainText(
+      /Worker rejected the scheduled evening:.*No evening was run/i,
+    );
+
+    await openCareerDisclosure(page, "Safe freelance-only automation");
+    await page
+      .getByRole("button", { name: "Apply safe offline policy now" })
+      .click();
+    await expect
+      .poll(async () => {
+        const saved = await savedCareer(page);
+        return {
+          completedEvenings: saved.career?.schedule?.completedEvenings ?? 0,
+          offlineHours:
+            saved.career?.offlinePolicy?.lastReport?.appliedHours ?? 0,
+        };
+      })
+      .toEqual({ completedEvenings: 1, offlineHours: 4 });
+
+    const result = page.getByRole("status", { name: "Latest evening result" });
+    await expect(result).toContainText("4.00h used");
+    await expect(result).not.toContainText("0.00h used");
+    expect(pageErrors).toEqual([]);
   });
 
   test("remains readable at 200 percent text with reduced motion", async ({

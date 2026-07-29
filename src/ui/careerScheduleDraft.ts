@@ -10,6 +10,7 @@ export type CareerScheduleDraft = Record<CareerRoute, number>;
 export type CareerScheduleBatchSubmitter = (
   commands: readonly SimulationCommand[],
 ) => number | null;
+export type CareerScheduleSubmissionObserver = (requestId: number) => void;
 
 export const CAREER_DRAFT_ROUTES: readonly CareerRoute[] = [
   "freelance",
@@ -154,7 +155,10 @@ export function useCareerScheduleDraft(
   }, [lastDurableRequestId]);
 
   const runScheduledEvening = useCallback(
-    (submitBatch: CareerScheduleBatchSubmitter): boolean => {
+    (
+      submitBatch: CareerScheduleBatchSubmitter,
+      onSubmitted?: CareerScheduleSubmissionObserver,
+    ): boolean => {
       // Set the ref before posting so two synchronous pointer/click events can
       // never enqueue two Worker batches before React disables the control.
       if (hasDurablePersistenceFailure || pendingRunRequestId.current !== null)
@@ -172,6 +176,7 @@ export function useCareerScheduleDraft(
         return false;
       }
       pendingRunRequestId.current = requestId;
+      onSubmitted?.(requestId);
       if (lastDurableRequestId >= requestId) {
         pendingRunRequestId.current = null;
         setIsRunPending(false);

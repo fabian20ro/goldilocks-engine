@@ -123,6 +123,39 @@ interface CareerCompletionFeedback {
   nextDecision: string;
 }
 
+interface SubmittedCareerProjection {
+  completedEvenings: number;
+  requestId: number;
+  projection: CareerEveningProjection;
+  responseConfirmed: boolean;
+}
+
+interface PendingOfflineCareerCompletion {
+  before: SimulationState;
+  completedEvenings: number;
+  requestId: number;
+  projection: CareerEveningProjection | null;
+}
+
+/**
+ * The offline Worker report owns the applied freelance hours. Reuse the same
+ * pure route accounting against the exact pre-command snapshot for its recap.
+ */
+function offlineCareerCompletionProjection(
+  before: SimulationState,
+  after: SimulationState,
+): CareerEveningProjection | null {
+  const report = after.career.offlinePolicy.lastReport;
+  if (!report || report.appliedHours <= 0) return null;
+
+  return projectCareerEvening(before, {
+    freelance: report.appliedHours,
+    competition: 0,
+    product: 0,
+    maintenance: 0,
+  });
+}
+
 const diagnosticCopy: Readonly<
   Record<DiagnosticUnlockId, { name: string; description: string }>
 > = {
@@ -2610,6 +2643,7 @@ export function CareerView({
   hasDurablePersistenceFailure,
   isRunBlocked,
   onRunScheduledEvening,
+  onApplySafeOfflinePolicyNow,
   completionFeedback,
 }: {
   state: SimulationState;
@@ -2620,6 +2654,7 @@ export function CareerView({
   hasDurablePersistenceFailure: boolean;
   isRunBlocked: boolean;
   onRunScheduledEvening: () => boolean;
+  onApplySafeOfflinePolicyNow: () => void;
   completionFeedback?: CareerCompletionFeedback | null;
 }) {
   const career = state.career;
@@ -3373,9 +3408,7 @@ export function CareerView({
             <button
               type="button"
               className="primary-action"
-              onClick={() =>
-                command({ type: "APPLY_OFFLINE_POLICY", requestedHours: 4 })
-              }
+              onClick={onApplySafeOfflinePolicyNow}
             >
               Apply safe offline policy now
             </button>
@@ -3789,6 +3822,7 @@ export function App() {
     command,
     commandBatch,
     hasDurablePersistenceFailure,
+    lastWorkerRequestId,
     lastDurableRequestId,
     timeSpeed,
     setTimeSpeed,
@@ -3822,10 +3856,11 @@ export function App() {
   const dragRef = useRef<DragState | null>(null);
   const detailOriginRef = useRef<HTMLElement | null>(null);
   const placementOriginRef = useRef<HTMLElement | null>(null);
-  const submittedCareerProjectionRef = useRef<{
-    completedEvenings: number;
-    projection: CareerEveningProjection;
-  } | null>(null);
+  const submittedCareerProjectionRef = useRef<SubmittedCareerProjection | null>(
+    null,
+  );
+  const pendingOfflineCareerCompletionRef =
+    useRef<PendingOfflineCareerCompletion | null>(null);
   const tabScrollPositions = useRef<Record<TabId, number>>({
     build: 0,
     jobs: 0,
@@ -3836,15 +3871,38 @@ export function App() {
 
   const runCareerEvening = useCallback(() => {
     const projection = projectCareerEvening(state, careerScheduleDraft.draft);
-    const accepted = careerScheduleDraft.runScheduledEvening(commandBatch);
-    if (!accepted) return false;
+    let requestId: number | null = null;
+    const accepted = careerScheduleDraft.runScheduledEvening(
+      commandBatch,
+      (submittedRequestId) => {
+        requestId = submittedRequestId;
+      },
+    );
+    if (!accepted || requestId === null) return false;
     submittedCareerProjectionRef.current = {
       completedEvenings: state.career.schedule.completedEvenings,
+      requestId,
       projection,
+      responseConfirmed: false,
     };
     setCareerCompletionFeedback(null);
     return true;
   }, [careerScheduleDraft, commandBatch, state]);
+
+  const applySafeOfflinePolicyNow = useCallback(() => {
+    const requestId = command({
+      type: "APPLY_OFFLINE_POLICY",
+      requestedHours: 4,
+    });
+    if (requestId === null) return;
+    pendingOfflineCareerCompletionRef.current = {
+      before: state,
+      completedEvenings: state.career.schedule.completedEvenings,
+      requestId,
+      projection: null,
+    };
+    setCareerCompletionFeedback(null);
+  }, [command, state]);
 
   useEffect(() => {
     const submitted = submittedCareerProjectionRef.current;
@@ -3857,15 +3915,73 @@ export function App() {
       setCareerCompletionFeedback(null);
       return;
     }
-    if (state.career.schedule.completedEvenings <= submitted.completedEvenings)
+    if (lastWorkerRequestId === submitted.requestId) {
+      if (
+        state.career.schedule.completedEvenings <= submitted.completedEvenings
+      ) {
+        // A rejected or otherwise non-completing batch must never be consumed
+        // by a later unrelated completion such as safe offline automation.
+        submittedCareerProjectionRef.current = null;
+        setCareerCompletionFeedback(null);
+        return;
+      }
+      submitted.responseConfirmed = true;
+    }
+    if (!submitted.responseConfirmed) {
+      if (
+        lastWorkerRequestId !== null &&
+        lastWorkerRequestId > submitted.requestId
+      ) {
+        submittedCareerProjectionRef.current = null;
+        setCareerCompletionFeedback(null);
+      }
       return;
+    }
+    if (lastDurableRequestId < submitted.requestId) return;
     setCareerCompletionFeedback({
       evening: submitted.completedEvenings + 1,
       projection: submitted.projection,
       nextDecision: nextCareerDecision(state),
     });
     submittedCareerProjectionRef.current = null;
-  }, [state]);
+  }, [lastDurableRequestId, lastWorkerRequestId, state]);
+
+  useEffect(() => {
+    const pending = pendingOfflineCareerCompletionRef.current;
+    if (!pending) return;
+    if (
+      state.career.runEnding ||
+      state.career.schedule.completedEvenings < pending.completedEvenings
+    ) {
+      pendingOfflineCareerCompletionRef.current = null;
+      return;
+    }
+    if (lastWorkerRequestId === pending.requestId) {
+      pending.projection = offlineCareerCompletionProjection(
+        pending.before,
+        state,
+      );
+      if (!pending.projection) {
+        pendingOfflineCareerCompletionRef.current = null;
+        return;
+      }
+    }
+    if (!pending.projection) {
+      if (
+        lastWorkerRequestId !== null &&
+        lastWorkerRequestId > pending.requestId
+      )
+        pendingOfflineCareerCompletionRef.current = null;
+      return;
+    }
+    if (lastDurableRequestId < pending.requestId) return;
+    setCareerCompletionFeedback({
+      evening: pending.completedEvenings + 1,
+      projection: pending.projection,
+      nextDecision: nextCareerDecision(state),
+    });
+    pendingOfflineCareerCompletionRef.current = null;
+  }, [lastDurableRequestId, lastWorkerRequestId, state]);
 
   useEffect(() => {
     setCareerCompletionFeedback((current) =>
@@ -4295,6 +4411,7 @@ export function App() {
               hasDurablePersistenceFailure={hasDurablePersistenceFailure}
               isRunBlocked={careerScheduleDraft.isRunBlocked}
               onRunScheduledEvening={runCareerEvening}
+              onApplySafeOfflinePolicyNow={applySafeOfflinePolicyNow}
               completionFeedback={careerCompletionFeedback}
             />
           ) : tab === "upgrades" ? (

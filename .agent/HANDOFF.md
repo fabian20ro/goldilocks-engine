@@ -1,4 +1,4 @@
-# Candidate handoff — round 055 Career action hierarchy (Phase 2)
+# Candidate handoff — round 056 V-061 Career completion attribution repair
 
 ## Implemented behavior summary
 
@@ -18,6 +18,11 @@
   ready/blocking/recovery reason. A completed evening adds a compact result:
   hours, money/progress, electricity/operating cost, relevant constraint, and
   next decision.
+- A submitted schedule projection is now consumed only after its exact Worker
+  response completes that evening and becomes durable. Rejected/non-completing
+  responses invalidate it. A player-triggered safe-offline completion receives
+  its own response-scoped recap using the same pure route accounting instead of
+  inheriting a prior draft.
 - Lifetime route actions, evaluation, savings, model/quantization, offline
   policy, independent exit, and diagnostics are native progressively disclosed
   sections in usefulness order. Existing Career mechanics and Phase 0/1
@@ -33,16 +38,19 @@
 | §20.7 Phase 2 compact hierarchy/composer                      | `CareerView`, `career-hierarchy.spec.ts`; 320/393 objective, resources, route controls, single Run, geometry evidence           |
 | Four stable routes; benefits, opportunity cost, exact Details | catalog `primaryBenefit`; component Details replacement/focus test; live catalog/state projections                              |
 | Projections and shared currency precision                     | pure engine projections; projection/currency unit tests; Details exact 3-decimal values                                         |
-| Completion summary and next decision                          | real Worker completion in portrait E2E deck                                                                                     |
+| Completion summary, recovery attribution, and next decision   | normal Worker deck plus repeated rejected-schedule → safe-offline E2E regression                                                |
 | Progressive disclosure                                        | ordered native disclosure E2E coverage; retained actions open only through their appropriate detail section                     |
 | Empty/partial/full/rejected/completed/locked/exit-ready deck  | committed Playwright deck emits all seven named screenshots at 320 and 393 CSS pixels                                           |
 | Accessibility/responsiveness                                  | 320/393, keyboard, CDP touch, labels, focus restoration, 100/200% text, reduced-motion, no horizontal/nested composer scrolling |
 | Retained Phase 0/1 persistence/offline/recovery               | canonical root E2E includes V-051–V-060 and offline/PWA/reload coverage                                                         |
 
-## Verifier findings resolved
+## Verifier findings addressed
 
-- No unresolved verifier finding exists at handoff. Retained V-057, V-058,
-  V-059, and V-060 behavior and tests remain passing.
+- V-061: a rejected Career batch now invalidates its response-scoped projection.
+  A later direct safe-offline completion uses its own Worker response and
+  pre-command route-accounting snapshot; it cannot render the rejected 0h/$0
+  recap.
+- Retained V-057, V-058, V-059, and V-060 behavior and tests remain covered.
 - Phase 2 required all retained Career controls to be explicitly opened through
   their new native disclosures; the preserved browser checks now model that
   user-visible interaction rather than querying hidden controls.
@@ -85,6 +93,8 @@ Focused Phase 2 checks:
 ```sh
 npx vitest run src/simulation/careerProjection.test.ts src/ui/careerView.test.tsx --coverage.enabled=false --reporter=dot
 E2E_PORT=4245 npm run test:e2e -- tests/e2e/career-hierarchy.spec.ts tests/e2e/career.spec.ts --reporter=dot
+E2E_PORT=4264 npm run test:e2e -- tests/e2e/career.spec.ts --grep "clears a rejected schedule projection" --repeat-each=5 --reporter=dot
+E2E_PORT=4265 npm run test:e2e -- tests/e2e/verifier-round-055.spec.ts --grep "rejected evening" --repeat-each=5 --reporter=dot
 ```
 
 `@playwright/test` is pinned in `package.json`; `npm run test:e2e` uses only
@@ -99,6 +109,9 @@ create its Mach-port rendezvous server; no browser test was skipped.
 - D-020 remains: successful storage, not merely a Worker response,
   acknowledges a submitted Career request. The existing lock/recovery boundary
   is unchanged.
+- D-022: a transient Career completion projection is keyed to its exact Worker
+  response. Rejection clears it; direct safe-offline feedback captures its own
+  response and waits for the same durable acknowledgement boundary.
 - Phase 2 estimates are presentation-only pure calculations over existing
   route/accounting logic. They do not issue commands, create ledger events,
   advance time, or add a parallel simulation model.
@@ -126,16 +139,21 @@ create its Mach-port rendezvous server; no browser test was skipped.
 - `npm run format:check` — pass.
 - `npm run lint` — pass.
 - `npm run typecheck` — pass.
-- Focused projections/Details check — 2 files, 5 tests pass.
+- Focused response/draft/Details unit check — 3 files, 18 tests pass.
+- Candidate-owned V-061 repeated browser regression — 5/5 pass.
+- Immutable V-061 repeated browser regression,
+  `E2E_PORT=4272 npm run test:e2e -- tests/e2e/verifier-round-055.spec.ts --grep "rejected evening" --repeat-each=5 --reporter=dot` — 5/5 pass.
 - Focused Phase 2 portrait deck — 2/2 pass; screenshots generated for seven
   states at both 320 and 393 CSS pixels.
 - Retained Career acceptance — 13/13 pass.
-- Canonical clean-state check, `E2E_PORT=4255 ./scripts/verify` — pass:
-  fresh `npm ci`; format; lint; typecheck; 36 unit/property files / 177 tests;
-  numeric, first-session, 20,001-seed upgrade, progression, Career, and
-  evaluation balances; production build; production audit (0 vulnerabilities);
-  176/176 root E2E; 2/2 Pages/offline E2E.
-- `./scripts/run` — ready at `127.0.0.1:4173` in 133ms; `/` and `/sw.js`
+- `npm run lint -- --max-warnings 0`, `git diff --check` — pass.
+- Canonical clean-state check, `E2E_PORT=4271 ./scripts/verify` — pass:
+  fresh `npm ci`; format; lint; typecheck; 37 unit/property files / 178 tests;
+  numeric, first-session (41 seeds), 20,001-seed upgrade, progression (41
+  seeds), Career (101 seeds), and evaluation (121 seeds) balances; production
+  build; production audit (0 vulnerabilities); 179/179 root E2E; 2/2
+  Pages/offline E2E.
+- `./scripts/run` — ready at `127.0.0.1:4173` in 155ms; `/` and `/sw.js`
   each returned HTTP 200; controlled shutdown left loopback unreachable (HTTP
   000).
 
