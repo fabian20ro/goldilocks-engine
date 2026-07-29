@@ -303,3 +303,32 @@
 - **Reversal condition:** Change completion-feedback attribution only through
   explicit product direction with equivalent response-ordering, durable-save,
   rejection, and offline-recovery evidence.
+
+## D-023 — Worker-bound Career recap snapshots
+
+- **Decision:** A transient Career recap uses one exact ordered Worker response
+  boundary: durable request ID, state immediately before that command, and
+  state returned by that command. Its night identity, projection baseline, and
+  next-decision copy are derived only when that matching response arrives. A
+  React state snapshot taken when the player clicks is never a recap boundary.
+- **Concurrency boundary:** Multiple valid Career commands may be posted before
+  React renders any response. The later command therefore uses the Worker
+  state immediately after earlier ordered commands, even when the browser UI
+  observed neither intermediate publication. A non-completing response still
+  invalidates its own recap under D-022.
+- **Durability boundary:** The boundary is App-session presentation data only.
+  D-020 still controls exact-once Run acknowledgement: no recap is displayed
+  until the matching request or a later ordered response is durably persisted.
+  No Worker command, state, schema, ledger, route, or balance rule changes.
+- **Reason:** A Run followed synchronously by safe offline work queued two
+  valid commands before either response rendered. The offline action captured
+  the stale pre-Run React count and incorrectly labeled its durable second
+  completion as Night 1.
+- **Evidence policy:** Candidate hook coverage batches the two Worker responses
+  and proves the later response retains its immediate pre-command state.
+  Candidate-owned and immutable round-056 V-062 Playwright probes repeatedly
+  prove the visible Night 2 recap; immutable V-061, human-paced draft, durable
+  save/recovery, and canonical checks remain required.
+- **Reversal condition:** Replace this response-bound presentation lifecycle
+  only through explicit product direction with equivalent concurrent-command,
+  durable-save, rejection, reload, and recovery evidence.

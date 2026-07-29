@@ -330,6 +330,55 @@ test.describe("Bedroom Developer career acceptance", () => {
     expect(pageErrors).toEqual([]);
   });
 
+  test("attributes concurrent Run and safe-offline completions to their own Worker responses", async ({
+    page,
+  }) => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
+    await page.setViewportSize({ width: 393, height: 742 });
+    await page.addInitScript(
+      ({ key, value }) => localStorage.setItem(key, value),
+      { key: SAVE_KEY, value: safeOfflineReadySave() },
+    );
+    await page.goto("/");
+    await waitForSavedState(page);
+    await openCareer(page);
+    await page.getByLabel("Freelance delivery evening hours").fill("4");
+    await openCareerDisclosure(page, "Safe freelance-only automation");
+
+    // Browser events can enqueue both valid commands before either response
+    // renders. The latest recap must use the offline command's own boundary.
+    await page.locator("button").evaluateAll((buttons) => {
+      const run = buttons.find(
+        (button) => button.textContent?.trim() === "Run scheduled evening",
+      ) as HTMLButtonElement | undefined;
+      const offline = buttons.find(
+        (button) =>
+          button.textContent?.trim() === "Apply safe offline policy now",
+      ) as HTMLButtonElement | undefined;
+      if (!run || !offline)
+        throw new Error("Expected concurrent Career action controls");
+      run.click();
+      offline.click();
+    });
+
+    await expect
+      .poll(async () => {
+        const saved = await savedCareer(page);
+        return {
+          completedEvenings: saved.career?.schedule?.completedEvenings ?? 0,
+          offlineHours:
+            saved.career?.offlinePolicy?.lastReport?.appliedHours ?? 0,
+        };
+      })
+      .toEqual({ completedEvenings: 2, offlineHours: 4 });
+
+    const result = page.getByRole("status", { name: "Latest evening result" });
+    await expect(result).toContainText("Night 2 result");
+    await expect(result).toContainText("4.00h used");
+    expect(pageErrors).toEqual([]);
+  });
+
   test("remains readable at 200 percent text with reduced motion", async ({
     page,
   }) => {

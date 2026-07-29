@@ -241,6 +241,72 @@ describe("durable Worker state publication", () => {
     unmount();
   });
 
+  it("retains the later Career command's immediate Worker boundary when responses batch", async () => {
+    const { result, unmount } = renderHook(() => useSimulation());
+    const worker = FakeWorker.instances[0];
+    if (!worker) throw new Error("Expected the simulation Worker");
+    const initial = applyCommand(createInitialState(2057), {
+      type: "SET_OFFLINE_POLICY",
+      enabled: true,
+      maxHours: 4,
+      maxElectricityCost: 5,
+      maxOperatingCost: 5,
+      minReliability: 0.7,
+    });
+
+    act(() => worker.emit({ type: "STATE", state: initial }));
+    const draft = replaceCareerScheduleHours(
+      normalizeCareerScheduleDraft(initial.career.schedule.allocations),
+      "freelance",
+      4,
+    );
+    act(() =>
+      result.current.commandBatch(createCareerScheduleCommandBatch(draft)),
+    );
+    const run = worker.requests.at(-1);
+    if (!run || run.type !== "COMMAND_BATCH")
+      throw new Error("Expected one Career command batch");
+
+    act(() => {
+      result.current.command({
+        type: "APPLY_OFFLINE_POLICY",
+        requestedHours: 4,
+      });
+    });
+    const offline = worker.requests.at(-1);
+    if (!offline || offline.type !== "COMMAND")
+      throw new Error("Expected one safe offline command");
+
+    const afterRun = reduceWorkerRequest(initial, run);
+    const afterOffline = reduceWorkerRequest(afterRun, offline);
+    act(() => {
+      worker.emit({
+        type: "STATE",
+        state: afterRun,
+        requestId: run.requestId,
+      });
+      worker.emit({
+        type: "STATE",
+        state: afterOffline,
+        requestId: offline.requestId,
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.lastWorkerResponse).toMatchObject({
+        requestId: offline.requestId,
+        before: afterRun,
+        after: afterOffline,
+      });
+    });
+    expect(
+      result.current.lastWorkerResponse?.after.career.schedule
+        .completedEvenings,
+    ).toBe(2);
+    expect(result.current.lastDurableRequestId).toBe(offline.requestId);
+    unmount();
+  });
+
   it("keeps Career Run locked until a later persisted Worker state covers a failed save", async () => {
     const storage = new FlakyStorage();
     vi.stubGlobal("localStorage", storage);

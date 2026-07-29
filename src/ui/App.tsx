@@ -124,17 +124,14 @@ interface CareerCompletionFeedback {
 }
 
 interface SubmittedCareerProjection {
-  completedEvenings: number;
+  allocations: CareerScheduleDraft;
   requestId: number;
-  projection: CareerEveningProjection;
-  responseConfirmed: boolean;
+  result: CareerCompletionFeedback | null;
 }
 
 interface PendingOfflineCareerCompletion {
-  before: SimulationState;
-  completedEvenings: number;
   requestId: number;
-  projection: CareerEveningProjection | null;
+  result: CareerCompletionFeedback | null;
 }
 
 /**
@@ -3822,7 +3819,7 @@ export function App() {
     command,
     commandBatch,
     hasDurablePersistenceFailure,
-    lastWorkerRequestId,
+    lastWorkerResponse,
     lastDurableRequestId,
     timeSpeed,
     setTimeSpeed,
@@ -3870,7 +3867,7 @@ export function App() {
   });
 
   const runCareerEvening = useCallback(() => {
-    const projection = projectCareerEvening(state, careerScheduleDraft.draft);
+    const allocations = { ...careerScheduleDraft.draft };
     let requestId: number | null = null;
     const accepted = careerScheduleDraft.runScheduledEvening(
       commandBatch,
@@ -3880,14 +3877,13 @@ export function App() {
     );
     if (!accepted || requestId === null) return false;
     submittedCareerProjectionRef.current = {
-      completedEvenings: state.career.schedule.completedEvenings,
+      allocations,
       requestId,
-      projection,
-      responseConfirmed: false,
+      result: null,
     };
     setCareerCompletionFeedback(null);
     return true;
-  }, [careerScheduleDraft, commandBatch, state]);
+  }, [careerScheduleDraft, commandBatch]);
 
   const applySafeOfflinePolicyNow = useCallback(() => {
     const requestId = command({
@@ -3896,28 +3892,24 @@ export function App() {
     });
     if (requestId === null) return;
     pendingOfflineCareerCompletionRef.current = {
-      before: state,
-      completedEvenings: state.career.schedule.completedEvenings,
       requestId,
-      projection: null,
+      result: null,
     };
     setCareerCompletionFeedback(null);
-  }, [command, state]);
+  }, [command]);
 
   useEffect(() => {
     const submitted = submittedCareerProjectionRef.current;
     if (!submitted) return;
-    if (
-      state.career.runEnding ||
-      state.career.schedule.completedEvenings < submitted.completedEvenings
-    ) {
+    if (state.career.runEnding) {
       submittedCareerProjectionRef.current = null;
       setCareerCompletionFeedback(null);
       return;
     }
-    if (lastWorkerRequestId === submitted.requestId) {
+    if (lastWorkerResponse?.requestId === submitted.requestId) {
       if (
-        state.career.schedule.completedEvenings <= submitted.completedEvenings
+        lastWorkerResponse.after.career.schedule.completedEvenings <=
+        lastWorkerResponse.before.career.schedule.completedEvenings
       ) {
         // A rejected or otherwise non-completing batch must never be consumed
         // by a later unrelated completion such as safe offline automation.
@@ -3925,12 +3917,19 @@ export function App() {
         setCareerCompletionFeedback(null);
         return;
       }
-      submitted.responseConfirmed = true;
+      submitted.result = {
+        evening: lastWorkerResponse.after.career.schedule.completedEvenings,
+        projection: projectCareerEvening(
+          lastWorkerResponse.before,
+          submitted.allocations,
+        ),
+        nextDecision: nextCareerDecision(lastWorkerResponse.after),
+      };
     }
-    if (!submitted.responseConfirmed) {
+    if (!submitted.result) {
       if (
-        lastWorkerRequestId !== null &&
-        lastWorkerRequestId > submitted.requestId
+        lastWorkerResponse !== null &&
+        lastWorkerResponse.requestId > submitted.requestId
       ) {
         submittedCareerProjectionRef.current = null;
         setCareerCompletionFeedback(null);
@@ -3938,50 +3937,48 @@ export function App() {
       return;
     }
     if (lastDurableRequestId < submitted.requestId) return;
-    setCareerCompletionFeedback({
-      evening: submitted.completedEvenings + 1,
-      projection: submitted.projection,
-      nextDecision: nextCareerDecision(state),
-    });
+    setCareerCompletionFeedback(submitted.result);
     submittedCareerProjectionRef.current = null;
-  }, [lastDurableRequestId, lastWorkerRequestId, state]);
+  }, [lastDurableRequestId, lastWorkerResponse, state]);
 
   useEffect(() => {
     const pending = pendingOfflineCareerCompletionRef.current;
     if (!pending) return;
-    if (
-      state.career.runEnding ||
-      state.career.schedule.completedEvenings < pending.completedEvenings
-    ) {
+    if (state.career.runEnding) {
       pendingOfflineCareerCompletionRef.current = null;
       return;
     }
-    if (lastWorkerRequestId === pending.requestId) {
-      pending.projection = offlineCareerCompletionProjection(
-        pending.before,
-        state,
+    if (lastWorkerResponse?.requestId === pending.requestId) {
+      const projection = offlineCareerCompletionProjection(
+        lastWorkerResponse.before,
+        lastWorkerResponse.after,
       );
-      if (!pending.projection) {
+      if (
+        !projection ||
+        lastWorkerResponse.after.career.schedule.completedEvenings <=
+          lastWorkerResponse.before.career.schedule.completedEvenings
+      ) {
         pendingOfflineCareerCompletionRef.current = null;
         return;
       }
+      pending.result = {
+        evening: lastWorkerResponse.after.career.schedule.completedEvenings,
+        projection,
+        nextDecision: nextCareerDecision(lastWorkerResponse.after),
+      };
     }
-    if (!pending.projection) {
+    if (!pending.result) {
       if (
-        lastWorkerRequestId !== null &&
-        lastWorkerRequestId > pending.requestId
+        lastWorkerResponse !== null &&
+        lastWorkerResponse.requestId > pending.requestId
       )
         pendingOfflineCareerCompletionRef.current = null;
       return;
     }
     if (lastDurableRequestId < pending.requestId) return;
-    setCareerCompletionFeedback({
-      evening: pending.completedEvenings + 1,
-      projection: pending.projection,
-      nextDecision: nextCareerDecision(state),
-    });
+    setCareerCompletionFeedback(pending.result);
     pendingOfflineCareerCompletionRef.current = null;
-  }, [lastDurableRequestId, lastWorkerRequestId, state]);
+  }, [lastDurableRequestId, lastWorkerResponse, state]);
 
   useEffect(() => {
     setCareerCompletionFeedback((current) =>

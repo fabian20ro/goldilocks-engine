@@ -19,6 +19,18 @@ export type TimeSpeed = (typeof TIME_SPEEDS)[number];
 type DurableWorkerRequest =
   | { type: "COMMAND"; command: SimulationCommand }
   | { type: "COMMAND_BATCH"; commands: readonly SimulationCommand[] };
+
+/**
+ * One exact Worker command response, including the state immediately before it
+ * ran. Consumers that need presentation-only command attribution must use this
+ * boundary rather than a potentially stale React snapshot taken while requests
+ * are still queued.
+ */
+export interface WorkerResponseBoundary {
+  requestId: number;
+  before: SimulationState;
+  after: SimulationState;
+}
 // Keep the established storage address so verifier-owned browser probes and
 // existing sessions observe the schema-6 migration in place. The payload's
 // schemaVersion, not this opaque key, is the save contract.
@@ -88,6 +100,7 @@ export function useSimulation() {
     savedStateRef.current !== undefined && state.career.offlinePolicy.enabled,
   );
   const workerRef = useRef<Worker | null>(null);
+  const workerStateRef = useRef(state);
   const nextRequestIdRef = useRef(1);
   // A later Worker publication includes every command processed before it.
   // Keep that watermark separate from the last *persisted* acknowledgement.
@@ -96,11 +109,10 @@ export function useSimulation() {
   const initialOfflineAppliedRef = useRef(false);
   const speedRef = useRef<TimeSpeed>(1);
   const [timeSpeed, setTimeSpeedState] = useState<TimeSpeed>(1);
-  // This identifies the exact Worker response currently published in memory.
-  // It is intentionally separate from the durable acknowledgement watermark.
-  const [lastWorkerRequestId, setLastWorkerRequestId] = useState<number | null>(
-    null,
-  );
+  // This is the exact in-memory command response, intentionally separate from
+  // the durable acknowledgement watermark below.
+  const [lastWorkerResponse, setLastWorkerResponse] =
+    useState<WorkerResponseBoundary | null>(null);
   const [lastDurableRequestId, setLastDurableRequestId] = useState(0);
   const [hasDurablePersistenceFailure, setHasDurablePersistenceFailure] =
     useState(false);
@@ -123,13 +135,19 @@ export function useSimulation() {
     worker.addEventListener(
       "message",
       (event: MessageEvent<WorkerResponse>) => {
-        if (isDurableRequestId(event.data.requestId))
-          setLastWorkerRequestId(event.data.requestId);
-        if (isDurableRequestId(event.data.requestId))
+        const before = workerStateRef.current;
+        workerStateRef.current = event.data.state;
+        if (isDurableRequestId(event.data.requestId)) {
+          setLastWorkerResponse({
+            requestId: event.data.requestId,
+            before,
+            after: event.data.state,
+          });
           highestWorkerRequestIdRef.current = Math.max(
             highestWorkerRequestIdRef.current,
             event.data.requestId,
           );
+        }
         const durable = persistBeforePublish(
           event.data.state,
           persistState,
@@ -207,7 +225,7 @@ export function useSimulation() {
     command,
     commandBatch,
     hasDurablePersistenceFailure,
-    lastWorkerRequestId,
+    lastWorkerResponse,
     lastDurableRequestId,
     timeSpeed,
     setTimeSpeed,
