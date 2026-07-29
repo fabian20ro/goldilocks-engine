@@ -241,7 +241,7 @@ describe("durable Worker state publication", () => {
     unmount();
   });
 
-  it("retains the later Career command's immediate Worker boundary when responses batch", async () => {
+  it("retains every ordered Career Worker boundary when responses batch before render", async () => {
     const { result, unmount } = renderHook(() => useSimulation());
     const worker = FakeWorker.instances[0];
     if (!worker) throw new Error("Expected the simulation Worker");
@@ -276,6 +276,10 @@ describe("durable Worker state publication", () => {
     const offline = worker.requests.at(-1);
     if (!offline || offline.type !== "COMMAND")
       throw new Error("Expected one safe offline command");
+    const runRequestId = run.requestId;
+    const offlineRequestId = offline.requestId;
+    if (runRequestId === undefined || offlineRequestId === undefined)
+      throw new Error("Expected numbered Career Worker requests");
 
     const afterRun = reduceWorkerRequest(initial, run);
     const afterOffline = reduceWorkerRequest(afterRun, offline);
@@ -283,27 +287,37 @@ describe("durable Worker state publication", () => {
       worker.emit({
         type: "STATE",
         state: afterRun,
-        requestId: run.requestId,
+        requestId: runRequestId,
       });
       worker.emit({
         type: "STATE",
         state: afterOffline,
-        requestId: offline.requestId,
+        requestId: offlineRequestId,
       });
     });
 
     await waitFor(() => {
-      expect(result.current.lastWorkerResponse).toMatchObject({
-        requestId: offline.requestId,
-        before: afterRun,
-        after: afterOffline,
-      });
+      expect(result.current.workerResponseBoundaries).toMatchObject([
+        {
+          requestId: runRequestId,
+          before: initial,
+          after: afterRun,
+        },
+        {
+          requestId: offlineRequestId,
+          before: afterRun,
+          after: afterOffline,
+        },
+      ]);
     });
-    expect(
-      result.current.lastWorkerResponse?.after.career.schedule
-        .completedEvenings,
-    ).toBe(2);
-    expect(result.current.lastDurableRequestId).toBe(offline.requestId);
+    expect(result.current.workerResponseBoundaries).toHaveLength(2);
+    expect(result.current.lastDurableRequestId).toBe(offlineRequestId);
+    act(() =>
+      result.current.consumeWorkerResponseBoundariesThrough(offlineRequestId),
+    );
+    await waitFor(() => {
+      expect(result.current.workerResponseBoundaries).toEqual([]);
+    });
     unmount();
   });
 

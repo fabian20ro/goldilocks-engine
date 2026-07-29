@@ -118,6 +118,7 @@ interface DeletedPreset {
 }
 
 interface CareerCompletionFeedback {
+  requestId: number;
   evening: number;
   projection: CareerEveningProjection;
   nextDecision: string;
@@ -3819,7 +3820,8 @@ export function App() {
     command,
     commandBatch,
     hasDurablePersistenceFailure,
-    lastWorkerResponse,
+    workerResponseBoundaries,
+    consumeWorkerResponseBoundariesThrough,
     lastDurableRequestId,
     timeSpeed,
     setTimeSpeed,
@@ -3866,6 +3868,15 @@ export function App() {
     inspect: 0,
   });
 
+  const clearCareerCompletionFeedbackForRequest = useCallback(
+    (requestId: number) => {
+      setCareerCompletionFeedback((current) =>
+        current?.requestId === requestId ? null : current,
+      );
+    },
+    [],
+  );
+
   const runCareerEvening = useCallback(() => {
     const allocations = { ...careerScheduleDraft.draft };
     let requestId: number | null = null;
@@ -3881,7 +3892,6 @@ export function App() {
       requestId,
       result: null,
     };
-    setCareerCompletionFeedback(null);
     return true;
   }, [careerScheduleDraft, commandBatch]);
 
@@ -3895,90 +3905,94 @@ export function App() {
       requestId,
       result: null,
     };
-    setCareerCompletionFeedback(null);
   }, [command]);
 
   useEffect(() => {
-    const submitted = submittedCareerProjectionRef.current;
-    if (!submitted) return;
     if (state.career.runEnding) {
       submittedCareerProjectionRef.current = null;
-      setCareerCompletionFeedback(null);
-      return;
-    }
-    if (lastWorkerResponse?.requestId === submitted.requestId) {
-      if (
-        lastWorkerResponse.after.career.schedule.completedEvenings <=
-        lastWorkerResponse.before.career.schedule.completedEvenings
-      ) {
-        // A rejected or otherwise non-completing batch must never be consumed
-        // by a later unrelated completion such as safe offline automation.
-        submittedCareerProjectionRef.current = null;
-        setCareerCompletionFeedback(null);
-        return;
-      }
-      submitted.result = {
-        evening: lastWorkerResponse.after.career.schedule.completedEvenings,
-        projection: projectCareerEvening(
-          lastWorkerResponse.before,
-          submitted.allocations,
-        ),
-        nextDecision: nextCareerDecision(lastWorkerResponse.after),
-      };
-    }
-    if (!submitted.result) {
-      if (
-        lastWorkerResponse !== null &&
-        lastWorkerResponse.requestId > submitted.requestId
-      ) {
-        submittedCareerProjectionRef.current = null;
-        setCareerCompletionFeedback(null);
-      }
-      return;
-    }
-    if (lastDurableRequestId < submitted.requestId) return;
-    setCareerCompletionFeedback(submitted.result);
-    submittedCareerProjectionRef.current = null;
-  }, [lastDurableRequestId, lastWorkerResponse, state]);
-
-  useEffect(() => {
-    const pending = pendingOfflineCareerCompletionRef.current;
-    if (!pending) return;
-    if (state.career.runEnding) {
       pendingOfflineCareerCompletionRef.current = null;
-      return;
-    }
-    if (lastWorkerResponse?.requestId === pending.requestId) {
-      const projection = offlineCareerCompletionProjection(
-        lastWorkerResponse.before,
-        lastWorkerResponse.after,
-      );
-      if (
-        !projection ||
-        lastWorkerResponse.after.career.schedule.completedEvenings <=
-          lastWorkerResponse.before.career.schedule.completedEvenings
-      ) {
-        pendingOfflineCareerCompletionRef.current = null;
-        return;
+      setCareerCompletionFeedback(null);
+    } else {
+      for (const boundary of workerResponseBoundaries) {
+        const submitted = submittedCareerProjectionRef.current;
+        if (submitted?.requestId === boundary.requestId) {
+          if (
+            boundary.after.career.schedule.completedEvenings <=
+            boundary.before.career.schedule.completedEvenings
+          ) {
+            // A rejection/non-completion invalidates only the recap created by
+            // that exact request. Earlier completed boundaries stay visible.
+            submittedCareerProjectionRef.current = null;
+            clearCareerCompletionFeedbackForRequest(boundary.requestId);
+          } else {
+            submitted.result = {
+              requestId: boundary.requestId,
+              evening: boundary.after.career.schedule.completedEvenings,
+              projection: projectCareerEvening(
+                boundary.before,
+                submitted.allocations,
+              ),
+              nextDecision: nextCareerDecision(boundary.after),
+            };
+          }
+        }
+
+        const pending = pendingOfflineCareerCompletionRef.current;
+        if (pending?.requestId !== boundary.requestId) continue;
+        const projection = offlineCareerCompletionProjection(
+          boundary.before,
+          boundary.after,
+        );
+        if (
+          !projection ||
+          boundary.after.career.schedule.completedEvenings <=
+            boundary.before.career.schedule.completedEvenings
+        ) {
+          pendingOfflineCareerCompletionRef.current = null;
+          clearCareerCompletionFeedbackForRequest(boundary.requestId);
+          continue;
+        }
+        pending.result = {
+          requestId: boundary.requestId,
+          evening: boundary.after.career.schedule.completedEvenings,
+          projection,
+          nextDecision: nextCareerDecision(boundary.after),
+        };
       }
-      pending.result = {
-        evening: lastWorkerResponse.after.career.schedule.completedEvenings,
-        projection,
-        nextDecision: nextCareerDecision(lastWorkerResponse.after),
-      };
-    }
-    if (!pending.result) {
-      if (
-        lastWorkerResponse !== null &&
-        lastWorkerResponse.requestId > pending.requestId
-      )
+
+      const completed: CareerCompletionFeedback[] = [];
+      const submitted = submittedCareerProjectionRef.current;
+      if (submitted?.result && lastDurableRequestId >= submitted.requestId) {
+        completed.push(submitted.result);
+        submittedCareerProjectionRef.current = null;
+      }
+      const pending = pendingOfflineCareerCompletionRef.current;
+      if (pending?.result && lastDurableRequestId >= pending.requestId) {
+        completed.push(pending.result);
         pendingOfflineCareerCompletionRef.current = null;
-      return;
+      }
+      if (completed.length > 0) {
+        const latest = completed.reduce((current, candidate) =>
+          candidate.requestId > current.requestId ? candidate : current,
+        );
+        setCareerCompletionFeedback((current) =>
+          current !== null && current.requestId > latest.requestId
+            ? current
+            : latest,
+        );
+      }
     }
-    if (lastDurableRequestId < pending.requestId) return;
-    setCareerCompletionFeedback(pending.result);
-    pendingOfflineCareerCompletionRef.current = null;
-  }, [lastDurableRequestId, lastWorkerResponse, state]);
+
+    const lastBoundary = workerResponseBoundaries.at(-1);
+    if (lastBoundary)
+      consumeWorkerResponseBoundariesThrough(lastBoundary.requestId);
+  }, [
+    clearCareerCompletionFeedbackForRequest,
+    consumeWorkerResponseBoundariesThrough,
+    lastDurableRequestId,
+    state.career.runEnding,
+    workerResponseBoundaries,
+  ]);
 
   useEffect(() => {
     setCareerCompletionFeedback((current) =>

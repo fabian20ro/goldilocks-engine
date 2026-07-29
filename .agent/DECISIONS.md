@@ -332,3 +332,32 @@
 - **Reversal condition:** Replace this response-bound presentation lifecycle
   only through explicit product direction with equivalent concurrent-command,
   durable-save, rejection, reload, and recovery evidence.
+
+## D-024 — Ordered Career response-boundary delivery
+
+- **Decision:** `useSimulation` retains ordered durable Worker response
+  boundaries in a small pending queue until the App processes them through the
+  last delivered request ID. Functional React state updates append each
+  boundary, so callbacks released in one browser task cannot overwrite an
+  earlier response before render.
+- **Consumption boundary:** Career processes the queue in Worker order and
+  derives each recap only from its matching request boundary. A non-completing
+  response clears only a recap carrying that same request ID; it cannot erase a
+  prior completed recap. The App drains processed boundaries immediately, so
+  the queue contains only unprocessed callbacks rather than a second durable
+  event system.
+- **Durability boundary:** This remains transient presentation lifecycle data.
+  D-020's persisted acknowledgement watermark still controls when a stored
+  recap is displayed; no Worker command, simulation state, schema, ledger,
+  route, or balance behavior changes.
+- **Reason:** V-063 showed that one `lastWorkerResponse` snapshot loses an
+  ordered completed Run response when React batches it with a later valid
+  zero-hour safe-offline response.
+- **Evidence policy:** Candidate hook coverage emits two real ordered Worker
+  responses before a render and verifies both are retained then consumed.
+  Candidate and immutable V-063 browser probes buffer/release the two real
+  callbacks together; immutable V-061/V-062, human-paced, persistence, and
+  canonical checks remain required.
+- **Reversal condition:** Replace this bounded presentation queue only through
+  explicit product direction with equivalent batched-response, durability,
+  rejection, and recovery evidence.

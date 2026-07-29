@@ -108,7 +108,7 @@ async function savedCareer(page: Page): Promise<{
   }, SAVE_KEY);
 }
 
-function safeOfflineReadySave(): string {
+function safeOfflineReadySave(maxHours = 4): string {
   const state = createInitialState(56_061);
   return JSON.stringify(
     sealSimulationState({
@@ -118,7 +118,7 @@ function safeOfflineReadySave(): string {
         offlinePolicy: {
           ...state.career.offlinePolicy,
           enabled: true,
-          maxHours: 4,
+          maxHours,
           maxElectricityCost: 5,
           maxOperatingCost: 5,
           minReliability: 0.7,
@@ -126,6 +126,51 @@ function safeOfflineReadySave(): string {
       },
     }),
   );
+}
+
+async function bufferTwoWorkerCommandResponses(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    type WorkerMessageListener = (this: Worker, event: MessageEvent) => void;
+    type InterceptableWorkerPrototype = {
+      addEventListener: (
+        type: string,
+        listener: WorkerMessageListener | null,
+        options?: boolean | AddEventListenerOptions,
+      ) => void;
+    };
+    const workerPrototype = Worker.prototype as InterceptableWorkerPrototype;
+    const addEventListener = workerPrototype.addEventListener;
+    workerPrototype.addEventListener = function bufferCommandResponses(
+      this: Worker,
+      type: string,
+      listener: WorkerMessageListener | null,
+      options?: boolean | AddEventListenerOptions,
+    ) {
+      if (type !== "message" || listener === null)
+        return addEventListener.call(this, type, listener, options);
+
+      const pending: MessageEvent[] = [];
+      return addEventListener.call(
+        this,
+        type,
+        function releaseTwoCommandResponsesTogether(
+          this: Worker,
+          event: MessageEvent,
+        ) {
+          const requestId = (event.data as { requestId?: unknown }).requestId;
+          if (typeof requestId !== "number") {
+            listener.call(this, event);
+            return;
+          }
+          pending.push(event);
+          if (pending.length < 2) return;
+          for (const response of pending.splice(0))
+            listener.call(this, response);
+        },
+        options,
+      );
+    };
+  });
 }
 
 async function assertPortraitControls(page: Page): Promise<void> {
@@ -375,6 +420,57 @@ test.describe("Bedroom Developer career acceptance", () => {
 
     const result = page.getByRole("status", { name: "Latest evening result" });
     await expect(result).toContainText("Night 2 result");
+    await expect(result).toContainText("4.00h used");
+    expect(pageErrors).toEqual([]);
+  });
+
+  test("keeps a completed Run recap when a batched later offline response applies zero hours", async ({
+    page,
+  }) => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
+    await page.setViewportSize({ width: 393, height: 742 });
+    await page.addInitScript(
+      ({ key, value }) => localStorage.setItem(key, value),
+      { key: SAVE_KEY, value: safeOfflineReadySave(0) },
+    );
+    await bufferTwoWorkerCommandResponses(page);
+    await page.goto("/");
+    await waitForSavedState(page);
+    await openCareer(page);
+    await page.getByLabel("Freelance delivery evening hours").fill("4");
+    await openCareerDisclosure(page, "Safe freelance-only automation");
+
+    // Release both real Worker responses in one browser task. The second
+    // policy response is valid but cannot complete an evening, so it must not
+    // consume the preceding Run's response-bound recap.
+    await page.locator("button").evaluateAll((buttons) => {
+      const run = buttons.find(
+        (button) => button.textContent?.trim() === "Run scheduled evening",
+      ) as HTMLButtonElement | undefined;
+      const offline = buttons.find(
+        (button) =>
+          button.textContent?.trim() === "Apply safe offline policy now",
+      ) as HTMLButtonElement | undefined;
+      if (!run || !offline)
+        throw new Error("Expected concurrent Career action controls");
+      run.click();
+      offline.click();
+    });
+
+    await expect
+      .poll(async () => {
+        const saved = await savedCareer(page);
+        return {
+          completedEvenings: saved.career?.schedule?.completedEvenings ?? 0,
+          offlineHours:
+            saved.career?.offlinePolicy?.lastReport?.appliedHours ?? -1,
+        };
+      })
+      .toEqual({ completedEvenings: 1, offlineHours: 0 });
+
+    const result = page.getByRole("status", { name: "Latest evening result" });
+    await expect(result).toContainText("Night 1 result");
     await expect(result).toContainText("4.00h used");
     expect(pageErrors).toEqual([]);
   });

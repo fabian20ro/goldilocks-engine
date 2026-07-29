@@ -109,10 +109,12 @@ export function useSimulation() {
   const initialOfflineAppliedRef = useRef(false);
   const speedRef = useRef<TimeSpeed>(1);
   const [timeSpeed, setTimeSpeedState] = useState<TimeSpeed>(1);
-  // This is the exact in-memory command response, intentionally separate from
-  // the durable acknowledgement watermark below.
-  const [lastWorkerResponse, setLastWorkerResponse] =
-    useState<WorkerResponseBoundary | null>(null);
+  // React can batch several Worker callbacks into one render. Keep each exact
+  // command boundary until the App has processed it, rather than replacing an
+  // earlier boundary with the latest response snapshot.
+  const [workerResponseBoundaries, setWorkerResponseBoundaries] = useState<
+    readonly WorkerResponseBoundary[]
+  >([]);
   const [lastDurableRequestId, setLastDurableRequestId] = useState(0);
   const [hasDurablePersistenceFailure, setHasDurablePersistenceFailure] =
     useState(false);
@@ -126,6 +128,19 @@ export function useSimulation() {
     return requestId;
   }, []);
 
+  const consumeWorkerResponseBoundariesThrough = useCallback(
+    (requestId: number) => {
+      if (!isDurableRequestId(requestId)) return;
+      setWorkerResponseBoundaries((current) => {
+        const firstUnconsumed = current.findIndex(
+          (boundary) => boundary.requestId > requestId,
+        );
+        return firstUnconsumed < 0 ? [] : current.slice(firstUnconsumed);
+      });
+    },
+    [],
+  );
+
   useEffect(() => {
     const worker = new Worker(
       new URL("../simulation/worker.ts", import.meta.url),
@@ -137,15 +152,19 @@ export function useSimulation() {
       (event: MessageEvent<WorkerResponse>) => {
         const before = workerStateRef.current;
         workerStateRef.current = event.data.state;
-        if (isDurableRequestId(event.data.requestId)) {
-          setLastWorkerResponse({
-            requestId: event.data.requestId,
-            before,
-            after: event.data.state,
-          });
+        const requestId = event.data.requestId;
+        if (isDurableRequestId(requestId)) {
+          setWorkerResponseBoundaries((current) => [
+            ...current,
+            {
+              requestId,
+              before,
+              after: event.data.state,
+            },
+          ]);
           highestWorkerRequestIdRef.current = Math.max(
             highestWorkerRequestIdRef.current,
-            event.data.requestId,
+            requestId,
           );
         }
         const durable = persistBeforePublish(
@@ -225,7 +244,8 @@ export function useSimulation() {
     command,
     commandBatch,
     hasDurablePersistenceFailure,
-    lastWorkerResponse,
+    workerResponseBoundaries,
+    consumeWorkerResponseBoundariesThrough,
     lastDurableRequestId,
     timeSpeed,
     setTimeSpeed,
