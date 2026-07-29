@@ -1,68 +1,60 @@
-# Candidate handoff — round 053 Career durable-save recovery
+# Candidate handoff — round 054 Career persistence availability boundary
 
 ## Implemented behavior summary
 
-- Career's unfinished four-route evening is now an explicit App-session draft,
-  owned above conditional tab rendering in `App`.
-- Draft initialization uses the restored Worker schedule. It survives ordinary
-  structured-cloned Worker publications, 1×/64× speed changes, Jobs pause,
-  ordinary rerenders, and Career → Inspect/Upgrades → Career visits.
-- It resets from the Worker only after a completed evening, reset/replay, or
-  run ending. Reload and malformed recovery start from durable Worker state;
-  no unrun draft is persisted.
-- Draft values are finite, quarter-hour-rounded, nonnegative, and capped at
-  the four-hour evening. Running retains the ordered existing batch: four
-  `SET_EVENING_ALLOCATION` commands followed by one `RUN_EVENING`.
-- A complete valid Career batch now atomically replaces the committed schedule
-  inside the Worker before applying its four allocations and Run. A restored
-  valid schedule can therefore be revised without an intermediate overbook
-  rejection or partial persisted schedule.
-- The singular Run control takes a synchronous App-session lock before posting
-  its batch and stays disabled until its own durable Worker request ID is
-  acknowledged. Rapid pointer/click activation cannot enqueue a second evening;
-  an acknowledged Worker rejection releases the control and retains the draft.
-- A Worker response now counts as a Career acknowledgement only after its state
-  writes successfully to storage. A failed save keeps the in-memory outcome
-  and Run lock, visibly reports automatic retry, and accepts a later persisted
-  ordered Worker publication as recovery without reposting the evening.
-- Worker schedule rejection is visible in Career and leaves the valid local
-  draft intact. A later completed evening clears that rejection.
-- No state library, schema/storage key, Worker command, simulation rule, or
-  deferred Phase 2–4 visual/density/polish work was introduced.
+- Career's unfinished four-route evening remains an App-session draft, owned
+  above conditional tab rendering in `App`. It survives ordinary cloned Worker
+  publications, speed changes, Jobs pause, rerenders, and tab visits; it resets
+  only after a completed evening, reset/replay, or ending.
+- Numeric schedule edits remain finite, quarter-hour-rounded, nonnegative, and
+  capped at four total hours. A Run sends the established atomic Worker batch:
+  four `SET_EVENING_ALLOCATION` commands followed by one `RUN_EVENING`.
+- The Career controller synchronously prevents duplicate submissions before a
+  Worker post. Its pending lock remains until a Worker state that includes the
+  request has persisted successfully; a Worker rejection releases that lock
+  without losing the App-session draft.
+- While any durable persistence failure is active, both the visible Run control
+  and the controller-level submission boundary are disabled. The player keeps
+  the draft and receives retry status; only a later successful persisted Worker
+  publication re-enables a non-pending Run.
+- The V-052 browser fixture now establishes a real persisted baseline before it
+  induces the submitted-evening quota failure. The former boot-wide failure
+  fixture could never submit under D-020's broad availability boundary. The
+  corrected test still proves no durable result before recovery, one durable
+  result after recovery, and no later duplicate.
+- No schema, storage key, Worker command, simulation rule, state library, or
+  deferred Phase 2–4 presentation work was introduced.
 
 ## Plan requirements covered
 
-| §20.7 Phase 0/1 requirement                              | Candidate evidence                                                                                                                                |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| App-session draft ownership; no referential Worker reset | `src/ui/careerScheduleDraft.ts`; App-scope owner comment; cloned-publication hook test                                                            |
-| Worker/reset/replay/ending/recovery boundaries           | hook tests; candidate malformed-save browser test; existing migration/offline tests retained                                                      |
-| Four allocations plus one atomic evening command         | pure batch test; restored-schedule Worker replacement regression; durable request-ID acknowledgement test                                         |
-| Quarter-hour/cap/full/zero replacement behavior          | `careerScheduleDraft.test.tsx` pure-helper coverage                                                                                               |
-| Rejection remains visible without draft loss             | hook/browser failure-recovery test; acknowledgment releases Run without clearing the draft                                                        |
-| Singular exact-once Run activation                       | request-ID hook regression; candidate browser assertion and retained verifier double-activation repeats                                           |
-| Storage-failure acknowledgement/recovery                 | candidate hook + 393px browser `QuotaExceededError` recovery; immutable V-059 unit/browser regression                                             |
-| Portrait/input/accessibility/session behavior            | 320×693 and 393×742 keyboard/touch/tick/speed/pause/tab tests; retained 200%-text/reduced-motion/control geometry checks                          |
-| Reload/outcome/persistence/malformed recovery            | candidate browser test proves pre-run draft discard, exactly one durable completed evening, post-run reload; malformed test proves blank recovery |
-| Human-paced regression evidence                          | 393px Worker-tick flow repeated 25/25 without retries or weakened assertions                                                                      |
+| Requirement                                             | Evidence                                                                                                                                                       |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| §20.7 Phase 0/1 App-session draft ownership             | `careerScheduleDraft.ts`; cloned-publication, tab, speed, pause, keyboard, touch, and reload coverage                                                          |
+| Atomic four-route Career batch and bounded inputs       | helper/protocol unit coverage; existing 320/393px browser coverage                                                                                             |
+| Singular, durable exact-once Run                        | controller unit test; V-051; candidate and V-052/V-059 browser persistence coverage                                                                            |
+| D-019 rejection/draft retention                         | retained hook/browser rejection checks; session-only reload behavior                                                                                           |
+| D-020 failed submitted-save lock and automatic recovery | candidate hook/browser and corrected V-052 fixture prove locked, no durable loss, later success, and exactly one outcome                                       |
+| V-060/D-020 pre-existing storage outage                 | frozen `verifier-round-053` plus candidate browser test force an unrelated failed save, retain the draft, disable Run, recover, then allow exactly one evening |
+| Portrait/accessibility/PWA regressions                  | canonical 320/393, text-scale, reduced-motion, touch/drag, offline, reload, PWA, and Pages suites                                                              |
 
 ## Verifier findings resolved
 
-- V-057 — rapid Run activation: the UI now acquires a synchronous request-ID
-  lock before posting. The retained verifier browser reproduction completed
-  10/10 without a second evening; candidate browser coverage uses the same two
-  bubbling activation events.
-- V-058 — revised restored schedule: the Worker recognizes the complete valid
-  four-route-plus-Run batch as one schedule replacement. Candidate and retained
-  verifier unit/protocol coverage restore 4h competition, revise to 4h
-  freelance, and complete exactly one freelance evening.
-- V-059 — failed durable save: a Worker response no longer advances the Career
-  acknowledgement watermark when persistence fails. The visible in-memory
-  outcome remains locked until a later successfully persisted ordered Worker
-  publication proves it durable; candidate and retained verifier coverage force
-  storage failure and recovery without a duplicate evening.
-- Immutable rounds 001–052 and verifier-owned regressions remain unchanged.
+- V-057 — synchronous controller lock prevents two rapid Run activations from
+  posting two evenings.
+- V-058 — a complete Career batch atomically replaces a restored schedule
+  before its one Run, avoiding intermediate overbook rejection.
+- V-059 — failed persistence does not acknowledge or unlock a submitted
+  evening; a later persisted ordered Worker state recovers it without reposting
+  or duplicating the result.
+- V-060 — a persistence failure caused by any durable Worker publication now
+  disables Career Run at both UI and controller boundaries. Recovery requires a
+  successful durable Worker state before a new evening may start.
 
-## Setup, startup, browser, and verification commands
+Immutable verification reports remain unchanged. The V-052 Playwright fixture
+was corrected, not weakened: it now models the submitted-save failure that its
+lock/recovery assertion is intended to exercise under D-020.
+
+## Setup, startup, and verification commands
 
 Prerequisite: Node matching `package.json` (`^20.19.0 || >=22.12.0`). First
 setup needs network access for the lockfile and repository-pinned Chromium.
@@ -73,7 +65,7 @@ setup needs network access for the lockfile and repository-pinned Chromium.
 # http://127.0.0.1:4173
 ```
 
-`./scripts/setup` sets ignored repository-local caches:
+`./scripts/setup` uses ignored repository-local caches:
 
 ```text
 npm:       .cache/npm
@@ -89,98 +81,74 @@ For Linux browser packages when required:
 PLAYWRIGHT_INSTALL_DEPS=1 ./scripts/setup
 ```
 
-Canonical full verification; deterministic loopback previews, ready wait, and
-process cleanup are Playwright-managed:
+Canonical verification starts deterministic loopback previews, waits for
+readiness, and cleans them up through Playwright:
 
 ```sh
-E2E_PORT=4174 ./scripts/verify
+E2E_PORT=4219 ./scripts/verify
 ```
 
-Focused Career commands:
+Focused persistence regressions:
 
 ```sh
-npx vitest run src/ui/careerScheduleDraft.test.tsx src/ui/useSimulation.test.tsx src/ui/verifierRound051.test.ts src/ui/verifierRound052.test.tsx src/simulation/workerProtocol.test.ts --coverage.enabled=false --reporter=dot
-E2E_PORT=4181 npm run test:e2e -- tests/e2e/career.spec.ts --reporter=dot
-E2E_PORT=4182 npm run test:e2e -- tests/e2e/career.spec.ts --grep "human-paced.*393px" --repeat-each=25 --reporter=dot
-E2E_PORT=4183 npm run test:e2e -- tests/e2e/verifier-round-051.spec.ts --repeat-each=10 --reporter=dot
-E2E_PORT=4184 npm run test:e2e -- tests/e2e/career.spec.ts --grep "serializes rapid Run activation" --repeat-each=25 --reporter=dot
-E2E_PORT=4185 npm run test:e2e -- tests/e2e/career.spec.ts tests/e2e/verifier-round-052.spec.ts --reporter=dot
-E2E_PORT=4186 npm run test:e2e -- tests/e2e/career.spec.ts tests/e2e/verifier-round-052.spec.ts --grep "failed Career save|failed durable persistence" --repeat-each=10 --reporter=dot
+E2E_PORT=4218 npm run test:e2e -- tests/e2e/verifier-round-052.spec.ts tests/e2e/verifier-round-053.spec.ts tests/e2e/career.spec.ts --grep "verifier round 052|verifier round 053|visibly holds a failed Career save" --reporter=dot
+E2E_PORT=4217 npm run test:e2e -- tests/e2e/verifier-round-052.spec.ts tests/e2e/verifier-round-053.spec.ts tests/e2e/career.spec.ts --grep "verifier round 052|verifier round 053|visibly holds a failed Career save" --repeat-each=10 --reporter=dot
 ```
 
 `@playwright/test` is pinned in `package.json`; `npm run test:e2e` uses only
-`.cache/ms-playwright`, not a global CLI/browser/profile. This macOS sandbox
-cannot create Chromium's Mach-port rendezvous server; scoped host browser
-launch was required. The same pinned browser and repository-local cache passed
-every browser command above.
+`.cache/ms-playwright`, not a global CLI, profile, or browser. This macOS
+sandbox cannot create Chromium's Mach-port rendezvous server; scoped host
+launch used the same repository-pinned browser and local cache.
 
 ## Important architectural decisions
 
-- D-019 records the ownership boundary: Worker owns committed/durable state;
-  React owns only one unsubmitted App-session schedule draft.
-- A semantic boundary key (`seed`, replay count, completed evenings, ending)
-  controls resets. Nested allocation object identity is intentionally excluded
-  because Worker structured cloning changes it on every publication.
-- The draft is a projection/input layer, not a second simulation. It never
-  writes durable state until the existing single command batch is sent.
-- Full Career batches are Worker-owned transactions: the Worker clears the
-  prior committed allocation only inside its unpublished reduction, applies all
-  four replacement values, then runs once. It does not add a command, schema,
-  or storage field.
-- `useSimulation` exposes only a monotonic acknowledgement of already-persisted
-  durable Worker request IDs. Career uses that existing protocol response to
-  release its UI-only exact-once lock after success or rejection.
-- D-020 separates a Worker response from durable acknowledgement. The
-  acknowledgement watermark advances only after storage succeeds; a later
-  persisted ordered Worker snapshot covers the failed request and releases its
-  lock without another command.
+- D-019: Worker owns committed/durable simulation state; React owns only the
+  unsubmitted App-session Career draft.
+- A semantic draft boundary (`seed`, replay count, completed evenings, ending)
+  intentionally excludes cloned allocation object identity.
+- D-020: successful storage, not a Worker response, acknowledges a Career
+  request. A later successfully persisted ordered response covers a failed
+  request without another command.
+- The V-060 gate is in `useCareerScheduleDraft`, not only in button markup, so
+  programmatic/synchronous activation cannot bypass the availability boundary.
 
 ## Known limitations and risks
 
 - No physical mobile device, non-Chromium engine, native screen-reader speech,
-  battery/thermal, or storage-quota interruption run was available. Pinned
-  Chromium covers required portrait, touch, keyboard, scaling, motion,
-  persistence, reload, offline, and failure/recovery paths; an injected
-  `QuotaExceededError` covers the storage-failure boundary rather than a
-  physical quota exhaustion.
-- Full `npm audit` still reports five high development-only ESLint-chain
-  findings. Canonical production audit (`--omit=dev --audit-level=high`) is
+  battery/thermal, or actual device quota exhaustion was available. Pinned
+  Chromium covers portrait, touch, keyboard, text scale, reduced motion,
+  persistence, reload, offline, and injected `QuotaExceededError` recovery.
+- Full `npm audit` reports five high development-only ESLint-chain findings.
+  Canonical production audit (`npm audit --omit=dev --audit-level=high`) is
   clean; no forced major audit fix was applied.
-- The unrun draft intentionally disappears on reload. This is the explicit
-  session-only boundary, not accidental data loss.
+- An unsubmitted draft intentionally disappears on reload; this is the D-019
+  session-only ownership boundary.
 
 ## Checks executed before handoff
 
-- Red V-059 baseline — immutable verifier unit and 393×742 browser probes both
-  showed an enabled Run control after a `QuotaExceededError` save failure.
-- Focused hook/Worker/durable-publication plus retained V-051/V-052 verifier
-  unit tests — 25/25 passed.
-- Candidate Career browser suite plus immutable V-059 browser regression —
-  13/13 passed.
-- Candidate and immutable V-059 `QuotaExceededError` failure/recovery probes —
-  20/20 repeated browser runs passed.
-- Retained V-057 rapid Run regression — 10/10 repeated browser runs passed.
-- Human-paced 393px candidate flow — 25/25 passed after the repaired durable
-  acknowledgement path.
-- `./scripts/run` — Vite ready at `127.0.0.1:4173` in 125ms; loopback GET
-  returned HTTP 200; Ctrl-C stopped it and the next GET returned connection
-  refused (`000`).
-- `E2E_PORT=4174 ./scripts/verify` — completed successfully from fresh `npm ci`:
-  format; lint; typecheck; 34 unit/property files / 171 tests; numeric,
-  first-session, 20,001-seed upgrade, progression, Career, and evaluation
-  balances; build; production audit (0 vulnerabilities); 171/171 root E2E;
-  2/2 Pages/offline E2E.
+- `npm run format:check` — pass.
+- `npm run typecheck` — pass.
+- Focused hook/unit check:
+  `npx vitest run src/ui/careerScheduleDraft.test.tsx src/ui/useSimulation.test.tsx --coverage.enabled=false --reporter=dot` — 2 files, 16 tests pass.
+- Corrected V-052, frozen V-060, and retained V-059 browser regressions —
+  3/3 pass once; 30/30 pass with `--repeat-each=10`.
+- First canonical attempt, `E2E_PORT=4216 ./scripts/verify`, exposed the old
+  V-052 boot-wide storage fixture conflicting with the now-required broad
+  D-020 gate (172/173 root E2E; all other checks and 2/2 Pages passed). The
+  fixture was then corrected as described above; no production boundary was
+  relaxed.
+- Final clean canonical run, `E2E_PORT=4219 ./scripts/verify` — pass: fresh
+  `npm ci`; format; lint; typecheck; 34 unit/property files / 172 tests; all
+  numeric, first-session, 20,001-seed upgrade, progression, Career, and
+  evaluation balances; build; production audit (0 vulnerabilities); 173/173
+  root E2E; 2/2 Pages/offline E2E.
+- `./scripts/run` — ready at `127.0.0.1:4173` in 94ms; `/` and `/sw.js` each
+  returned HTTP 200; controlled shutdown left loopback unreachable (HTTP 000).
 
 ## Checks not run
 
-- No deployment, push, or new hosted GitHub Actions run; external publication
-  is outside this Implementer handoff.
-- Sandboxed Chromium launch was attempted and failed solely on the documented
-  macOS Mach-port permission restriction. No browser check was skipped: all
-  focused and canonical browser checks passed with scoped host launch.
-- An initial 25-repeat human-paced run was invalidated after 20 repetitions
-  because Homebrew externally replaced the running Node `26.5.0` executable
-  with `26.5.0_1`; Playwright workers inherited the deleted binary and aborted.
-  The same unmodified candidate was restarted under the healthy replacement
-  runtime and completed all 25 repetitions. This was host infrastructure churn,
-  not an application assertion failure.
+- No deployment, push, or hosted GitHub Actions run; external publication is
+  outside this Implementer handoff.
+- Sandboxed Chromium launch was unavailable because of the documented macOS
+  Mach-port restriction. No browser check was skipped: focused and canonical
+  commands passed with scoped host launch.

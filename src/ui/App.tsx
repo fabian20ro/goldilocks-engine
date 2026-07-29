@@ -2511,7 +2511,7 @@ function CareerView({
   scheduledDraftHours,
   onScheduleDraftChange,
   hasDurablePersistenceFailure,
-  isRunPending,
+  isRunBlocked,
   onRunScheduledEvening,
 }: {
   state: SimulationState;
@@ -2520,7 +2520,7 @@ function CareerView({
   scheduledDraftHours: number;
   onScheduleDraftChange: (route: CareerRoute, value: number) => void;
   hasDurablePersistenceFailure: boolean;
-  isRunPending: boolean;
+  isRunBlocked: boolean;
   onRunScheduledEvening: () => boolean;
 }) {
   const career = state.career;
@@ -2670,8 +2670,8 @@ function CareerView({
           <button
             type="button"
             className="primary-action"
-            disabled={isRunPending}
-            aria-busy={isRunPending || undefined}
+            disabled={isRunBlocked}
+            aria-busy={isRunBlocked || undefined}
             aria-describedby={
               hasDurablePersistenceFailure
                 ? "career-persistence-recovery"
@@ -3477,6 +3477,7 @@ export function App() {
   const careerScheduleDraft = useCareerScheduleDraft(
     state,
     lastDurableRequestId,
+    hasDurablePersistenceFailure,
   );
   const [tab, setTab] = useState<TabId>("build");
   const [selected, setSelected] = useState<PendingPlacement | null>(null);
@@ -3924,7 +3925,7 @@ export function App() {
               scheduledDraftHours={careerScheduleDraft.scheduledHours}
               onScheduleDraftChange={careerScheduleDraft.setRouteHours}
               hasDurablePersistenceFailure={hasDurablePersistenceFailure}
-              isRunPending={careerScheduleDraft.isRunPending}
+              isRunBlocked={careerScheduleDraft.isRunBlocked}
               onRunScheduledEvening={() =>
                 careerScheduleDraft.runScheduledEvening(commandBatch)
               }

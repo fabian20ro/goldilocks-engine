@@ -286,6 +286,33 @@ describe("App-session Career schedule draft", () => {
     expect(submit).toHaveBeenCalledTimes(2);
   });
 
+  it("blocks a Career Run during persistence recovery, then permits one after recovery", () => {
+    const initial = createInitialState(4061);
+    const submit = vi.fn().mockReturnValue(61);
+    const { result, rerender } = renderHook(
+      ({ hasDurablePersistenceFailure }) =>
+        useCareerScheduleDraft(initial, 0, hasDurablePersistenceFailure),
+      { initialProps: { hasDurablePersistenceFailure: true } },
+    );
+
+    act(() => result.current.setRouteHours("freelance", 4));
+    expect(result.current.isRunBlocked).toBe(true);
+    act(() => {
+      expect(result.current.runScheduledEvening(submit)).toBe(false);
+    });
+    expect(submit).not.toHaveBeenCalled();
+    expect(result.current.draft.freelance).toBe(4);
+
+    rerender({ hasDurablePersistenceFailure: false });
+    expect(result.current.isRunBlocked).toBe(false);
+    act(() => {
+      expect(result.current.runScheduledEvening(submit)).toBe(true);
+      expect(result.current.runScheduledEvening(submit)).toBe(false);
+    });
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(result.current.isRunBlocked).toBe(true);
+  });
+
   it("releases the singular Run action after an acknowledged Worker rejection", async () => {
     const initial = createInitialState(4060);
     const submit = vi.fn().mockReturnValueOnce(51).mockReturnValueOnce(52);

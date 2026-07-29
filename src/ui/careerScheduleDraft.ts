@@ -123,6 +123,7 @@ export function latestCareerScheduleWorkerRejection(
 export function useCareerScheduleDraft(
   state: Pick<SimulationState, "seed" | "career" | "meta">,
   lastDurableRequestId = 0,
+  hasDurablePersistenceFailure = false,
 ) {
   const workerAllocations = state.career.schedule.allocations;
   const boundary = careerScheduleDraftBoundary(state);
@@ -132,6 +133,7 @@ export function useCareerScheduleDraft(
   );
   const pendingRunRequestId = useRef<number | null>(null);
   const [isRunPending, setIsRunPending] = useState(false);
+  const isRunBlocked = isRunPending || hasDurablePersistenceFailure;
 
   useEffect(() => {
     if (lastBoundary.current === boundary) return;
@@ -155,7 +157,8 @@ export function useCareerScheduleDraft(
     (submitBatch: CareerScheduleBatchSubmitter): boolean => {
       // Set the ref before posting so two synchronous pointer/click events can
       // never enqueue two Worker batches before React disables the control.
-      if (pendingRunRequestId.current !== null) return false;
+      if (hasDurablePersistenceFailure || pendingRunRequestId.current !== null)
+        return false;
       pendingRunRequestId.current = -1;
       setIsRunPending(true);
       const requestId = submitBatch(createCareerScheduleCommandBatch(draft));
@@ -175,7 +178,7 @@ export function useCareerScheduleDraft(
       }
       return true;
     },
-    [draft, lastDurableRequestId],
+    [draft, hasDurablePersistenceFailure, lastDurableRequestId],
   );
 
   return {
@@ -183,6 +186,7 @@ export function useCareerScheduleDraft(
     scheduledHours: useMemo(() => careerScheduleDraftHours(draft), [draft]),
     setRouteHours,
     isRunPending,
+    isRunBlocked,
     runScheduledEvening,
   };
 }

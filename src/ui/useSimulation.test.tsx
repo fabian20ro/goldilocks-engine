@@ -249,6 +249,7 @@ describe("durable Worker state publication", () => {
       const schedule = useCareerScheduleDraft(
         simulation.state,
         simulation.lastDurableRequestId,
+        simulation.hasDurablePersistenceFailure,
       );
       return { simulation, schedule };
     });
@@ -288,6 +289,7 @@ describe("durable Worker state publication", () => {
     expect(result.current.simulation.lastDurableRequestId).toBe(0);
     expect(result.current.simulation.hasDurablePersistenceFailure).toBe(true);
     expect(result.current.schedule.isRunPending).toBe(true);
+    expect(result.current.schedule.isRunBlocked).toBe(true);
     expect(document.documentElement.dataset.offlineReady).toBe("false");
     expect(
       JSON.parse(storage.getItem(SAVE_KEY) ?? "null").career.schedule
@@ -306,6 +308,7 @@ describe("durable Worker state publication", () => {
         false,
       );
       expect(result.current.schedule.isRunPending).toBe(false);
+      expect(result.current.schedule.isRunBlocked).toBe(false);
     });
     expect(document.documentElement.dataset.offlineReady).toBe("true");
     expect(JSON.parse(storage.getItem(SAVE_KEY) ?? "null")).toEqual(completed);
