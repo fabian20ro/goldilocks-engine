@@ -44,6 +44,15 @@ async function openCareer(page: Page): Promise<void> {
   ).toBeVisible();
 }
 
+async function openCareerDisclosure(page: Page, title: string): Promise<void> {
+  const summary = page.locator(`summary[aria-label="Show ${title}"]`);
+  const disclosure = summary.locator("xpath=..");
+  await expect(summary).toHaveCount(1);
+  if (!(await disclosure.evaluate((element) => element.hasAttribute("open"))))
+    await summary.click();
+  await expect(disclosure).toHaveAttribute("open", "");
+}
+
 test("malformed full-history save cannot manufacture a user-visible causal ending", async ({
   page,
 }, testInfo) => {
@@ -61,6 +70,7 @@ test("malformed full-history save cannot manufacture a user-visible causal endin
   );
   await page.goto("/");
   await openCareer(page);
+  await openCareerDisclosure(page, "Evaluation discipline");
   const recovered = await savedState(page);
   expect
     .soft((recovered.career as { evaluation?: unknown }).evaluation)

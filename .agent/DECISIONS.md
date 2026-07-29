@@ -253,3 +253,30 @@
 - **Reversal condition:** Change the response/persistence distinction or the
   retry acknowledgement watermark only through explicit product direction with
   equivalent deterministic, storage-failure, and browser recovery evidence.
+
+## D-021 — Career hierarchy remains presentation-only
+
+- **Decision:** Phase 2 reorganizes the existing one-evening Career loop but
+  does not alter route availability, progression, command semantics, state,
+  or balance. All four existing evening routes remain available from the first
+  evening. Product income and maintenance benefit communicate their existing
+  lifecycle conditions; they are not new route locks.
+- **Locked-state interpretation:** The required locked Career screenshot uses
+  the existing locked local-model tier in the Model tiers and quantization
+  disclosure. It demonstrates the applicable established Career capability
+  lock without inventing a new route gate or mechanic.
+- **Information boundary:** Current projections are pure views over the
+  existing authoritative route/accounting functions. Compact money uses shared
+  cents-or-mills precision while Details retains three-decimal accounting; the
+  Worker, ledger, and Inspect remain authoritative.
+- **Reason:** `plan.md` authorizes a Career action hierarchy and explicitly
+  forbids new mechanics, pages, assets, framework, or theme work. A visual
+  route lock would misrepresent the existing playable first-evening choice.
+- **Evidence policy:** Catalog/projection/component tests plus pinned 320/393
+  browser deck cover empty, partial, full, rejected, completed, locked,
+  exit-ready, keyboard, touch, focus, text-scale, reduced-motion, disclosure,
+  persistence, offline, and recovery behavior. Canonical verification remains
+  required.
+- **Reversal condition:** Change route availability, projection authority, or
+  locked-state interpretation only through explicit product direction with
+  corresponding deterministic and browser evidence.

@@ -1513,6 +1513,47 @@ interface CareerRouteResult {
   electricityKwh: number;
 }
 
+/**
+ * Presentation-only estimate for the current Career draft. It reuses the
+ * authoritative route calculations without issuing a command or mutating the
+ * Worker state.
+ */
+export interface CareerRouteProjection {
+  route: CareerRoute;
+  hours: number;
+  gross: number;
+  operatingCost: number;
+  electricityCost: number;
+  electricityKwh: number;
+  configuredCost: number;
+  economicNet: number;
+  cashChange: number;
+  unpaidCostChange: number;
+  competitionProgress: number;
+  productBuildProgress: number;
+  productRevenue: number;
+  maintenanceDebtReduction: number;
+  constraint: string;
+}
+
+export interface CareerEveningProjection {
+  routes: readonly CareerRouteProjection[];
+  hours: number;
+  gross: number;
+  operatingCost: number;
+  electricityCost: number;
+  electricityKwh: number;
+  configuredCost: number;
+  economicNet: number;
+  cashChange: number;
+  unpaidCostChange: number;
+  competitionProgress: number;
+  productBuildProgress: number;
+  productRevenue: number;
+  maintenanceDebtReduction: number;
+  constraint: string;
+}
+
 function runCareerRoute(
   state: SimulationState,
   route: CareerRoute,
@@ -1725,6 +1766,221 @@ function runCareerRoute(
     message: `${routeName}: ${hours.toFixed(2)}h allocated; $${gross.toFixed(3)} gross, $${totalCost.toFixed(3)} configured operating + electricity cost, $${next.career.unpaidCosts.toFixed(3)} career cost still unpaid.`,
   });
   return { ...costs, state: next, gross };
+}
+
+function careerProjectionConstraint(
+  state: SimulationState,
+  route: CareerRoute,
+  metrics: PipelineMetrics,
+): string {
+  if (metrics.memoryPressure > 1)
+    return "Memory pressure blocks usable route work.";
+  if (metrics.orderWarnings.includes("no model stage"))
+    return "The pipeline needs a model stage before this route can produce its benefit.";
+  if (route === "freelance" && metrics.reliability < 0.72)
+    return "Low reliability can leave freelance work with no gross payout.";
+  if (route === "competition" && state.career.evaluation.coverage < 0.3)
+    return "Limited private coverage increases the entry's overfit risk.";
+  if (route === "product" && !state.career.product.released)
+    return "Build work creates no product income until Deskflow is released.";
+  if (route === "product" && state.career.product.serviceDebt > 0)
+    return "Existing service debt reduces released-product income.";
+  if (route === "maintenance" && state.career.product.serviceDebt <= 0)
+    return "No service debt is available to repay yet.";
+  if (route === "maintenance")
+    return "Maintenance protects product capacity but does not add direct cash.";
+  return "Configured operating and electricity costs apply to every allocated hour.";
+}
+
+function projectCareerRouteFromState(
+  state: SimulationState,
+  route: CareerRoute,
+  hours: number,
+): { projection: CareerRouteProjection; state: SimulationState } {
+  const boundedHours =
+    Number.isFinite(hours) && hours > 0
+      ? Math.min(
+          EVENING_HOURS,
+          Number(
+            (
+              Math.round(
+                Math.min(EVENING_HOURS, hours) / CAREER_HOUR_INCREMENT,
+              ) * CAREER_HOUR_INCREMENT
+            ).toFixed(2),
+          ),
+        )
+      : 0;
+  const metrics = careerRouteMetrics(state, route);
+  if (boundedHours === 0) {
+    return {
+      state,
+      projection: {
+        route,
+        hours: 0,
+        gross: 0,
+        operatingCost: 0,
+        electricityCost: 0,
+        electricityKwh: 0,
+        configuredCost: 0,
+        economicNet: 0,
+        cashChange: 0,
+        unpaidCostChange: 0,
+        competitionProgress: 0,
+        productBuildProgress: 0,
+        productRevenue: 0,
+        maintenanceDebtReduction: 0,
+        constraint: careerProjectionConstraint(state, route, metrics),
+      },
+    };
+  }
+
+  const result = runCareerRoute(state, route, boundedHours);
+  const next = result.state;
+  const configuredCost = round(
+    result.operatingCost + result.electricityCost,
+    3,
+  );
+  return {
+    state: next,
+    projection: {
+      route,
+      hours: boundedHours,
+      gross: result.gross,
+      operatingCost: result.operatingCost,
+      electricityCost: result.electricityCost,
+      electricityKwh: result.electricityKwh,
+      configuredCost,
+      economicNet: round(result.gross - configuredCost, 3),
+      cashChange: round(next.resources.money - state.resources.money, 3),
+      unpaidCostChange: round(
+        next.career.unpaidCosts - state.career.unpaidCosts,
+        3,
+      ),
+      competitionProgress: round(
+        next.career.competition.progress - state.career.competition.progress,
+        3,
+      ),
+      productBuildProgress: round(
+        next.career.product.buildProgress - state.career.product.buildProgress,
+        3,
+      ),
+      productRevenue: round(
+        next.career.product.lifetimeRevenue -
+          state.career.product.lifetimeRevenue,
+        3,
+      ),
+      maintenanceDebtReduction: round(
+        state.career.product.serviceDebt - next.career.product.serviceDebt,
+        3,
+      ),
+      constraint: careerProjectionConstraint(state, route, metrics),
+    },
+  };
+}
+
+/** Returns the live single-route estimate used by the Career composer. */
+export function projectCareerRoute(
+  state: SimulationState,
+  route: CareerRoute,
+  hours: number,
+): CareerRouteProjection {
+  return projectCareerRouteFromState(state, route, hours).projection;
+}
+
+/**
+ * Returns an ordered four-route evening estimate. This is deliberately a pure
+ * read: it models the same route accounting but never creates ledger entries,
+ * advances time, or changes the durable schedule.
+ */
+export function projectCareerEvening(
+  state: SimulationState,
+  allocations: Readonly<Record<CareerRoute, number>>,
+): CareerEveningProjection {
+  let remaining = EVENING_HOURS;
+  let next = state;
+  const routes: CareerRouteProjection[] = [];
+  for (const route of CAREER_ROUTES) {
+    const candidate = allocations[route];
+    const hours =
+      Number.isFinite(candidate) && candidate > 0
+        ? Math.min(
+            remaining,
+            Number(
+              (
+                Math.round(
+                  Math.min(EVENING_HOURS, candidate) / CAREER_HOUR_INCREMENT,
+                ) * CAREER_HOUR_INCREMENT
+              ).toFixed(2),
+            ),
+          )
+        : 0;
+    remaining = round(remaining - hours, 2);
+    const projected = projectCareerRouteFromState(next, route, hours);
+    next = projected.state;
+    if (hours > 0) routes.push(projected.projection);
+  }
+  const configuredCost = round(
+    next.career.operatingCostsIncurred -
+      state.career.operatingCostsIncurred +
+      next.career.electricityCostsIncurred -
+      state.career.electricityCostsIncurred,
+    3,
+  );
+  const operatingCost = round(
+    next.career.operatingCostsIncurred - state.career.operatingCostsIncurred,
+    3,
+  );
+  const electricityCost = round(
+    next.career.electricityCostsIncurred -
+      state.career.electricityCostsIncurred,
+    3,
+  );
+  const gross = round(
+    routes.reduce((total, route) => total + route.gross, 0),
+    3,
+  );
+  const hours = round(
+    routes.reduce((total, route) => total + route.hours, 0),
+    2,
+  );
+  return {
+    routes,
+    hours,
+    gross,
+    operatingCost,
+    electricityCost,
+    electricityKwh: round(
+      next.resources.electricityKwh - state.resources.electricityKwh,
+      4,
+    ),
+    configuredCost,
+    economicNet: round(gross - configuredCost, 3),
+    cashChange: round(next.resources.money - state.resources.money, 3),
+    unpaidCostChange: round(
+      next.career.unpaidCosts - state.career.unpaidCosts,
+      3,
+    ),
+    competitionProgress: round(
+      next.career.competition.progress - state.career.competition.progress,
+      3,
+    ),
+    productBuildProgress: round(
+      next.career.product.buildProgress - state.career.product.buildProgress,
+      3,
+    ),
+    productRevenue: round(
+      next.career.product.lifetimeRevenue -
+        state.career.product.lifetimeRevenue,
+      3,
+    ),
+    maintenanceDebtReduction: round(
+      state.career.product.serviceDebt - next.career.product.serviceDebt,
+      3,
+    ),
+    constraint:
+      routes.find((route) => route.constraint !== "")?.constraint ??
+      "Allocate at least one quarter hour to estimate this evening.",
+  };
 }
 
 function demandFor(

@@ -58,6 +58,15 @@ async function openCareer(page: Page): Promise<void> {
   ).toHaveAttribute("aria-current", "page");
 }
 
+async function openCareerDisclosure(page: Page, title: string): Promise<void> {
+  const summary = page.locator(`summary[aria-label="Show ${title}"]`);
+  const disclosure = summary.locator("xpath=..");
+  await expect(summary).toHaveCount(1);
+  if (!(await disclosure.evaluate((element) => element.hasAttribute("open"))))
+    await summary.click();
+  await expect(disclosure).toHaveAttribute("open", "");
+}
+
 async function savedState(page: Page): Promise<Record<string, unknown>> {
   return page.evaluate((key) => {
     return JSON.parse(localStorage.getItem(key) ?? "null") as Record<
@@ -141,6 +150,7 @@ test("preserves a sealed saturated ending through offline reload and touch resta
   await context.setOffline(false);
 
   await touchTap(page, "Restart this scenario");
+  await openCareerDisclosure(page, "Evaluation discipline");
   await expect(
     page.getByRole("heading", { name: "Evaluation discipline" }),
   ).toBeVisible();

@@ -18,6 +18,15 @@ async function openCareer(page: Page): Promise<void> {
   ).toBeVisible();
 }
 
+async function openCareerDisclosure(page: Page, title: string): Promise<void> {
+  const summary = page.locator(`summary[aria-label="Show ${title}"]`);
+  const disclosure = summary.locator("xpath=..");
+  await expect(summary).toHaveCount(1);
+  if (!(await disclosure.evaluate((element) => element.hasAttribute("open"))))
+    await summary.click();
+  await expect(disclosure).toHaveAttribute("open", "");
+}
+
 async function openTab(page: Page, name: string): Promise<void> {
   await page
     .getByRole("navigation", { name: "Primary" })
@@ -52,9 +61,9 @@ async function expectFreelanceDraft(page: Page, hours: number): Promise<void> {
   await expect(page.getByLabel("Freelance delivery evening hours")).toHaveValue(
     String(hours),
   );
-  await expect(
-    page.getByText(new RegExp(`^Scheduled: ${hours.toFixed(2)}h\\.`)),
-  ).toBeVisible();
+  await expect(page.getByTestId("career-run-status")).toContainText(
+    new RegExp(`Scheduled: ${hours.toFixed(2)}h / 4\\.00h\\.`),
+  );
 }
 
 async function savedCareer(page: Page): Promise<{
@@ -175,7 +184,9 @@ test.describe("Bedroom Developer career acceptance", () => {
     }, SAVE_KEY);
     await page.reload();
     await openCareer(page);
-    await expect(page.getByText("Durable savings")).toBeVisible();
+    await expect(page.getByLabel("Tonight's Career resources")).toContainText(
+      "Savings",
+    );
     await expect
       .poll(async () => {
         const state = await savedCareer(page);
@@ -195,6 +206,7 @@ test.describe("Bedroom Developer career acceptance", () => {
       .toBe(4);
     await page.reload();
     await openCareer(page);
+    await openCareerDisclosure(page, "Career progress and route actions");
     await expect(page.getByText(/gross from 4\.00h/)).toBeVisible();
   });
 
@@ -206,6 +218,7 @@ test.describe("Bedroom Developer career acceptance", () => {
     await page.goto("/");
     await waitForSavedState(page);
     await openCareer(page);
+    await openCareerDisclosure(page, "Safe freelance-only automation");
     await page.getByLabel("Enable safe offline freelance").check();
     await page.getByLabel("Offline maximum hours").fill("1");
     await page.getByLabel("Offline minimum reliability").fill("0.999");
@@ -246,6 +259,7 @@ test.describe("Bedroom Developer career acceptance", () => {
     await context.setOffline(true);
     await page.reload({ waitUntil: "domcontentloaded" });
     await openCareer(page);
+    await openCareerDisclosure(page, "Safe freelance-only automation");
     await expect(
       page.getByLabel("Enable safe offline freelance"),
     ).toBeChecked();
@@ -262,6 +276,7 @@ test.describe("Bedroom Developer career acceptance", () => {
     await page.evaluate(() => {
       document.documentElement.style.fontSize = "32px";
     });
+    await openCareerDisclosure(page, "Safe freelance-only automation");
     await expect(
       page.getByRole("heading", { name: "Safe freelance-only automation" }),
     ).toBeVisible();
@@ -323,10 +338,14 @@ test.describe("Bedroom Developer career acceptance", () => {
       await expect(
         page.getByLabel("Bedroom Benchmark Cup evening hours"),
       ).toHaveValue("1");
-      await expect(page.getByText(/^Scheduled: 4\.00h\./)).toBeVisible();
+      await expect(page.getByTestId("career-run-status")).toContainText(
+        "Scheduled: 4.00h / 4.00h.",
+      );
       await waitForHumanPacedWorkerTicks(page);
       await expect(freelance).toHaveValue("3");
-      await expect(page.getByText(/^Scheduled: 4\.00h\./)).toBeVisible();
+      await expect(page.getByTestId("career-run-status")).toContainText(
+        "Scheduled: 4.00h / 4.00h.",
+      );
       expect(errors).toEqual([]);
     });
   }
@@ -357,7 +376,9 @@ test.describe("Bedroom Developer career acceptance", () => {
         name: "Allocate 1 hours to Bedroom Benchmark Cup",
       })
       .click();
-    await expect(page.getByText(/^Scheduled: 4\.00h\./)).toBeVisible();
+    await expect(page.getByTestId("career-run-status")).toContainText(
+      "Scheduled: 4.00h / 4.00h.",
+    );
     await page.getByRole("button", { name: "Run scheduled evening" }).click();
     await expect
       .poll(
@@ -393,6 +414,7 @@ test.describe("Bedroom Developer career acceptance", () => {
     const reloaded = await savedCareer(page);
     expect(reloaded.career?.schedule?.completedEvenings).toBe(1);
     expect(reloaded.career?.freelanceHours).toBe(3);
+    await openCareerDisclosure(page, "Career progress and route actions");
     await expect(page.getByText(/gross from 3\.00h/)).toBeVisible();
   });
 

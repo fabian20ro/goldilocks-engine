@@ -43,6 +43,15 @@ async function openCareer(page: Page): Promise<void> {
   ).toBeVisible();
 }
 
+async function openCareerDisclosure(page: Page, title: string): Promise<void> {
+  const summary = page.locator(`summary[aria-label="Show ${title}"]`);
+  const disclosure = summary.locator("xpath=..");
+  await expect(summary).toHaveCount(1);
+  if (!(await disclosure.evaluate((element) => element.hasAttribute("open"))))
+    await summary.click();
+  await expect(disclosure).toHaveAttribute("open", "");
+}
+
 test("Career flow remains operable at 320px with 200% text and reduced motion", async ({
   page,
 }, testInfo) => {
@@ -76,6 +85,7 @@ test("Career flow remains operable at 320px with 200% text and reduced motion", 
     )
     .toBe(1);
 
+  await openCareerDisclosure(page, "Safe freelance-only automation");
   await page
     .getByRole("button", { name: "Save safe offline policy" })
     .scrollIntoViewIfNeeded();
@@ -127,9 +137,9 @@ test("Career overview remains readable at 393px with 200% text", async ({
   await page
     .getByRole("heading", { name: "Career loop", exact: true })
     .scrollIntoViewIfNeeded();
-  await expect(
-    page.getByText("Durable savings", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByLabel("Tonight's Career resources")).toContainText(
+    "Savings",
+  );
   await expect(
     page.getByRole("button", { name: "Run scheduled evening" }),
   ).toBeVisible();
@@ -151,6 +161,7 @@ test("restored offline policy performs one bounded freelance-only recovery", asy
   await page.goto("/");
   await waitForSave(page);
   await openCareer(page);
+  await openCareerDisclosure(page, "Safe freelance-only automation");
   await page.getByLabel("Enable safe offline freelance").check();
   await page.getByLabel("Offline maximum hours").fill("1");
   await page.getByLabel("Offline maximum electricity cost").fill("0.1");

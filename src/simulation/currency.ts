@@ -20,3 +20,15 @@ export function formatCurrencyMagnitude(
   const normalized = Math.abs(amount) < 0.0005 ? 0 : Math.abs(amount);
   return normalized.toFixed(precision);
 }
+
+/** Shared compact money text; detailed accounting retains its explicit fields. */
+export function formatCurrency(
+  amount: number,
+  precision: CurrencyDisplayPrecision,
+): string {
+  const normalized = Math.abs(amount) < 0.0005 ? 0 : amount;
+  return `${normalized < 0 ? "-$" : "$"}${formatCurrencyMagnitude(
+    normalized,
+    precision,
+  )}`;
+}

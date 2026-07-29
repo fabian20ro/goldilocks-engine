@@ -70,6 +70,15 @@ async function openCareer(page: Page): Promise<void> {
   ).toBeVisible();
 }
 
+async function openCareerDisclosure(page: Page, title: string): Promise<void> {
+  const summary = page.locator(`summary[aria-label="Show ${title}"]`);
+  const disclosure = summary.locator("xpath=..");
+  await expect(summary).toHaveCount(1);
+  if (!(await disclosure.evaluate((element) => element.hasAttribute("open"))))
+    await summary.click();
+  await expect(disclosure).toHaveAttribute("open", "");
+}
+
 async function assertNoPageOrConsoleErrors(
   pageErrors: readonly string[],
   consoleErrors: readonly string[],
@@ -108,6 +117,7 @@ test("recovers stale forged evaluation plus coherent checkpoint after rollover a
     document.documentElement.style.fontSize = "32px";
   });
   await openCareer(page);
+  await openCareerDisclosure(page, "Evaluation discipline");
 
   await expect
     .poll(async () => {

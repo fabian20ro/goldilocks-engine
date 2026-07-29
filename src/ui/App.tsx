@@ -30,10 +30,14 @@ import {
   getWorkloadQuote,
   independentRunReadiness,
   localModelTierUnlockProgress,
+  projectCareerEvening,
+  projectCareerRoute,
+  type CareerEveningProjection,
   workloadUnlockProgress,
 } from "../simulation/engine";
 import {
   currencyDisplayPrecision,
+  formatCurrency,
   formatCurrencyMagnitude,
 } from "../simulation/currency";
 import type {
@@ -111,6 +115,12 @@ const TARGET_KEY = "goldilocks-next-useful-target-v1";
 interface DeletedPreset {
   preset: SavedPreset;
   index: number;
+}
+
+interface CareerCompletionFeedback {
+  evening: number;
+  projection: CareerEveningProjection;
+  nextDecision: string;
 }
 
 const diagnosticCopy: Readonly<
@@ -2504,7 +2514,94 @@ function RunEndingView({
   );
 }
 
-function CareerView({
+function CareerDisclosure({
+  eyebrow,
+  title,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <details className="career-disclosure">
+      <summary aria-label={`Show ${title}`}>
+        <span>
+          <span className="eyebrow">{eyebrow}</span>
+          <strong>{title}</strong>
+        </span>
+        <span aria-hidden="true">Details</span>
+      </summary>
+      {children}
+    </details>
+  );
+}
+
+function careerRouteRequirement(route: CareerRoute): string {
+  switch (route) {
+    case "freelance":
+      return "Available from the first evening. A usable, reliable pipeline is still required for a payout.";
+    case "competition":
+      return "Available from the first evening. Submit only after the Cup entry reaches 8.00 progress.";
+    case "product":
+      return "Available from the first evening. Product revenue remains locked until Deskflow reaches 8.00 build progress and is released.";
+    case "maintenance":
+      return "Available from the first evening. Its repair benefit is unavailable until released product work creates service debt.";
+  }
+}
+
+function careerProjectionOutcome(
+  route: CareerRoute,
+  projection: ReturnType<typeof projectCareerRoute>,
+  money: (amount: number) => string,
+): string {
+  switch (route) {
+    case "freelance":
+      return `${projection.economicNet >= 0 ? "+" : ""}${money(projection.economicNet)} expected net`;
+    case "competition":
+      return `+${projection.competitionProgress.toFixed(2)} Cup progress`;
+    case "product":
+      return projection.productBuildProgress > 0
+        ? `+${projection.productBuildProgress.toFixed(2)} Deskflow build`
+        : `${projection.productRevenue >= 0 ? "+" : ""}${money(projection.productRevenue)} product revenue`;
+    case "maintenance":
+      return projection.maintenanceDebtReduction > 0
+        ? `-${projection.maintenanceDebtReduction.toFixed(2)} service debt`
+        : "No debt repair available";
+  }
+}
+
+function careerProgressSummary(projection: CareerEveningProjection): string {
+  const progress: string[] = [];
+  if (projection.competitionProgress > 0)
+    progress.push(`Cup +${projection.competitionProgress.toFixed(2)}`);
+  if (projection.productBuildProgress > 0)
+    progress.push(
+      `Deskflow build +${projection.productBuildProgress.toFixed(2)}`,
+    );
+  if (projection.productRevenue > 0)
+    progress.push(`Product revenue +$${projection.productRevenue.toFixed(3)}`);
+  if (projection.maintenanceDebtReduction > 0)
+    progress.push(
+      `Service debt -${projection.maintenanceDebtReduction.toFixed(2)}`,
+    );
+  return progress.length ? progress.join(" · ") : "No durable progress change";
+}
+
+function nextCareerDecision(state: SimulationState): string {
+  const career = state.career;
+  if (!career.product.released && career.product.buildProgress >= 8)
+    return "Release Deskflow Local in Career progress.";
+  if (career.competition.progress >= 8)
+    return "Submit the Bedroom Benchmark Cup entry in Career progress.";
+  if (career.exitAchieved)
+    return "Review the independent conclusion checklist.";
+  if (career.savings < 24)
+    return "Choose tomorrow's route or move available cash into savings.";
+  return "Allocate tomorrow's four-hour evening.";
+}
+
+export function CareerView({
   state,
   command,
   scheduleDraft,
@@ -2513,6 +2610,7 @@ function CareerView({
   hasDurablePersistenceFailure,
   isRunBlocked,
   onRunScheduledEvening,
+  completionFeedback,
 }: {
   state: SimulationState;
   command: (command: SimulationCommand) => void;
@@ -2522,8 +2620,11 @@ function CareerView({
   hasDurablePersistenceFailure: boolean;
   isRunBlocked: boolean;
   onRunScheduledEvening: () => boolean;
+  completionFeedback?: CareerCompletionFeedback | null;
 }) {
   const career = state.career;
+  const [routeDetails, setRouteDetails] = useState<CareerRoute | null>(null);
+  const routeDetailsOriginRef = useRef<HTMLElement | null>(null);
   const [savingsAmount, setSavingsAmount] = useState(1);
   const [offlineDraft, setOfflineDraft] = useState(() => ({
     enabled: career.offlinePolicy.enabled,
@@ -2538,6 +2639,55 @@ function CareerView({
 
   const conclusion = independentRunReadiness(state);
   const workerScheduleRejection = latestCareerScheduleWorkerRejection(state);
+  const routeProjections = bedroomCareerRoutes.map((route) =>
+    projectCareerRoute(state, route.id, scheduleDraft[route.id]),
+  );
+  const eveningProjection = projectCareerEvening(state, scheduleDraft);
+  const compactCurrencyPrecision = currencyDisplayPrecision([
+    state.resources.money,
+    career.savings,
+    career.operatingCostsIncurred,
+    career.electricityCostsIncurred,
+    career.unpaidCosts,
+    ...routeProjections.flatMap((projection) => [
+      projection.gross,
+      projection.configuredCost,
+      projection.economicNet,
+      projection.cashChange,
+    ]),
+  ]);
+  const compactMoney = (amount: number) =>
+    formatCurrency(amount, compactCurrencyPrecision);
+  const exactMoney = (amount: number) => formatCurrency(amount, 3);
+  const detailRoute = routeDetails
+    ? (bedroomCareerRoutes.find((route) => route.id === routeDetails) ?? null)
+    : null;
+  const detailProjection = detailRoute
+    ? routeProjections.find((projection) => projection.route === detailRoute.id)
+    : null;
+  const detailMetrics = detailRoute
+    ? calculateMetrics({ ...state, workloadId: detailRoute.workloadId })
+    : null;
+  const activeTier =
+    localModelTiers.find((tier) => tier.id === career.activeModelTierId) ??
+    localModelTiers[0]!;
+  const runStatus = hasDurablePersistenceFailure
+    ? "Blocked: waiting for a successful durable save before another evening can start."
+    : isRunBlocked
+      ? "Blocked: the submitted evening is waiting for its durable Worker acknowledgement."
+      : scheduledDraftHours === 0
+        ? "Blocking reason: allocate at least 0.25h before the Worker can run tonight."
+        : "Ready: the Worker will commit all four allocations as one evening.";
+  const visibleConstraint =
+    eveningProjection.routes.find(
+      (projection) => !projection.constraint.startsWith("Configured operating"),
+    )?.constraint ?? eveningProjection.constraint;
+  const completionConstraint = completionFeedback
+    ? (completionFeedback.projection.routes.find(
+        (projection) =>
+          !projection.constraint.startsWith("Configured operating"),
+      )?.constraint ?? completionFeedback.projection.constraint)
+    : visibleConstraint;
 
   return (
     <div className="career-deck">
@@ -2553,123 +2703,190 @@ function CareerView({
               : `Night ${career.schedule.day}`}
           </span>
         </div>
-        <p className="concept-note">
-          One local pipeline; four after-work hours per evening. Allocate real
-          work, then run the evening. Idle simulation time never creates career
-          money, savings, product work, or competition progress.
+        <p className="career-objective" data-testid="career-objective">
+          <strong>Tonight:</strong> spend one four-hour evening on cash, a Cup
+          entry, Deskflow, or maintenance. Idle time creates no career income or
+          progress.
         </p>
-        <dl className="career-stat-grid" aria-label="Bedroom career resources">
+        <dl
+          className="career-quick-resources"
+          aria-label="Tonight's Career resources"
+        >
           <div>
-            <dt>Durable savings</dt>
-            <dd>${career.savings.toFixed(3)}</dd>
+            <dt>Cash</dt>
+            <dd>{compactMoney(state.resources.money)}</dd>
           </div>
           <div>
-            <dt>Liquid cash</dt>
-            <dd>${state.resources.money.toFixed(3)}</dd>
+            <dt>Savings</dt>
+            <dd>{compactMoney(career.savings)}</dd>
           </div>
           <div>
-            <dt>Career costs</dt>
-            <dd>
-              $
-              {(
-                career.operatingCostsIncurred + career.electricityCostsIncurred
-              ).toFixed(3)}
-            </dd>
+            <dt>Tonight</dt>
+            <dd>{scheduledDraftHours.toFixed(2)} / 4.00h</dd>
           </div>
           <div>
-            <dt>Unpaid costs</dt>
-            <dd>${career.unpaidCosts.toFixed(3)}</dd>
-          </div>
-          <div>
-            <dt>Electricity</dt>
-            <dd>
-              {career.electricityCostsIncurred.toFixed(3)} /{" "}
-              {state.resources.electricityKwh.toFixed(3)} kWh
-            </dd>
-          </div>
-          <div>
-            <dt>Evening window</dt>
-            <dd>{career.schedule.hoursRemaining.toFixed(2)}h open</dd>
+            <dt>Constraint</dt>
+            <dd>{state.metrics.dominantBottleneck}</dd>
           </div>
         </dl>
-        <p className="career-exit" role="status">
-          Bedroom Developer exit: save $24, submit one Cup entry, release
-          Deskflow Local, and unlock Kiln 13B. Current: $
-          {career.savings.toFixed(2)} · {career.competition.submissions}/1
-          submission ·{" "}
-          {career.product.released ? "product released" : "product unreleased"}{" "}
-          ·{" "}
-          {career.unlockedModelTierIds.includes("kiln-13b")
-            ? "Kiln unlocked"
-            : "Kiln locked"}
-          .
-        </p>
       </section>
 
-      <section className="panel evening-panel" aria-labelledby="evening-title">
+      <section
+        className="panel evening-panel career-composer"
+        aria-labelledby="evening-title"
+      >
         <div className="section-heading">
           <div>
             <span className="eyebrow">Player-authored schedule</span>
             <h2 id="evening-title">Tonight's four hours</h2>
           </div>
-          <strong className="store-money">
-            {Math.max(0, 4 - scheduledDraftHours).toFixed(2)}h unallocated
+          <strong className="store-money" data-testid="career-unallocated">
+            {Math.max(0, 4 - scheduledDraftHours).toFixed(2)}h open
           </strong>
         </div>
         <div className="career-route-list">
-          {bedroomCareerRoutes.map((route) => (
-            <div className="career-route" key={route.id}>
-              <span>
-                <strong>
-                  <DecorativeGlyph>{careerGlyph(route.id)}</DecorativeGlyph>{" "}
-                  {route.name}
-                </strong>
-                <small>{route.description}</small>
-                <em>{route.opportunityCost}</em>
-              </span>
-              <span className="career-hours-control">
-                <span
-                  className="hour-tokens"
-                  aria-label={`${route.name} hour allocation tokens`}
+          {bedroomCareerRoutes.map((route, index) => {
+            const projection = routeProjections[index]!;
+            return (
+              <div className="career-route" key={route.id}>
+                <div className="career-route-summary">
+                  <span>
+                    <strong>
+                      <DecorativeGlyph>{careerGlyph(route.id)}</DecorativeGlyph>{" "}
+                      {route.name}
+                    </strong>
+                    <span className="career-allocation">
+                      {scheduleDraft[route.id].toFixed(2)}h allocated
+                    </span>
+                  </span>
+                  <p>
+                    <strong>Benefit:</strong> {route.primaryBenefit}
+                  </p>
+                  <p>
+                    <strong>Tradeoff:</strong> {route.opportunityCost}
+                  </p>
+                  <button
+                    type="button"
+                    className="secondary-action career-details-action"
+                    aria-expanded={detailRoute?.id === route.id}
+                    onClick={(event) => {
+                      routeDetailsOriginRef.current = event.currentTarget;
+                      setRouteDetails(route.id);
+                    }}
+                  >
+                    {route.name} details
+                  </button>
+                </div>
+                <p
+                  className="career-route-projection"
+                  data-testid={`career-projection-${route.id}`}
                 >
-                  {[1, 2, 3, 4].map((hour) => (
-                    <button
-                      key={hour}
-                      type="button"
-                      className={
-                        scheduleDraft[route.id] >= hour ? "filled" : ""
-                      }
-                      aria-label={`Allocate ${hour} hours to ${route.name}`}
-                      aria-pressed={scheduleDraft[route.id] === hour}
-                      onClick={() => onScheduleDraftChange(route.id, hour)}
-                    >
-                      {scheduleDraft[route.id] >= hour ? "●" : "○"}
-                    </button>
-                  ))}
+                  <strong>Estimate · {projection.hours.toFixed(2)}h:</strong>{" "}
+                  {careerProjectionOutcome(route.id, projection, compactMoney)}
+                  {projection.hours > 0
+                    ? ` · ${compactMoney(projection.configuredCost)} configured cost`
+                    : " · assign time to estimate costs"}
+                </p>
+                <span className="career-route-constraint">
+                  <DecorativeGlyph>{glyphs.status.warning}</DecorativeGlyph>{" "}
+                  {projection.constraint}
                 </span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  min="0"
-                  max="4"
-                  step="0.25"
-                  value={scheduleDraft[route.id]}
-                  aria-label={`${route.name} evening hours`}
-                  onChange={(event) =>
-                    onScheduleDraftChange(
-                      route.id,
-                      event.currentTarget.valueAsNumber,
-                    )
-                  }
-                />
-              </span>
-            </div>
-          ))}
+                <span className="career-hours-control">
+                  <span
+                    className="hour-tokens"
+                    aria-label={`${route.name} hour allocation tokens`}
+                  >
+                    {[1, 2, 3, 4].map((hour) => (
+                      <button
+                        key={hour}
+                        type="button"
+                        className={
+                          scheduleDraft[route.id] >= hour ? "filled" : ""
+                        }
+                        aria-label={`Allocate ${hour} hours to ${route.name}`}
+                        aria-pressed={scheduleDraft[route.id] === hour}
+                        onClick={() => onScheduleDraftChange(route.id, hour)}
+                      >
+                        {scheduleDraft[route.id] >= hour ? "●" : "○"}
+                      </button>
+                    ))}
+                  </span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    max="4"
+                    step="0.25"
+                    value={scheduleDraft[route.id]}
+                    aria-label={`${route.name} evening hours`}
+                    onChange={(event) =>
+                      onScheduleDraftChange(
+                        route.id,
+                        event.currentTarget.valueAsNumber,
+                      )
+                    }
+                  />
+                </span>
+              </div>
+            );
+          })}
         </div>
+        {detailRoute && detailProjection && detailMetrics ? (
+          <DetailsSurface
+            title={detailRoute.name}
+            glyph={careerGlyph(detailRoute.id)}
+            onClose={() => setRouteDetails(null)}
+            returnFocus={routeDetailsOriginRef}
+          >
+            <p>{detailRoute.description}</p>
+            <dl className="career-detail-grid">
+              <div>
+                <dt>Primary benefit</dt>
+                <dd>{detailRoute.primaryBenefit}</dd>
+              </div>
+              <div>
+                <dt>Opportunity cost</dt>
+                <dd>{detailRoute.opportunityCost}</dd>
+              </div>
+              <div>
+                <dt>Availability / unlock</dt>
+                <dd>{careerRouteRequirement(detailRoute.id)}</dd>
+              </div>
+              <div>
+                <dt>Exact estimate at {detailProjection.hours.toFixed(2)}h</dt>
+                <dd>
+                  {exactMoney(detailProjection.gross)} gross ·{" "}
+                  {exactMoney(detailProjection.operatingCost)} operating ·{" "}
+                  {exactMoney(detailProjection.electricityCost)} electricity ·{" "}
+                  {exactMoney(detailProjection.economicNet)} economic net
+                </dd>
+              </div>
+              <div>
+                <dt>Rig / model effect</dt>
+                <dd>
+                  {getHardware(state.hardwareId).name} · {activeTier.name} ·{" "}
+                  {career.quantization.toUpperCase()} ·{" "}
+                  {detailMetrics.latencySeconds.toFixed(2)}s latency ·{" "}
+                  {(detailMetrics.reliability * 100).toFixed(1)}% reliability
+                </dd>
+              </div>
+              <div>
+                <dt>Evidence qualification</dt>
+                <dd>
+                  {detailRoute.id === "competition"
+                    ? `${(career.evaluation.coverage * 100).toFixed(0)}% private coverage; ${career.evaluation.privateAssessment} assessment. Coverage narrows risk but never guarantees a private result.`
+                    : detailRoute.id === "product"
+                      ? `${(career.evaluation.distributionShiftRisk * 100).toFixed(0)}% modeled shift risk; released service can still add debt or a reliability incident.`
+                      : "This is a configuration-derived estimate. Exact configured costs and settled amounts remain in Inspect and the ledger."}
+                </dd>
+              </div>
+            </dl>
+          </DetailsSurface>
+        ) : null}
         <div className="career-actions">
           <button
             type="button"
-            className="primary-action"
+            className="primary-action career-run-action"
             disabled={isRunBlocked}
             aria-busy={isRunBlocked || undefined}
             aria-describedby={
@@ -2681,9 +2898,12 @@ function CareerView({
           >
             Run scheduled evening
           </button>
-          <p>
-            Scheduled: {scheduledDraftHours.toFixed(2)}h. Route work uses the
-            currently equipped rig, local model, and configured pipeline costs.
+          <p className="career-run-status" data-testid="career-run-status">
+            <strong>
+              Scheduled: {scheduledDraftHours.toFixed(2)}h / 4.00h.
+            </strong>{" "}
+            {Math.max(0, 4 - scheduledDraftHours).toFixed(2)}h unallocated.{" "}
+            {runStatus}
           </p>
         </div>
         {hasDurablePersistenceFailure ? (
@@ -2705,444 +2925,545 @@ function CareerView({
         ) : null}
       </section>
 
-      <section className="panel" aria-labelledby="funding-title">
-        <div className="section-heading compact">
-          <div>
-            <span className="eyebrow">Three funding routes</span>
-            <h2 id="funding-title">Persistent work, not parallel pipelines</h2>
+      {completionFeedback ? (
+        <section
+          className="career-completion-feedback"
+          aria-label="Latest evening result"
+          role="status"
+        >
+          <div className="section-heading compact">
+            <div>
+              <span className="eyebrow">Completed locally</span>
+              <h2>Night {completionFeedback.evening} result</h2>
+            </div>
+            <span className="equipment-state">READY</span>
           </div>
-        </div>
-        <div className="career-project-grid">
-          <article>
-            <span className="eyebrow">Freelance / cash now</span>
-            <strong>
-              ${career.freelanceGross.toFixed(3)} gross from{" "}
-              {career.freelanceHours.toFixed(2)}h
-            </strong>
-            <p>
-              Sensitive to the pipeline's latency and reliability. This is the
-              fastest cash route, but it does not build product progress or a
-              Cup entry.
-            </p>
-          </article>
-          <article>
-            <span className="eyebrow">One competition / reputation</span>
-            <strong>
-              {career.competition.progress.toFixed(2)} / 8.00 progress · best{" "}
-              {career.competition.bestScore.toFixed(1)}
-            </strong>
-            <p>
-              Bedroom Benchmark Cup has{" "}
-              {career.competition.overfitRisk.toFixed(2)} overfit risk. Better
-              evaluation lowers the score penalty; submitting clears the current
-              entry work without destroying the run.
-            </p>
-            <button
-              type="button"
-              className="secondary-action"
-              onClick={() => command({ type: "SUBMIT_COMPETITION" })}
-            >
-              Submit Cup entry
-            </button>
-          </article>
-          <article>
-            <span className="eyebrow">One product / durable revenue</span>
-            <strong>
-              {career.product.released
-                ? `Released · $${career.product.lifetimeRevenue.toFixed(3)} revenue`
-                : `${career.product.buildProgress.toFixed(2)} / 8.00 build`}
-            </strong>
-            <p>
-              Deskflow Local has {career.product.serviceDebt.toFixed(2)} service
-              debt. Product hours before release build it; after release they
-              earn revenue but can add debt. Maintenance pays debt down.
-            </p>
-            <button
-              type="button"
-              className="secondary-action"
-              onClick={() => command({ type: "RELEASE_PRODUCT" })}
-            >
-              Release Deskflow Local
-            </button>
-          </article>
-        </div>
-      </section>
+          <dl>
+            <div>
+              <dt>Hours</dt>
+              <dd>{completionFeedback.projection.hours.toFixed(2)}h used</dd>
+            </div>
+            <div>
+              <dt>Money / progress</dt>
+              <dd>
+                {completionFeedback.projection.cashChange >= 0 ? "+" : ""}
+                {compactMoney(completionFeedback.projection.cashChange)} ·{" "}
+                {careerProgressSummary(completionFeedback.projection)}
+              </dd>
+            </div>
+            <div>
+              <dt>Electricity / operating</dt>
+              <dd>
+                {compactMoney(completionFeedback.projection.electricityCost)}{" "}
+                electricity ·{" "}
+                {compactMoney(completionFeedback.projection.operatingCost)}{" "}
+                operating
+              </dd>
+            </div>
+            <div>
+              <dt>Constraint</dt>
+              <dd>{completionConstraint}</dd>
+            </div>
+            <div>
+              <dt>Next decision</dt>
+              <dd>{completionFeedback.nextDecision}</dd>
+            </div>
+          </dl>
+        </section>
+      ) : null}
 
-      <section
-        className="panel evaluation-panel"
-        aria-labelledby="evaluation-title"
+      <CareerDisclosure
+        eyebrow="Current progress and lifetime totals"
+        title="Career progress and route actions"
       >
-        <div className="section-heading compact">
-          <div>
-            <span className="eyebrow">Public proxy / private evidence</span>
-            <h2 id="evaluation-title">Evaluation discipline</h2>
+        <section className="panel" aria-labelledby="funding-title">
+          <div className="section-heading compact">
+            <div>
+              <span className="eyebrow">Three funding routes</span>
+              <h2 id="funding-title">
+                Persistent work, not parallel pipelines
+              </h2>
+            </div>
           </div>
-          <span className="counter">
-            {(career.evaluation.coverage * 100).toFixed(0)}% covered
-          </span>
-        </div>
-        <p className="concept-note">
-          Public previews are visible benchmark proxies. Private evaluation
-          costs cash and returns an evidence band, not an exact
-          actual-capability number. Coverage reduces leakage and shifted-input
-          uncertainty but does not guarantee a result.
-        </p>
-        <dl className="evaluation-stat-grid" aria-label="Evaluation evidence">
-          <div>
-            <dt>Public score</dt>
-            <dd>
-              {career.evaluation.publicScore === null
-                ? "Not run"
-                : career.evaluation.publicScore.toFixed(1)}
-            </dd>
-          </div>
-          <div>
-            <dt>Private assessment</dt>
-            <dd>{career.evaluation.privateAssessment}</dd>
-          </div>
-          <div>
-            <dt>Leakage risk</dt>
-            <dd>{(career.evaluation.leakageRisk * 100).toFixed(0)}%</dd>
-          </div>
-          <div>
-            <dt>Shift risk</dt>
-            <dd>
-              {(career.evaluation.distributionShiftRisk * 100).toFixed(0)}%
-            </dd>
-          </div>
-          <div>
-            <dt>Reliability incidents</dt>
-            <dd>{career.evaluation.reliabilityIncidents}</dd>
-          </div>
-          <div>
-            <dt>Paid evidence</dt>
-            <dd>${career.evaluation.evaluationSpend.toFixed(3)}</dd>
-          </div>
-        </dl>
-        <div className="career-actions evaluation-actions">
-          <button
-            type="button"
-            className="secondary-action"
-            aria-label="Run public benchmark preview"
-            onClick={() => command({ type: "RUN_PUBLIC_EVALUATION" })}
-          >
-            Run public preview
-          </button>
-          <button
-            type="button"
-            className="primary-action"
-            aria-label="Run paid private evaluation"
-            onClick={() => command({ type: "RUN_PRIVATE_EVALUATION" })}
-          >
-            Run private evaluation · $0.750
-          </button>
-          <p>
-            {career.evaluation.publicEvaluations} public preview
-            {career.evaluation.publicEvaluations === 1 ? "" : "s"} ·{" "}
-            {career.evaluation.privateEvaluations} paid private sample
-            {career.evaluation.privateEvaluations === 1 ? "" : "s"}. Warnings
-            remain evidence in the causal ledger; ignoring an escalating warning
-            is a durable run decision.
-          </p>
-        </div>
-      </section>
-
-      <section className="panel" aria-labelledby="savings-title">
-        <div className="section-heading compact">
-          <div>
-            <span className="eyebrow">Explicit reserves</span>
-            <h2 id="savings-title">Savings and costs</h2>
-          </div>
-        </div>
-        <p className="concept-note">
-          All route costs are charged as configured operating cost plus local
-          electricity at $0.24/kWh. Cash cannot go below zero; unpaid costs stay
-          visible and future route income pays them first.
-        </p>
-        <div className="savings-controls">
-          <label>
-            Amount
-            <input
-              type="number"
-              inputMode="decimal"
-              min="0.001"
-              step="0.25"
-              value={savingsAmount}
-              aria-label="Savings transfer amount"
-              onChange={(event) =>
-                setSavingsAmount(event.currentTarget.valueAsNumber)
-              }
-            />
-          </label>
-          <button
-            type="button"
-            className="secondary-action"
-            onClick={() =>
-              command({ type: "DEPOSIT_SAVINGS", amount: savingsAmount })
-            }
-          >
-            Deposit savings
-          </button>
-          <button
-            type="button"
-            className="secondary-action"
-            onClick={() =>
-              command({ type: "WITHDRAW_SAVINGS", amount: savingsAmount })
-            }
-          >
-            Withdraw savings
-          </button>
-        </div>
-      </section>
-
-      <section className="panel" aria-labelledby="model-tier-title">
-        <div className="section-heading compact">
-          <div>
-            <span className="eyebrow">Durable local models</span>
-            <h2 id="model-tier-title">Model tiers and quantization</h2>
-          </div>
-        </div>
-        <p className="concept-note">
-          A tier modifies a model stage in the one current pipeline. It is not a
-          new work queue, vendor countdown, or second pipeline.
-        </p>
-        <div className="career-model-list">
-          {localModelTiers.map((tier) => {
-            const unlock = localModelTierUnlockProgress(state, tier.id);
-            const active = career.activeModelTierId === tier.id;
-            return (
+          <div className="career-project-grid">
+            <article>
+              <span className="eyebrow">Freelance / cash now</span>
+              <strong>
+                ${career.freelanceGross.toFixed(3)} gross from{" "}
+                {career.freelanceHours.toFixed(2)}h
+              </strong>
+              <p>
+                Sensitive to the pipeline's latency and reliability. This is the
+                fastest cash route, but it does not build product progress or a
+                Cup entry.
+              </p>
+            </article>
+            <article>
+              <span className="eyebrow">One competition / reputation</span>
+              <strong>
+                {career.competition.progress.toFixed(2)} / 8.00 progress · best{" "}
+                {career.competition.bestScore.toFixed(1)}
+              </strong>
+              <p>
+                Bedroom Benchmark Cup has{" "}
+                {career.competition.overfitRisk.toFixed(2)} overfit risk. Better
+                evaluation lowers the score penalty; submitting clears the
+                current entry work without destroying the run.
+              </p>
               <button
                 type="button"
-                key={tier.id}
-                className={`${active ? "choice-card selected" : "choice-card"} ${unlock.unlocked ? "" : "locked"}`}
-                aria-pressed={active}
-                onClick={() =>
-                  command({
-                    type: "SELECT_LOCAL_MODEL_TIER",
-                    modelTierId: tier.id,
-                  })
-                }
+                className="secondary-action"
+                onClick={() => command({ type: "SUBMIT_COMPETITION" })}
               >
-                <span>
-                  <strong>
-                    {tier.name} · {tier.shortName}
-                  </strong>
-                  <small>
-                    {tier.description} {unlock.requirement}
-                  </small>
-                </span>
-                <span className="choice-stat">
-                  {unlock.unlocked ? (active ? "ACTIVE" : "SELECT") : "LOCKED"}
-                </span>
+                Submit Cup entry
               </button>
-            );
-          })}
-        </div>
-        <div
-          className="quantization-controls"
-          role="group"
-          aria-label="Local model quantization"
+            </article>
+            <article>
+              <span className="eyebrow">One product / durable revenue</span>
+              <strong>
+                {career.product.released
+                  ? `Released · $${career.product.lifetimeRevenue.toFixed(3)} revenue`
+                  : `${career.product.buildProgress.toFixed(2)} / 8.00 build`}
+              </strong>
+              <p>
+                Deskflow Local has {career.product.serviceDebt.toFixed(2)}{" "}
+                service debt. Product hours before release build it; after
+                release they earn revenue but can add debt. Maintenance pays
+                debt down.
+              </p>
+              <button
+                type="button"
+                className="secondary-action"
+                onClick={() => command({ type: "RELEASE_PRODUCT" })}
+              >
+                Release Deskflow Local
+              </button>
+            </article>
+          </div>
+        </section>
+      </CareerDisclosure>
+
+      <CareerDisclosure
+        eyebrow="Public proxy / private evidence"
+        title="Evaluation discipline"
+      >
+        <section
+          className="panel evaluation-panel"
+          aria-labelledby="evaluation-title"
         >
-          {(["q4", "q8"] as const).map((profile) => (
+          <div className="section-heading compact">
+            <div>
+              <span className="eyebrow">Public proxy / private evidence</span>
+              <h2 id="evaluation-title">Evaluation discipline</h2>
+            </div>
+            <span className="counter">
+              {(career.evaluation.coverage * 100).toFixed(0)}% covered
+            </span>
+          </div>
+          <p className="concept-note">
+            Public previews are visible benchmark proxies. Private evaluation
+            costs cash and returns an evidence band, not an exact
+            actual-capability number. Coverage reduces leakage and shifted-input
+            uncertainty but does not guarantee a result.
+          </p>
+          <dl className="evaluation-stat-grid" aria-label="Evaluation evidence">
+            <div>
+              <dt>Public score</dt>
+              <dd>
+                {career.evaluation.publicScore === null
+                  ? "Not run"
+                  : career.evaluation.publicScore.toFixed(1)}
+              </dd>
+            </div>
+            <div>
+              <dt>Private assessment</dt>
+              <dd>{career.evaluation.privateAssessment}</dd>
+            </div>
+            <div>
+              <dt>Leakage risk</dt>
+              <dd>{(career.evaluation.leakageRisk * 100).toFixed(0)}%</dd>
+            </div>
+            <div>
+              <dt>Shift risk</dt>
+              <dd>
+                {(career.evaluation.distributionShiftRisk * 100).toFixed(0)}%
+              </dd>
+            </div>
+            <div>
+              <dt>Reliability incidents</dt>
+              <dd>{career.evaluation.reliabilityIncidents}</dd>
+            </div>
+            <div>
+              <dt>Paid evidence</dt>
+              <dd>${career.evaluation.evaluationSpend.toFixed(3)}</dd>
+            </div>
+          </dl>
+          <div className="career-actions evaluation-actions">
             <button
               type="button"
-              key={profile}
-              aria-pressed={career.quantization === profile}
-              className={
-                career.quantization === profile
-                  ? "primary-action"
-                  : "secondary-action"
-              }
-              onClick={() => command({ type: "SET_QUANTIZATION", profile })}
+              className="secondary-action"
+              aria-label="Run public benchmark preview"
+              onClick={() => command({ type: "RUN_PUBLIC_EVALUATION" })}
             >
-              {profile.toUpperCase()}{" "}
-              {profile === "q4"
-                ? "fast / lower memory"
-                : "quality / higher memory"}
+              Run public preview
             </button>
-          ))}
-        </div>
-      </section>
-
-      <section className="panel" aria-labelledby="offline-policy-title">
-        <div className="section-heading compact">
-          <div>
-            <span className="eyebrow">Bounded offline policy</span>
-            <h2 id="offline-policy-title">Safe freelance-only automation</h2>
+            <button
+              type="button"
+              className="primary-action"
+              aria-label="Run paid private evaluation"
+              onClick={() => command({ type: "RUN_PRIVATE_EVALUATION" })}
+            >
+              Run private evaluation · $0.750
+            </button>
+            <p>
+              {career.evaluation.publicEvaluations} public preview
+              {career.evaluation.publicEvaluations === 1 ? "" : "s"} ·{" "}
+              {career.evaluation.privateEvaluations} paid private sample
+              {career.evaluation.privateEvaluations === 1 ? "" : "s"}. Warnings
+              remain evidence in the causal ledger; ignoring an escalating
+              warning is a durable run decision.
+            </p>
           </div>
-        </div>
-        <p className="concept-note">
-          Player-authored only. It can perform bounded freelance work when safe;
-          it can never buy, submit, release, schedule product/competition work,
-          or create unpaid cost. A pending player schedule always wins.
-        </p>
-        <div className="offline-policy-form">
-          <label className="policy-toggle">
-            <input
-              type="checkbox"
-              checked={offlineDraft.enabled}
-              onChange={(event) => {
-                const enabled = event.currentTarget.checked;
-                setOfflineDraft((draft) => ({
-                  ...draft,
-                  enabled,
-                }));
-              }}
-            />
-            Enable safe offline freelance
-          </label>
-          <label>
-            Maximum hours
-            <input
-              type="number"
-              min="0"
-              max="4"
-              step="0.25"
-              value={offlineDraft.maxHours}
-              aria-label="Offline maximum hours"
-              onChange={(event) => {
-                const maxHours = event.currentTarget.valueAsNumber;
-                setOfflineDraft((draft) => ({
-                  ...draft,
-                  maxHours,
-                }));
-              }}
-            />
-          </label>
-          <label>
-            Max electricity cost
-            <input
-              type="number"
-              min="0"
-              max="5"
-              step="0.01"
-              value={offlineDraft.maxElectricityCost}
-              aria-label="Offline maximum electricity cost"
-              onChange={(event) => {
-                const maxElectricityCost = event.currentTarget.valueAsNumber;
-                setOfflineDraft((draft) => ({
-                  ...draft,
-                  maxElectricityCost,
-                }));
-              }}
-            />
-          </label>
-          <label>
-            Max operating cost
-            <input
-              type="number"
-              min="0"
-              max="5"
-              step="0.01"
-              value={offlineDraft.maxOperatingCost}
-              aria-label="Offline maximum operating cost"
-              onChange={(event) => {
-                const maxOperatingCost = event.currentTarget.valueAsNumber;
-                setOfflineDraft((draft) => ({
-                  ...draft,
-                  maxOperatingCost,
-                }));
-              }}
-            />
-          </label>
-          <label>
-            Minimum reliability
-            <input
-              type="number"
-              min="0.7"
-              max="0.999"
-              step="0.001"
-              value={offlineDraft.minReliability}
-              aria-label="Offline minimum reliability"
-              onChange={(event) => {
-                const minReliability = event.currentTarget.valueAsNumber;
-                setOfflineDraft((draft) => ({
-                  ...draft,
-                  minReliability,
-                }));
-              }}
-            />
-          </label>
-        </div>
-        <div className="career-actions">
-          <button
-            type="button"
-            className="secondary-action"
-            onClick={() =>
-              command({ type: "SET_OFFLINE_POLICY", ...offlineDraft })
-            }
-          >
-            Save safe offline policy
-          </button>
-          <button
-            type="button"
-            className="primary-action"
-            onClick={() =>
-              command({ type: "APPLY_OFFLINE_POLICY", requestedHours: 4 })
-            }
-          >
-            Apply safe offline policy now
-          </button>
-        </div>
-        {career.offlinePolicy.lastReport ? (
-          <p className="offline-report" role="status">
-            Offline report:{" "}
-            {career.offlinePolicy.lastReport.appliedHours.toFixed(2)}h applied ·
-            ${career.offlinePolicy.lastReport.gross.toFixed(3)} gross · $
-            {career.offlinePolicy.lastReport.configuredCost.toFixed(3)}{" "}
-            configured cost · {career.offlinePolicy.lastReport.stoppedReason}.
-          </p>
-        ) : null}
-      </section>
+        </section>
+      </CareerDisclosure>
 
-      <section
-        className="panel conclusion-panel"
-        aria-labelledby="conclusion-title"
+      <CareerDisclosure eyebrow="Explicit reserves" title="Savings and costs">
+        <section className="panel" aria-labelledby="savings-title">
+          <div className="section-heading compact">
+            <div>
+              <span className="eyebrow">Explicit reserves</span>
+              <h2 id="savings-title">Savings and costs</h2>
+            </div>
+          </div>
+          <p className="concept-note">
+            All route costs are charged as configured operating cost plus local
+            electricity at $0.24/kWh. Cash cannot go below zero; unpaid costs
+            stay visible and future route income pays them first.
+          </p>
+          <div className="savings-controls">
+            <label>
+              Amount
+              <input
+                type="number"
+                inputMode="decimal"
+                min="0.001"
+                step="0.25"
+                value={savingsAmount}
+                aria-label="Savings transfer amount"
+                onChange={(event) =>
+                  setSavingsAmount(event.currentTarget.valueAsNumber)
+                }
+              />
+            </label>
+            <button
+              type="button"
+              className="secondary-action"
+              onClick={() =>
+                command({ type: "DEPOSIT_SAVINGS", amount: savingsAmount })
+              }
+            >
+              Deposit savings
+            </button>
+            <button
+              type="button"
+              className="secondary-action"
+              onClick={() =>
+                command({ type: "WITHDRAW_SAVINGS", amount: savingsAmount })
+              }
+            >
+              Withdraw savings
+            </button>
+          </div>
+        </section>
+      </CareerDisclosure>
+
+      <CareerDisclosure
+        eyebrow="Durable local models"
+        title="Model tiers and quantization"
       >
-        <div className="section-heading compact">
-          <div>
-            <span className="eyebrow">Explicit success condition</span>
-            <h2 id="conclusion-title">Independent conclusion</h2>
+        <section className="panel" aria-labelledby="model-tier-title">
+          <div className="section-heading compact">
+            <div>
+              <span className="eyebrow">Durable local models</span>
+              <h2 id="model-tier-title">Model tiers and quantization</h2>
+            </div>
           </div>
-          <span className={conclusion.ready ? "equipment-state" : "counter"}>
-            {conclusion.ready ? "READY" : "EVIDENCE NEEDED"}
-          </span>
-        </div>
-        <p className="concept-note">
-          The honest ending is never a hidden roll. It requires the existing
-          Bedroom Developer exit plus credible private evidence, adequate
-          coverage, paid costs, and restrained incident history.
-        </p>
-        {conclusion.reasons.length ? (
-          <ul className="conclusion-reasons">
-            {conclusion.reasons.map((reason) => (
-              <li key={reason}>{reason}</li>
-            ))}
-          </ul>
-        ) : (
-          <p className="conclusion-ready" role="status">
-            Evidence is sufficient for a deliberate independent conclusion.
+          <p className="concept-note">
+            A tier modifies a model stage in the one current pipeline. It is not
+            a new work queue, vendor countdown, or second pipeline.
           </p>
-        )}
-        <div className="career-actions">
-          <button
-            type="button"
-            className="primary-action"
-            disabled={!conclusion.ready}
-            aria-describedby="conclusion-status"
-            onClick={() => command({ type: "CONCLUDE_INDEPENDENT_RUN" })}
+          <div className="career-model-list">
+            {localModelTiers.map((tier) => {
+              const unlock = localModelTierUnlockProgress(state, tier.id);
+              const active = career.activeModelTierId === tier.id;
+              return (
+                <button
+                  type="button"
+                  key={tier.id}
+                  className={`${active ? "choice-card selected" : "choice-card"} ${unlock.unlocked ? "" : "locked"}`}
+                  aria-pressed={active}
+                  onClick={() =>
+                    command({
+                      type: "SELECT_LOCAL_MODEL_TIER",
+                      modelTierId: tier.id,
+                    })
+                  }
+                >
+                  <span>
+                    <strong>
+                      {tier.name} · {tier.shortName}
+                    </strong>
+                    <small>
+                      {tier.description} {unlock.requirement}
+                    </small>
+                  </span>
+                  <span className="choice-stat">
+                    {unlock.unlocked
+                      ? active
+                        ? "ACTIVE"
+                        : "SELECT"
+                      : "LOCKED"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div
+            className="quantization-controls"
+            role="group"
+            aria-label="Local model quantization"
           >
-            Conclude independent run
-          </button>
-          <p id="conclusion-status">
-            {conclusion.ready
-              ? "This irreversible conclusion opens its recorded postmortem and diagnostic unlock."
-              : "The listed evidence gaps keep this conclusion unavailable; no progress is lost."}
-          </p>
-        </div>
-      </section>
+            {(["q4", "q8"] as const).map((profile) => (
+              <button
+                type="button"
+                key={profile}
+                aria-pressed={career.quantization === profile}
+                className={
+                  career.quantization === profile
+                    ? "primary-action"
+                    : "secondary-action"
+                }
+                onClick={() => command({ type: "SET_QUANTIZATION", profile })}
+              >
+                {profile.toUpperCase()}{" "}
+                {profile === "q4"
+                  ? "fast / lower memory"
+                  : "quality / higher memory"}
+              </button>
+            ))}
+          </div>
+        </section>
+      </CareerDisclosure>
 
-      <DiagnosticMemory state={state} />
+      <CareerDisclosure
+        eyebrow="Bounded offline policy"
+        title="Safe freelance-only automation"
+      >
+        <section className="panel" aria-labelledby="offline-policy-title">
+          <div className="section-heading compact">
+            <div>
+              <span className="eyebrow">Bounded offline policy</span>
+              <h2 id="offline-policy-title">Safe freelance-only automation</h2>
+            </div>
+          </div>
+          <p className="concept-note">
+            Player-authored only. It can perform bounded freelance work when
+            safe; it can never buy, submit, release, schedule
+            product/competition work, or create unpaid cost. A pending player
+            schedule always wins.
+          </p>
+          <div className="offline-policy-form">
+            <label className="policy-toggle">
+              <input
+                type="checkbox"
+                checked={offlineDraft.enabled}
+                onChange={(event) => {
+                  const enabled = event.currentTarget.checked;
+                  setOfflineDraft((draft) => ({
+                    ...draft,
+                    enabled,
+                  }));
+                }}
+              />
+              Enable safe offline freelance
+            </label>
+            <label>
+              Maximum hours
+              <input
+                type="number"
+                min="0"
+                max="4"
+                step="0.25"
+                value={offlineDraft.maxHours}
+                aria-label="Offline maximum hours"
+                onChange={(event) => {
+                  const maxHours = event.currentTarget.valueAsNumber;
+                  setOfflineDraft((draft) => ({
+                    ...draft,
+                    maxHours,
+                  }));
+                }}
+              />
+            </label>
+            <label>
+              Max electricity cost
+              <input
+                type="number"
+                min="0"
+                max="5"
+                step="0.01"
+                value={offlineDraft.maxElectricityCost}
+                aria-label="Offline maximum electricity cost"
+                onChange={(event) => {
+                  const maxElectricityCost = event.currentTarget.valueAsNumber;
+                  setOfflineDraft((draft) => ({
+                    ...draft,
+                    maxElectricityCost,
+                  }));
+                }}
+              />
+            </label>
+            <label>
+              Max operating cost
+              <input
+                type="number"
+                min="0"
+                max="5"
+                step="0.01"
+                value={offlineDraft.maxOperatingCost}
+                aria-label="Offline maximum operating cost"
+                onChange={(event) => {
+                  const maxOperatingCost = event.currentTarget.valueAsNumber;
+                  setOfflineDraft((draft) => ({
+                    ...draft,
+                    maxOperatingCost,
+                  }));
+                }}
+              />
+            </label>
+            <label>
+              Minimum reliability
+              <input
+                type="number"
+                min="0.7"
+                max="0.999"
+                step="0.001"
+                value={offlineDraft.minReliability}
+                aria-label="Offline minimum reliability"
+                onChange={(event) => {
+                  const minReliability = event.currentTarget.valueAsNumber;
+                  setOfflineDraft((draft) => ({
+                    ...draft,
+                    minReliability,
+                  }));
+                }}
+              />
+            </label>
+          </div>
+          <div className="career-actions">
+            <button
+              type="button"
+              className="secondary-action"
+              onClick={() =>
+                command({ type: "SET_OFFLINE_POLICY", ...offlineDraft })
+              }
+            >
+              Save safe offline policy
+            </button>
+            <button
+              type="button"
+              className="primary-action"
+              onClick={() =>
+                command({ type: "APPLY_OFFLINE_POLICY", requestedHours: 4 })
+              }
+            >
+              Apply safe offline policy now
+            </button>
+          </div>
+          {career.offlinePolicy.lastReport ? (
+            <p className="offline-report" role="status">
+              Offline report:{" "}
+              {career.offlinePolicy.lastReport.appliedHours.toFixed(2)}h applied
+              · ${career.offlinePolicy.lastReport.gross.toFixed(3)} gross · $
+              {career.offlinePolicy.lastReport.configuredCost.toFixed(3)}{" "}
+              configured cost · {career.offlinePolicy.lastReport.stoppedReason}.
+            </p>
+          ) : null}
+        </section>
+      </CareerDisclosure>
+
+      <CareerDisclosure
+        eyebrow="Exit checklist and irreversible conclusion"
+        title="Independent conclusion"
+      >
+        <section
+          className="panel conclusion-panel"
+          aria-labelledby="conclusion-title"
+        >
+          <div className="section-heading compact">
+            <div>
+              <span className="eyebrow">Explicit success condition</span>
+              <h2 id="conclusion-title">Independent conclusion</h2>
+            </div>
+            <span className={conclusion.ready ? "equipment-state" : "counter"}>
+              {conclusion.ready ? "READY" : "EVIDENCE NEEDED"}
+            </span>
+          </div>
+          <p className="concept-note">
+            The honest ending is never a hidden roll. It requires the existing
+            Bedroom Developer exit plus credible private evidence, adequate
+            coverage, paid costs, and restrained incident history.
+          </p>
+          {conclusion.reasons.length ? (
+            <ul className="conclusion-reasons">
+              {conclusion.reasons.map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="conclusion-ready" role="status">
+              Evidence is sufficient for a deliberate independent conclusion.
+            </p>
+          )}
+          <div className="career-actions">
+            <button
+              type="button"
+              className="primary-action"
+              disabled={!conclusion.ready}
+              aria-describedby="conclusion-status"
+              onClick={() => command({ type: "CONCLUDE_INDEPENDENT_RUN" })}
+            >
+              Conclude independent run
+            </button>
+            <p id="conclusion-status">
+              {conclusion.ready
+                ? "This irreversible conclusion opens its recorded postmortem and diagnostic unlock."
+                : "The listed evidence gaps keep this conclusion unavailable; no progress is lost."}
+            </p>
+          </div>
+          <p className="career-exit" role="status">
+            Bedroom Developer exit: save $24, submit one Cup entry, release
+            Deskflow Local, and unlock Kiln 13B. Current:{" "}
+            {exactMoney(career.savings)} · {career.competition.submissions}/1
+            submission ·{" "}
+            {career.product.released
+              ? "product released"
+              : "product unreleased"}{" "}
+            ·{" "}
+            {career.unlockedModelTierIds.includes("kiln-13b")
+              ? "Kiln unlocked"
+              : "Kiln locked"}
+            .
+          </p>
+        </section>
+      </CareerDisclosure>
+
+      <CareerDisclosure
+        eyebrow="Information-only replay memory"
+        title="Diagnostics"
+      >
+        <DiagnosticMemory state={state} />
+      </CareerDisclosure>
     </div>
   );
 }
@@ -3479,6 +3800,8 @@ export function App() {
     lastDurableRequestId,
     hasDurablePersistenceFailure,
   );
+  const [careerCompletionFeedback, setCareerCompletionFeedback] =
+    useState<CareerCompletionFeedback | null>(null);
   const [tab, setTab] = useState<TabId>("build");
   const [selected, setSelected] = useState<PendingPlacement | null>(null);
   const [moduleDetail, setModuleDetail] = useState<ModuleDetail | null>(null);
@@ -3499,6 +3822,10 @@ export function App() {
   const dragRef = useRef<DragState | null>(null);
   const detailOriginRef = useRef<HTMLElement | null>(null);
   const placementOriginRef = useRef<HTMLElement | null>(null);
+  const submittedCareerProjectionRef = useRef<{
+    completedEvenings: number;
+    projection: CareerEveningProjection;
+  } | null>(null);
   const tabScrollPositions = useRef<Record<TabId, number>>({
     build: 0,
     jobs: 0,
@@ -3506,6 +3833,47 @@ export function App() {
     upgrades: 0,
     inspect: 0,
   });
+
+  const runCareerEvening = useCallback(() => {
+    const projection = projectCareerEvening(state, careerScheduleDraft.draft);
+    const accepted = careerScheduleDraft.runScheduledEvening(commandBatch);
+    if (!accepted) return false;
+    submittedCareerProjectionRef.current = {
+      completedEvenings: state.career.schedule.completedEvenings,
+      projection,
+    };
+    setCareerCompletionFeedback(null);
+    return true;
+  }, [careerScheduleDraft, commandBatch, state]);
+
+  useEffect(() => {
+    const submitted = submittedCareerProjectionRef.current;
+    if (!submitted) return;
+    if (
+      state.career.runEnding ||
+      state.career.schedule.completedEvenings < submitted.completedEvenings
+    ) {
+      submittedCareerProjectionRef.current = null;
+      setCareerCompletionFeedback(null);
+      return;
+    }
+    if (state.career.schedule.completedEvenings <= submitted.completedEvenings)
+      return;
+    setCareerCompletionFeedback({
+      evening: submitted.completedEvenings + 1,
+      projection: submitted.projection,
+      nextDecision: nextCareerDecision(state),
+    });
+    submittedCareerProjectionRef.current = null;
+  }, [state]);
+
+  useEffect(() => {
+    setCareerCompletionFeedback((current) =>
+      current && state.career.schedule.completedEvenings < current.evening
+        ? null
+        : current,
+    );
+  }, [state.career.schedule.completedEvenings]);
 
   const clearPlacement = useCallback((restoreFocus = false) => {
     const origin = placementOriginRef.current;
@@ -3926,9 +4294,8 @@ export function App() {
               onScheduleDraftChange={careerScheduleDraft.setRouteHours}
               hasDurablePersistenceFailure={hasDurablePersistenceFailure}
               isRunBlocked={careerScheduleDraft.isRunBlocked}
-              onRunScheduledEvening={() =>
-                careerScheduleDraft.runScheduledEvening(commandBatch)
-              }
+              onRunScheduledEvening={runCareerEvening}
+              completionFeedback={careerCompletionFeedback}
             />
           ) : tab === "upgrades" ? (
             <UpgradesView

@@ -45,6 +45,15 @@ async function openCareer(page: Page): Promise<void> {
   ).toBeVisible();
 }
 
+async function openCareerDisclosure(page: Page, title: string): Promise<void> {
+  const summary = page.locator(`summary[aria-label="Show ${title}"]`);
+  const disclosure = summary.locator("xpath=..");
+  await expect(summary).toHaveCount(1);
+  if (!(await disclosure.evaluate((element) => element.hasAttribute("open"))))
+    await summary.click();
+  await expect(disclosure).toHaveAttribute("open", "");
+}
+
 async function assertPortraitControls(page: Page): Promise<void> {
   const layout = await page.evaluate(() => {
     const buttons = Array.from(
@@ -101,6 +110,7 @@ test.describe("evaluation, failure, and replay acceptance", () => {
     await page.goto("/");
     await waitForSave(page);
     await openCareer(page);
+    await openCareerDisclosure(page, "Evaluation discipline");
 
     await expect(
       page.getByRole("heading", { name: "Evaluation discipline" }),
@@ -131,6 +141,7 @@ test.describe("evaluation, failure, and replay acceptance", () => {
         evaluationSpend: 0,
       });
 
+    await openCareerDisclosure(page, "Savings and costs");
     await page.getByRole("button", { name: "Withdraw savings" }).click();
     await expect
       .poll(async () => (await savedState(page)).resources?.money ?? 0)
@@ -149,6 +160,7 @@ test.describe("evaluation, failure, and replay acceptance", () => {
 
     await page.reload();
     await openCareer(page);
+    await openCareerDisclosure(page, "Evaluation discipline");
     await expect(
       page.getByText("Private assessment", { exact: true }),
     ).toBeVisible();
@@ -173,6 +185,7 @@ test.describe("evaluation, failure, and replay acceptance", () => {
     await page.goto("/");
     await waitForSave(page);
     await openCareer(page);
+    await openCareerDisclosure(page, "Model tiers and quantization");
 
     const q4 = page.getByRole("button", { name: /^Q4 fast \/ lower memory$/ });
     const q8 = page.getByRole("button", {
@@ -232,6 +245,7 @@ test.describe("evaluation, failure, and replay acceptance", () => {
     await context.setOffline(false);
 
     await page.getByRole("button", { name: "Restart this scenario" }).click();
+    await openCareerDisclosure(page, "Evaluation discipline");
     await expect(
       page.getByRole("heading", { name: "Evaluation discipline" }),
     ).toBeVisible();
@@ -251,6 +265,7 @@ test.describe("evaluation, failure, and replay acceptance", () => {
         completed: ["tutorial-loop"],
         replayCount: 1,
       });
+    await openCareerDisclosure(page, "Diagnostics");
     await expect(
       page.getByRole("heading", { name: "Diagnostic unlocks" }),
     ).toBeVisible();

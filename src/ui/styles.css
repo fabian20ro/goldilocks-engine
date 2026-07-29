@@ -2016,6 +2016,48 @@ h2 {
   border-top: 1px solid var(--line);
 }
 
+.career-objective {
+  padding: 0.7rem 0.8rem;
+  border-top: 1px solid var(--line);
+  color: #d7e3da;
+  font-size: 0.69rem;
+  line-height: 1.45;
+}
+
+.career-quick-resources {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  border-top: 1px solid var(--line);
+  background: var(--line);
+}
+
+.career-quick-resources > div {
+  display: grid;
+  min-width: 0;
+  gap: 0.18rem;
+  padding: 0.52rem 0.65rem;
+  background: #0e1612;
+}
+
+.career-quick-resources dt,
+.career-detail-grid dt,
+.career-completion-feedback dt {
+  color: var(--muted);
+  font-size: 0.54rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.career-quick-resources dd {
+  overflow-wrap: anywhere;
+  color: var(--acid);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
 .career-stat-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2219,6 +2261,64 @@ h2 {
   background: #0e1612;
 }
 
+.career-route-summary {
+  display: grid;
+  gap: 0.32rem;
+  min-width: 0;
+}
+
+.career-route-summary > span:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.career-route-summary p,
+.career-route-projection,
+.career-route-constraint,
+.career-run-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.64rem;
+  line-height: 1.42;
+}
+
+.career-route-summary p strong,
+.career-route-projection strong,
+.career-run-status strong {
+  color: #dce8df;
+}
+
+.career-allocation {
+  flex: 0 0 auto;
+  padding: 0.22rem 0.38rem;
+  border: 1px solid var(--line-bright);
+  border-radius: 1rem;
+  color: var(--acid);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.56rem;
+  font-weight: 700;
+}
+
+.career-details-action {
+  min-height: 2.75rem;
+  font-size: 0.63rem;
+}
+
+.career-route-projection {
+  padding: 0.48rem 0.55rem;
+  border: 1px solid #3b625b;
+  border-radius: 0.38rem;
+  background: #10201c;
+  color: #bee4e5;
+}
+
+.career-route-constraint {
+  display: block;
+  color: #d9bc8b;
+}
+
 .career-route > span:first-child {
   display: grid;
   min-width: 0;
@@ -2276,6 +2376,104 @@ h2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.5rem;
   padding: 0 0.75rem 0.75rem;
+}
+
+.career-run-action {
+  grid-column: 1 / -1;
+  min-height: 3.55rem;
+  font-size: 0.78rem;
+}
+
+.career-run-status {
+  grid-column: 1 / -1;
+  padding: 0.15rem 0.1rem 0;
+}
+
+.career-detail-grid,
+.career-completion-feedback dl {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  background: var(--line);
+}
+
+.career-detail-grid > div,
+.career-completion-feedback dl > div {
+  display: grid;
+  gap: 0.24rem;
+  padding: 0.55rem;
+  background: #0e1612;
+}
+
+.career-detail-grid dd,
+.career-completion-feedback dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #d8e4db;
+  font-size: 0.65rem;
+  line-height: 1.42;
+}
+
+.career-disclosure {
+  overflow: clip;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  background: var(--panel);
+}
+
+.career-disclosure > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  min-height: 3.25rem;
+  padding: 0.52rem 0.7rem;
+  color: var(--cyan);
+  cursor: pointer;
+  list-style: none;
+}
+
+.career-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.career-disclosure > summary > span:first-child {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.career-disclosure > summary > span:last-child {
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.58rem;
+}
+
+.career-disclosure[open] > summary {
+  border-bottom: 1px solid var(--line);
+  background: #17221c;
+}
+
+.career-disclosure[open] > summary > span:last-child::before {
+  content: "Hide ";
+}
+
+.career-disclosure[open] > summary > span:last-child {
+  font-size: 0;
+}
+
+.career-disclosure[open] > summary > span:last-child::before {
+  font-size: 0.58rem;
+}
+
+.career-completion-feedback {
+  overflow: hidden;
+  border: 1px solid var(--acid-dim);
+  border-radius: 0.55rem;
+  background: #17221c;
+}
+
+.career-completion-feedback .section-heading {
+  padding: 0.66rem 0.72rem;
 }
 
 .career-actions p {
@@ -3062,15 +3260,7 @@ h1 {
 }
 
 .career-deck > * {
-  order: 3;
-}
-
-.career-deck > .evening-panel {
-  order: 1;
-}
-
-.career-deck > .career-overview {
-  order: 2;
+  order: initial;
 }
 
 .decision-deltas,

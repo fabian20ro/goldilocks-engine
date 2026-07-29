@@ -63,6 +63,7 @@ export const bedroomCareerRoutes: readonly CareerRouteSpec[] = [
   {
     id: "freelance",
     name: "Freelance delivery",
+    primaryBenefit: "Immediate cash from a configured local pipeline.",
     description:
       "Cash now from small local delivery work. Sensitive to latency and reliability; it does not build the product or competition record.",
     workloadId: "interactive-chat",
@@ -72,6 +73,7 @@ export const bedroomCareerRoutes: readonly CareerRouteSpec[] = [
   {
     id: "competition",
     name: "Bedroom Benchmark Cup",
+    primaryBenefit: "Builds the next verified Cup entry.",
     description:
       "One persistent competition. Build a verified score, then submit deliberately; weak evaluation raises overfit risk.",
     workloadId: "competition-run",
@@ -80,6 +82,8 @@ export const bedroomCareerRoutes: readonly CareerRouteSpec[] = [
   {
     id: "product",
     name: "Deskflow Local",
+    primaryBenefit:
+      "Builds a durable local product or serves it after release.",
     description:
       "One persistent local utility. Initial build work earns nothing; released service hours earn durable product revenue and can create service debt.",
     workloadId: "interactive-chat",
@@ -88,6 +92,7 @@ export const bedroomCareerRoutes: readonly CareerRouteSpec[] = [
   {
     id: "maintenance",
     name: "Product maintenance",
+    primaryBenefit: "Repays Deskflow service debt when it exists.",
     description:
       "Pays down Deskflow service debt. It protects retained product income but creates no direct cash or competition progress.",
     workloadId: "batch-classification",

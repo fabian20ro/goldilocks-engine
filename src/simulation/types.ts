@@ -107,6 +107,7 @@ export interface LocalModelTierSpec {
 export interface CareerRouteSpec {
   id: CareerRoute;
   name: string;
+  primaryBenefit: string;
   description: string;
   workloadId: string;
   opportunityCost: string;

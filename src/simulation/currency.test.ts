@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { currencyDisplayPrecision, formatCurrencyMagnitude } from "./currency";
+import {
+  currencyDisplayPrecision,
+  formatCurrency,
+  formatCurrencyMagnitude,
+} from "./currency";
 
 const parseDisplayed = (amount: number, precision: 2 | 3) =>
   Number(formatCurrencyMagnitude(amount, precision));
@@ -19,6 +23,8 @@ describe("currency equation formatting", () => {
     expect(precision).toBe(3);
     expect(formatCurrencyMagnitude(0.01, precision)).toBe("0.010");
     expect(formatCurrencyMagnitude(0.005, precision)).toBe("0.005");
+    expect(formatCurrency(-0.005, precision)).toBe("-$0.005");
+    expect(formatCurrency(0.005, precision)).toBe("$0.005");
   });
 
   it("keeps all reachable three-decimal paid/unpaid and gross/net partitions additive", () => {

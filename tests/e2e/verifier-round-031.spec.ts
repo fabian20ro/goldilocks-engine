@@ -37,7 +37,17 @@ async function openCareer(page: Page): Promise<void> {
   ).toBeVisible();
 }
 
+async function openCareerDisclosure(page: Page, title: string): Promise<void> {
+  const summary = page.locator(`summary[aria-label="Show ${title}"]`);
+  const disclosure = summary.locator("xpath=..");
+  await expect(summary).toHaveCount(1);
+  if (!(await disclosure.evaluate((element) => element.hasAttribute("open"))))
+    await summary.click();
+  await expect(disclosure).toHaveAttribute("open", "");
+}
+
 async function createTutorialLoop(page: Page): Promise<void> {
+  await openCareerDisclosure(page, "Model tiers and quantization");
   const q4 = page.getByRole("button", { name: /^Q4 fast \/ lower memory$/ });
   const q8 = page.getByRole("button", {
     name: /^Q8 quality \/ higher memory$/,
