@@ -6,7 +6,7 @@ The first-run Quick Start explains the queue → run → completion → payout l
 
 The **Upgrades** view implements a deliberately bounded purchase-loop redesign: earn money from settlements, compare rig/module tradeoffs, pay once for durable ownership, then separately equip a rig or add an owned compatible module. Schema-v4 state preserves the run, purchases, equipment, and pipeline across reload/offline use, carries migration metadata plus a deterministic full-snapshot integrity check, validates every UI-bound field before restore, and safely migrates schema-v3 state. Saved configurations continue to describe their own rig after the live rig changes. The deterministic balance checks fund a first module by five successful starter jobs and a used rig by fifteen, including that module purchase. Researchers, longer/multiple pipelines, newer-model content, hype/fear, personal scheduling, and the rest of Milestone 2+ remain deferred.
 
-Deployment target: <https://fabian20ro.github.io/goldlocks-engine/>. The GitHub Pages workflow at `.github/workflows/deploy-pages.yml` deploys `dist` after pushes to `agent/implementation` or a manual dispatch. `.github/workflows/verify.yml` independently runs the exact `./scripts/verify` gate on Ubuntu before its immutable run/artifacts can be used as browser evidence for that SHA.
+Deployment target: <https://fabian20ro.github.io/goldilocks-engine/>. The GitHub Pages workflow at `.github/workflows/deploy-pages.yml` deploys `dist` after pushes to `agent/implementation` or a manual dispatch. `.github/workflows/verify.yml` independently runs the exact `./scripts/verify` gate on Ubuntu before its immutable run/artifacts can be used as browser evidence for that SHA.
 
 ```sh
 ./scripts/setup
@@ -26,7 +26,7 @@ npm run build:pwa-update-fixtures
 npm run test:e2e -- tests/e2e/pwa-update.spec.ts
 ```
 
-The default build and local server remain rooted at `/`. `build:pages` packages every HTML, manifest, icon, service-worker, CSS, JavaScript, and Web Worker URL for `/goldlocks-engine/`. The Pages browser check serves that exact subpath, loads it online, audits the scoped cache, reloads offline, and exercises the worker-backed pipeline again.
+The default build and local server remain rooted at `/`. `build:pages` packages every HTML, manifest, icon, service-worker, CSS, JavaScript, and Web Worker URL for `/goldilocks-engine/`. The Pages browser check serves that exact subpath, loads it online, audits the scoped cache, reloads offline, and exercises the worker-backed pipeline again.
 
 ## Install and update behavior
 

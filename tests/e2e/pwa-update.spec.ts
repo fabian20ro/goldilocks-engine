@@ -38,7 +38,7 @@ interface PackageState {
 
 const SCOPES: readonly ScopeDefinition[] = [
   { name: "root", basePath: "/" },
-  { name: "pages", basePath: "/goldlocks-engine/" },
+  { name: "pages", basePath: "/goldilocks-engine/" },
 ];
 
 const contentTypes: Record<string, string> = {
@@ -201,7 +201,7 @@ async function workerVersionMessage(
     return new Promise<{ buildId: string; cacheName: string }>((resolve) => {
       const channel = new MessageChannel();
       channel.port1.onmessage = (event) => resolve(event.data);
-      worker.postMessage({ type: "GOLDLOCKS_PWA_VERSION" }, [channel.port2]);
+      worker.postMessage({ type: "GOLDILOCKS_PWA_VERSION" }, [channel.port2]);
     });
   });
 }

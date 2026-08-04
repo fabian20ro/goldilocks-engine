@@ -29,7 +29,7 @@ interface WorkerState {
 
 const SCOPES: readonly ScopeDefinition[] = [
   { name: "root", basePath: "/" },
-  { name: "pages", basePath: "/goldlocks-engine/" },
+  { name: "pages", basePath: "/goldilocks-engine/" },
 ];
 
 const contentTypes: Record<string, string> = {

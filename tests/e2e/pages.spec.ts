@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { settleStarterJob } from "./helpers";
 
-const pagesPath = "/goldlocks-engine/";
+const pagesPath = "/goldilocks-engine/";
 
 function captureErrors(page: Page): string[] {
   const errors: string[] = [];
@@ -138,7 +138,7 @@ test("the GitHub Pages build loads and remains worker-backed offline", async ({
     ...packageState.resourcePaths,
     ...packageState.assets,
   ])
-    expect(path).toMatch(/^\/goldlocks-engine\//);
+    expect(path).toMatch(/^\/goldilocks-engine\//);
 
   await page.getByRole("button", { name: "Jobs" }).click();
   await settleStarterJob(page);

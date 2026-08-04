@@ -69,7 +69,7 @@ async function workerVersion(
       });
     };
     try {
-      worker.postMessage({ type: "GOLDLOCKS_PWA_VERSION" }, [channel.port2]);
+      worker.postMessage({ type: "GOLDILOCKS_PWA_VERSION" }, [channel.port2]);
     } catch {
       settle(null);
     }

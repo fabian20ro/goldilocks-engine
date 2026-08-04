@@ -45,7 +45,7 @@ function createDeploymentVersion(root: string, base: string): string {
   hash.update("goldilocks-pwa-deployment-v1\0");
   hash.update(normalizeBase(base));
   hash.update("\0");
-  hash.update(process.env.GOLDLOCKS_BUILD_MARKER ?? "");
+  hash.update(process.env.GOLDILOCKS_BUILD_MARKER ?? "");
   hash.update("\0");
 
   for (const input of DEPLOYMENT_INPUTS) {
@@ -109,9 +109,9 @@ function pwaDeploymentArtifacts(): Plugin {
         type: "asset",
         fileName: "sw.js",
         source: serviceWorkerTemplate
-          .replaceAll("__GOLDLOCKS_BUILD_ID__", buildId)
+          .replaceAll("__GOLDILOCKS_BUILD_ID__", buildId)
           .replaceAll(
-            "__GOLDLOCKS_EXPECTED_ASSETS_JSON__",
+            "__GOLDILOCKS_EXPECTED_ASSETS_JSON__",
             JSON.stringify(assets),
           ),
       });

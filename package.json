@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build:pages": "tsc -b && vite build --base=/goldlocks-engine/",
+    "build:pages": "tsc -b && vite build --base=/goldilocks-engine/",
     "build:pwa-update-fixtures": "node scripts/build-pwa-update-fixtures.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -b --pretty false",
