@@ -10,12 +10,12 @@ const deployments = [
   { name: "root-b", base: "/", marker: "pwa-update-b" },
   {
     name: "pages-a",
-    base: "/goldlocks-engine/",
+    base: "/goldilocks-engine/",
     marker: "pwa-update-a",
   },
   {
     name: "pages-b",
-    base: "/goldlocks-engine/",
+    base: "/goldilocks-engine/",
     marker: "pwa-update-b",
   },
 ];
@@ -35,7 +35,7 @@ for (const deployment of deployments) {
       cwd: root,
       env: {
         ...process.env,
-        GOLDLOCKS_BUILD_MARKER: deployment.marker,
+        GOLDILOCKS_BUILD_MARKER: deployment.marker,
       },
       stdio: "inherit",
     },

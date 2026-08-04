@@ -11,4 +11,4 @@ fi
 
 npm run build:pages
 E2E_PORT=${E2E_PORT:-4173}
-exec npm run preview -- --host 127.0.0.1 --port "$E2E_PORT" --strictPort --base=/goldlocks-engine/
+exec npm run preview -- --host 127.0.0.1 --port "$E2E_PORT" --strictPort --base=/goldilocks-engine/

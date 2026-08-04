@@ -1,7 +1,7 @@
 import { defineConfig } from "@playwright/test";
 
 const port = process.env.E2E_PORT ?? "4173";
-const pagesUrl = `http://127.0.0.1:${port}/goldlocks-engine/`;
+const pagesUrl = `http://127.0.0.1:${port}/goldilocks-engine/`;
 
 export default defineConfig({
   testDir: "./tests/e2e",

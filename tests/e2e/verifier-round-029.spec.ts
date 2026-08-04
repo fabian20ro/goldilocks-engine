@@ -32,7 +32,7 @@ interface Identity {
 
 const SCOPES: readonly ScopeDefinition[] = [
   { name: "root", basePath: "/" },
-  { name: "pages", basePath: "/goldlocks-engine/" },
+  { name: "pages", basePath: "/goldilocks-engine/" },
 ];
 
 const CONTENT_TYPES: Record<string, string> = {
@@ -151,7 +151,7 @@ async function identity(page: Page, scope: ScopeDefinition): Promise<Identity> {
               data && typeof data.buildId === "string" ? data.buildId : null,
             );
           };
-          controller.postMessage({ type: "GOLDLOCKS_PWA_VERSION" }, [
+          controller.postMessage({ type: "GOLDILOCKS_PWA_VERSION" }, [
             channel.port2,
           ]);
         })
