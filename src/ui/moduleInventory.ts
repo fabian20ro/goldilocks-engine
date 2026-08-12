@@ -1,4 +1,5 @@
 import { getSlot, modules } from "../simulation/catalog";
+import { formatCompactCurrency } from "../simulation/currency";
 import type {
   ModuleSpec,
   SimulationState,
@@ -91,9 +92,9 @@ function requirementFor({
   }
 
   if (affordable)
-    return `Available now for $${module.purchaseCost.toFixed(2)} in Upgrades.`;
+    return `Available now for ${formatCompactCurrency(module.purchaseCost)} in Upgrades.`;
 
-  return `Need $${Math.max(0, module.purchaseCost - money).toFixed(2)} more for $${module.purchaseCost.toFixed(2)}.`;
+  return `Need ${formatCompactCurrency(Math.max(0, module.purchaseCost - money))} more for ${formatCompactCurrency(module.purchaseCost)}.`;
 }
 
 /**

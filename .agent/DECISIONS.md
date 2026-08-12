@@ -509,3 +509,37 @@
 - **Reversal condition:** Expand or replace the file pattern only when a new
   committed verifier probe has a documented execution model and equivalent
   static/browser evidence.
+
+## D-030 — Compact money summaries and Inspect decision order
+
+- **Decision:** One small currency presentation policy serves non-accounting
+  HUD, card, target, quote, and settlement summaries. A compact value shows
+  cents by default and promotes itself to mills when it needs that precision;
+  an explicitly additive settlement row promotes its related accounting
+  equation together. Details, Inspect comparison/accounting, and
+  ledger-adjacent disclosures explicitly remain mill-precise.
+- **Screen-order boundary:** Inspect keeps the existing configuration panel
+  and comparison component, but its first diagnostic content is a compact
+  dominant-bottleneck, baseline-delta, and latest-causal-evidence strip.
+  First-session guidance, upgrade feedback, and time controls follow it rather
+  than displacing the current decision. No command, Worker state, persistence,
+  simulation calculation, topology, or money arithmetic changes.
+- **Responsive boundary:** Header controls retain their established accessible
+  names while their short visible labels, intrinsic resource columns, 44px
+  minima, and bottom-tab truncation prevent enlarged text from fragmenting
+  words or creating horizontal overflow. Bottom-tab scroll positions remain
+  per-tab presentation state.
+- **Reason:** The same live money appeared with local formatting rules across
+  cards, HUD, targets, and settlement text, while Inspect's first viewport
+  buried the current bottleneck/baseline/evidence under general guidance.
+  A shared formatter and one existing comparison surface remove only that
+  demonstrated drift.
+- **Evidence policy:** Currency unit coverage locks cent/mill and signed
+  equation behavior. Pinned command-deck browser coverage captures every tab
+  for starter and expansion at 320×693 and 393×742, checks target/overflow and
+  per-tab scroll geometry, and captures the Inspect strip at 200% text with
+  reduced motion. Retained Details focus, glyph/status, warnings, first-session,
+  persistence, PWA, Career, and canonical suites remain required.
+- **Reversal condition:** Replace this policy only with a demonstrated
+  accounting-display requirement that preserves an equally explicit exact-value
+  route and the same portrait/reduced-motion evidence.

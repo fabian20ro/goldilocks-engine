@@ -32,3 +32,24 @@ export function formatCurrency(
     precision,
   )}`;
 }
+
+/**
+ * Shared compact presentation policy: use cents until a displayed value or
+ * its related accounting equation needs mills. Callers that show a single
+ * summary can omit `relatedAmounts`; settlements and projections pass their
+ * complete equation so every displayed term remains legible together.
+ */
+export function formatCompactCurrency(
+  amount: number,
+  relatedAmounts: readonly number[] = [],
+): string {
+  return formatCurrency(
+    amount,
+    currencyDisplayPrecision([amount, ...relatedAmounts]),
+  );
+}
+
+/** Exact Details, Inspect, and ledger-adjacent accounting remains mill-based. */
+export function formatExactCurrency(amount: number): string {
+  return formatCurrency(amount, 3);
+}

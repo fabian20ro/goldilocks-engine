@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   currencyDisplayPrecision,
+  formatCompactCurrency,
   formatCurrency,
+  formatExactCurrency,
   formatCurrencyMagnitude,
 } from "./currency";
 
@@ -25,6 +27,19 @@ describe("currency equation formatting", () => {
     expect(formatCurrencyMagnitude(0.005, precision)).toBe("0.005");
     expect(formatCurrency(-0.005, precision)).toBe("-$0.005");
     expect(formatCurrency(0.005, precision)).toBe("$0.005");
+  });
+
+  it("uses one compact policy for isolated summaries and related equations", () => {
+    expect(formatCompactCurrency(4)).toBe("$4.00");
+    expect(formatCompactCurrency(1.4)).toBe("$1.40");
+    expect(formatCompactCurrency(0.005)).toBe("$0.005");
+    expect(formatCompactCurrency(0.01, [0.005, 0.005, -0.01])).toBe("$0.010");
+    expect(formatCompactCurrency(-0.01, [0.005, 0.005, -0.01])).toBe("-$0.010");
+  });
+
+  it("keeps Details and ledger disclosures explicitly mill-precise", () => {
+    expect(formatExactCurrency(4)).toBe("$4.000");
+    expect(formatExactCurrency(-0.005)).toBe("-$0.005");
   });
 
   it("keeps all reachable three-decimal paid/unpaid and gross/net partitions additive", () => {

@@ -38,6 +38,54 @@ async function assertPortrait(page: Page) {
   expect(small).toEqual([]);
 }
 
+async function assertTabScrollContract(
+  page: Page,
+  destination: (typeof tabs)[number],
+) {
+  const region = page.locator(".app-scroll-region");
+  await region.evaluate((element) => {
+    element.scrollTop = Math.min(
+      180,
+      element.scrollHeight - element.clientHeight,
+    );
+  });
+  const saved = await region.evaluate((element) => element.scrollTop);
+  expect(saved).toBeGreaterThan(0);
+
+  await openTab(page, destination);
+  await expect
+    .poll(() => region.evaluate((element) => element.scrollTop))
+    .toBe(0);
+  await openTab(page, "Build");
+  await expect
+    .poll(() => region.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0);
+}
+
+async function assertInspectPriority(page: Page) {
+  const priority = page.getByTestId("inspect-priority");
+  await expect(priority).toContainText("Dominant bottleneck");
+  await expect(priority).toContainText("Baseline delta");
+  await expect(priority).toContainText("Latest causal evidence");
+  const order = await page.evaluate(() => {
+    const main = document.querySelector(".main-content");
+    const priority = document.querySelector(".inspect-priority");
+    const gauges = document.querySelector(".instrument-grid");
+    const guide = document.querySelector(".first-session-guide");
+    const top = (element: Element | null) =>
+      element?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY;
+    return {
+      mainTop: top(main),
+      priority: top(priority),
+      gauges: top(gauges),
+      guide: top(guide),
+    };
+  });
+  expect(order.priority).toBeGreaterThanOrEqual(order.mainTop);
+  expect(order.priority).toBeLessThan(order.gauges);
+  expect(order.priority).toBeLessThan(order.guide);
+}
+
 async function assertInitialGeometry(page: Page) {
   expect(
     await page
@@ -175,6 +223,7 @@ for (const viewport of [
       await assertPortrait(page);
       if (tab === "Career")
         await assertCareerControlGeometry(page, viewport.width);
+      if (tab === "Inspect") await assertInspectPriority(page);
       await page.screenshot({
         path: `test-results/command-deck/${viewport.width}-starter-${tab.toLowerCase()}.png`,
       });
@@ -194,12 +243,44 @@ for (const viewport of [
       await assertPortrait(page);
       if (tab === "Career")
         await assertCareerControlGeometry(page, viewport.width);
+      if (tab === "Inspect") await assertInspectPriority(page);
       await page.screenshot({
         path: `test-results/command-deck/${viewport.width}-expanded-${tab.toLowerCase()}.png`,
       });
     }
   });
 }
+
+test("bottom tabs retain their own scroll position instead of inheriting another tab", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 393, height: 742 });
+  await page.goto("/");
+  await assertTabScrollContract(page, "Jobs");
+});
+
+test("Inspect priority remains readable with reduced motion at 200 percent text", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 693 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  await page.addStyleTag({
+    content: ":root { font-size: 200% !important; }",
+  });
+  await openTab(page, "Inspect");
+  await assertInspectPriority(page);
+  await page.getByRole("button", { name: "Capture", exact: true }).click();
+  await expect(
+    page.getByLabel("Throughput compared with baseline: 0/m"),
+  ).toBeVisible();
+  await assertPortrait(page);
+  await page.getByTestId("inspect-priority").scrollIntoViewIfNeeded();
+  await expect(page.getByTestId("inspect-priority")).toBeInViewport();
+  await page.screenshot({
+    path: "test-results/command-deck/320-inspect-priority-200-percent.png",
+  });
+});
 
 test("stage details replace, restore focus, and Build/Run is presentation-only", async ({
   page,

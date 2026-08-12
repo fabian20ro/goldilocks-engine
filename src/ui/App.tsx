@@ -37,8 +37,8 @@ import {
 } from "../simulation/engine";
 import {
   currencyDisplayPrecision,
-  formatCurrency,
-  formatCurrencyMagnitude,
+  formatCompactCurrency,
+  formatExactCurrency,
 } from "../simulation/currency";
 import type {
   CareerRoute,
@@ -355,7 +355,7 @@ function ResourceStrip({ state }: { state: SimulationState }) {
     {
       glyph: glyphs.resource.money,
       label: "Money",
-      value: `$${formatNumber(state.resources.money)}`,
+      value: formatCompactCurrency(state.resources.money),
     },
     {
       glyph: glyphs.resource.time,
@@ -687,7 +687,7 @@ function ModuleCard({
       ? "EQUIPPED"
       : owned
         ? "OWNED · DETAILS / DRAG"
-        : `LOCKED · BUY $${module.purchaseCost.toFixed(2)}`);
+        : `LOCKED · BUY ${formatCompactCurrency(module.purchaseCost)}`);
   return (
     <button
       type="button"
@@ -937,7 +937,9 @@ function Pipeline({
             </div>
             <div>
               <dt>Operating cost</dt>
-              <dd>${getModule(detail.moduleId).costPerJob.toFixed(3)}/job</dd>
+              <dd>
+                {formatExactCurrency(getModule(detail.moduleId).costPerJob)}/job
+              </dd>
             </div>
           </dl>
           <p>
@@ -1075,8 +1077,8 @@ function ModuleLibrary({
                           : entry.owned
                             ? "OWNED · DETAILS / DRAG"
                             : entry.affordable
-                              ? `AFFORDABLE · BUY $${entry.module.purchaseCost.toFixed(2)}`
-                              : `LOCKED · BUY $${entry.module.purchaseCost.toFixed(2)}`
+                              ? `AFFORDABLE · BUY ${formatCompactCurrency(entry.module.purchaseCost)}`
+                              : `LOCKED · BUY ${formatCompactCurrency(entry.module.purchaseCost)}`
                       }
                       requirement={entry.requirement}
                       onSelect={onOpenDetails}
@@ -1380,20 +1382,24 @@ function MoneyLoop({
   const settlementUnpaidCost = settlement
     ? Math.max(0, settlement.operatingCost - settlementPaidCost)
     : 0;
-  const settlementCurrencyPrecision = currencyDisplayPrecision(
-    settlement
-      ? [
-          settlement.lockedGrossQuote,
-          settlement.grossPayout,
-          settlement.operatingCost,
-          settlementNet,
-          settlementPaidCost,
-          settlementUnpaidCost,
-        ]
-      : [],
-  );
-  const settlementCurrency = (amount: number) =>
-    formatCurrencyMagnitude(amount, settlementCurrencyPrecision);
+  // A quote card is a compact summary, so each figure earns mill precision
+  // only when that figure needs it. Settlement rows below remain one related
+  // accounting equation and therefore share their precision.
+  const quoteMoney = (amount: number) => formatCompactCurrency(amount);
+  const settlementAmounts = settlement
+    ? [
+        settlement.lockedGrossQuote,
+        settlement.grossPayout,
+        settlement.operatingCost,
+        settlementNet,
+        settlementPaidCost,
+        settlementUnpaidCost,
+      ]
+    : [];
+  const settlementCurrencyPrecision =
+    currencyDisplayPrecision(settlementAmounts);
+  const settlementMoney = (amount: number) =>
+    formatCompactCurrency(amount, settlementAmounts);
   const targetOptions = modules
     .filter(
       (item) =>
@@ -1434,15 +1440,15 @@ function MoneyLoop({
           <span className="eyebrow">Selected-work live quote</span>
           <h3 id="money-loop-title">{workload.name}</h3>
           <p>
-            ${quote.grossQuote.toFixed(2)} gross if accepted now · $
-            {formatNumber(offerMetrics.operatingCost, 3)} estimated operating
-            cost · {offer.expectedNet >= 0 ? "+" : "−"}$
-            {Math.abs(offer.expectedNet).toFixed(2)} expected net at{" "}
+            {quoteMoney(quote.grossQuote)} gross if accepted now ·{" "}
+            {quoteMoney(offerMetrics.operatingCost)} estimated operating cost ·{" "}
+            {offer.expectedNet >= 0 ? "+" : ""}
+            {quoteMoney(offer.expectedNet)} expected net at{" "}
             {Math.round(offerMetrics.reliability * 100)}% modeled delivery.
             Demand {quote.demandPercent}% · {quote.trend}.{" "}
             {offer.guaranteedFailure
-              ? "Guaranteed failure in this configuration: $0 expected gross."
-              : "Failed jobs receive $0 gross."}
+              ? `Guaranteed failure in this configuration: ${quoteMoney(0)} expected gross.`
+              : `Failed jobs receive ${quoteMoney(0)} gross.`}
           </p>
           <small>
             {quote.reason} Actual cost is locked only by the configuration that
@@ -1457,19 +1463,19 @@ function MoneyLoop({
           {settlement ? (
             <>
               <strong className={settlementNet < 0 ? "bad" : "good"}>
-                {settlementNet >= 0 ? "+" : "−"}$
-                {settlementCurrency(settlementNet)} net
+                {settlementNet >= 0 ? "+" : ""}
+                {settlementMoney(settlementNet)} net
               </strong>
               <small>
                 {getWorkload(settlement.workloadId).name} · task{" "}
-                {settlement.taskId} · $
-                {settlementCurrency(settlement.lockedGrossQuote)} locked gross ·{" "}
-                {settlement.completed} paid · {settlement.failed} failed · $
-                {settlementCurrency(settlement.grossPayout)} settled gross − $
-                {settlementCurrency(settlement.operatingCost)} configured actual
+                {settlement.taskId} ·{" "}
+                {settlementMoney(settlement.lockedGrossQuote)} locked gross ·{" "}
+                {settlement.completed} paid · {settlement.failed} failed ·{" "}
+                {settlementMoney(settlement.grossPayout)} settled gross −{" "}
+                {settlementMoney(settlement.operatingCost)} configured actual
                 costs
                 {settlementUnpaidCost > 0
-                  ? ` · $${settlementCurrency(settlementPaidCost)} paid · $${settlementCurrency(settlementUnpaidCost)} unpaid because cash cannot go below $0`
+                  ? ` · ${settlementMoney(settlementPaidCost)} paid · ${settlementMoney(settlementUnpaidCost)} unpaid because cash cannot go below ${formatCompactCurrency(0)}`
                   : " · paid in full"}
                 {settlementCurrencyPrecision === 3
                   ? " · Three decimals shown to preserve sub-cent accounting."
@@ -1488,10 +1494,11 @@ function MoneyLoop({
                   <strong>Failure record:</strong>{" "}
                   {failureEvent?.directCause ??
                     "Delivery did not clear the modeled reliability check."}{" "}
-                  Gross $0; configured cost remains visible above. Recovery
-                  forecast: {recoveryQuote?.trend ?? "steady"} quote $
-                  {recoveryQuote?.grossQuote.toFixed(2) ?? "0.00"} after time
-                  recovery. No recovery action was applied.
+                  Gross {formatCompactCurrency(0)}; configured cost remains
+                  visible above. Recovery forecast:{" "}
+                  {recoveryQuote?.trend ?? "steady"} quote{" "}
+                  {formatCompactCurrency(recoveryQuote?.grossQuote ?? 0)}
+                  after time recovery. No recovery action was applied.
                 </p>
               ) : null}
             </>
@@ -1505,10 +1512,10 @@ function MoneyLoop({
           <span className="eyebrow">Next useful target</span>
           {target ? (
             <strong>
-              {target.name} · ${target.purchaseCost.toFixed(2)} ·{" "}
+              {target.name} · {formatCompactCurrency(target.purchaseCost)} ·{" "}
               {state.resources.money >= target.purchaseCost
                 ? "affordable now"
-                : `$${(target.purchaseCost - state.resources.money).toFixed(2)} remaining`}
+                : `${formatCompactCurrency(target.purchaseCost - state.resources.money)} remaining`}
             </strong>
           ) : targetOptions.length ? (
             <strong>No target selected</strong>
@@ -1529,7 +1536,7 @@ function MoneyLoop({
                 <option value="">No target</option>
                 {targetOptions.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {item.name} · ${item.purchaseCost.toFixed(2)}
+                    {item.name} · {formatCompactCurrency(item.purchaseCost)}
                   </option>
                 ))}
               </select>
@@ -1543,8 +1550,9 @@ function MoneyLoop({
         ) : null}
       </section>
       <p className="earnings-total">
-        Run totals: ${state.jobs.grossEarned.toFixed(2)} gross earned · $
-        {state.jobs.operatingCostsPaid.toFixed(2)} operating costs paid.
+        Run totals: {formatCompactCurrency(state.jobs.grossEarned)} gross earned
+        · {formatCompactCurrency(state.jobs.operatingCostsPaid)} operating costs
+        paid.
       </p>
     </section>
   );
@@ -1633,7 +1641,7 @@ function RigUpgradeCard({
         <strong className="upgrade-price">
           {item.purchaseCost === 0
             ? "STARTER"
-            : `$${item.purchaseCost.toFixed(2)}`}
+            : formatCompactCurrency(item.purchaseCost)}
         </strong>
       </div>
       <p>{item.description}</p>
@@ -1682,7 +1690,7 @@ function RigUpgradeCard({
           </div>
           <div>
             <dt>Maintenance</dt>
-            <dd>${item.maintenance.toFixed(2)}</dd>
+            <dd>{formatExactCurrency(item.maintenance)}</dd>
           </div>
           <div>
             <dt>Versus equipped</dt>
@@ -1705,7 +1713,7 @@ function RigUpgradeCard({
           aria-describedby={reasonId}
           onClick={() => command({ type: "BUY_HARDWARE", hardwareId: item.id })}
         >
-          Buy {item.name} for ${item.purchaseCost.toFixed(2)}
+          Buy {item.name} for {formatCompactCurrency(item.purchaseCost)}
         </button>
       ) : equipped ? (
         <button type="button" className="owned-action" disabled>
@@ -1730,8 +1738,8 @@ function RigUpgradeCard({
           : affordable
             ? "Affordable now. Buying creates ownership; equipping is a separate choice."
             : !timeReady
-              ? `Need $${Math.max(0, item.purchaseCost - state.resources.money).toFixed(2)} more at current funds. Order window opens at simulated hour ${item.availableAfterHour}; current age ${getSimulationAgeHours(state).toFixed(1)}h. Money alone cannot bypass this catalogue pacing gate.`
-              : `Need $${(item.purchaseCost - state.resources.money).toFixed(2)} more. Queue successful jobs; no partial or duplicate deduction occurs.`}
+              ? `Need ${formatCompactCurrency(Math.max(0, item.purchaseCost - state.resources.money))} more at current funds. Order window opens at simulated hour ${item.availableAfterHour}; current age ${getSimulationAgeHours(state).toFixed(1)}h. Money alone cannot bypass this catalogue pacing gate.`
+              : `Need ${formatCompactCurrency(item.purchaseCost - state.resources.money)} more. Queue successful jobs; no partial or duplicate deduction occurs.`}
       </p>
     </article>
   );
@@ -1784,7 +1792,7 @@ function ModuleUpgradeCard({
           </h3>
         </div>
         <strong className="upgrade-price">
-          ${item.purchaseCost.toFixed(2)}
+          {formatCompactCurrency(item.purchaseCost)}
         </strong>
       </div>
       <p>{item.description}</p>
@@ -1858,7 +1866,7 @@ function ModuleUpgradeCard({
           </div>
           <div>
             <dt>Operating cost</dt>
-            <dd>${item.costPerJob.toFixed(3)}/job</dd>
+            <dd>{formatExactCurrency(item.costPerJob)}/job</dd>
           </div>
         </dl>
         {comparison ? (
@@ -1883,7 +1891,7 @@ function ModuleUpgradeCard({
           aria-describedby={reasonId}
           onClick={() => command({ type: "BUY_MODULE", moduleId: item.id })}
         >
-          Buy {item.name} for ${item.purchaseCost.toFixed(2)}
+          Buy {item.name} for {formatCompactCurrency(item.purchaseCost)}
         </button>
       ) : (
         <button
@@ -1945,7 +1953,7 @@ function PipelineExpansionCard({
           </h3>
         </div>
         <strong className="upgrade-price">
-          ${spec.purchaseCost.toFixed(2)}
+          {formatCompactCurrency(spec.purchaseCost)}
         </strong>
       </div>
       <div className="capacity-route" aria-label="Pipeline capacity change">
@@ -1985,7 +1993,7 @@ function PipelineExpansionCard({
             command({ type: "BUY_EXPANSION", expansionId: spec.id })
           }
         >
-          Buy {spec.name} for ${spec.purchaseCost.toFixed(2)}
+          Buy {spec.name} for {formatCompactCurrency(spec.purchaseCost)}
         </button>
       ) : !active ? (
         <button
@@ -2013,8 +2021,10 @@ function PipelineExpansionCard({
       )}
       {!owned ? (
         <p className="purchase-reason">
-          ${Math.min(state.resources.money, spec.purchaseCost).toFixed(2)} / $
-          {spec.purchaseCost.toFixed(2)} funded ·{" "}
+          {formatCompactCurrency(
+            Math.min(state.resources.money, spec.purchaseCost),
+          )}{" "}
+          / {formatCompactCurrency(spec.purchaseCost)} funded ·{" "}
           {Math.round(
             Math.min(100, (state.resources.money / spec.purchaseCost) * 100),
           )}
@@ -2053,7 +2063,7 @@ function UpgradesView({
             <h2 id="upgrades-title">Upgrades</h2>
           </div>
           <strong className="store-money">
-            ${state.resources.money.toFixed(2)} available
+            {formatCompactCurrency(state.resources.money)} available
           </strong>
         </div>
         <UpgradeRoute />
@@ -2220,6 +2230,8 @@ function JobsView({
   );
   const queueTenFirst = queueTenQuotes[0] ?? 0;
   const queueTenLast = queueTenQuotes.at(-1) ?? 0;
+  const queueTenMoney = (amount: number) =>
+    formatCompactCurrency(amount, queueTenQuotes);
   const queueStarter = () => {
     commandBatch([
       { type: "SET_WORKLOAD", workloadId: "interactive-chat" },
@@ -2258,12 +2270,12 @@ function JobsView({
               <strong>{displayedWorkload.name}</strong>
               <em>{displayedWorkload.description}</em>
             </span>
-            <b>${selectedQuote.grossQuote.toFixed(2)}</b>
+            <b>{formatCompactCurrency(selectedQuote.grossQuote)}</b>
           </div>
           <p>
             {Math.round(selectedMetrics.reliability * 100)}% modeled delivery ·{" "}
-            {selectedOffer.expectedNet >= 0 ? "+" : "−"}$
-            {Math.abs(selectedOffer.expectedNet).toFixed(2)} expected after
+            {selectedOffer.expectedNet >= 0 ? "+" : ""}
+            {formatCompactCurrency(selectedOffer.expectedNet)} expected after
             cost. A failed delivery pays $0 gross.
           </p>
           {observingStarter ? (
@@ -2289,11 +2301,12 @@ function JobsView({
           <details>
             <summary>Quote, cost, and uncertainty details</summary>
             <p>
-              Queue-time gross quote ${selectedQuote.grossQuote.toFixed(2)} ·
-              configured operating cost $
-              {selectedMetrics.operatingCost.toFixed(3)}. Success pays the
-              locked quote; failure pays $0 gross. Demand{" "}
-              {selectedQuote.demandPercent}% {selectedQuote.trend}.{" "}
+              Queue-time gross quote{" "}
+              {formatExactCurrency(selectedQuote.grossQuote)} · configured
+              operating cost{" "}
+              {formatExactCurrency(selectedMetrics.operatingCost)}. Success pays
+              the locked quote; failure pays {formatExactCurrency(0)} gross.
+              Demand {selectedQuote.demandPercent}% {selectedQuote.trend}.{" "}
               {selectedQuote.reason}
             </p>
           </details>
@@ -2333,7 +2346,7 @@ function JobsView({
                   heldForStarter
                     ? `${workload.name} is available to compare, but the first-session route queues one Interactive Chat job before workload selection.`
                     : unlock.unlocked
-                      ? `${workload.name}. Current quote $${quote.grossQuote.toFixed(2)}. Estimated cost $${metrics.operatingCost.toFixed(3)}. ${offer.guaranteedFailure ? "Guaranteed failure; expected gross is $0." : `Expected net ${estimatedNet >= 0 ? "plus" : "minus"} $${Math.abs(estimatedNet).toFixed(2)} at ${Math.round(metrics.reliability * 100)} percent modeled delivery.`} Demand ${quote.demandPercent} percent, ${quote.trend}.`
+                      ? `${workload.name}. Current quote ${formatCompactCurrency(quote.grossQuote)}. Estimated cost ${formatCompactCurrency(metrics.operatingCost, [quote.grossQuote, metrics.operatingCost, estimatedNet])}. ${offer.guaranteedFailure ? `Guaranteed failure; expected gross is ${formatCompactCurrency(0)}.` : `Expected net ${estimatedNet >= 0 ? "plus" : "minus"} ${formatCompactCurrency(estimatedNet)} at ${Math.round(metrics.reliability * 100)} percent modeled delivery.`} Demand ${quote.demandPercent} percent, ${quote.trend}.`
                       : `${workload.name} locked. ${unlock.requirements.join("; ")}`
                 }
                 onClick={() =>
@@ -2347,14 +2360,14 @@ function JobsView({
                     </DecorativeGlyph>{" "}
                     {workload.name} ·{" "}
                     {unlock.unlocked
-                      ? `$${quote.grossQuote.toFixed(2)} quote`
+                      ? `${formatCompactCurrency(quote.grossQuote)} quote`
                       : "LOCKED"}
                   </strong>
                   <small>
                     {unlock.unlocked
                       ? offer.guaranteedFailure
-                        ? "Not safe in this configuration: delivery pays $0 gross."
-                        : `${Math.round(metrics.reliability * 100)}% modeled delivery · ${estimatedNet >= 0 ? "+" : "−"}$${Math.abs(estimatedNet).toFixed(2)} expected after cost.`
+                        ? `Not safe in this configuration: delivery pays ${formatCompactCurrency(0)} gross.`
+                        : `${Math.round(metrics.reliability * 100)}% modeled delivery · ${estimatedNet >= 0 ? "+" : ""}${formatCompactCurrency(estimatedNet)} expected after cost.`
                       : `Requires ${unlock.requirements.join(" · ")}.`}
                   </small>
                   {unlock.unlocked && risky ? (
@@ -2378,8 +2391,8 @@ function JobsView({
               className="primary-action"
               onClick={() => command({ type: "QUEUE_JOBS", count: 10 })}
             >
-              Queue 10 · locks ${queueTenFirst.toFixed(2)} → $
-              {queueTenLast.toFixed(2)}
+              Queue 10 · locks {queueTenMoney(queueTenFirst)} →{" "}
+              {queueTenMoney(queueTenLast)}
             </button>
           ) : (
             <p className="starter-queue-note">
@@ -2433,9 +2446,9 @@ function JobsView({
             <span className="eyebrow">Active task</span>
             {state.jobs.activeTask ? (
               <strong>
-                {getWorkload(state.jobs.activeTask.workloadId).name} · $
-                {state.jobs.activeTask.lockedGrossQuote.toFixed(2)} locked ·{" "}
-                {Math.round(state.jobs.activeTask.progress * 100)}%
+                {getWorkload(state.jobs.activeTask.workloadId).name} ·{" "}
+                {formatCompactCurrency(state.jobs.activeTask.lockedGrossQuote)}{" "}
+                locked · {Math.round(state.jobs.activeTask.progress * 100)}%
               </strong>
             ) : (
               <strong>None processing</strong>
@@ -2449,8 +2462,8 @@ function JobsView({
               <ol>
                 {state.jobs.waitingTasks.slice(0, 12).map((task) => (
                   <li key={task.id}>
-                    {getWorkload(task.workloadId).name} · {task.id} · $
-                    {task.lockedGrossQuote.toFixed(2)} locked
+                    {getWorkload(task.workloadId).name} · {task.id} ·{" "}
+                    {formatCompactCurrency(task.lockedGrossQuote)} locked
                   </li>
                 ))}
               </ol>
@@ -2754,7 +2767,10 @@ function careerProjectionOutcome(
   }
 }
 
-function careerProgressSummary(projection: CareerEveningProjection): string {
+function careerProgressSummary(
+  projection: CareerEveningProjection,
+  money: (amount: number) => string,
+): string {
   const progress: string[] = [];
   if (projection.competitionProgress > 0)
     progress.push(`Cup +${projection.competitionProgress.toFixed(2)}`);
@@ -2763,7 +2779,7 @@ function careerProgressSummary(projection: CareerEveningProjection): string {
       `Deskflow build +${projection.productBuildProgress.toFixed(2)}`,
     );
   if (projection.productRevenue > 0)
-    progress.push(`Product revenue +$${projection.productRevenue.toFixed(3)}`);
+    progress.push(`Product revenue +${money(projection.productRevenue)}`);
   if (projection.maintenanceDebtReduction > 0)
     progress.push(
       `Service debt -${projection.maintenanceDebtReduction.toFixed(2)}`,
@@ -2828,7 +2844,7 @@ export function CareerView({
     projectCareerRoute(state, route.id, scheduleDraft[route.id]),
   );
   const eveningProjection = projectCareerEvening(state, scheduleDraft);
-  const compactCurrencyPrecision = currencyDisplayPrecision([
+  const compactCurrencyAmounts = [
     state.resources.money,
     career.savings,
     career.operatingCostsIncurred,
@@ -2840,10 +2856,10 @@ export function CareerView({
       projection.economicNet,
       projection.cashChange,
     ]),
-  ]);
+  ];
   const compactMoney = (amount: number) =>
-    formatCurrency(amount, compactCurrencyPrecision);
-  const exactMoney = (amount: number) => formatCurrency(amount, 3);
+    formatCompactCurrency(amount, compactCurrencyAmounts);
+  const exactMoney = (amount: number) => formatExactCurrency(amount);
   const detailRoute = routeDetails
     ? (bedroomCareerRoutes.find((route) => route.id === routeDetails) ?? null)
     : null;
@@ -3133,7 +3149,10 @@ export function CareerView({
               <dd>
                 {completionFeedback.projection.cashChange >= 0 ? "+" : ""}
                 {compactMoney(completionFeedback.projection.cashChange)} ·{" "}
-                {careerProgressSummary(completionFeedback.projection)}
+                {careerProgressSummary(
+                  completionFeedback.projection,
+                  compactMoney,
+                )}
               </dd>
             </div>
             <div>
@@ -3174,7 +3193,7 @@ export function CareerView({
             <article>
               <span className="eyebrow">Freelance / cash now</span>
               <strong>
-                ${career.freelanceGross.toFixed(3)} gross from{" "}
+                {compactMoney(career.freelanceGross)} gross from{" "}
                 {career.freelanceHours.toFixed(2)}h
               </strong>
               <p>
@@ -3207,7 +3226,7 @@ export function CareerView({
               <span className="eyebrow">One product / durable revenue</span>
               <strong>
                 {career.product.released
-                  ? `Released · $${career.product.lifetimeRevenue.toFixed(3)} revenue`
+                  ? `Released · ${compactMoney(career.product.lifetimeRevenue)} revenue`
                   : `${career.product.buildProgress.toFixed(2)} / 8.00 build`}
               </strong>
               <p>
@@ -3280,7 +3299,7 @@ export function CareerView({
             </div>
             <div>
               <dt>Paid evidence</dt>
-              <dd>${career.evaluation.evaluationSpend.toFixed(3)}</dd>
+              <dd>{exactMoney(career.evaluation.evaluationSpend)}</dd>
             </div>
           </dl>
           <div className="career-actions evaluation-actions">
@@ -3567,8 +3586,8 @@ export function CareerView({
             <p className="offline-report" role="status">
               Offline report:{" "}
               {career.offlinePolicy.lastReport.appliedHours.toFixed(2)}h applied
-              · ${career.offlinePolicy.lastReport.gross.toFixed(3)} gross · $
-              {career.offlinePolicy.lastReport.configuredCost.toFixed(3)}{" "}
+              · {exactMoney(career.offlinePolicy.lastReport.gross)} gross ·{" "}
+              {exactMoney(career.offlinePolicy.lastReport.configuredCost)}{" "}
               configured cost · {career.offlinePolicy.lastReport.stoppedReason}.
             </p>
           ) : null}
@@ -3755,6 +3774,74 @@ function Comparison({
   );
 }
 
+function InspectPriority({ state }: { state: SimulationState }) {
+  const latestEvidence = [...state.ledger]
+    .reverse()
+    .find(
+      (event) =>
+        event.directCause || event.contributingCondition || event.causal,
+    );
+  const latestCause =
+    latestEvidence?.directCause ??
+    latestEvidence?.causal?.directCauses[0] ??
+    latestEvidence?.contributingCondition ??
+    null;
+  const bottleneckSlot = getSlot(state.metrics.bottleneckSlotId);
+
+  return (
+    <section
+      className="inspect-priority"
+      aria-label="Current diagnostic priorities"
+      data-testid="inspect-priority"
+    >
+      <article>
+        <h3>
+          <DecorativeGlyph>{glyphs.status.warning}</DecorativeGlyph> Dominant
+          bottleneck
+        </h3>
+        <strong>{state.metrics.dominantBottleneck}</strong>
+        <small>{bottleneckSlot.name} is the current constrained stage.</small>
+      </article>
+      <article>
+        <h3>
+          <DecorativeGlyph>{glyphs.status.active}</DecorativeGlyph> Baseline
+          delta
+        </h3>
+        {state.baselineMetrics ? (
+          <strong>
+            <ComparisonDelta
+              label="Throughput compared with baseline"
+              current={state.metrics.throughputPerMinute}
+              baseline={state.baselineMetrics.throughputPerMinute}
+              suffix="/m"
+              digits={1}
+            />
+          </strong>
+        ) : (
+          <strong>Capture a baseline</strong>
+        )}
+        <small>
+          {state.baselineMetrics
+            ? `${state.baselineLabel ?? "Saved baseline"} remains available in exact comparison.`
+            : "Save this configuration before testing a change."}
+        </small>
+      </article>
+      <article>
+        <h3>
+          <DecorativeGlyph>{glyphs.resource.evidence}</DecorativeGlyph> Latest
+          causal evidence
+        </h3>
+        <strong>{latestCause ?? "No causal record yet"}</strong>
+        <small>
+          {latestEvidence
+            ? `Recorded event ${latestEvidence.id}; see the recent event log for full accounting details.`
+            : "Queue and settle a job to record a configuration result."}
+        </small>
+      </article>
+    </section>
+  );
+}
+
 function InspectView({
   state,
   command,
@@ -3767,6 +3854,7 @@ function InspectView({
   onCancelDelete,
   onConfirmDelete,
   onUndoDelete,
+  supplemental,
 }: {
   state: SimulationState;
   command: (command: SimulationCommand) => void;
@@ -3779,6 +3867,7 @@ function InspectView({
   onCancelDelete: () => void;
   onConfirmDelete: () => void;
   onUndoDelete: () => void;
+  supplemental?: ReactNode;
 }) {
   return (
     <>
@@ -3799,6 +3888,10 @@ function InspectView({
             Capture
           </button>
         </div>
+        <InspectPriority state={state} />
+        {supplemental ? (
+          <div className="inspect-supplemental">{supplemental}</div>
+        ) : null}
         <div className="instrument-grid" aria-label="Live instrument gauges">
           <StatusGauge
             label="Memory pressure"
@@ -4500,6 +4593,13 @@ export function App() {
       onTimeSpeedChange={setTimeSpeed}
     />
   );
+  const inspectSupplemental = (
+    <>
+      <UpgradeFeedback state={state} />
+      <FirstSessionGuide state={state} />
+      {secondaryControls}
+    </>
+  );
 
   return (
     <div
@@ -4522,22 +4622,26 @@ export function App() {
               <button
                 type="button"
                 className="help-toggle"
+                aria-label="Help / Quick start"
                 aria-expanded={showTutorial}
                 aria-controls="quick-start-title"
                 onClick={() => {
                   setShowTutorial(true);
                 }}
               >
-                Help / Quick start
+                Help
               </button>
               <div className="animation-control">
                 <button
                   type="button"
                   className="motion-toggle"
+                  aria-label={
+                    reducedMotion ? "Animations off" : "Animations on"
+                  }
                   aria-pressed={reducedMotion}
                   onClick={() => setReducedMotion((value) => !value)}
                 >
-                  {reducedMotion ? "Animations off" : "Animations on"}
+                  {reducedMotion ? "Motion off" : "Motion on"}
                 </button>
                 <small>Visual only</small>
               </div>
@@ -4547,9 +4651,9 @@ export function App() {
         </header>
 
         <main id="main-content" className={`main-content ${tab}-content`}>
-          {tab !== "build" ? secondaryControls : null}
-          <FirstSessionGuide state={state} />
-          <UpgradeFeedback state={state} />
+          {tab !== "build" && tab !== "inspect" ? secondaryControls : null}
+          {tab !== "inspect" ? <FirstSessionGuide state={state} /> : null}
+          {tab !== "inspect" ? <UpgradeFeedback state={state} /> : null}
 
           {tab === "build" ? (
             <BuildView
@@ -4615,6 +4719,7 @@ export function App() {
               onCancelDelete={() => setPendingDeleteId(null)}
               onConfirmDelete={confirmPresetDelete}
               onUndoDelete={undoPresetDelete}
+              supplemental={inspectSupplemental}
             />
           )}
           {showTutorial ? <QuickStart onDismiss={dismissTutorial} /> : null}
@@ -4632,7 +4737,7 @@ export function App() {
             onClick={() => switchTab(id)}
           >
             <DecorativeGlyph>{icon}</DecorativeGlyph>
-            {label}
+            <span className="tab-label">{label}</span>
             {id === "build" && selectedName ? <small>1 pending</small> : null}
           </button>
         ))}
