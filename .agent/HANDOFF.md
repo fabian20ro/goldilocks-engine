@@ -1,4 +1,4 @@
-# Candidate handoff — round 063 Phase 3 Build/Upgrades density reduction
+# Candidate handoff — round 064 Phase 3 selected-stage and tray repairs
 
 ## Implemented behavior summary
 
@@ -10,9 +10,9 @@
   ownership, current money, installed state, exact remaining money, and Build
   compatibility.
 - Each section defaults to three cards. `Show every module (17)` exposes every
-  exact catalog item; Build prioritizes the selected stage's installed module
-  and compatible next choices, while Upgrades keeps a newly paid owned module
-  at its explicit `Place in Build` handoff.
+  exact catalog item; selected Build ranks the installed module first and
+  compatible owned choices before incompatible modules. Upgrades retains its
+  paid-owned `Place in Build` handoff priority.
 - Locked and affordable cards expose one existing Build Details surface. Owned
   cards retain explicit Details/drag and named `Place in Build`; they do not
   begin placement on selection. Repeated remove/bypass actions remain only in
@@ -22,7 +22,9 @@
   inventory framework was added.
 - Pending-placement tray, compatible snap, Cancel/Escape, origin focus,
   tab-cancellation, keyboard selection, touch drag, persistence, Worker
-  commands, PWA scope, and one-pipeline topology remain unchanged.
+  commands, PWA scope, and one-pipeline topology remain unchanged. On portrait
+  widths through 31rem, the existing sticky tray stacks copy above its full
+  width Cancel target so 200%-text placement remains visible and cancellable.
 - Workstation Expansion I remains `3 → 6` process capacity. Its Process 4–6
   slots remain explicitly empty/bypassed and carry no compute or memory claim.
 
@@ -40,13 +42,14 @@
 
 ## Verifier findings addressed
 
-- Round 062 accepted the parent baseline; it had no unresolved findings.
-- No new verifier report exists for Phase 3 yet. The candidate preserves prior
-  V-001–V-065 regressions and adds Phase 3-owned selector/browser coverage;
-  independent verification must evaluate this frozen candidate.
-- The retained V-004 touch-drawer probe now scopes its unchanged horizontal
-  pan assertion to the `Owned` drawer. Phase 3 deliberately introduces its
-  sibling `Locked` drawer; the probe no longer relies on a one-drawer topology.
+- V-066: `selectModuleInventory` now ranks a selected stage's compatible owned
+  placement choices before incompatible owned modules; paid-owned preference
+  is retained only for the no-stage Upgrades route.
+- V-067: the existing placement tray uses a narrow-portrait stack so its copy
+  and Cancel action have separate full-width rows at 200% text, with no tray
+  scroll or changed cancellation semantics.
+- Immutable round-063 unit and browser probes remain unchanged. Candidate
+  selector and 320/393 200%-text cancellation coverage exercise the repairs.
 
 ## Setup, startup, and verification commands
 
@@ -84,9 +87,9 @@ E2E_PORT=4255 ./scripts/verify
 Focused Phase 3 checks:
 
 ```sh
-npm test -- src/ui/moduleInventory.test.ts src/ui/commandDeck.test.tsx --coverage.enabled=false --reporter=dot
-E2E_PORT=4256 npm run test:e2e -- tests/e2e/phase-3-density.spec.ts --reporter=dot
-E2E_PORT=4257 npm run test:e2e -- tests/e2e/first-session.spec.ts tests/e2e/game.spec.ts tests/e2e/round-012-upgrades.spec.ts tests/e2e/round-015-expansion.spec.ts --reporter=dot
+npm test -- src/ui/moduleInventory.test.ts src/ui/verifierRound063.test.ts --coverage.enabled=false --reporter=dot
+E2E_PORT=4256 npm run test:e2e -- tests/e2e/verifier-round-063.spec.ts tests/e2e/phase-3-density.spec.ts --reporter=dot
+E2E_PORT=4257 npm run test:e2e -- tests/e2e/first-session.spec.ts tests/e2e/game.spec.ts tests/e2e/round-015-expansion.spec.ts tests/e2e/verifier-round-040.spec.ts tests/e2e/verifier-round-061.spec.ts --reporter=dot
 ```
 
 The active Pages package is `https://fabian20ro.github.io/goldlocks-engine/`.
@@ -105,6 +108,8 @@ its Mach-port rendezvous server; no browser check is silently skipped.
 ## Important architectural decisions
 
 - D-027: one module-specific pure selector, not a general inventory framework.
+- D-028: selected Build compatibility ranks before incompatible paid ownership;
+  the narrow-portrait sticky placement tray stacks copy and cancellation.
 - The selected Build stage is App-session presentation state only. Worker state
   remains authority for ownership, money, topology, metrics, commands, and
   persistence.
@@ -123,23 +128,19 @@ its Mach-port rendezvous server; no browser check is silently skipped.
 
 ## Checks executed before handoff
 
-- `npm run typecheck` — pass.
-- `npm test -- src/ui/moduleInventory.test.ts src/ui/commandDeck.test.tsx --coverage.enabled=false --reporter=dot` — 8/8 pass.
-- `E2E_PORT=4508/4509/4510 npm run test:e2e -- tests/e2e/phase-3-density.spec.ts --reporter=dot` — final 5/5 pass; generated and visually inspected 100%/200% owned-small, catalogue-rich, and expanded captures for 320×693 and 393×742.
-- `E2E_PORT=4511 npm run test:e2e -- tests/e2e/first-session.spec.ts --reporter=dot` — 7/7 pass.
-- `E2E_PORT=4512 npm run test:e2e -- tests/e2e/game.spec.ts --reporter=dot` — 11/11 pass.
-- `E2E_PORT=4513 npm run test:e2e -- tests/e2e/round-012-upgrades.spec.ts --reporter=dot` — 5/5 pass before final compact-all-sections ordering adjustment; rerun is included in the canonical gate.
-- `E2E_PORT=4514 npm run test:e2e -- tests/e2e/round-015-expansion.spec.ts --reporter=dot` — 4/4 pass before final compact-all-sections ordering adjustment; rerun is included in the canonical gate.
-- `E2E_PORT=4515 npm run test:e2e -- tests/e2e/phase-3-density.spec.ts tests/e2e/first-session.spec.ts tests/e2e/game.spec.ts --reporter=dot` — 23/23 pass after final compact-all-sections behavior.
-- `E2E_PORT=4518 npm run test:e2e -- tests/e2e/verifier-round-004.spec.ts --reporter=dot` — 2/2 pass after scoping the retained touch-pan probe to the Owned drawer.
-- `E2E_PORT=4520 ./scripts/verify` — pass: clean setup, format, lint,
-  typecheck, 41 files/191 unit tests, numeric/first-session/20,001-upgrade/
-  progression/Career/evaluation balances, production build, zero-vulnerability
-  production audit, 194/194 root Playwright tests, and 2/2 Pages Playwright
-  tests.
+- `npm test -- src/ui/moduleInventory.test.ts src/ui/verifierRound063.test.ts --coverage.enabled=false --reporter=dot` — 2 files, 6/6 pass.
+- `E2E_PORT=4873 npm run test:e2e -- tests/e2e/verifier-round-063.spec.ts --reporter=dot` — 2/2 pass: exact V-067 200%-text tray geometry at 320×693 and 393×742.
+- `E2E_PORT=4874 npm run test:e2e -- tests/e2e/phase-3-density.spec.ts --reporter=dot` — 7/7 pass; visually inspected generated 320×693 and 393×742 200%-text placement-tray captures, plus retained 100%/200% Phase 3 portraits.
+- `E2E_PORT=4875 npm run test:e2e -- tests/e2e/first-session.spec.ts tests/e2e/game.spec.ts tests/e2e/round-015-expansion.spec.ts tests/e2e/verifier-round-040.spec.ts tests/e2e/verifier-round-061.spec.ts --reporter=dot` — 27/27 pass.
+- `E2E_PORT=4876 ./scripts/verify` — completed successfully from fresh setup:
+  format, lint, typecheck, 42 files/193 unit tests, numeric/first-session/
+  20,001-upgrade/progression/Career/evaluation balances, production build,
+  high/critical production audit, 198/198 root Playwright tests, and 2/2 Pages
+  Playwright tests.
+- `PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright npx playwright test --list` — 198 root tests discovered; Pages config list — 2 tests discovered.
 - `./scripts/run` — Vite loopback readiness verified at
-  `http://127.0.0.1:4173/` (`The Goldilocks Engine` title); temporary tmux
-  session stopped and no 4173/4520 server remained.
+  `http://127.0.0.1:4173/` (`The Goldilocks Engine` title); temporary
+  `goldlocks-r064` tmux session stopped afterwards.
 
 ## Checks not run
 

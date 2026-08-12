@@ -3554,6 +3554,25 @@ h1 {
   }
 }
 
+/* The portrait shell is at most 31rem wide. Stack the active Build
+ * transaction here so 200%-text Cancel never competes with explanatory copy
+ * for one narrow flex row. This keeps the complete sticky tray in view. */
+@media (max-width: 31rem) {
+  .placement-tray {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+    gap: 0.35rem;
+    bottom: 0.25rem;
+    padding: 0.45rem 0.5rem;
+  }
+
+  .placement-tray > div,
+  .placement-tray button {
+    width: 100%;
+  }
+}
+
 @media (min-width: 50rem) {
   .app-shell::before {
     position: fixed;

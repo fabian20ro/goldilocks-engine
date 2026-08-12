@@ -224,6 +224,73 @@ for (const viewport of [
   });
 }
 
+for (const viewport of [
+  { width: 320, height: 693 },
+  { width: 393, height: 742 },
+]) {
+  test(`Phase 3 placement tray remains cancellable at 200% text on ${viewport.width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+    await waitForSave(page);
+    await setTwoHundredPercentText(page);
+
+    await page
+      .getByRole("button", { name: "Select Input stage", exact: true })
+      .click();
+    const alternate = page.locator(
+      '[data-inventory-section="owned"] [data-module-id="stream-intake"]',
+    );
+    await alternate.click();
+    await page
+      .getByRole("button", {
+        name: "Place Stream Intake in Build",
+        exact: true,
+      })
+      .click();
+
+    const tray = page.locator(".placement-tray");
+    await tray.scrollIntoViewIfNeeded();
+    await assertPortrait(page);
+    const geometry = await page.evaluate(() => {
+      const tray = document.querySelector<HTMLElement>(".placement-tray");
+      const copy = tray?.querySelector<HTMLElement>("div");
+      const cancel = tray?.querySelector<HTMLElement>("button");
+      if (!tray || !copy || !cancel) throw new Error("Missing placement tray");
+      const cancelBox = cancel.getBoundingClientRect();
+      const copyRange = document.createRange();
+      copyRange.selectNodeContents(copy);
+      return {
+        tray: tray.getBoundingClientRect().toJSON(),
+        cancel: cancelBox.toJSON(),
+        copy: copy.getBoundingClientRect().toJSON(),
+        overlapCount: Array.from(copyRange.getClientRects()).filter(
+          (rect) =>
+            rect.left < cancelBox.right &&
+            rect.right > cancelBox.left &&
+            rect.top < cancelBox.bottom &&
+            rect.bottom > cancelBox.top,
+        ).length,
+        viewportHeight: window.innerHeight,
+      };
+    });
+    expect(geometry.tray.top).toBeGreaterThanOrEqual(0);
+    expect(geometry.tray.bottom).toBeLessThanOrEqual(geometry.viewportHeight);
+    expect(geometry.cancel.top).toBeGreaterThanOrEqual(0);
+    expect(geometry.cancel.bottom).toBeLessThanOrEqual(geometry.viewportHeight);
+    expect(geometry.copy.width).toBeGreaterThan(0);
+    expect(geometry.overlapCount).toBe(0);
+    await page.screenshot({
+      path: `test-results/phase-3/${viewport.width}-placement-tray-200.png`,
+    });
+
+    await page.getByRole("button", { name: "Cancel placement" }).click();
+    await expect(tray).toHaveCount(0);
+    await expect(alternate).toBeFocused();
+  });
+}
+
 test("Phase 3 explicit placement, tab cancellation, keyboard, and touch-drag retain one pipeline", async ({
   page,
 }) => {

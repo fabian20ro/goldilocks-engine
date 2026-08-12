@@ -29,9 +29,9 @@ export interface ModuleInventorySection {
 
 export interface ModuleInventoryOptions {
   /**
-   * Build's selected-stage drawer needs one next-placement cue. Upgrades is
-   * the durable catalogue, so preserving the purchase order there lets a
-   * just-bought item remain at its stable card position.
+   * Build's selected-stage drawer needs an unplaced next-placement cue after
+   * its installed module and other compatible choices. Upgrades is the
+   * durable catalogue, so its paid-owned handoff remains first there.
    */
   prioritizeUnplacedOwned?: boolean;
 }
@@ -107,6 +107,7 @@ export function selectModuleInventory(
   { prioritizeUnplacedOwned = false }: ModuleInventoryOptions = {},
 ): readonly ModuleInventorySection[] {
   const slotType = selectedSlotType(state, selectedStageId);
+  const selectedBuildContext = selectedStageId !== null && slotType !== null;
   const selectedStageModuleId = selectedStageId
     ? state.slots.find((slot) => slot.slotId === selectedStageId)?.moduleId
     : null;
@@ -155,19 +156,32 @@ export function selectModuleInventory(
         Number(right.module.id === selectedStageModuleId) -
         Number(left.module.id === selectedStageModuleId);
       if (selectedStageModule !== 0) return selectedStageModule;
+      const compatibility =
+        Number(right.compatibleWithSelectedStage) -
+        Number(left.compatibleWithSelectedStage);
+      // The selected Build stage is a placement decision: show every
+      // compatible owned choice before unrelated paid process upgrades. The
+      // paid-owned handoff remains the preferred compact order in Upgrades,
+      // where no stage is selected.
+      if (selectedBuildContext && compatibility !== 0) return compatibility;
+      if (selectedBuildContext && prioritizeUnplacedOwned) {
+        const needsPlacement = Number(!right.equipped) - Number(!left.equipped);
+        if (needsPlacement !== 0) return needsPlacement;
+        if (left.owned && !left.equipped && !right.equipped)
+          return (
+            (ownershipOrder.get(right.module.id) ?? -1) -
+            (ownershipOrder.get(left.module.id) ?? -1)
+          );
+      }
       const paidOwned =
         Number(right.owned && right.module.purchaseCost > 0) -
         Number(left.owned && left.module.purchaseCost > 0);
       if (paidOwned !== 0) return paidOwned;
-      const compatibility =
-        Number(right.compatibleWithSelectedStage) -
-        Number(left.compatibleWithSelectedStage);
-      if (compatibility !== 0) return compatibility;
-      // Build's selected-stage drawer promotes an unplaced owned module ahead
-      // of already-equipped alternatives, so the next placement stays visible
-      // without opening the full list. Upgrades keeps its stable catalogue
-      // ordering because it has no selected pipeline stage.
-      if (prioritizeUnplacedOwned) {
+      if (!selectedBuildContext && compatibility !== 0) return compatibility;
+      // Outside a selected Build stage, retain the stable catalogue ordering;
+      // an explicit caller can still promote an unplaced owned item after the
+      // paid-owned Upgrades handoff.
+      if (!selectedBuildContext && prioritizeUnplacedOwned) {
         const needsPlacement = Number(!right.equipped) - Number(!left.equipped);
         if (needsPlacement !== 0) return needsPlacement;
         if (left.owned && !left.equipped && !right.equipped)

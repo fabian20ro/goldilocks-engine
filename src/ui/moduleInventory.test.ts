@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { applyCommand, createInitialState } from "../simulation/engine";
-import { selectModuleInventory } from "./moduleInventory";
+import {
+  applyCommand,
+  createEstablishedScenarioState,
+  createInitialState,
+} from "../simulation/engine";
+import {
+  moduleInventoryDefaultEntries,
+  selectModuleInventory,
+} from "./moduleInventory";
 
 function section(
   state: ReturnType<typeof createInitialState>,
@@ -99,5 +106,27 @@ describe("live Build and Upgrades module inventory", () => {
     expect(section(state, "owned").entries[0]?.module.id).toBe(
       "precision-cleaner",
     );
+  });
+
+  it("keeps selected-stage compatible choices ahead of paid incompatible modules", () => {
+    let state = createEstablishedScenarioState(63064);
+    state = {
+      ...state,
+      resources: { ...state.resources, money: 30 },
+    };
+    for (const moduleId of [
+      "precision-cleaner",
+      "adaptive-context",
+      "efficient-runtime",
+    ])
+      state = applyCommand(state, { type: "BUY_MODULE", moduleId });
+
+    const owned = section(state, "owned", "source");
+    const compact = moduleInventoryDefaultEntries(owned);
+    expect(compact.map((entry) => entry.module.id).slice(0, 2)).toEqual([
+      "request-buffer",
+      "stream-intake",
+    ]);
+    expect(compact[1]?.compatibleWithSelectedStage).toBe(true);
   });
 });

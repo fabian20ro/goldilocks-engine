@@ -459,3 +459,29 @@
 - **Reversal condition:** Add a broader catalog abstraction only after a
   second independently implemented consumer demonstrates the same domain
   lifecycle; otherwise keep this selector module-specific.
+
+## D-028 — Selected Build context favours compatible placement at scaled portrait widths
+
+- **Decision:** In a selected Build stage, the installed module remains first;
+  compatible owned alternatives then precede incompatible owned modules. The
+  existing paid-owned priority remains for Upgrades, where no pipeline stage is
+  selected. At portrait widths through 31rem, the active placement tray stacks
+  its explanatory copy and Cancel target rather than compressing them into a
+  single row.
+- **Boundary:** This is presentation-only ordering and responsive layout. It
+  does not alter catalog membership, ownership, affordability, compatibility,
+  capacity, placement commands, sticky-tray semantics, or simulation state.
+  The tray retains the existing no-scroll page model and cancellation/focus
+  route.
+- **Reason:** V-066 found paid incompatible modules taking a default compact
+  Build position before compatible placement choices. V-067 found a 200%-text
+  tray's copy and cancellation action overlapping or leaving the viewport at
+  320×693 and 393×742.
+- **Evidence policy:** Keep the pure selected-stage ordering regression and
+  the immutable V-063 probe. Candidate portrait coverage must inspect the
+  320×693 and 393×742 200%-text tray, assert its geometry and cancellation,
+  and retain 100%/200% Phase 3, first-session, expansion, and selected-stage
+  browser coverage.
+- **Reversal condition:** Change the narrow ordering or portrait stack only
+  with a replacement that preserves explicit placement, visible cancellation,
+  and the same compatibility-before-incompatibility evidence.
