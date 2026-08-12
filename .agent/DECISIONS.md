@@ -522,6 +522,16 @@
   independent compact values. Each Career route or completed-evening equation
   may promote only its own displayed accounting terms together; a mill-bearing
   route preview never promotes an unrelated quick resource.
+- **Independent disclosure boundary:** A standalone Career action cost and a
+  Build warning payout are compact summaries, so both call the shared compact
+  formatter rather than carrying raw money literals. The private-evaluation
+  action's `$0.75` price therefore remains independent of exact evaluation
+  evidence and any route equation.
+- **Settlement ledger boundary:** Settlement event sentences are accounting
+  disclosures. Gross payout, configured cost, signed net, paid and unpaid
+  portions, and the cash floor all call the fixed-three-decimal formatter in
+  every success and failure branch. This changes presentation only; the
+  settlement equation and money arithmetic remain unchanged.
 - **Quote-range precision boundary:** Queue 10 is a non-additive preview, not
   a settlement equation. Its first and last labels format each displayed
   endpoint independently; undisplayed reserved quotes never promote either
@@ -544,7 +554,9 @@
   A shared formatter and one existing comparison surface remove only that
   demonstrated drift. V-070 additionally showed that a Queue 10 label was
   borrowing mills from undisplayed intermediate quotes despite not being an
-  additive accounting row.
+  additive accounting row. V-071 found the inverse boundary drift: independent
+  Career/Build summaries retained raw mill/zero literals while an Inspect
+  failed-settlement sentence mixed compact zeros with accounting values.
 - **Evidence policy:** Currency unit coverage locks cent/mill and signed
   equation behavior and the independent Queue 10 endpoint boundary. Pinned
   command-deck browser coverage captures every tab for starter and expansion at
@@ -552,6 +564,10 @@
   captures the Inspect strip at 200% text with reduced motion. The Queue 10
   browser regression persists all ten locked quotes after the preview and
   verifies the cent-exact range labels despite mill-bearing middle quotes.
+  Candidate engine/component/browser coverage additionally locks the compact
+  private-evaluation action, compact no-model warning, and exact failed ledger
+  sentence through reload. The unchanged round-068 adversarial probe remains
+  required.
   Retained Details focus, glyph/status, warnings, first-session, persistence,
   PWA, Career, and canonical suites remain required.
 - **Reversal condition:** Replace this policy only with a demonstrated

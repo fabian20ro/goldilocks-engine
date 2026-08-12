@@ -30,6 +30,7 @@ import {
   getWorkloadQuote,
   independentRunReadiness,
   localModelTierUnlockProgress,
+  PRIVATE_EVALUATION_COST,
   projectCareerEvening,
   projectCareerRoute,
   type CareerEveningProjection,
@@ -602,8 +603,7 @@ function WarningBanner({ state }: { state: SimulationState }) {
       "Compute budget and workload CU demand are already at their current minima; no current policy can reduce estimated heat further.";
     guidance = `Estimated thermal load is ${formatNumber(state.metrics.thermalLoad, 1)} against a ${rig.thermalLimit} limit. ${availableActions} Module swaps mainly change memory, throughput, quality, and reliability in this toy—not heat directly. The Animations control changes visuals only; it does not affect heat or simulation time. Throttling is predicted, not a certain hardware fault.`;
   } else if (state.metrics.orderWarnings.includes("no model stage")) {
-    guidance =
-      "Add an owned model module to an empty compatible process position, or move one back into the active graph. A pipeline without a model cannot produce an answer: accepted tasks fail and pay $0 gross.";
+    guidance = `Add an owned model module to an empty compatible process position, or move one back into the active graph. A pipeline without a model cannot produce an answer: accepted tasks fail and pay ${formatCompactCurrency(0)} gross.`;
   } else if (state.metrics.orderWarnings.length > 0) {
     guidance =
       "Put preparation before model and evaluation after model. Reordering changes throughput, quality, and reliability together; compare the baseline instead of assuming every delta has one cause.";
@@ -3341,7 +3341,8 @@ export function CareerView({
               aria-label="Run paid private evaluation"
               onClick={() => command({ type: "RUN_PRIVATE_EVALUATION" })}
             >
-              Run private evaluation · $0.750
+              Run private evaluation ·{" "}
+              {formatCompactCurrency(PRIVATE_EVALUATION_COST)}
             </button>
             <p>
               {career.evaluation.publicEvaluations} public preview

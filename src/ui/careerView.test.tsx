@@ -171,6 +171,28 @@ describe("Phase 4 compact money boundaries", () => {
     ).toHaveTextContent("A failed delivery pays $0.00 gross.");
   });
 
+  it("formats the private evaluation action as an independent compact cost", () => {
+    render(
+      <CareerView
+        state={createInitialState(20_709)}
+        command={vi.fn()}
+        scheduleDraft={emptySchedule}
+        scheduledDraftHours={0}
+        onScheduleDraftChange={vi.fn()}
+        hasDurablePersistenceFailure={false}
+        isRunBlocked={false}
+        onRunScheduledEvening={() => true}
+        onApplySafeOfflinePolicyNow={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText("Show Evaluation discipline"));
+
+    expect(
+      screen.getByRole("button", { name: "Run paid private evaluation" }),
+    ).toHaveTextContent("Run private evaluation · $0.75");
+  });
+
   it("keeps Queue 10 range endpoints compact despite middle mill quotes", () => {
     const state = createEstablishedScenarioState();
     const quotes = Array.from(

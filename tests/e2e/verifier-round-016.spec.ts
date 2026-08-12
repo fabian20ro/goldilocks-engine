@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { formatCompactCurrency } from "../../src/simulation/currency";
 import { settleStarterJob } from "./helpers";
 
 async function openTab(page: Page, name: string) {
@@ -40,7 +41,7 @@ test.describe("verifier round 016 market feedback", () => {
     }
 
     await expect(page.getByLabel("Current warning and actions")).toContainText(
-      "accepted tasks fail and pay $0 gross",
+      `accepted tasks fail and pay ${formatCompactCurrency(0)} gross`,
     );
 
     await openTab(page, "Jobs");

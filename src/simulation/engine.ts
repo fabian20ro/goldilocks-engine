@@ -50,7 +50,7 @@ import {
   type WorkloadDemandState,
   type WorkloadQuote,
 } from "./types";
-import { currencyDisplayPrecision, formatCurrencyMagnitude } from "./currency";
+import { formatExactCurrency } from "./currency";
 
 const MAX_LEDGER_EVENTS = 80;
 const MAX_QUEUED_TASKS = 99;
@@ -66,7 +66,7 @@ const CAREER_ROUTES: readonly CareerRoute[] = [
 ];
 const QUANTIZATION_PROFILES: readonly QuantizationProfile[] = ["q4", "q8"];
 const MAX_OFFLINE_HOURS = 4;
-const PRIVATE_EVALUATION_COST = 0.75;
+export const PRIVATE_EVALUATION_COST = 0.75;
 const MIN_PRIVATE_EVALUATION_COVERAGE_GAIN = 0.25;
 const MAX_PRIVATE_EVALUATION_COVERAGE_GAIN = 0.5;
 const MAX_EVALUATION_SPEND = 10_000;
@@ -3397,20 +3397,11 @@ function advanceTickQuantum(
   );
   const unpaidOperatingCost = round(operatingCost - operatingCostPaid, 3);
   const economicNet = round(grossPayout - operatingCost, 3);
-  const settlementCurrencyPrecision = currencyDisplayPrecision([
-    task.lockedGrossQuote,
-    grossPayout,
-    operatingCost,
-    operatingCostPaid,
-    unpaidOperatingCost,
-    economicNet,
-  ]);
-  const settlementCurrency = (amount: number) =>
-    formatCurrencyMagnitude(amount, settlementCurrencyPrecision);
-  const settlementPrecisionNote =
-    settlementCurrencyPrecision === 3
-      ? " Amounts use three decimals to preserve sub-cent accounting."
-      : "";
+  // Ledger settlement sentences are accounting disclosures: every term of the
+  // equation stays fixed at three decimals, including a zero payout or floor.
+  const settlementCurrency = (amount: number) => formatExactCurrency(amount);
+  const signedSettlementCurrency = (amount: number) =>
+    `${amount >= 0 ? "+" : "−"}${formatExactCurrency(Math.abs(amount))}`;
   const moneyAfter = round(
     Math.max(0, moneyBeforeSettlement + grossPayout - operatingCost),
     3,
@@ -3489,16 +3480,16 @@ function advanceTickQuantum(
     };
     next = appendEvent(next, {
       kind: "success",
-      message: `${workload.name} task ${task.id} completed; $${settlementCurrency(task.lockedGrossQuote)} gross payout earned before operating cost (locked quote) − $${settlementCurrency(operatingCost)} configured actual cost = ${economicNet >= 0 ? "+" : "−"}$${settlementCurrency(economicNet)} net. ${unpaidOperatingCost > 0 ? `$${settlementCurrency(operatingCostPaid)} was paid and $${settlementCurrency(unpaidOperatingCost)} remains unpaid because cash cannot go below $0.` : "The configured cost was paid in full."}${settlementPrecisionNote} Future ${workload.name} demand is lower and recovers with simulated time.`,
+      message: `${workload.name} task ${task.id} completed; ${settlementCurrency(task.lockedGrossQuote)} gross payout earned before operating cost (locked quote) − ${settlementCurrency(operatingCost)} configured actual cost = ${signedSettlementCurrency(economicNet)} net. ${unpaidOperatingCost > 0 ? `${settlementCurrency(operatingCostPaid)} was paid and ${settlementCurrency(unpaidOperatingCost)} remains unpaid because cash cannot go below ${settlementCurrency(0)}.` : "The configured cost was paid in full."} Future ${workload.name} demand is lower and recovers with simulated time.`,
     });
   } else {
     next = appendEvent(next, {
       kind: "failure",
       message: missingModel
-        ? `${workload.name} task ${task.id} failed before delivery: no model stage produced an answer. Locked quote paid $0 gross; configured actual cost was $${settlementCurrency(operatingCost)}. ${unpaidOperatingCost > 0 ? `$${settlementCurrency(operatingCostPaid)} was paid and $${settlementCurrency(unpaidOperatingCost)} remains unpaid because cash cannot go below $0.` : "The configured cost was paid in full."}${settlementPrecisionNote}`
+        ? `${workload.name} task ${task.id} failed before delivery: no model stage produced an answer. Locked quote paid ${settlementCurrency(0)} gross; configured actual cost was ${settlementCurrency(operatingCost)}. ${unpaidOperatingCost > 0 ? `${settlementCurrency(operatingCostPaid)} was paid and ${settlementCurrency(unpaidOperatingCost)} remains unpaid because cash cannot go below ${settlementCurrency(0)}.` : "The configured cost was paid in full."}`
         : memoryFailure
-          ? `${workload.name} task ${task.id} failed before delivery: memory capacity exceeded. Locked quote paid $0 gross; configured actual cost was $${settlementCurrency(operatingCost)}. ${unpaidOperatingCost > 0 ? `$${settlementCurrency(operatingCostPaid)} was paid and $${settlementCurrency(unpaidOperatingCost)} remains unpaid because cash cannot go below $0.` : "The configured cost was paid in full."}${settlementPrecisionNote}`
-          : `${workload.name} task ${task.id} produced unstable output and was rejected. Locked quote paid $0 gross; configured actual cost was $${settlementCurrency(operatingCost)}. ${unpaidOperatingCost > 0 ? `$${settlementCurrency(operatingCostPaid)} was paid and $${settlementCurrency(unpaidOperatingCost)} remains unpaid because cash cannot go below $0.` : "The configured cost was paid in full."}${settlementPrecisionNote}`,
+          ? `${workload.name} task ${task.id} failed before delivery: memory capacity exceeded. Locked quote paid ${settlementCurrency(0)} gross; configured actual cost was ${settlementCurrency(operatingCost)}. ${unpaidOperatingCost > 0 ? `${settlementCurrency(operatingCostPaid)} was paid and ${settlementCurrency(unpaidOperatingCost)} remains unpaid because cash cannot go below ${settlementCurrency(0)}.` : "The configured cost was paid in full."}`
+          : `${workload.name} task ${task.id} produced unstable output and was rejected. Locked quote paid ${settlementCurrency(0)} gross; configured actual cost was ${settlementCurrency(operatingCost)}. ${unpaidOperatingCost > 0 ? `${settlementCurrency(operatingCostPaid)} was paid and ${settlementCurrency(unpaidOperatingCost)} remains unpaid because cash cannot go below ${settlementCurrency(0)}.` : "The configured cost was paid in full."}`,
       directCause: missingModel
         ? "The active pipeline had no model stage."
         : memoryFailure

@@ -384,6 +384,25 @@ describe("deterministic simulation engine", () => {
     expect(isStateValid(settled)).toBe(true);
   });
 
+  it("keeps every failed-settlement ledger term fixed at three decimals", () => {
+    let state = createInitialState(20_709);
+    for (const slotId of ["prepare", "runtime", "verify"])
+      state = applyCommand(state, { type: "REMOVE_MODULE", slotId });
+    state = applyCommand(state, { type: "QUEUE_JOBS", count: 1 });
+    for (let minute = 0; minute < 60 && state.jobs.queued > 0; minute += 1)
+      state = tick(state, 60);
+
+    expect(state.jobs.queued).toBe(0);
+    expect(state.lastSettlement).toMatchObject({
+      failed: 1,
+      grossPayout: 0,
+      operatingCost: 0.01,
+    });
+    expect(state.ledger.at(-1)?.message).toContain(
+      "Locked quote paid $0.000 gross; configured actual cost was $0.010. $0.000 was paid and $0.010 remains unpaid because cash cannot go below $0.000.",
+    );
+  });
+
   it("keeps bounded time-speed tick schedules deterministic", () => {
     const run = (speed: 1 | 4 | 16 | 64) => {
       let state = applyCommand(createEstablishedScenarioState(91), {
