@@ -485,3 +485,27 @@
 - **Reversal condition:** Change the narrow ordering or portrait stack only
   with a replacement that preserves explicit placement, visible cancellation,
   and the same compatibility-before-incompatibility evidence.
+
+## D-029 — Dual-runtime adversarial probes remain in the static gate
+
+- **Decision:** Playwright adversarial probes under
+  `.agent/verification/**/*-adversarial.mjs` remain ordinary ESLint inputs.
+  Their Node orchestration and browser `page.evaluate` callbacks receive only
+  the corresponding Node and browser globals through a narrow flat-config
+  override. The verification directory is not ignored, and older probes that
+  intentionally declare their own narrower globals retain that lint path.
+- **Boundary:** This is static-tooling configuration only. It changes no
+  production code, browser behavior, simulation, Worker, persistence, PWA,
+  verifier report, test assertion, or lint rule severity.
+- **Reason:** CI Verify run `31622985993` linted the round-064 adversarial
+  probe after that verifier artifact was committed, while the candidate's
+  earlier canonical lint had run before the artifact existed. Default
+  JavaScript globals then rejected its legitimate `process` and browser-callback
+  references as undefined.
+- **Evidence policy:** The exact CI lint command, direct adversarial-file lint,
+  syntax check, immutable round-064 browser probe, full canonical gate, and
+  startup cleanup must pass. Do not replace this with an ignore, a blanket
+  no-undef suppression, or edits to immutable verifier evidence.
+- **Reversal condition:** Expand or replace the file pattern only when a new
+  committed verifier probe has a documented execution model and equivalent
+  static/browser evidence.

@@ -1,7 +1,11 @@
-# Candidate handoff — round 064 Phase 3 selected-stage and tray repairs
+# Candidate handoff — round 065 static verification-lane repair
 
 ## Implemented behavior summary
 
+- Repository-owned adversarial Playwright probes remain linted. The narrow
+  `*-adversarial.mjs` ESLint override recognizes their real dual runtime:
+  Node orchestration plus browser callbacks. It neither ignores verifier files
+  nor weakens lint rules, and does not alter the immutable round-064 evidence.
 - Build keeps the single ordered pipeline rail first. Each rail position is a
   44 CSS-pixel selected-stage control; its current `Input`/process/`Output`
   context appears before the compact inventory.
@@ -42,6 +46,12 @@
 
 ## Verifier findings addressed
 
+- CI Verify `31622985993` static lane: round-064's verifier-owned Playwright
+  probe was added after the Phase 3 candidate's canonical lint. The committed
+  verifier SHA therefore exposed legitimate Node/browser globals to default
+  JavaScript linting. D-029 supplies only those globals to adversarial probes;
+  existing verifier reports, tests, and legacy declared-global probes remain
+  unchanged and linted.
 - V-066: `selectModuleInventory` now ranks a selected stage's compatible owned
   placement choices before incompatible owned modules; paid-owned preference
   is retained only for the no-stage Upgrades route.
@@ -110,6 +120,8 @@ its Mach-port rendezvous server; no browser check is silently skipped.
 - D-027: one module-specific pure selector, not a general inventory framework.
 - D-028: selected Build compatibility ranks before incompatible paid ownership;
   the narrow-portrait sticky placement tray stacks copy and cancellation.
+- D-029: adversarial verifier probes are linted in their exact Node/browser
+  execution environments without excluding verification artifacts.
 - The selected Build stage is App-session presentation state only. Worker state
   remains authority for ownership, money, topology, metrics, commands, and
   persistence.
@@ -128,19 +140,22 @@ its Mach-port rendezvous server; no browser check is silently skipped.
 
 ## Checks executed before handoff
 
-- `npm test -- src/ui/moduleInventory.test.ts src/ui/verifierRound063.test.ts --coverage.enabled=false --reporter=dot` — 2 files, 6/6 pass.
-- `E2E_PORT=4873 npm run test:e2e -- tests/e2e/verifier-round-063.spec.ts --reporter=dot` — 2/2 pass: exact V-067 200%-text tray geometry at 320×693 and 393×742.
-- `E2E_PORT=4874 npm run test:e2e -- tests/e2e/phase-3-density.spec.ts --reporter=dot` — 7/7 pass; visually inspected generated 320×693 and 393×742 200%-text placement-tray captures, plus retained 100%/200% Phase 3 portraits.
-- `E2E_PORT=4875 npm run test:e2e -- tests/e2e/first-session.spec.ts tests/e2e/game.spec.ts tests/e2e/round-015-expansion.spec.ts tests/e2e/verifier-round-040.spec.ts tests/e2e/verifier-round-061.spec.ts --reporter=dot` — 27/27 pass.
-- `E2E_PORT=4876 ./scripts/verify` — completed successfully from fresh setup:
+- `npm run lint` — reproduced the CI static failure before repair (25
+  `no-undef` diagnostics in immutable `round-064-adversarial.mjs`), then passed
+  after the narrow dual-runtime config override.
+- `npx eslint .agent/verification/round-064-adversarial.mjs --max-warnings 0`
+  and `node --check .agent/verification/round-064-adversarial.mjs` — pass;
+  the immutable probe remains an ordinary checked input.
+- `E2E_PORT=4968 ./scripts/run-e2e`; `PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright BASE_URL=http://127.0.0.1:4968 OUTPUT_DIR=test-results/round-065-adversarial node .agent/verification/round-064-adversarial.mjs` — pass: 24 fresh captures, no findings; temporary preview stopped.
+- `E2E_PORT=4970 ./scripts/verify` — completed successfully from fresh setup:
   format, lint, typecheck, 42 files/193 unit tests, numeric/first-session/
   20,001-upgrade/progression/Career/evaluation balances, production build,
   high/critical production audit, 198/198 root Playwright tests, and 2/2 Pages
   Playwright tests.
-- `PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright npx playwright test --list` — 198 root tests discovered; Pages config list — 2 tests discovered.
 - `./scripts/run` — Vite loopback readiness verified at
   `http://127.0.0.1:4173/` (`The Goldilocks Engine` title); temporary
-  `goldlocks-r064` tmux session stopped afterwards.
+  `goldlocks-r065-run` tmux session stopped and the port no longer accepted a
+  connection.
 
 ## Checks not run
 

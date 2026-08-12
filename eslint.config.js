@@ -57,4 +57,11 @@ export default tseslint.config(
     files: ["scripts/**/*.mjs"],
     languageOptions: { globals: globals.node },
   },
+  {
+    // Playwright verifier probes run as Node orchestration but exercise browser
+    // callbacks. Keep both real execution environments linted without
+    // changing older probes that declare their own narrowly scoped globals.
+    files: [".agent/verification/**/*-adversarial.mjs"],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
 );
