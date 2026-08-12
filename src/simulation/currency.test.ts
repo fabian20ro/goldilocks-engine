@@ -30,6 +30,7 @@ describe("currency equation formatting", () => {
   });
 
   it("uses one compact policy for isolated summaries and related equations", () => {
+    expect(formatCompactCurrency(0)).toBe("$0.00");
     expect(formatCompactCurrency(4)).toBe("$4.00");
     expect(formatCompactCurrency(1.4)).toBe("$1.40");
     expect(formatCompactCurrency(0.005)).toBe("$0.005");

@@ -518,6 +518,10 @@
   an explicitly additive settlement row promotes its related accounting
   equation together. Details, Inspect comparison/accounting, and
   ledger-adjacent disclosures explicitly remain mill-precise.
+- **Career precision boundary:** Cash, Savings, and lifetime totals are
+  independent compact values. Each Career route or completed-evening equation
+  may promote only its own displayed accounting terms together; a mill-bearing
+  route preview never promotes an unrelated quick resource.
 - **Screen-order boundary:** Inspect keeps the existing configuration panel
   and comparison component, but its first diagnostic content is a compact
   dominant-bottleneck, baseline-delta, and latest-causal-evidence strip.

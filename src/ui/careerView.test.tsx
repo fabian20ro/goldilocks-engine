@@ -6,7 +6,7 @@ import {
   createInitialState,
   projectCareerRoute,
 } from "../simulation/engine";
-import { CareerView } from "./App";
+import { CareerView, JobsView } from "./App";
 
 const emptySchedule = {
   freelance: 0,
@@ -116,5 +116,56 @@ describe("Career Phase 2 action hierarchy", () => {
         resolve();
       });
     });
+  });
+});
+
+describe("Phase 4 compact money boundaries", () => {
+  it("keeps quick resources independent while the Freelance equation retains mills", () => {
+    const state = createInitialState(20_706);
+    render(
+      <CareerView
+        state={state}
+        command={vi.fn()}
+        scheduleDraft={{ ...emptySchedule, freelance: 1 }}
+        scheduledDraftHours={1}
+        onScheduleDraftChange={vi.fn()}
+        hasDurablePersistenceFailure={false}
+        isRunBlocked={false}
+        onRunScheduledEvening={() => true}
+        onApplySafeOfflinePolicyNow={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByLabelText("Tonight's Career resources"),
+    ).toHaveTextContent("Cash$0.00Savings$3.00");
+    expect(screen.getByTestId("career-projection-freelance")).toHaveTextContent(
+      "$2.166 expected net · $0.110 configured cost",
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Freelance delivery details" }),
+    );
+    expect(
+      screen.getByLabelText("Freelance delivery details"),
+    ).toHaveTextContent(
+      "$2.276 gross · $0.098 operating · $0.012 electricity · $2.166 economic net",
+    );
+  });
+
+  it("formats the selected Jobs failed payout through the shared compact policy", () => {
+    render(
+      <JobsView
+        state={createInitialState(20_706)}
+        command={vi.fn()}
+        commandBatch={vi.fn()}
+        reducedMotion={false}
+        usefulTarget={null}
+        onUsefulTargetChange={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByLabelText("Selected playable workload"),
+    ).toHaveTextContent("A failed delivery pays $0.00 gross.");
   });
 });

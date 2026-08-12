@@ -33,6 +33,7 @@ import {
   projectCareerEvening,
   projectCareerRoute,
   type CareerEveningProjection,
+  type CareerRouteProjection,
   workloadUnlockProgress,
 } from "../simulation/engine";
 import {
@@ -2194,7 +2195,7 @@ function UpgradesView({
   );
 }
 
-function JobsView({
+export function JobsView({
   state,
   command,
   commandBatch,
@@ -2276,7 +2277,7 @@ function JobsView({
             {Math.round(selectedMetrics.reliability * 100)}% modeled delivery ·{" "}
             {selectedOffer.expectedNet >= 0 ? "+" : ""}
             {formatCompactCurrency(selectedOffer.expectedNet)} expected after
-            cost. A failed delivery pays $0 gross.
+            cost. A failed delivery pays {formatCompactCurrency(0)} gross.
           </p>
           {observingStarter ? (
             <p className="starter-queue-note">
@@ -2767,6 +2768,35 @@ function careerProjectionOutcome(
   }
 }
 
+type CareerMoneyProjection = Pick<
+  CareerRouteProjection,
+  | "gross"
+  | "operatingCost"
+  | "electricityCost"
+  | "configuredCost"
+  | "economicNet"
+  | "cashChange"
+  | "unpaidCostChange"
+  | "productRevenue"
+>;
+
+/** A route or evening equation shares its own compact precision, never another's. */
+function formatCareerProjectionCurrency(
+  projection: CareerMoneyProjection,
+  amount: number,
+): string {
+  return formatCompactCurrency(amount, [
+    projection.gross,
+    projection.operatingCost,
+    projection.electricityCost,
+    projection.configuredCost,
+    projection.economicNet,
+    projection.cashChange,
+    projection.unpaidCostChange,
+    projection.productRevenue,
+  ]);
+}
+
 function careerProgressSummary(
   projection: CareerEveningProjection,
   money: (amount: number) => string,
@@ -2844,21 +2874,11 @@ export function CareerView({
     projectCareerRoute(state, route.id, scheduleDraft[route.id]),
   );
   const eveningProjection = projectCareerEvening(state, scheduleDraft);
-  const compactCurrencyAmounts = [
-    state.resources.money,
-    career.savings,
-    career.operatingCostsIncurred,
-    career.electricityCostsIncurred,
-    career.unpaidCosts,
-    ...routeProjections.flatMap((projection) => [
-      projection.gross,
-      projection.configuredCost,
-      projection.economicNet,
-      projection.cashChange,
-    ]),
-  ];
-  const compactMoney = (amount: number) =>
-    formatCompactCurrency(amount, compactCurrencyAmounts);
+  const compactMoney = (amount: number) => formatCompactCurrency(amount);
+  const completionMoney = (amount: number) =>
+    completionFeedback
+      ? formatCareerProjectionCurrency(completionFeedback.projection, amount)
+      : compactMoney(amount);
   const exactMoney = (amount: number) => formatExactCurrency(amount);
   const detailRoute = routeDetails
     ? (bedroomCareerRoutes.find((route) => route.id === routeDetails) ?? null)
@@ -2983,9 +3003,14 @@ export function CareerView({
                   data-testid={`career-projection-${route.id}`}
                 >
                   <strong>Estimate · {projection.hours.toFixed(2)}h:</strong>{" "}
-                  {careerProjectionOutcome(route.id, projection, compactMoney)}
+                  {careerProjectionOutcome(route.id, projection, (amount) =>
+                    formatCareerProjectionCurrency(projection, amount),
+                  )}
                   {projection.hours > 0
-                    ? ` · ${compactMoney(projection.configuredCost)} configured cost`
+                    ? ` · ${formatCareerProjectionCurrency(
+                        projection,
+                        projection.configuredCost,
+                      )} configured cost`
                     : " · assign time to estimate costs"}
                 </p>
                 <span className="career-route-constraint">
@@ -3148,19 +3173,21 @@ export function CareerView({
               <dt>Money / progress</dt>
               <dd>
                 {completionFeedback.projection.cashChange >= 0 ? "+" : ""}
-                {compactMoney(completionFeedback.projection.cashChange)} ·{" "}
+                {completionMoney(
+                  completionFeedback.projection.cashChange,
+                )} ·{" "}
                 {careerProgressSummary(
                   completionFeedback.projection,
-                  compactMoney,
+                  completionMoney,
                 )}
               </dd>
             </div>
             <div>
               <dt>Electricity / operating</dt>
               <dd>
-                {compactMoney(completionFeedback.projection.electricityCost)}{" "}
+                {completionMoney(completionFeedback.projection.electricityCost)}{" "}
                 electricity ·{" "}
-                {compactMoney(completionFeedback.projection.operatingCost)}{" "}
+                {completionMoney(completionFeedback.projection.operatingCost)}{" "}
                 operating
               </dd>
             </div>

@@ -1,13 +1,17 @@
-# Candidate handoff — round 066 Phase 4 cross-screen consistency
+# Candidate handoff — round 067 Phase 4 compact-currency repair
 
 ## Implemented behavior summary
 
-- All non-accounting money summaries now use the shared
-  `formatCompactCurrency` policy: cents by default, or mills where an
-  individual summary needs it; explicitly additive settlement rows keep their
-  related terms at one precision. This covers the HUD, Build and
-  Upgrades cards, requirements, targets, Jobs quotes, queue summaries, Career
-  summaries, and settlement/recovery text.
+- All non-accounting money summaries use the shared `formatCompactCurrency`
+  policy: cents by default, or mills where an individual summary needs it.
+  Career Cash, Savings, and lifetime totals are independent values; individual
+  Career route/completed-evening accounting equations retain one local
+  precision. Explicitly additive Jobs settlement rows remain one equation.
+  This covers the HUD, Build and Upgrades cards, requirements, targets, Jobs
+  quotes, queue summaries, Career summaries, and settlement/recovery text.
+- The selected Jobs dispatch card now formats its failed payout through that
+  shared policy (`$0.00`), rather than a raw `$0` literal. Exact Career route
+  Details remain three-decimal accounting disclosures.
 - Exact three-decimal values remain explicit in Details, Inspect-adjacent
   accounting, and ledger-style disclosures through `formatExactCurrency`.
   Money arithmetic, purchases, quotes, Worker authority, persistence, and
@@ -40,8 +44,14 @@
 
 ## Verifier findings addressed
 
-- No unresolved verifier finding existed at accepted base
-  `12eacb17d250a840c6debf69940ebd8a9728c724`.
+- V-068: clean Career quick resources remain Cash `$0.00` and Savings `$3.00`
+  while a one-hour Freelance preview retains its own mill equation
+  (`$2.166` expected net, `$0.110` configured cost). Exact Details retains
+  `$2.276` gross, `$0.098` operating, `$0.012` electricity, and `$2.166`
+  economic net. Candidate component coverage locks all three boundaries.
+- V-069: the selected Jobs failed-payout card uses
+  `formatCompactCurrency(0)` and renders `$0.00 gross`; component coverage
+  locks the card text.
 - V-066 and V-067 remain preserved: selected Build ordering still favors a
   compatible actionable owned choice, and the narrow sticky placement tray
   keeps a visible, cancellable 44px action at enlarged text.
@@ -79,13 +89,13 @@ Canonical full verification starts deterministic loopback servers, waits for
 readiness, and lets Playwright clean them up:
 
 ```sh
-E2E_PORT=4255 ./scripts/verify
+E2E_PORT=4257 ./scripts/verify
 ```
 
 Focused Phase 4 checks:
 
 ```sh
-npx vitest run --coverage=false src/simulation/currency.test.ts src/ui/commandDeck.test.tsx src/ui/moduleInventory.test.ts
+npx vitest run --coverage=false src/simulation/currency.test.ts src/ui/careerView.test.tsx src/ui/commandDeck.test.tsx src/ui/moduleInventory.test.ts
 E2E_PORT=4256 npm run test:e2e -- tests/e2e/command-deck.spec.ts --reporter=dot
 ```
 
@@ -106,8 +116,9 @@ skipped.
 ## Important architectural decisions
 
 - D-030: compact presentation is a formatter policy, not a money-model
-  change. Related equation terms are formatted together; exact accounting
-  surfaces opt in explicitly.
+  change. Independent values never inherit a different equation's precision;
+  related route/evening/settlement terms are formatted together; exact
+  accounting surfaces opt in explicitly.
 - Inspect adds one local priority strip and reuses the existing comparison
   component. No new page, drawer, state schema, Worker command, asset, or
   research/design-system abstraction was added.
@@ -131,22 +142,33 @@ skipped.
 - `npm run format:check` — pass.
 - `npm run lint` — pass.
 - `npm run typecheck` and `npm run build` — pass.
-- `npm test` — 42 files / 195 tests pass; global coverage
+- `npm test` — 42 files / 197 tests pass; global coverage
   statements/branches/functions/lines: 88.92% / 85.96% / 96.09% / 92.33%.
-- `npx vitest run --coverage=false src/simulation/currency.test.ts src/ui/commandDeck.test.tsx src/ui/moduleInventory.test.ts` — 3 files / 14 tests pass.
-- `npm run test:e2e -- tests/e2e/command-deck.spec.ts --reporter=dot` — 8
+- `npx vitest run --coverage=false src/simulation/currency.test.ts src/ui/careerView.test.tsx src/ui/commandDeck.test.tsx src/ui/moduleInventory.test.ts` — 4 files / 18 tests pass.
+- `E2E_PORT=4256 npm run test:e2e -- tests/e2e/command-deck.spec.ts --reporter=dot` — 8
   tests pass under scoped pinned Chromium; screenshots reviewed at starter and
   expanded 320×693/393×742 plus Inspect 320×693 at 200% reduced motion.
-- `E2E_PORT=4255 ./scripts/verify` — pass: formatting, lint, typecheck, 42
-  unit files / 195 tests, all numeric/first-session/20,001-upgrade/progression/
+- `PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright BASE_URL=http://127.0.0.1:4968 OUTPUT_DIR=test-results/round-067-adversarial node .agent/verification/round-066-adversarial.mjs` — V-069 clears;
+  V-068's actual screen text is Cash `$0.00` and Savings `$3.00`, but the
+  immutable probe hard-codes Savings `$0.00` despite `createInitialState`
+  deliberately providing the established `$3.00` emergency reserve. The probe
+  therefore reports only that fixture-value mismatch; it was not edited and no
+  product state/value was falsified to satisfy it.
+- `E2E_PORT=4257 ./scripts/verify` — pass (logged isolated exit `0`):
+  formatting, lint, typecheck, 42 unit files / 197 tests, all
+  numeric/first-session/20,001-upgrade/progression/
   Career/evaluation balances, production build, high/critical production audit,
   200/200 root Playwright tests, and 2/2 Pages Playwright tests.
 - `./scripts/run` loopback startup/readiness/cleanup — Vite ready at
   `http://127.0.0.1:4173/`; fetched the `The Goldilocks Engine` shell, stopped
-  the temporary `goldlocks-r066` session, and confirmed port 4173 no longer
-  accepted a connection.
+  the temporary `goldlocks-r067-startup` session, and confirmed port 4173
+  returned a nonzero connection result after cleanup.
 
 ## Checks not run
 
 - No deployment, push, hosted GitHub Actions run, physical-device pass, or
   external screen-reader pass; outside local Implementer authority.
+- No local required check was skipped. The immutable round-066 adversarial
+  probe was run unchanged; its sole nonzero result is the documented stale
+  `$0.00` Savings fixture expectation, not an infrastructure skip or product
+  failure. It remains immutable for independent verifier correction.

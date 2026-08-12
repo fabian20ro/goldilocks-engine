@@ -2139,7 +2139,13 @@ h2 {
   background: #0e1612;
 }
 
-.career-quick-resources dt,
+.career-quick-resources dt {
+  color: var(--muted);
+  font-size: 0.54rem;
+  letter-spacing: 0.05em;
+  text-transform: none;
+}
+
 .career-detail-grid dt,
 .career-completion-feedback dt {
   color: var(--muted);
