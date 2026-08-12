@@ -3,7 +3,9 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   applyCommand,
+  createEstablishedScenarioState,
   createInitialState,
+  getWorkloadQuote,
   projectCareerRoute,
 } from "../simulation/engine";
 import { CareerView, JobsView } from "./App";
@@ -167,5 +169,31 @@ describe("Phase 4 compact money boundaries", () => {
     expect(
       screen.getByLabelText("Selected playable workload"),
     ).toHaveTextContent("A failed delivery pays $0.00 gross.");
+  });
+
+  it("keeps Queue 10 range endpoints compact despite middle mill quotes", () => {
+    const state = createEstablishedScenarioState();
+    const quotes = Array.from(
+      { length: 10 },
+      (_, index) => getWorkloadQuote(state, state.workloadId, index).grossQuote,
+    );
+
+    expect(quotes).toEqual([
+      1.4, 1.303, 1.014, 0.531, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02,
+    ]);
+    render(
+      <JobsView
+        state={state}
+        command={vi.fn()}
+        commandBatch={vi.fn()}
+        reducedMotion={false}
+        usefulTarget={null}
+        onUsefulTargetChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /^Queue 10/ })).toHaveTextContent(
+      "Queue 10 · locks $1.40 → $0.02",
+    );
   });
 });

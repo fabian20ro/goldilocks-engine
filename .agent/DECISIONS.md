@@ -522,6 +522,11 @@
   independent compact values. Each Career route or completed-evening equation
   may promote only its own displayed accounting terms together; a mill-bearing
   route preview never promotes an unrelated quick resource.
+- **Quote-range precision boundary:** Queue 10 is a non-additive preview, not
+  a settlement equation. Its first and last labels format each displayed
+  endpoint independently; undisplayed reserved quotes never promote either
+  endpoint to mills. Queue-time quote locking and the separate settlement
+  equation remain unchanged.
 - **Screen-order boundary:** Inspect keeps the existing configuration panel
   and comparison component, but its first diagnostic content is a compact
   dominant-bottleneck, baseline-delta, and latest-causal-evidence strip.
@@ -537,13 +542,18 @@
   cards, HUD, targets, and settlement text, while Inspect's first viewport
   buried the current bottleneck/baseline/evidence under general guidance.
   A shared formatter and one existing comparison surface remove only that
-  demonstrated drift.
+  demonstrated drift. V-070 additionally showed that a Queue 10 label was
+  borrowing mills from undisplayed intermediate quotes despite not being an
+  additive accounting row.
 - **Evidence policy:** Currency unit coverage locks cent/mill and signed
-  equation behavior. Pinned command-deck browser coverage captures every tab
-  for starter and expansion at 320×693 and 393×742, checks target/overflow and
-  per-tab scroll geometry, and captures the Inspect strip at 200% text with
-  reduced motion. Retained Details focus, glyph/status, warnings, first-session,
-  persistence, PWA, Career, and canonical suites remain required.
+  equation behavior and the independent Queue 10 endpoint boundary. Pinned
+  command-deck browser coverage captures every tab for starter and expansion at
+  320×693 and 393×742, checks target/overflow and per-tab scroll geometry, and
+  captures the Inspect strip at 200% text with reduced motion. The Queue 10
+  browser regression persists all ten locked quotes after the preview and
+  verifies the cent-exact range labels despite mill-bearing middle quotes.
+  Retained Details focus, glyph/status, warnings, first-session, persistence,
+  PWA, Career, and canonical suites remain required.
 - **Reversal condition:** Replace this policy only with a demonstrated
   accounting-display requirement that preserves an equally explicit exact-value
   route and the same portrait/reduced-motion evidence.

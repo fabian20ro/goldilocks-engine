@@ -38,6 +38,14 @@ describe("currency equation formatting", () => {
     expect(formatCompactCurrency(-0.01, [0.005, 0.005, -0.01])).toBe("-$0.010");
   });
 
+  it("keeps non-additive range endpoints independent of undisplayed mills", () => {
+    const quotes = [1.4, 1.303, 1.014, 0.531, 0.02];
+
+    expect(currencyDisplayPrecision(quotes)).toBe(3);
+    expect(formatCompactCurrency(quotes[0] ?? 0)).toBe("$1.40");
+    expect(formatCompactCurrency(quotes.at(-1) ?? 0)).toBe("$0.02");
+  });
+
   it("keeps Details and ledger disclosures explicitly mill-precise", () => {
     expect(formatExactCurrency(4)).toBe("$4.000");
     expect(formatExactCurrency(-0.005)).toBe("-$0.005");

@@ -2225,14 +2225,11 @@ export function JobsView({
     workloadId: displayedWorkload.id,
   });
   const selectedOffer = estimateWorkloadOffer(selectedMetrics, selectedQuote);
-  const queueTenQuotes = Array.from(
-    { length: 10 },
-    (_, index) => getWorkloadQuote(state, state.workloadId, index).grossQuote,
-  );
-  const queueTenFirst = queueTenQuotes[0] ?? 0;
-  const queueTenLast = queueTenQuotes.at(-1) ?? 0;
-  const queueTenMoney = (amount: number) =>
-    formatCompactCurrency(amount, queueTenQuotes);
+  // Queue 10 is a non-additive range. Its visible endpoints are independent
+  // compact summaries, so undisplayed intervening reservations cannot promote
+  // either label to mills.
+  const queueTenFirst = getWorkloadQuote(state, state.workloadId, 0).grossQuote;
+  const queueTenLast = getWorkloadQuote(state, state.workloadId, 9).grossQuote;
   const queueStarter = () => {
     commandBatch([
       { type: "SET_WORKLOAD", workloadId: "interactive-chat" },
@@ -2392,8 +2389,8 @@ export function JobsView({
               className="primary-action"
               onClick={() => command({ type: "QUEUE_JOBS", count: 10 })}
             >
-              Queue 10 · locks {queueTenMoney(queueTenFirst)} →{" "}
-              {queueTenMoney(queueTenLast)}
+              Queue 10 · locks {formatCompactCurrency(queueTenFirst)} →{" "}
+              {formatCompactCurrency(queueTenLast)}
             </button>
           ) : (
             <p className="starter-queue-note">
