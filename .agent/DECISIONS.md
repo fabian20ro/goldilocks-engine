@@ -361,3 +361,38 @@
 - **Reversal condition:** Replace this bounded presentation queue only through
   explicit product direction with equivalent batched-response, durability,
   rejection, and recovery evidence.
+
+## D-025 — Per-request Career feedback transaction registry
+
+- **Decision:** The App keeps a small, Career-only, in-session registry keyed
+  by the existing Worker request ID. Every player-submitted scheduled evening
+  and direct safe-offline apply receives its own entry; policy saves and other
+  commands receive none. An entry holds only the local schedule draft where a
+  Run needs it, whether its exact response was claimed, and a transient recap
+  awaiting durable acknowledgement.
+- **Ordering boundary:** Career processes the existing D-024 Worker boundary
+  queue in Worker order. It claims an entry only for the matching response ID
+  and derives the recap from that response's immediate before/after snapshots.
+  Claiming, completion, invalidation, and durable draining are exactly-once;
+  duplicate or unrelated responses are inert.
+- **Durability and cleanup boundary:** D-020 remains authoritative. A completed
+  entry is displayed only after its request ID is at or below the durable
+  watermark, including a later persisted response/tick. A non-completion
+  removes only its own entry; it cannot replace or erase an earlier completed
+  entry. Every acknowledged or orphaned entry is removed, and the registry is
+  cleared when the run ends; it is not persisted and naturally ends with the
+  App session.
+- **Reason:** V-064 showed that one mutable safe-offline reference was
+  overwritten by a later apply while a policy save and zero-hour apply were
+  queued before React rendered. The first durable four-hour completion then
+  had no retained local recap.
+- **Evidence policy:** Pure transaction tests cover independent entries,
+  duplicate-claim prevention, non-completion, D-020 draining, and a
+  three-response apply/save/apply batch. Hook coverage retains all three exact
+  before/after boundaries. Candidate and immutable round-058 Playwright tests
+  buffer and release the three real Worker responses together; retained
+  V-061/V-062/V-063, human-paced, persistence/recovery, and canonical checks
+  remain required.
+- **Reversal condition:** Replace this request-keyed presentation lifecycle
+  only through explicit product direction with equivalent ordered-boundary,
+  durable-acknowledgement, multi-request, rejection, and recovery evidence.

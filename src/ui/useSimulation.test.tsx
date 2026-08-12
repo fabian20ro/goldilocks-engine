@@ -321,6 +321,113 @@ describe("durable Worker state publication", () => {
     unmount();
   });
 
+  it("retains the ordered three-response Career apply/save/apply boundary batch", async () => {
+    const { result, unmount } = renderHook(() => useSimulation());
+    const worker = FakeWorker.instances[0];
+    if (!worker) throw new Error("Expected the simulation Worker");
+    const initial = applyCommand(createInitialState(2058), {
+      type: "SET_OFFLINE_POLICY",
+      enabled: true,
+      maxHours: 4,
+      maxElectricityCost: 5,
+      maxOperatingCost: 5,
+      minReliability: 0.7,
+    });
+    act(() => worker.emit({ type: "STATE", state: initial }));
+
+    act(() => {
+      result.current.command({
+        type: "APPLY_OFFLINE_POLICY",
+        requestedHours: 4,
+      });
+      result.current.command({
+        type: "SET_OFFLINE_POLICY",
+        enabled: true,
+        maxHours: 0,
+        maxElectricityCost: 5,
+        maxOperatingCost: 5,
+        minReliability: 0.7,
+      });
+      result.current.command({
+        type: "APPLY_OFFLINE_POLICY",
+        requestedHours: 4,
+      });
+    });
+
+    const [firstApply, savePolicy, zeroHourApply] = worker.requests.slice(-3);
+    if (
+      !firstApply ||
+      firstApply.type !== "COMMAND" ||
+      !savePolicy ||
+      savePolicy.type !== "COMMAND" ||
+      !zeroHourApply ||
+      zeroHourApply.type !== "COMMAND"
+    )
+      throw new Error("Expected three ordered Career commands");
+    const firstRequestId = firstApply.requestId;
+    const saveRequestId = savePolicy.requestId;
+    const zeroHourRequestId = zeroHourApply.requestId;
+    if (
+      firstRequestId === undefined ||
+      saveRequestId === undefined ||
+      zeroHourRequestId === undefined
+    )
+      throw new Error("Expected numbered Career Worker requests");
+
+    const afterFirstApply = reduceWorkerRequest(initial, firstApply);
+    const afterSavePolicy = reduceWorkerRequest(afterFirstApply, savePolicy);
+    const afterZeroHourApply = reduceWorkerRequest(
+      afterSavePolicy,
+      zeroHourApply,
+    );
+    act(() => {
+      worker.emit({
+        type: "STATE",
+        state: afterFirstApply,
+        requestId: firstRequestId,
+      });
+      worker.emit({
+        type: "STATE",
+        state: afterSavePolicy,
+        requestId: saveRequestId,
+      });
+      worker.emit({
+        type: "STATE",
+        state: afterZeroHourApply,
+        requestId: zeroHourRequestId,
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.workerResponseBoundaries).toMatchObject([
+        {
+          requestId: firstRequestId,
+          before: initial,
+          after: afterFirstApply,
+        },
+        {
+          requestId: saveRequestId,
+          before: afterFirstApply,
+          after: afterSavePolicy,
+        },
+        {
+          requestId: zeroHourRequestId,
+          before: afterSavePolicy,
+          after: afterZeroHourApply,
+        },
+      ]);
+    });
+    expect(result.current.workerResponseBoundaries).toHaveLength(3);
+    expect(result.current.lastDurableRequestId).toBe(zeroHourRequestId);
+    act(() =>
+      result.current.consumeWorkerResponseBoundariesThrough(zeroHourRequestId),
+    );
+    await waitFor(() => {
+      expect(result.current.workerResponseBoundaries).toEqual([]);
+    });
+    unmount();
+  });
+
   it("keeps Career Run locked until a later persisted Worker state covers a failed save", async () => {
     const storage = new FlakyStorage();
     vi.stubGlobal("localStorage", storage);

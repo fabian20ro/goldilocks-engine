@@ -1,4 +1,4 @@
-# Candidate handoff — round 058 V-063 ordered Career response delivery repair
+# Candidate handoff — round 059 V-064 request-keyed Career feedback repair
 
 ## Implemented behavior summary
 
@@ -18,14 +18,17 @@
   ready/blocking/recovery reason. A completed evening adds a compact result:
   hours, money/progress, electricity/operating cost, relevant constraint, and
   next decision.
-- Career response boundaries are retained in Worker order until the App
-  consumes them. Each recap uses only its matching request ID, immediate
-  before-state, and returned state; React batching cannot replace an earlier
-  completed boundary with a later response before either is processed.
-  Display still waits for the existing durable acknowledgement.
-- A rejected or non-completing response invalidates only feedback carrying its
-  own request ID. A later zero-hour safe-offline response therefore cannot
-  remove a preceding completed Run recap.
+- Career feedback now uses a small, request-ID-keyed, App-session registry.
+  Every submitted Run and direct safe-offline apply owns one independent entry;
+  unrelated policy-save responses own none and cannot replace an earlier entry.
+- Career processes the existing Worker boundary queue in order and claims each
+  entry only from its exact request ID, immediate before-state, and returned
+  state. React batching of apply → policy save → zero-hour apply therefore
+  preserves the first completed offline recap.
+- D-020 remains the display/removal boundary: a completed entry waits for the
+  existing durable watermark, then is drained exactly once. A non-completing
+  response invalidates only its own entry; durable/orphaned entries and a
+  run-ending session are cleaned up without persistence or simulation changes.
 - Lifetime route actions, evaluation, savings, model/quantization, offline
   policy, independent exit, and diagnostics are native progressively disclosed
   sections in usefulness order. Existing Career mechanics and Phase 0/1
@@ -36,19 +39,24 @@
 
 ## Plan requirements covered
 
-| Requirement                                                                    | Evidence                                                                                                                                                                |
-| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| §20.7 Phase 2 compact hierarchy/composer                                       | `CareerView`, `career-hierarchy.spec.ts`; 320/393 objective, resources, route controls, single Run, geometry evidence                                                   |
-| Four stable routes; benefits, opportunity cost, exact Details                  | catalog `primaryBenefit`; component Details replacement/focus test; live catalog/state projections                                                                      |
-| Projections and shared currency precision                                      | pure engine projections; projection/currency unit tests; Details exact 3-decimal values                                                                                 |
-| Completion summary, response ordering, recovery attribution, and next decision | ordered queue/drain hook coverage; buffered real-Worker 0h follow-up, repeated Run → safe-offline, rejected → safe-offline, immutable V-063/V-062/V-061 E2E regressions |
-| Progressive disclosure                                                         | ordered native disclosure E2E coverage; retained actions open only through their appropriate detail section                                                             |
-| Empty/partial/full/rejected/completed/locked/exit-ready deck                   | committed Playwright deck emits all seven named screenshots at 320 and 393 CSS pixels                                                                                   |
-| Accessibility/responsiveness                                                   | 320/393, keyboard, CDP touch, labels, focus restoration, 100/200% text, reduced-motion, no horizontal/nested composer scrolling                                         |
-| Retained Phase 0/1 persistence/offline/recovery                                | canonical root E2E includes V-051–V-060 and offline/PWA/reload coverage                                                                                                 |
+| Requirement                                                                    | Evidence                                                                                                                                                                  |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| §20.7 Phase 2 compact hierarchy/composer                                       | `CareerView`, `career-hierarchy.spec.ts`; 320/393 objective, resources, route controls, single Run, geometry evidence                                                     |
+| Four stable routes; benefits, opportunity cost, exact Details                  | catalog `primaryBenefit`; component Details replacement/focus test; live catalog/state projections                                                                        |
+| Projections and shared currency precision                                      | pure engine projections; projection/currency unit tests; Details exact 3-decimal values                                                                                   |
+| Completion summary, response ordering, recovery attribution, and next decision | request-keyed pure registry + three-boundary hook coverage; buffered real-Worker apply → policy save → zero-hour apply; immutable V-064/V-063/V-062/V-061 E2E regressions |
+| Progressive disclosure                                                         | ordered native disclosure E2E coverage; retained actions open only through their appropriate detail section                                                               |
+| Empty/partial/full/rejected/completed/locked/exit-ready deck                   | committed Playwright deck emits all seven named screenshots at 320 and 393 CSS pixels                                                                                     |
+| Accessibility/responsiveness                                                   | 320/393, keyboard, CDP touch, labels, focus restoration, 100/200% text, reduced-motion, no horizontal/nested composer scrolling                                           |
+| Retained Phase 0/1 persistence/offline/recovery                                | canonical root E2E includes V-051–V-060 and offline/PWA/reload coverage                                                                                                   |
 
 ## Verifier findings addressed
 
+- V-064: independent request-ID entries retain the first completed safe-offline
+  result across a later policy save and zero-hour apply released in the same
+  React batch. The candidate-owned and immutable three-command browser probes
+  show `Night 1 result` / `4.00h used` after the durable state reaches
+  `{ completedEvenings: 1, maxHours: 0, offlineHours: 0 }`.
 - V-063: functional ordered boundary delivery retains both real Worker
   responses until Career processes them. A later valid zero-hour offline
   response invalidates only its own absent recap, leaving the preceding
@@ -100,11 +108,11 @@ E2E_PORT=4255 ./scripts/verify
 Focused Phase 2 checks:
 
 ```sh
-npx vitest run src/ui/useSimulation.test.tsx --coverage.enabled=false --reporter=dot
-E2E_PORT=4320 npm run test:e2e -- tests/e2e/career.spec.ts --grep "keeps a completed Run recap" --repeat-each=10 --reporter=dot
-E2E_PORT=4321 npm run test:e2e -- tests/e2e/verifier-round-055.spec.ts tests/e2e/verifier-round-056.spec.ts tests/e2e/verifier-round-057.spec.ts --repeat-each=10 --reporter=dot
-E2E_PORT=4333 npm run test:e2e -- tests/e2e/career.spec.ts --grep "human-paced App-session draft through Worker ticks, speed, pause, and tabs at 393px" --repeat-each=25 --reporter=dot
-E2E_PORT=4323 npm run test:e2e -- tests/e2e/career.spec.ts --grep "(visibly holds a failed Career save until a later Worker persistence retry succeeds|keeps an unsubmitted Career evening blocked through an unrelated save failure)" --repeat-each=5 --reporter=dot
+npm test -- src/ui/careerFeedbackTransactions.test.ts src/ui/useSimulation.test.tsx --coverage.enabled=false --reporter=dot
+E2E_PORT=4392 npm run test:e2e -- tests/e2e/career.spec.ts --grep "earlier completed offline recap" --repeat-each=5 --reporter=dot
+E2E_PORT=4394 npm run test:e2e -- tests/e2e/verifier-round-055.spec.ts tests/e2e/verifier-round-056.spec.ts tests/e2e/verifier-round-057.spec.ts tests/e2e/verifier-round-058.spec.ts --repeat-each=10 --reporter=dot
+E2E_PORT=4395 npm run test:e2e -- tests/e2e/career.spec.ts --grep "human-paced App-session draft" --repeat-each=25 --reporter=dot
+E2E_PORT=4396 npm run test:e2e -- tests/e2e/career.spec.ts --grep "(visibly holds a failed Career save until a later Worker persistence retry succeeds|keeps an unsubmitted Career evening blocked through an unrelated save failure)" --repeat-each=5 --reporter=dot
 ```
 
 `@playwright/test` is pinned in `package.json`; `npm run test:e2e` uses only
@@ -119,11 +127,13 @@ create its Mach-port rendezvous server; no browser test was skipped.
 - D-020 remains: successful storage, not merely a Worker response,
   acknowledges a submitted Career request. The existing lock/recovery boundary
   is unchanged.
-- D-022/D-023/D-024: a transient Career recap is keyed to its exact ordered
-  Worker boundary. The App drains every queued response after it processes the
-  matching request; a non-completion clears only feedback from that request,
-  while queued safe-offline work uses the real post-prior-command baseline and
-  waits for the same durable acknowledgement boundary.
+- D-022/D-023/D-024 remain: every recap uses its exact ordered Worker boundary;
+  the App drains processed boundaries rather than creating a durable event
+  system.
+- D-025: a Career-only `Map<requestId, transaction>` retains one independent
+  UI-session entry per relevant submitted action. Exact-once claim/completion,
+  per-ID invalidation, D-020 durable draining, and run-ending cleanup prevent
+  a later request from overwriting or erasing a prior completed feedback item.
 - Phase 2 estimates are presentation-only pure calculations over existing
   route/accounting logic. They do not issue commands, create ledger events,
   advance time, or add a parallel simulation model.
@@ -148,41 +158,43 @@ create its Mach-port rendezvous server; no browser test was skipped.
 
 ## Checks executed before handoff
 
-- `npm run format:check && npm run lint && npm run typecheck` — pass before
-  final commit preparation.
-- `npx vitest run src/ui/useSimulation.test.tsx --coverage.enabled=false --reporter=dot`
-  — 1 file / 6 tests pass; batched Worker response-boundary regression included.
-- Candidate V-063 E2E, `E2E_PORT=4320 npm run test:e2e --
-tests/e2e/career.spec.ts --grep "keeps a completed Run recap" --repeat-each=10
---reporter=dot` — 10/10 pass.
-- Immutable V-061/V-062/V-063 E2E, `E2E_PORT=4321 npm run test:e2e --
+- `npm test -- --runInBand src/ui/careerFeedbackTransactions.test.ts
+src/ui/useSimulation.test.tsx --coverage.enabled=false --reporter=dot` —
+  Vitest rejected the unsupported `--runInBand` option before test execution;
+  corrected immediately below.
+- `npm test -- src/ui/careerFeedbackTransactions.test.ts
+src/ui/useSimulation.test.tsx --coverage.enabled=false --reporter=dot` —
+  2 files / 9 tests pass: multiple independent entries, duplicate claim,
+  non-completion, exact-once durable drain, and three real ordered boundaries.
+- `npm run format:check && npm run lint && npm run typecheck` — pass after
+  production and candidate test edits.
+- Candidate V-064 E2E, `E2E_PORT=4392 npm run test:e2e --
+tests/e2e/career.spec.ts --grep "earlier completed offline recap"
+--repeat-each=5 --reporter=dot` — 5/5 pass.
+- Immutable V-064 E2E, `E2E_PORT=4393 npm run test:e2e --
+tests/e2e/verifier-round-058.spec.ts --repeat-each=10 --reporter=dot` —
+  10/10 pass.
+- Immutable V-061/V-062/V-063/V-064 E2E, `E2E_PORT=4394 npm run test:e2e --
 tests/e2e/verifier-round-055.spec.ts tests/e2e/verifier-round-056.spec.ts
-tests/e2e/verifier-round-057.spec.ts --repeat-each=10 --reporter=dot` —
-  50/50 pass.
-- V-017 retained regression, `E2E_PORT=4335 npm run test:e2e --
-tests/e2e/verifier-round-017.spec.ts --repeat-each=3 --reporter=dot` — 6/6
-  pass.
-- Human-paced 393px Career draft regression — 25/25 pass in nine isolated
-  commands (ports 4324–4332; the first eight used `--repeat-each=3`, the last
-  used `--repeat-each=1`) to avoid the local command-cell time cap.
-- Career persistence failure/recovery regression,
-  `E2E_PORT=4323 npm run test:e2e -- tests/e2e/career.spec.ts --grep
+tests/e2e/verifier-round-057.spec.ts tests/e2e/verifier-round-058.spec.ts
+--repeat-each=10 --reporter=dot` — 60/60 pass.
+- Human-paced App-session draft, `E2E_PORT=4395 npm run test:e2e --
+tests/e2e/career.spec.ts --grep "human-paced App-session draft"
+--repeat-each=25 --reporter=dot` — 50/50 pass (25 repeats at each required
+  320px and 393px width).
+- Persistence/recovery E2E, `E2E_PORT=4396 npm run test:e2e --
+tests/e2e/career.spec.ts --grep
 "(visibly holds a failed Career save until a later Worker persistence retry succeeds|keeps an unsubmitted Career evening blocked through an unrelated save failure)"
 --repeat-each=5 --reporter=dot` — 10/10 pass.
-- First isolated `E2E_PORT=4336 ./scripts/verify` exercised all functional
-  checks successfully (179/179 unit, 184/184 root E2E, 2/2 Pages E2E), but
-  exited 1 because this handoff was not yet Prettier-formatted. The formatting
-  defect was corrected before the final clean rerun below.
-- Final isolated canonical clean-state check, `E2E_PORT=4337 ./scripts/verify`
-  — exit 0: fresh `npm ci`; format; lint; typecheck; 37 unit/property files /
-  179 tests; numeric, first-session (41 seeds), 20,001-seed upgrade,
-  progression (41 seeds), Career (101 seeds), and evaluation (121 seeds)
-  balances; production build; production audit (0 vulnerabilities); 184/184
-  root E2E; 2/2 Pages/offline E2E.
-- `./scripts/run` — ready at `127.0.0.1:4173` in 71 ms; `/` and `/sw.js`
+- Canonical clean-state check, `E2E_PORT=4397 ./scripts/verify` — completed
+  passing after fresh `npm ci`: format, lint, typecheck, full unit/property
+  suite, numeric and all five deterministic balance runs, production build,
+  production audit, root pinned-Chromium E2E, and Pages/offline E2E. Both final
+  Playwright report markers record `status: passed`.
+- `./scripts/run` — ready at `127.0.0.1:4173` in 167 ms; `/` and `/sw.js`
   each returned HTTP 200; controlled shutdown left loopback unreachable (HTTP
   000).
-- `git diff --check` — pass.
+- `git diff --check` — pass before documentation finalization.
 
 ## Checks not run
 

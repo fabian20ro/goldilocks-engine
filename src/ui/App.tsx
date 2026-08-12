@@ -62,6 +62,16 @@ import {
   useCareerScheduleDraft,
 } from "./careerScheduleDraft";
 import {
+  claimCareerFeedbackTransaction,
+  clearCareerFeedbackTransactions,
+  completeCareerFeedbackTransaction,
+  createCareerFeedbackTransactionRegistry,
+  drainDurablyAcknowledgedCareerFeedback,
+  invalidateCareerFeedbackTransaction,
+  registerCareerFeedbackTransaction,
+  type CareerCompletionFeedback,
+} from "./careerFeedbackTransactions";
+import {
   careerGlyph,
   DecorativeGlyph,
   glyphs,
@@ -115,24 +125,6 @@ const TARGET_KEY = "goldilocks-next-useful-target-v1";
 interface DeletedPreset {
   preset: SavedPreset;
   index: number;
-}
-
-interface CareerCompletionFeedback {
-  requestId: number;
-  evening: number;
-  projection: CareerEveningProjection;
-  nextDecision: string;
-}
-
-interface SubmittedCareerProjection {
-  allocations: CareerScheduleDraft;
-  requestId: number;
-  result: CareerCompletionFeedback | null;
-}
-
-interface PendingOfflineCareerCompletion {
-  requestId: number;
-  result: CareerCompletionFeedback | null;
 }
 
 /**
@@ -3855,11 +3847,9 @@ export function App() {
   const dragRef = useRef<DragState | null>(null);
   const detailOriginRef = useRef<HTMLElement | null>(null);
   const placementOriginRef = useRef<HTMLElement | null>(null);
-  const submittedCareerProjectionRef = useRef<SubmittedCareerProjection | null>(
-    null,
+  const careerFeedbackTransactionsRef = useRef(
+    createCareerFeedbackTransactionRegistry(),
   );
-  const pendingOfflineCareerCompletionRef =
-    useRef<PendingOfflineCareerCompletion | null>(null);
   const tabScrollPositions = useRef<Record<TabId, number>>({
     build: 0,
     jobs: 0,
@@ -3887,11 +3877,11 @@ export function App() {
       },
     );
     if (!accepted || requestId === null) return false;
-    submittedCareerProjectionRef.current = {
+    registerCareerFeedbackTransaction(careerFeedbackTransactionsRef.current, {
+      kind: "scheduled-evening",
       allocations,
       requestId,
-      result: null,
-    };
+    });
     return true;
   }, [careerScheduleDraft, commandBatch]);
 
@@ -3901,76 +3891,66 @@ export function App() {
       requestedHours: 4,
     });
     if (requestId === null) return;
-    pendingOfflineCareerCompletionRef.current = {
+    registerCareerFeedbackTransaction(careerFeedbackTransactionsRef.current, {
+      kind: "safe-offline",
       requestId,
-      result: null,
-    };
+    });
   }, [command]);
 
   useEffect(() => {
     if (state.career.runEnding) {
-      submittedCareerProjectionRef.current = null;
-      pendingOfflineCareerCompletionRef.current = null;
+      clearCareerFeedbackTransactions(careerFeedbackTransactionsRef.current);
       setCareerCompletionFeedback(null);
     } else {
       for (const boundary of workerResponseBoundaries) {
-        const submitted = submittedCareerProjectionRef.current;
-        if (submitted?.requestId === boundary.requestId) {
-          if (
-            boundary.after.career.schedule.completedEvenings <=
-            boundary.before.career.schedule.completedEvenings
-          ) {
-            // A rejection/non-completion invalidates only the recap created by
-            // that exact request. Earlier completed boundaries stay visible.
-            submittedCareerProjectionRef.current = null;
-            clearCareerCompletionFeedbackForRequest(boundary.requestId);
-          } else {
-            submitted.result = {
-              requestId: boundary.requestId,
-              evening: boundary.after.career.schedule.completedEvenings,
-              projection: projectCareerEvening(
-                boundary.before,
-                submitted.allocations,
-              ),
-              nextDecision: nextCareerDecision(boundary.after),
-            };
-          }
-        }
-
-        const pending = pendingOfflineCareerCompletionRef.current;
-        if (pending?.requestId !== boundary.requestId) continue;
-        const projection = offlineCareerCompletionProjection(
-          boundary.before,
-          boundary.after,
+        const transaction = claimCareerFeedbackTransaction(
+          careerFeedbackTransactionsRef.current,
+          boundary.requestId,
         );
-        if (
-          !projection ||
-          boundary.after.career.schedule.completedEvenings <=
-            boundary.before.career.schedule.completedEvenings
-        ) {
-          pendingOfflineCareerCompletionRef.current = null;
+        if (!transaction) continue;
+
+        const completedEvening =
+          boundary.after.career.schedule.completedEvenings >
+          boundary.before.career.schedule.completedEvenings;
+        if (!completedEvening) {
+          // A rejection/non-completion invalidates only this exact request;
+          // previously completed request entries remain independently durable.
+          invalidateCareerFeedbackTransaction(
+            careerFeedbackTransactionsRef.current,
+            boundary.requestId,
+          );
           clearCareerCompletionFeedbackForRequest(boundary.requestId);
           continue;
         }
-        pending.result = {
+
+        const projection =
+          transaction.kind === "scheduled-evening"
+            ? projectCareerEvening(boundary.before, transaction.allocations)
+            : offlineCareerCompletionProjection(
+                boundary.before,
+                boundary.after,
+              );
+        if (!projection) {
+          invalidateCareerFeedbackTransaction(
+            careerFeedbackTransactionsRef.current,
+            boundary.requestId,
+          );
+          clearCareerCompletionFeedbackForRequest(boundary.requestId);
+          continue;
+        }
+
+        completeCareerFeedbackTransaction(transaction, {
           requestId: boundary.requestId,
           evening: boundary.after.career.schedule.completedEvenings,
           projection,
           nextDecision: nextCareerDecision(boundary.after),
-        };
+        });
       }
 
-      const completed: CareerCompletionFeedback[] = [];
-      const submitted = submittedCareerProjectionRef.current;
-      if (submitted?.result && lastDurableRequestId >= submitted.requestId) {
-        completed.push(submitted.result);
-        submittedCareerProjectionRef.current = null;
-      }
-      const pending = pendingOfflineCareerCompletionRef.current;
-      if (pending?.result && lastDurableRequestId >= pending.requestId) {
-        completed.push(pending.result);
-        pendingOfflineCareerCompletionRef.current = null;
-      }
+      const completed = drainDurablyAcknowledgedCareerFeedback(
+        careerFeedbackTransactionsRef.current,
+        lastDurableRequestId,
+      );
       if (completed.length > 0) {
         const latest = completed.reduce((current, candidate) =>
           candidate.requestId > current.requestId ? candidate : current,

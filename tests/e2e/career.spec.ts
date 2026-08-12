@@ -85,6 +85,7 @@ async function savedCareer(page: Page): Promise<{
     product?: { buildProgress?: number };
     offlinePolicy?: {
       enabled?: boolean;
+      maxHours?: number;
       lastReport?: { appliedHours?: number };
     };
   };
@@ -164,6 +165,51 @@ async function bufferTwoWorkerCommandResponses(page: Page): Promise<void> {
           }
           pending.push(event);
           if (pending.length < 2) return;
+          for (const response of pending.splice(0))
+            listener.call(this, response);
+        },
+        options,
+      );
+    };
+  });
+}
+
+async function bufferThreeWorkerCommandResponses(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    type WorkerMessageListener = (this: Worker, event: MessageEvent) => void;
+    type InterceptableWorkerPrototype = {
+      addEventListener: (
+        type: string,
+        listener: WorkerMessageListener | null,
+        options?: boolean | AddEventListenerOptions,
+      ) => void;
+    };
+    const workerPrototype = Worker.prototype as InterceptableWorkerPrototype;
+    const addEventListener = workerPrototype.addEventListener;
+    workerPrototype.addEventListener = function bufferCommandResponses(
+      this: Worker,
+      type: string,
+      listener: WorkerMessageListener | null,
+      options?: boolean | AddEventListenerOptions,
+    ) {
+      if (type !== "message" || listener === null)
+        return addEventListener.call(this, type, listener, options);
+
+      const pending: MessageEvent[] = [];
+      return addEventListener.call(
+        this,
+        type,
+        function releaseThreeCommandResponsesTogether(
+          this: Worker,
+          event: MessageEvent,
+        ) {
+          const requestId = (event.data as { requestId?: unknown }).requestId;
+          if (typeof requestId !== "number") {
+            listener.call(this, event);
+            return;
+          }
+          pending.push(event);
+          if (pending.length < 3) return;
           for (const response of pending.splice(0))
             listener.call(this, response);
         },
@@ -468,6 +514,58 @@ test.describe("Bedroom Developer career acceptance", () => {
         };
       })
       .toEqual({ completedEvenings: 1, offlineHours: 0 });
+
+    const result = page.getByRole("status", { name: "Latest evening result" });
+    await expect(result).toContainText("Night 1 result");
+    await expect(result).toContainText("4.00h used");
+    expect(pageErrors).toEqual([]);
+  });
+
+  test("keeps an earlier completed offline recap through a batched policy change and zero-hour apply", async ({
+    page,
+  }) => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error") pageErrors.push(message.text());
+    });
+    await page.setViewportSize({ width: 393, height: 742 });
+    await page.addInitScript(
+      ({ key, value }) => localStorage.setItem(key, value),
+      { key: SAVE_KEY, value: safeOfflineReadySave(4) },
+    );
+    await bufferThreeWorkerCommandResponses(page);
+    await page.goto("/");
+    await waitForSavedState(page);
+    await openCareer(page);
+    await openCareerDisclosure(page, "Safe freelance-only automation");
+
+    // Three real Worker responses arrive in one browser task: a completing
+    // safe apply, a policy save, then a valid zero-hour apply. Only the two
+    // apply requests have recap transactions, so the last response cannot
+    // replace or erase the first completed result.
+    await page
+      .getByRole("button", { name: "Apply safe offline policy now" })
+      .click();
+    await page.getByLabel("Offline maximum hours").fill("0");
+    await page
+      .getByRole("button", { name: "Save safe offline policy" })
+      .click();
+    await page
+      .getByRole("button", { name: "Apply safe offline policy now" })
+      .click();
+
+    await expect
+      .poll(async () => {
+        const saved = await savedCareer(page);
+        return {
+          completedEvenings: saved.career?.schedule?.completedEvenings ?? 0,
+          maxHours: saved.career?.offlinePolicy?.maxHours ?? -1,
+          offlineHours:
+            saved.career?.offlinePolicy?.lastReport?.appliedHours ?? -1,
+        };
+      })
+      .toEqual({ completedEvenings: 1, maxHours: 0, offlineHours: 0 });
 
     const result = page.getByRole("status", { name: "Latest evening result" });
     await expect(result).toContainText("Night 1 result");
