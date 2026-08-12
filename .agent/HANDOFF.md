@@ -1,4 +1,4 @@
-# Candidate handoff — round 060 V-065 production dependency boundary repair
+# Candidate handoff — round 061 publication integration
 
 ## Implemented behavior summary
 
@@ -39,23 +39,34 @@
 - `vite` and `@vitejs/plugin-react` are now explicitly build/test-only
   development dependencies. React and ReactDOM remain the shipped browser
   runtime dependencies; no application or dependency version changed.
+- Owner migration `60c1b5c` is integrated with recorded cherry-pick
+  provenance. The active GitHub Pages package, manifests, service-worker
+  registration, update fixtures, Pages checks, and documentation now use
+  `/goldilocks-engine/` at `fabian20ro/goldilocks-engine`; root packaging
+  remains `/`. Existing `goldilocks-*` local storage/preset keys remain
+  intentionally unchanged.
 
 ## Plan requirements covered
 
-| Requirement                                                                    | Evidence                                                                                                                                                                  |
-| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| §20.7 Phase 2 compact hierarchy/composer                                       | `CareerView`, `career-hierarchy.spec.ts`; 320/393 objective, resources, route controls, single Run, geometry evidence                                                     |
-| Four stable routes; benefits, opportunity cost, exact Details                  | catalog `primaryBenefit`; component Details replacement/focus test; live catalog/state projections                                                                        |
-| Projections and shared currency precision                                      | pure engine projections; projection/currency unit tests; Details exact 3-decimal values                                                                                   |
-| Completion summary, response ordering, recovery attribution, and next decision | request-keyed pure registry + three-boundary hook coverage; buffered real-Worker apply → policy save → zero-hour apply; immutable V-064/V-063/V-062/V-061 E2E regressions |
-| Progressive disclosure                                                         | ordered native disclosure E2E coverage; retained actions open only through their appropriate detail section                                                               |
-| Empty/partial/full/rejected/completed/locked/exit-ready deck                   | committed Playwright deck emits all seven named screenshots at 320 and 393 CSS pixels                                                                                     |
-| Accessibility/responsiveness                                                   | 320/393, keyboard, CDP touch, labels, focus restoration, 100/200% text, reduced-motion, no horizontal/nested composer scrolling                                           |
-| Retained Phase 0/1 persistence/offline/recovery                                | canonical root E2E includes V-051–V-060 and offline/PWA/reload coverage                                                                                                   |
-| Phase 4 production dependency audit                                            | manifest/lock boundary unit test; clean omitted-dev install; zero-result production audit JSON/tree; clean build, Pages, and canonical verification                       |
+| Requirement                                                                    | Evidence                                                                                                                                                                           |
+| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| §20.7 Phase 2 compact hierarchy/composer                                       | `CareerView`, `career-hierarchy.spec.ts`; 320/393 objective, resources, route controls, single Run, geometry evidence                                                              |
+| Four stable routes; benefits, opportunity cost, exact Details                  | catalog `primaryBenefit`; component Details replacement/focus test; live catalog/state projections                                                                                 |
+| Projections and shared currency precision                                      | pure engine projections; projection/currency unit tests; Details exact 3-decimal values                                                                                            |
+| Completion summary, response ordering, recovery attribution, and next decision | request-keyed pure registry + three-boundary hook coverage; buffered real-Worker apply → policy save → zero-hour apply; immutable V-064/V-063/V-062/V-061 E2E regressions          |
+| Progressive disclosure                                                         | ordered native disclosure E2E coverage; retained actions open only through their appropriate detail section                                                                        |
+| Empty/partial/full/rejected/completed/locked/exit-ready deck                   | committed Playwright deck emits all seven named screenshots at 320 and 393 CSS pixels                                                                                              |
+| Accessibility/responsiveness                                                   | 320/393, keyboard, CDP touch, labels, focus restoration, 100/200% text, reduced-motion, no horizontal/nested composer scrolling                                                    |
+| Retained Phase 0/1 persistence/offline/recovery                                | canonical root E2E includes V-051–V-060 and offline/PWA/reload coverage                                                                                                            |
+| Phase 4 production dependency audit                                            | manifest/lock boundary unit test; clean omitted-dev install; zero-result production audit JSON/tree; clean build, Pages, and canonical verification                                |
+| Publication/PWA scope integration                                              | owner migration `60c1b5c`; Pages build metadata, A/B deployment fixtures, root/Pages worker isolation, stale-URL recovery, and current documentation all use `/goldilocks-engine/` |
 
 ## Verifier findings addressed
 
+- Publication integration: owner-authorized `60c1b5c` is preserved as a
+  cherry-pick commit. It changes only the active deployment URL/scope and
+  internal PWA build/version protocol spelling; it deliberately preserves
+  historical verifier reports and existing Goldilocks save/storage keys.
 - V-065: Vite and its React plugin were misclassified as shipped runtime
   packages despite appearing only in build configuration and build/test scripts.
   They now live under `devDependencies`, with their locked Vite/PostCSS chain
@@ -114,6 +125,14 @@ readiness, and lets Playwright clean them up:
 E2E_PORT=4255 ./scripts/verify
 ```
 
+The active Pages package is `https://fabian20ro.github.io/goldilocks-engine/`.
+Its local exact-scope check is:
+
+```sh
+npm run build:pages
+E2E_PORT=4256 npm run test:e2e:pages
+```
+
 Focused Phase 2 checks:
 
 ```sh
@@ -156,6 +175,10 @@ create its Mach-port rendezvous server; no browser test was skipped.
   their locked transitive build chain are dev-only. Ordinary `npm ci` remains
   required for local build, browser checks, verification lanes, and Pages CI;
   the production audit remains an unmodified omit-dev gate.
+- D-008 deployment contract now names `/goldilocks-engine/` as the one active
+  GitHub Pages subpath. PWA cache isolation still keys by actual scope; old
+  `goldilocks-*` durable storage keys remain compatibility data, not a URL
+  identity to migrate.
 - Phase 2 estimates are presentation-only pure calculations over existing
   route/accounting logic. They do not issue commands, create ledger events,
   advance time, or add a parallel simulation model.
@@ -178,6 +201,9 @@ create its Mach-port rendezvous server; no browser test was skipped.
 - Completion feedback is an in-tab compact recap. Reload retains the durable
   evening outcome in the existing state/ledger but intentionally does not
   preserve that transient recap panel.
+- Remote push, hosted workflow aggregation, and exact-SHA Pages publication
+  remain external release steps and were not performed by this local
+  integration candidate.
 
 ## Checks executed before handoff
 
@@ -231,6 +257,25 @@ test:e2e:pages -- --reporter=dot` — 2/2 pass.
 - Startup/cleanup, `./scripts/run` — Vite ready at `127.0.0.1:4173` in 81 ms;
   `/` and `/sw.js` each returned HTTP 200. Controlled `SIGINT` shutdown left
   the loopback endpoint unreachable (curl HTTP 000).
+- Publication integration preflight, `npm run format:check && npm run lint &&
+npm run typecheck && npm audit --omit=dev --audit-level=high --json && npm
+run build:pages` — pass; Pages `build-info.json` scope/cache and asset
+  manifest use `/goldilocks-engine/`, and generated worker uses
+  `GOLDILOCKS_PWA_VERSION`.
+- Owner-scope PWA regression, `E2E_PORT=4421 npm run test:e2e --
+tests/e2e/pwa-update.spec.ts tests/e2e/verifier-round-027.spec.ts
+tests/e2e/verifier-round-028.spec.ts tests/e2e/verifier-round-029.spec.ts
+--reporter=dot` — 22/22 pass: root/Pages A→B update, malformed/partial
+  candidate retention, stale URL repair, and live nested-shell isolation.
+- Final canonical integration run, `E2E_PORT=4424 ./scripts/verify` — pass
+  after fresh `npm ci`: format, lint, typecheck, 40 files / 186 unit tests,
+  numeric and all deterministic balance runs, production build, zero-result
+  production audit, root E2E, and migrated Pages/offline E2E. Both final
+  Playwright report markers record `status: passed`.
+- Final startup/cleanup, `./scripts/run` — Vite ready at
+  `127.0.0.1:4173` in 88 ms; `/` and `/sw.js` each returned HTTP 200.
+  Controlled `SIGINT` shutdown left the loopback endpoint unreachable (curl
+  HTTP 000).
 - `git diff --check` — pass before documentation finalization.
 
 ## Checks not run
