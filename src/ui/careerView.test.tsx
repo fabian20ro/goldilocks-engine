@@ -193,6 +193,31 @@ describe("Phase 4 compact money boundaries", () => {
     ).toHaveTextContent("Run private evaluation · $0.75");
   });
 
+  it("formats model-tier card requirements with compact cents", () => {
+    render(
+      <CareerView
+        state={createInitialState(20_710)}
+        command={vi.fn()}
+        scheduleDraft={emptySchedule}
+        scheduledDraftHours={0}
+        onScheduleDraftChange={vi.fn()}
+        hasDurablePersistenceFailure={false}
+        isRunBlocked={false}
+        onRunScheduledEvening={() => true}
+        onApplySafeOfflinePolicyNow={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText("Show Model tiers and quantization"));
+
+    expect(screen.getByText(/Unlock with \$8\.00 saved/)).toBeVisible();
+    expect(
+      screen.getByText(
+        /Unlock with \$18\.00 saved plus either the competition prize or \$8\.00 product revenue/,
+      ),
+    ).toBeVisible();
+  });
+
   it("keeps Queue 10 range endpoints compact despite middle mill quotes", () => {
     const state = createEstablishedScenarioState();
     const quotes = Array.from(

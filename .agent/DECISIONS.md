@@ -532,6 +532,16 @@
   portions, and the cash floor all call the fixed-three-decimal formatter in
   every success and failure branch. This changes presentation only; the
   settlement equation and money arithmetic remain unchanged.
+- **Capital and exit ledger boundary:** Module, hardware, and expansion
+  purchase or insufficient-funds events, plus the Bedroom exit savings
+  milestone, are durable accounting records and use fixed-three currency.
+  Purchase controls remain compact. Existing cents-era purchase records remain
+  accepted only as historical provenance during safe stale-save recovery; new
+  records are never written at cents precision.
+- **Tier requirement boundary:** Career model-tier requirements are compact
+  choice-card copy. Their visible monetary thresholds use the shared
+  cents-default formatter while their catalog eligibility criteria remain
+  unchanged.
 - **Quote-range precision boundary:** Queue 10 is a non-additive preview, not
   a settlement equation. Its first and last labels format each displayed
   endpoint independently; undisplayed reserved quotes never promote either

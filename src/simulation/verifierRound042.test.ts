@@ -72,7 +72,7 @@ describe("round 042 independent first-session recovery probes", () => {
     expect(state.ledger).toHaveLength(80);
     expect(
       state.ledger.some((event) =>
-        event.message.includes("Precision Cleaner purchased for $4.00"),
+        event.message.includes("Precision Cleaner purchased for $4.000"),
       ),
     ).toBe(false);
     expect(

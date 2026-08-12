@@ -90,6 +90,13 @@ import {
 
 type TabId = "build" | "jobs" | "career" | "upgrades" | "inspect";
 
+/** Model-tier requirement copy is a compact card disclosure, not accounting. */
+function formatModelTierRequirement(requirement: string): string {
+  return requirement.replace(/\$(\d+(?:\.\d+)?)/g, (_, amount: string) =>
+    formatCompactCurrency(Number(amount)),
+  );
+}
+
 interface DragState {
   moduleId: string;
   fromSlotId?: string;
@@ -1476,7 +1483,7 @@ function MoneyLoop({
                 {settlementMoney(settlement.operatingCost)} configured actual
                 costs
                 {settlementUnpaidCost > 0
-                  ? ` · ${settlementMoney(settlementPaidCost)} paid · ${settlementMoney(settlementUnpaidCost)} unpaid because cash cannot go below ${formatCompactCurrency(0)}`
+                  ? ` · ${settlementMoney(settlementPaidCost)} paid · ${settlementMoney(settlementUnpaidCost)} unpaid because cash cannot go below ${settlementMoney(0)}`
                   : " · paid in full"}
                 {settlementCurrencyPrecision === 3
                   ? " · Three decimals shown to preserve sub-cent accounting."
@@ -3443,7 +3450,8 @@ export function CareerView({
                       {tier.name} · {tier.shortName}
                     </strong>
                     <small>
-                      {tier.description} {unlock.requirement}
+                      {tier.description}{" "}
+                      {formatModelTierRequirement(unlock.requirement)}
                     </small>
                   </span>
                   <span className="choice-stat">

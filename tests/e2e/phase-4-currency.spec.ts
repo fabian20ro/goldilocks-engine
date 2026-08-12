@@ -17,6 +17,23 @@ async function savedState(page: Page): Promise<SimulationState> {
   }, SAVE_KEY);
 }
 
+async function setSavedMoney(page: Page, money: number): Promise<void> {
+  await expect
+    .poll(() => page.evaluate((key) => localStorage.getItem(key), SAVE_KEY))
+    .not.toBeNull();
+  await page.evaluate(
+    ({ key, value }) => {
+      const state = JSON.parse(localStorage.getItem(key) ?? "null") as {
+        resources: { money: number };
+      };
+      state.resources.money = value;
+      localStorage.setItem(key, JSON.stringify(state));
+    },
+    { key: SAVE_KEY, value: money },
+  );
+  await page.reload({ waitUntil: "domcontentloaded" });
+}
+
 async function openTab(page: Page, label: string) {
   await page
     .getByRole("navigation", { name: "Primary" })
@@ -150,5 +167,80 @@ test("keeps V-071 compact disclosures separate from exact failed-settlement acco
   await page.reload({ waitUntil: "domcontentloaded" });
   await openTab(page, "Inspect");
   await expect(page.locator(".event-log")).toContainText(exactFailure);
+  expect(errors).toEqual([]);
+});
+
+test("keeps the settlement cash floor in its promoted equation and tier requirements compact", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(`page: ${error.message}`));
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(`console: ${message.text()}`);
+  });
+
+  await page.setViewportSize({ width: 393, height: 850 });
+  await page.goto("/");
+  await setSavedMoney(page, 0.005);
+  await removeStarterProcessingModules(page);
+
+  await openTab(page, "Jobs");
+  await page.getByRole("button", { name: "64×", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: "Queue one safe Interactive Chat job",
+      exact: true,
+    })
+    .click();
+
+  const latestSettlement = page
+    .getByText("Latest settlement", { exact: true })
+    .locator("..");
+  await expect(latestSettlement).toContainText(
+    "$0.010 configured actual costs · $0.005 paid · $0.005 unpaid because cash cannot go below $0.000",
+  );
+
+  await openTab(page, "Career");
+  await page
+    .getByLabel("Show Model tiers and quantization", { exact: true })
+    .click();
+  await expect(page.locator(".career-model-list")).toContainText(
+    "Unlock with $8.00 saved, one competition submission, or one product release.",
+  );
+  await expect(page.locator(".career-model-list")).toContainText(
+    "Unlock with $18.00 saved plus either the competition prize or $8.00 product revenue.",
+  );
+  expect(errors).toEqual([]);
+});
+
+test("persists capital purchase accounting at fixed three decimals", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(`page: ${error.message}`));
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(`console: ${message.text()}`);
+  });
+
+  await page.setViewportSize({ width: 393, height: 850 });
+  await page.goto("/");
+  await setSavedMoney(page, 4);
+  await openTab(page, "Jobs");
+  await settleStarterJob(page);
+
+  await openTab(page, "Upgrades");
+  await page
+    .getByRole("button", {
+      name: "Buy Precision Cleaner for $4.00",
+      exact: true,
+    })
+    .click();
+
+  const expected = "Precision Cleaner purchased for $4.000 and is now owned.";
+  await openTab(page, "Inspect");
+  await expect(page.locator(".event-log")).toContainText(expected);
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await openTab(page, "Inspect");
+  await expect(page.locator(".event-log")).toContainText(expected);
   expect(errors).toEqual([]);
 });

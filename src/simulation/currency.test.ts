@@ -36,6 +36,9 @@ describe("currency equation formatting", () => {
     expect(formatCompactCurrency(0.005)).toBe("$0.005");
     expect(formatCompactCurrency(0.01, [0.005, 0.005, -0.01])).toBe("$0.010");
     expect(formatCompactCurrency(-0.01, [0.005, 0.005, -0.01])).toBe("-$0.010");
+    expect(formatCompactCurrency(0, [0.01, 0.005, 0.005, -0.01])).toBe(
+      "$0.000",
+    );
   });
 
   it("keeps non-additive range endpoints independent of undisplayed mills", () => {

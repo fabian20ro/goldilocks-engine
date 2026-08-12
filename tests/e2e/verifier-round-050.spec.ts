@@ -323,7 +323,7 @@ test("verifier round 050: audited paid completion survives stale-save recovery w
     (event) =>
       event.kind === "success" &&
       event.message ===
-        "Precision Cleaner purchased for $4.00 and is now owned. Add it to a compatible process slot in Build; purchase deducted exactly once.",
+        "Precision Cleaner purchased for $4.000 and is now owned. Add it to a compatible process slot in Build; purchase deducted exactly once.",
   ).length;
   expect(expectedPurchaseEvents).toBe(1);
 
@@ -368,7 +368,7 @@ test("verifier round 050: audited paid completion survives stale-save recovery w
           (event) =>
             event.kind === "success" &&
             event.message ===
-              "Precision Cleaner purchased for $4.00 and is now owned. Add it to a compatible process slot in Build; purchase deducted exactly once.",
+              "Precision Cleaner purchased for $4.000 and is now owned. Add it to a compatible process slot in Build; purchase deducted exactly once.",
         ),
       ).toHaveLength(1);
     };

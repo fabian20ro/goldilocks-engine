@@ -107,7 +107,7 @@ describe("verifier round 041: stale purchase provenance", () => {
     expect(completed.resources.money).toBe(moneyBeforePurchase - 4);
     expect(
       completed.ledger.some((event) =>
-        event.message.includes("purchased for $4.00"),
+        event.message.includes("purchased for $4.000"),
       ),
     ).toBe(true);
     expect(restored.firstSession.step).toBe("complete");

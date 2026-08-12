@@ -50,7 +50,7 @@ import {
   type WorkloadDemandState,
   type WorkloadQuote,
 } from "./types";
-import { formatExactCurrency } from "./currency";
+import { formatCurrency, formatExactCurrency } from "./currency";
 
 const MAX_LEDGER_EVENTS = 80;
 const MAX_QUEUED_TASKS = 99;
@@ -67,6 +67,7 @@ const CAREER_ROUTES: readonly CareerRoute[] = [
 const QUANTIZATION_PROFILES: readonly QuantizationProfile[] = ["q4", "q8"];
 const MAX_OFFLINE_HOURS = 4;
 export const PRIVATE_EVALUATION_COST = 0.75;
+const BEDROOM_EXIT_SAVINGS_REQUIRED = 24;
 const MIN_PRIVATE_EVALUATION_COVERAGE_GAIN = 0.25;
 const MAX_PRIVATE_EVALUATION_COVERAGE_GAIN = 0.5;
 const MAX_EVALUATION_SPEND = 10_000;
@@ -269,20 +270,31 @@ function hasInstalledFirstSessionPurchase(state: SimulationState): boolean {
  * event that the command boundary writes, rather than infer a purchase from
  * current cash, inventory, or a module's position in the pipeline.
  */
-function modulePurchaseLedgerMessage(moduleId: string): string | null {
+function modulePurchaseLedgerMessage(
+  moduleId: string,
+  formatMoney: (amount: number) => string = formatExactCurrency,
+): string | null {
   const item = findModule(moduleId);
   if (!item || item.purchaseCost <= 0) return null;
-  return `${item.name} purchased for $${item.purchaseCost.toFixed(2)} and is now owned. Add it to a compatible ${item.slotTypes.join("/")} slot in Build; purchase deducted exactly once.`;
+  return `${item.name} purchased for ${formatMoney(item.purchaseCost)} and is now owned. Add it to a compatible ${item.slotTypes.join("/")} slot in Build; purchase deducted exactly once.`;
 }
 
 function hasRecordedFirstSessionPurchase(state: SimulationState): boolean {
   const purchasedModuleId = state.firstSession.purchasedModuleId;
   if (!purchasedModuleId) return false;
-  const message = modulePurchaseLedgerMessage(purchasedModuleId);
+  const messages = [
+    modulePurchaseLedgerMessage(purchasedModuleId),
+    // Existing saved purchase evidence predates exact ledger presentation.
+    // Keep it as valid provenance during safe stale-save recovery; new events
+    // always use the fixed-three default above.
+    modulePurchaseLedgerMessage(purchasedModuleId, (amount) =>
+      formatCurrency(amount, 2),
+    ),
+  ].filter((message): message is string => message !== null);
   return (
-    message !== null &&
+    messages.length > 0 &&
     state.ledger.some(
-      (event) => event.kind === "success" && event.message === message,
+      (event) => event.kind === "success" && messages.includes(event.message),
     )
   );
 }
@@ -1371,7 +1383,7 @@ export function localModelTierUnlockProgress(
 
 function careerExitSatisfied(career: CareerState): boolean {
   return (
-    career.savings >= 24 &&
+    career.savings >= BEDROOM_EXIT_SAVINGS_REQUIRED &&
     career.competition.submissions >= 1 &&
     career.product.released &&
     career.unlockedModelTierIds.includes("kiln-13b")
@@ -1405,8 +1417,7 @@ function refreshCareerUnlocks(state: SimulationState): SimulationState {
       },
       {
         kind: "success",
-        message:
-          "Bedroom Developer exit reached: $24 durable savings, a submitted competition entry, a released local product, and the Kiln 13B tier are in place.",
+        message: `Bedroom Developer exit reached: ${formatExactCurrency(BEDROOM_EXIT_SAVINGS_REQUIRED)} durable savings, a submitted competition entry, a released local product, and the Kiln 13B tier are in place.`,
       },
     );
   }
@@ -2402,7 +2413,7 @@ function applyValidCommand(
       if (state.resources.money < item.purchaseCost)
         return withUpgradeNotice(state, {
           kind: "warning",
-          message: `${item.name} costs $${item.purchaseCost.toFixed(2)}; $${(item.purchaseCost - state.resources.money).toFixed(2)} more is required. No money was deducted.`,
+          message: `${item.name} costs ${formatExactCurrency(item.purchaseCost)}; ${formatExactCurrency(item.purchaseCost - state.resources.money)} more is required. No money was deducted.`,
         });
       return recordCapitalCommitment(
         withUpgradeNotice(
@@ -2416,7 +2427,7 @@ function applyValidCommand(
           },
           {
             kind: "success",
-            message: `${item.name} purchased for $${item.purchaseCost.toFixed(2)} and is now owned. Equip it to apply its constraints; purchase deducted exactly once.`,
+            message: `${item.name} purchased for ${formatExactCurrency(item.purchaseCost)} and is now owned. Equip it to apply its constraints; purchase deducted exactly once.`,
           },
         ),
         item.purchaseCost,
@@ -2473,7 +2484,7 @@ function applyValidCommand(
       if (state.resources.money < item.purchaseCost)
         return withUpgradeNotice(state, {
           kind: "warning",
-          message: `${item.name} costs $${item.purchaseCost.toFixed(2)}; $${(item.purchaseCost - state.resources.money).toFixed(2)} more is required. No money was deducted.`,
+          message: `${item.name} costs ${formatExactCurrency(item.purchaseCost)}; ${formatExactCurrency(item.purchaseCost - state.resources.money)} more is required. No money was deducted.`,
         });
       const purchased = {
         ...state,
@@ -2514,7 +2525,7 @@ function applyValidCommand(
       if (state.resources.money < item.purchaseCost)
         return withUpgradeNotice(state, {
           kind: "warning",
-          message: `${item.name} costs $${item.purchaseCost.toFixed(2)}; $${(item.purchaseCost - state.resources.money).toFixed(2)} more is required. No money was deducted.`,
+          message: `${item.name} costs ${formatExactCurrency(item.purchaseCost)}; ${formatExactCurrency(item.purchaseCost - state.resources.money)} more is required. No money was deducted.`,
         });
       return recordCapitalCommitment(
         withUpgradeNotice(
@@ -2528,7 +2539,7 @@ function applyValidCommand(
           },
           {
             kind: "success",
-            message: `${item.name} purchased for $${item.purchaseCost.toFixed(2)} and is now owned. Activate it explicitly; its three new positions start empty and no module was bought or filled automatically.`,
+            message: `${item.name} purchased for ${formatExactCurrency(item.purchaseCost)} and is now owned. Activate it explicitly; its three new positions start empty and no module was bought or filled automatically.`,
           },
         ),
         item.purchaseCost,

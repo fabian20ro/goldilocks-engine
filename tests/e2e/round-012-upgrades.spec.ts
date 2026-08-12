@@ -109,7 +109,7 @@ test.describe("round 012 persistent upgrade economy and UX", () => {
     await expect(buy).toBeEnabled();
     await buy.click();
     await expect(page.getByLabel("Latest upgrade action")).toContainText(
-      "purchased for $4.00 and is now owned",
+      "purchased for $4.000 and is now owned",
     );
     await page
       .getByRole("button", { name: "Place Precision Cleaner in Build" })

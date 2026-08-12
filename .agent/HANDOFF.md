@@ -1,4 +1,4 @@
-# Candidate handoff — round 069 Phase 4 currency disclosure repair
+# Candidate handoff — round 070 Phase 4 accounting disclosure repair
 
 ## Implemented behavior summary
 
@@ -24,6 +24,16 @@
   accounting, and ledger-style disclosures through `formatExactCurrency`.
   Money arithmetic, purchases, quotes, Worker authority, persistence, and
   simulation state are unchanged.
+- A Jobs settlement cash-floor term now uses the same related-equation
+  precision as the visible gross, configured, paid, unpaid, and net terms.
+  Mill rows therefore render the floor as `$0.000`; ordinary rows stay compact.
+- Durable module, hardware, and Workstation Expansion purchase/rejection
+  records, plus the Bedroom exit-savings milestone, use fixed-three currency.
+  Purchase controls stay compact. Cents-era purchase records remain accepted
+  solely as historical provenance during safe stale-save recovery.
+- Career model-tier requirement cards format their visible $8/$18 thresholds
+  with `formatCompactCurrency` (`$8.00` / `$18.00`) without changing catalog
+  eligibility mechanics or Details accounting.
 - Inspect's configuration panel now begins with one compact diagnostic strip:
   dominant bottleneck, existing `ComparisonDelta` baseline throughput, and the
   latest retained causal evidence. Existing guidance, upgrade feedback, and
@@ -74,6 +84,16 @@
   Candidate engine, Career component, and reload-safe browser coverage lock
   the three boundaries; the unchanged round-068 adversarial probe returns no
   findings.
+- V-072: the Jobs settlement cash floor now uses the same displayed equation
+  precision as gross, configured, paid, unpaid, and net terms. Candidate unit
+  and browser coverage lock the `$0.000` floor on a partial mill settlement.
+- V-073: module, hardware, and expansion success/insufficient-funds records,
+  and the Bedroom exit record, use fixed-three accounting currency. Candidate
+  engine and reload-safe browser coverage cover all branches; retained
+  first-session provenance tests keep cents-era persisted records recoverable.
+- V-074: model-tier requirement cards call the compact formatter for each
+  independent threshold. Candidate component and browser coverage lock Harbor
+  `$8.00` and Kiln `$18.00`/`$8.00` copy.
 - V-066 and V-067 remain preserved: selected Build ordering still favors a
   compatible actionable owned choice, and the narrow sticky placement tray
   keeps a visible, cancellable 44px action at enlarged text.
@@ -117,10 +137,11 @@ E2E_PORT=4257 ./scripts/verify
 Focused Phase 4 checks:
 
 ```sh
-npx vitest run --coverage=false src/simulation/currency.test.ts src/simulation/engine.test.ts src/simulation/verifierRound017.test.ts src/simulation/verifierRound018.test.ts src/ui/careerView.test.tsx src/ui/commandDeck.test.tsx src/ui/moduleInventory.test.ts
-E2E_PORT=4256 npm run test:e2e -- tests/e2e/command-deck.spec.ts tests/e2e/phase-3-density.spec.ts tests/e2e/career-hierarchy.spec.ts tests/e2e/career.spec.ts tests/e2e/phase-4-currency.spec.ts --reporter=dot
-E2E_PORT=4272 ./scripts/run-e2e
-PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright BASE_URL=http://127.0.0.1:4272 OUTPUT_DIR=/tmp/goldlocks-r069-round-068-adversarial node .agent/verification/round-068-adversarial.mjs
+npx vitest run --coverage=false src/simulation/currency.test.ts src/simulation/capitalLedgerCurrency.test.ts src/simulation/verifierRound041.test.ts src/simulation/verifierRound042.test.ts src/simulation/verifierRound069.test.ts src/ui/careerView.test.tsx
+E2E_PORT=4283 npm run test:e2e -- tests/e2e/command-deck.spec.ts tests/e2e/phase-3-density.spec.ts tests/e2e/career-hierarchy.spec.ts tests/e2e/career.spec.ts tests/e2e/phase-4-currency.spec.ts --reporter=dot
+E2E_PORT=4282 ./scripts/run-e2e
+PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright BASE_URL=http://127.0.0.1:4282 OUTPUT_DIR=/tmp/goldlocks-r070-round-067-adversarial node .agent/verification/round-067-adversarial.mjs
+PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright BASE_URL=http://127.0.0.1:4282 OUTPUT_DIR=/tmp/goldlocks-r070-round-068-adversarial node .agent/verification/round-068-adversarial.mjs
 ```
 
 The active Pages package remains
@@ -147,6 +168,11 @@ skipped.
   undisplayed reservations. The private-evaluation action and Build warning
   are independent compact disclosures; settlement ledger equations opt into
   exact fixed-three currency for each visible accounting term.
+- D-030 additionally distinguishes compact settlement summary precision from
+  fixed-three durable capital/exit ledger records. A cash floor is a visible
+  member of a related settlement equation; model-tier card thresholds remain
+  independent compact values. Recovery recognizes the prior cents purchase
+  wording only as historical provenance.
 - Inspect adds one local priority strip and reuses the existing comparison
   component. No new page, drawer, state schema, Worker command, asset, or
   research/design-system abstraction was added.
@@ -168,32 +194,34 @@ skipped.
 ## Checks executed before handoff
 
 - `npm run format:check`; `npm run lint`; `npm run typecheck` — pass.
-- `npx vitest run --coverage=false src/simulation/currency.test.ts src/simulation/engine.test.ts src/simulation/verifierRound017.test.ts src/simulation/verifierRound018.test.ts src/ui/careerView.test.tsx src/ui/commandDeck.test.tsx src/ui/moduleInventory.test.ts`
-  — 7 files / 81 tests pass.
-- `E2E_PORT=4271 npm run test:e2e -- tests/e2e/phase-4-currency.spec.ts --reporter=dot`
-  — 2/2 candidate currency regressions pass.
-- `E2E_PORT=4256 npm run test:e2e -- tests/e2e/phase-4-currency.spec.ts tests/e2e/command-deck.spec.ts --reporter=dot`
-  — 10/10 retained Phase 4 browser checks pass.
-- `E2E_PORT=4261 npm run test:e2e -- tests/e2e/verifier-round-016.spec.ts tests/e2e/phase-4-currency.spec.ts --reporter=dot`
-  — 3/3 pass after the retained guaranteed-failure assertion adopted the same
-  compact formatter contract; its no-positive-net behavior is unchanged.
-- Logged `E2E_PORT=4260 npm run test:e2e -- tests/e2e/command-deck.spec.ts tests/e2e/phase-3-density.spec.ts tests/e2e/career-hierarchy.spec.ts tests/e2e/career.spec.ts tests/e2e/phase-4-currency.spec.ts --reporter=dot`
-  — 36/36 pass. It includes starter/expanded 320×693 and 393×742, 200%-text
-  reduced-motion, Build placement, Career, and all three V-071 boundaries.
-- Fresh loopback preview at `127.0.0.1:4272`; unchanged immutable probe:
-  `PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright BASE_URL=http://127.0.0.1:4272 OUTPUT_DIR=/tmp/goldlocks-r069-round-068-adversarial node .agent/verification/round-068-adversarial.mjs`
-  — `findings: []`. The probe was neither edited nor bypassed.
-- Final logged `E2E_PORT=4257 ./scripts/verify` — exit `0` at
-  `2026-08-12T21:28:32Z`: format, lint, typecheck; 42 unit files / 201 tests;
-  coverage statements/branches/functions/lines
-  `88.92% / 85.88% / 96.10% / 92.33%`; numeric, first-session (41), upgrades
-  (20,001), progression (41), Career (101), and evaluation (121) balances;
-  production build/audit (`0 vulnerabilities`); root Playwright 202/202;
-  Pages Playwright 2/2.
-- `./scripts/run` loopback startup/readiness/cleanup — `127.0.0.1:4173`
-  returned `200` with the `The Goldilocks Engine` shell; the temporary
-  `goldlocks-r069-startup-final` session was stopped and a subsequent fetch
-  failed as expected.
+- `npx vitest run --coverage=false src/simulation/currency.test.ts src/simulation/capitalLedgerCurrency.test.ts src/simulation/verifierRound041.test.ts src/simulation/verifierRound042.test.ts src/simulation/verifierRound069.test.ts src/ui/careerView.test.tsx`
+  — 6 files / 34 tests pass.
+- Exact verifier browser regression:
+  `E2E_PORT=4280 npm run test:e2e -- tests/e2e/verifier-round-069.spec.ts --reporter=list`
+  — 3/3 pass.
+- Candidate currency browser regression:
+  `E2E_PORT=4281 npm run test:e2e -- tests/e2e/phase-4-currency.spec.ts --reporter=list`
+  — 4/4 pass.
+- Focused Phase 3/4 portrait and Career matrix:
+  `E2E_PORT=4283 npm run test:e2e -- tests/e2e/command-deck.spec.ts tests/e2e/phase-3-density.spec.ts tests/e2e/career-hierarchy.spec.ts tests/e2e/career.spec.ts tests/e2e/phase-4-currency.spec.ts --reporter=dot`
+  — 38/38 pass; starter/expanded 320×693 and 393×742, 200%-text,
+  placement, Career, and currency boundaries.
+- Retained purchase/recovery and verifier browser tests:
+  `E2E_PORT=4284 npm run test:e2e -- tests/e2e/round-012-upgrades.spec.ts tests/e2e/verifier-round-050.spec.ts tests/e2e/verifier-round-069.spec.ts --reporter=list`
+  — 12/12 pass.
+- Fresh production preview at `127.0.0.1:4282`; unchanged immutable probes:
+  round-067 and round-068 commands above — each returned `findings: []`.
+  Neither probe was edited or bypassed.
+- Final isolated canonical command from these final files:
+  `E2E_PORT=4291 ./scripts/verify`, captured at
+  `/tmp/goldlocks-r070-canonical.log` — 44 unit files / 217 tests;
+  first-session 41, upgrades 20,001, progression 41, Career 101, and
+  evaluation 121 balance seeds without failures; production audit `0`
+  vulnerabilities; root Playwright 207/207; Pages 2/2. Terminal validation
+  marker: `R070_CANONICAL_EXIT=0`.
+- `./scripts/run` — `127.0.0.1:4173` returned the `The Goldilocks Engine`
+  shell; temporary `goldlocks-r070-startup` was stopped and the port then
+  returned connection refused.
 
 ## Checks not run
 
