@@ -2,7 +2,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useRef, useState } from "react";
 import { describe, expect, it } from "vitest";
-import { DetailsSurface, StatusGauge } from "./commandDeck";
+import { ComparisonDelta, DetailsSurface, StatusGauge } from "./commandDeck";
 import {
   glyphs,
   navigationItems,
@@ -93,5 +93,23 @@ describe("emoji command-deck primitives", () => {
     expect(
       screen.getByRole("meter", { name: "Thermal pressure" }),
     ).toHaveAttribute("aria-valuenow", "100");
+  });
+
+  it("uses one signed, named comparison delta for current catalogue values", () => {
+    render(
+      <ComparisonDelta
+        label="Memory compared with equipped module"
+        current={1.3}
+        baseline={0.8}
+        suffix=" GB"
+        inverse
+        digits={1}
+      />,
+    );
+    expect(
+      screen.getByLabelText(
+        "Memory compared with equipped module: plus 0.5 GB",
+      ),
+    ).toHaveTextContent("+0.5 GB");
   });
 });

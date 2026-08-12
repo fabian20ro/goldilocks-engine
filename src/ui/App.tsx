@@ -52,10 +52,16 @@ import type {
 } from "../simulation/types";
 import { TIME_SPEEDS, useSimulation, type TimeSpeed } from "./useSimulation";
 import {
+  ComparisonDelta,
   DetailsSurface,
   ItemDetailsDisclosure,
   StatusGauge,
 } from "./commandDeck";
+import {
+  moduleInventoryDefaultEntries,
+  selectModuleInventory,
+  type ModuleInventoryEntry,
+} from "./moduleInventory";
 import {
   latestCareerScheduleWorkerRejection,
   type CareerScheduleDraft,
@@ -647,68 +653,49 @@ function SecondaryControls({
   );
 }
 
-function Delta({
-  current,
-  baseline,
-  suffix = "",
-  inverse = false,
-}: {
-  current: number;
-  baseline?: number;
-  suffix?: string;
-  inverse?: boolean;
-}) {
-  if (baseline === undefined) return <span className="delta neutral">—</span>;
-  const difference = current - baseline;
-  const good = inverse ? difference < 0 : difference > 0;
-  return (
-    <span
-      className={`delta ${Math.abs(difference) < 0.005 ? "neutral" : good ? "good" : "bad"}`}
-    >
-      {difference > 0 ? "+" : ""}
-      {formatNumber(difference, 2)}
-      {suffix}
-    </span>
-  );
-}
-
 function ModuleCard({
   moduleId,
   slotId,
   selected,
   owned = true,
   equipped = false,
+  statusOverride,
+  requirement,
+  compatibleWithSelectedStage,
   onSelect,
   onDragStart,
-  onLocked,
 }: {
   moduleId: string;
   slotId?: string;
   selected: boolean;
   owned?: boolean;
   equipped?: boolean;
+  statusOverride?: string;
+  requirement?: string;
+  compatibleWithSelectedStage?: boolean;
   onSelect: (moduleId: string, fromSlotId?: string) => void;
   onDragStart: (
     event: ReactPointerEvent,
     moduleId: string,
     fromSlotId?: string,
   ) => void;
-  onLocked?: () => void;
 }) {
   const module = getModule(moduleId);
-  const status = equipped
-    ? "EQUIPPED"
-    : owned
-      ? "OWNED · DETAILS / DRAG"
-      : `LOCKED · BUY $${module.purchaseCost.toFixed(2)}`;
+  const status =
+    statusOverride ??
+    (equipped
+      ? "EQUIPPED"
+      : owned
+        ? "OWNED · DETAILS / DRAG"
+        : `LOCKED · BUY $${module.purchaseCost.toFixed(2)}`);
   return (
     <button
       type="button"
-      className={`module-card ${selected ? "selected" : ""} ${owned ? "owned" : "locked"}`}
+      className={`module-card ${selected ? "selected" : ""} ${owned ? "owned" : "locked"} ${compatibleWithSelectedStage === false ? "incompatible" : ""}`}
       aria-pressed={selected}
-      aria-label={`${module.name}. ${status}. ${module.description}`}
+      aria-label={`${module.name}. ${status}. ${requirement ? `${requirement} ` : ""}${module.description}`}
       data-module-id={module.id}
-      onClick={() => (owned ? onSelect(module.id, slotId) : onLocked?.())}
+      onClick={() => onSelect(module.id, slotId)}
       onPointerDown={(event) => {
         if (owned) onDragStart(event, module.id, slotId);
       }}
@@ -723,6 +710,9 @@ function ModuleCard({
           {formatNumber(module.reliability * 100, 1)}%
         </small>
         <span className="module-status">{status}</span>
+        {requirement ? (
+          <small className="module-requirement">{requirement}</small>
+        ) : null}
       </span>
       <span className="drag-grip" aria-hidden="true">
         ⠿
@@ -734,7 +724,9 @@ function ModuleCard({
 function Pipeline({
   state,
   selected,
+  selectedStageId,
   detail,
+  onSelectStage,
   onOpenDetails,
   onCloseDetails,
   onBeginPlacement,
@@ -745,7 +737,9 @@ function Pipeline({
 }: {
   state: SimulationState;
   selected: PendingPlacement | null;
+  selectedStageId: string;
   detail: ModuleDetail | null;
+  onSelectStage: (slotId: string) => void;
   onOpenDetails: (moduleId: string, fromSlotId?: string) => void;
   onCloseDetails: () => void;
   onBeginPlacement: (moduleId: string, fromSlotId?: string) => void;
@@ -813,21 +807,28 @@ function Pipeline({
             : false;
           const failed = failureIndex === index;
           const propagated = failureIndex >= 0 && index > failureIndex;
+          const stageSelected = selectedStageId === slot.id;
           return (
             <li className="pipeline-stage-group" key={slot.id}>
               <div
-                className={`pipeline-slot ${compatible ? "compatible" : ""} ${failed ? "failed" : ""} ${propagated ? "propagated" : ""}`}
+                className={`pipeline-slot ${compatible ? "compatible" : ""} ${failed ? "failed" : ""} ${propagated ? "propagated" : ""} ${stageSelected ? "selected-stage" : ""}`}
                 data-slot-id={slot.id}
                 data-testid={`slot-${slot.id}`}
               >
                 <div className="slot-meta">
-                  <span>
+                  <button
+                    type="button"
+                    className="stage-select"
+                    aria-pressed={stageSelected}
+                    aria-label={`Select ${slot.name} stage`}
+                    onClick={() => onSelectStage(slot.id)}
+                  >
                     <b>{index + 1}</b> ·{" "}
                     <DecorativeGlyph>
                       {pipelineGlyph(module?.role ?? "empty", slot.type)}
                     </DecorativeGlyph>{" "}
                     {slot.name}
-                  </span>
+                  </button>
                   {state.jobs.queued > 0 && slot.id === queueSlot ? (
                     <span
                       className="queue-badge"
@@ -847,12 +848,21 @@ function Pipeline({
                         selected?.moduleId === module.id &&
                         selected.fromSlotId === slot.id
                       }
-                      onSelect={onOpenDetails}
+                      onSelect={(moduleId, fromSlotId) => {
+                        onSelectStage(slot.id);
+                        onOpenDetails(moduleId, fromSlotId);
+                      }}
                       onDragStart={onDragStart}
                     />
                   </>
                 ) : (
-                  <div className="empty-module" role="status">
+                  <button
+                    type="button"
+                    className="empty-module stage-empty-action"
+                    aria-pressed={stageSelected}
+                    aria-label={`Select ${slot.name} empty bypassed stage`}
+                    onClick={() => onSelectStage(slot.id)}
+                  >
                     <strong>
                       <DecorativeGlyph>{glyphs.pipeline.empty}</DecorativeGlyph>{" "}
                       Empty / bypassed
@@ -860,7 +870,7 @@ function Pipeline({
                     <small>
                       No memory, latency, cost, or processing effect.
                     </small>
-                  </div>
+                  </button>
                 )}
                 {compatible ? (
                   <button
@@ -961,6 +971,7 @@ function Pipeline({
 function ModuleLibrary({
   state,
   selected,
+  selectedStageId,
   detail,
   onOpenDetails,
   onCloseDetails,
@@ -969,6 +980,7 @@ function ModuleLibrary({
 }: {
   state: SimulationState;
   selected: PendingPlacement | null;
+  selectedStageId: string;
   detail: ModuleDetail | null;
   onOpenDetails: (moduleId: string, fromSlotId?: string) => void;
   onCloseDetails: () => void;
@@ -979,71 +991,164 @@ function ModuleLibrary({
     fromSlotId?: string,
   ) => void;
 }) {
+  const [showEveryModule, setShowEveryModule] = useState(false);
+  const selectedSlot = state.slots.find(
+    (slot) => slot.slotId === selectedStageId,
+  );
+  const selectedSlotSpec = selectedSlot ? getSlot(selectedSlot.slotId) : null;
+  const inventory = selectModuleInventory(state, selectedStageId, {
+    prioritizeUnplacedOwned: true,
+  });
+  const compatibleOwnedCount = inventory
+    .find((section) => section.id === "owned")
+    ?.entries.filter((entry) => entry.compatibleWithSelectedStage).length;
+  const detailEntry = detail
+    ? inventory
+        .flatMap((section) => section.entries)
+        .find((entry) => entry.module.id === detail.moduleId)
+    : null;
   return (
     <section className="panel library-panel" aria-labelledby="library-title">
       <div className="section-heading compact">
         <div>
-          <span className="eyebrow">Module drawer</span>
-          <h2 id="library-title">Inspect, then place in a slot</h2>
+          <span className="eyebrow">Selected-stage inventory</span>
+          <h2 id="library-title">Inspect, then place in Build</h2>
           <p className="section-note">
-            Text labels show locked, owned, and equipped state. Locked cards
-            require purchase in the bottom Upgrades tab; tap opens details,
-            while touch-drag starts explicit placement.
+            The selected rail stage stays above this compact inventory. Drag an
+            owned card or use its named placement action; buying remains in the
+            bottom Upgrades tab.
           </p>
         </div>
       </div>
-      <div className="module-library">
-        {modules.map((module) => (
-          <ModuleCard
-            key={module.id}
-            moduleId={module.id}
-            selected={selected?.moduleId === module.id && !selected.fromSlotId}
-            owned={state.ownedModuleIds.includes(module.id)}
-            equipped={state.slots.some((slot) => slot.moduleId === module.id)}
-            onSelect={onOpenDetails}
-            onDragStart={onDragStart}
-          />
-        ))}
+      {selectedSlotSpec ? (
+        <div
+          className="selected-stage-context"
+          aria-label="Selected stage context"
+        >
+          <span className="eyebrow">Selected stage</span>
+          <strong>
+            {selectedSlotSpec.name} · {selectedSlotSpec.type}
+          </strong>
+          <small>
+            {compatibleOwnedCount ?? 0} compatible owned module
+            {compatibleOwnedCount === 1 ? "" : "s"} · all cards name live
+            ownership, price, and compatibility.
+          </small>
+        </div>
+      ) : null}
+      <div className="module-inventory-sections">
+        {inventory.map((section) => {
+          const entries = showEveryModule
+            ? section.entries
+            : moduleInventoryDefaultEntries(section);
+          return (
+            <section
+              className={`module-inventory-section ${section.id}`}
+              key={section.id}
+              aria-labelledby={`module-inventory-${section.id}`}
+            >
+              <div className="module-inventory-heading">
+                <h3 id={`module-inventory-${section.id}`}>{section.label}</h3>
+                <span>{section.entries.length}</span>
+              </div>
+              {entries.length ? (
+                <div
+                  className="module-library"
+                  data-inventory-section={section.id}
+                >
+                  {entries.map((entry) => (
+                    <ModuleCard
+                      key={entry.module.id}
+                      moduleId={entry.module.id}
+                      selected={
+                        selected?.moduleId === entry.module.id &&
+                        !selected.fromSlotId
+                      }
+                      owned={entry.owned}
+                      equipped={entry.equipped}
+                      compatibleWithSelectedStage={
+                        entry.compatibleWithSelectedStage
+                      }
+                      statusOverride={
+                        entry.equipped
+                          ? "EQUIPPED"
+                          : entry.owned
+                            ? "OWNED · DETAILS / DRAG"
+                            : entry.affordable
+                              ? `AFFORDABLE · BUY $${entry.module.purchaseCost.toFixed(2)}`
+                              : `LOCKED · BUY $${entry.module.purchaseCost.toFixed(2)}`
+                      }
+                      requirement={entry.requirement}
+                      onSelect={onOpenDetails}
+                      onDragStart={onDragStart}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="inventory-empty">
+                  No modules currently match this live state.
+                </p>
+              )}
+            </section>
+          );
+        })}
       </div>
-      {detail && !detail.fromSlotId ? (
+      {!showEveryModule ? (
+        <button
+          type="button"
+          className="catalogue-toggle"
+          onClick={() => setShowEveryModule(true)}
+        >
+          Show every module ({modules.length})
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="catalogue-toggle"
+          onClick={() => setShowEveryModule(false)}
+        >
+          Show compact next choices
+        </button>
+      )}
+      {detail && !detail.fromSlotId && detailEntry ? (
         <DetailsSurface
-          title={getModule(detail.moduleId).name}
-          glyph={pipelineGlyph(getModule(detail.moduleId).role, "process")}
+          title={detailEntry.module.name}
+          glyph={pipelineGlyph(detailEntry.module.role, "process")}
           onClose={onCloseDetails}
         >
-          <p>{getModule(detail.moduleId).description}</p>
+          <p>{detailEntry.module.description}</p>
           <dl className="compact-details-grid">
             <div>
               <dt>Compatibility</dt>
-              <dd>{getModule(detail.moduleId).slotTypes.join("/")}</dd>
+              <dd>{detailEntry.module.slotTypes.join("/")}</dd>
             </div>
             <div>
               <dt>Throughput</dt>
-              <dd>{getModule(detail.moduleId).throughput}/m</dd>
+              <dd>{detailEntry.module.throughput}/m</dd>
             </div>
             <div>
               <dt>Memory</dt>
-              <dd>{getModule(detail.moduleId).memory} GB</dd>
+              <dd>{detailEntry.module.memory} GB</dd>
             </div>
             <div>
               <dt>Reliability</dt>
-              <dd>
-                {formatNumber(getModule(detail.moduleId).reliability * 100, 1)}%
-              </dd>
+              <dd>{formatNumber(detailEntry.module.reliability * 100, 1)}%</dd>
             </div>
           </dl>
-          {state.ownedModuleIds.includes(detail.moduleId) ? (
+          <p className="purchase-reason">{detailEntry.requirement}</p>
+          {detailEntry.owned ? (
             <button
               type="button"
               className="equip-action"
               onClick={() => onBeginPlacement(detail.moduleId)}
             >
-              Place {getModule(detail.moduleId).name} in Build
+              Place {detailEntry.module.name} in Build
             </button>
           ) : (
             <p className="purchase-reason">
-              This module is locked. Details are informational; buy it in
-              Upgrades before placement is available.
+              Details do not begin placement. Buy this exact module in the
+              bottom Upgrades tab, then return to Build to choose a compatible
+              position.
             </p>
           )}
         </DetailsSurface>
@@ -1085,7 +1190,9 @@ function BuildView({
   state,
   command,
   selected,
+  selectedStageId,
   detail,
+  onSelectStage,
   onOpenDetails,
   onCloseDetails,
   onBeginPlacement,
@@ -1098,7 +1205,9 @@ function BuildView({
   state: SimulationState;
   command: (command: SimulationCommand) => void;
   selected: PendingPlacement | null;
+  selectedStageId: string;
   detail: ModuleDetail | null;
+  onSelectStage: (slotId: string) => void;
   onOpenDetails: (moduleId: string, fromSlotId?: string) => void;
   onCloseDetails: () => void;
   onBeginPlacement: (moduleId: string, fromSlotId?: string) => void;
@@ -1189,7 +1298,11 @@ function BuildView({
         state={state}
         command={command}
         selected={presentation === "build" ? selected : null}
+        selectedStageId={selectedStageId}
         detail={presentation === "build" ? detail : null}
+        onSelectStage={
+          presentation === "build" ? onSelectStage : () => undefined
+        }
         onOpenDetails={
           presentation === "build" ? onOpenDetails : () => undefined
         }
@@ -1214,6 +1327,7 @@ function BuildView({
           <ModuleLibrary
             state={state}
             selected={selected}
+            selectedStageId={selectedStageId}
             detail={detail}
             onOpenDetails={onOpenDetails}
             onCloseDetails={onCloseDetails}
@@ -1625,7 +1739,7 @@ function RigUpgradeCard({
 
 function ModuleUpgradeCard({
   state,
-  moduleId,
+  entry,
   command,
   onChoose,
   detailOpen,
@@ -1633,17 +1747,15 @@ function ModuleUpgradeCard({
   onCloseDetails,
 }: {
   state: SimulationState;
-  moduleId: string;
+  entry: ModuleInventoryEntry;
   command: (command: SimulationCommand) => void;
   onChoose: (moduleId: string) => void;
   detailOpen: boolean;
   onOpenDetails: () => void;
   onCloseDetails: () => void;
 }) {
-  const item = getModule(moduleId);
-  const owned = state.ownedModuleIds.includes(item.id);
-  const equipped = state.slots.some((slot) => slot.moduleId === item.id);
-  const affordable = state.resources.money >= item.purchaseCost;
+  const item = entry.module;
+  const { affordable, equipped, owned } = entry;
   const comparison = state.slots
     .flatMap((slot) => (slot.moduleId ? [getModule(slot.moduleId)] : []))
     .find((candidate) => candidate.role === item.role);
@@ -1681,18 +1793,29 @@ function ModuleUpgradeCard({
           className="decision-deltas"
           aria-label={`Key comparison with ${comparison.name}`}
         >
-          <span>
-            {item.throughput - comparison.throughput >= 0 ? "+" : ""}
-            {formatNumber(item.throughput - comparison.throughput, 1)}/m
-          </span>
-          <span>
-            {item.memory - comparison.memory >= 0 ? "+" : ""}
-            {formatNumber(item.memory - comparison.memory, 1)} GB
-          </span>
-          <span>
-            {item.costPerJob - comparison.costPerJob >= 0 ? "+" : ""}$
-            {formatNumber(item.costPerJob - comparison.costPerJob, 3)}/job
-          </span>
+          <ComparisonDelta
+            label="Throughput compared with equipped module"
+            current={item.throughput}
+            baseline={comparison.throughput}
+            suffix="/m"
+            digits={1}
+          />
+          <ComparisonDelta
+            label="Memory compared with equipped module"
+            current={item.memory}
+            baseline={comparison.memory}
+            suffix=" GB"
+            inverse
+            digits={1}
+          />
+          <ComparisonDelta
+            label="Operating cost compared with equipped module"
+            current={item.costPerJob}
+            baseline={comparison.costPerJob}
+            suffix="/job"
+            inverse
+            digits={3}
+          />
         </p>
       ) : null}
       <ItemDetailsDisclosure
@@ -1774,9 +1897,7 @@ function ModuleUpgradeCard({
       <p id={reasonId} className="purchase-reason">
         {owned
           ? "Owned permanently for this run. Details stay informational; Place in Build is the explicit handoff that highlights compatible targets."
-          : affordable
-            ? "Affordable now. Buy once, then add it from Build."
-            : `Need $${(item.purchaseCost - state.resources.money).toFixed(2)} more. Its cost and tradeoffs remain visible while locked.`}
+          : entry.requirement}
       </p>
     </article>
   );
@@ -1916,6 +2037,8 @@ function UpgradesView({
   const [selectedDetailId, setSelectedDetailId] = useState<string | null>(
     `rig:${state.hardwareId}`,
   );
+  const [showEveryModule, setShowEveryModule] = useState(false);
+  const moduleInventory = selectModuleInventory(state);
   const detailProps = (id: string) => ({
     detailOpen: selectedDetailId === id,
     onOpenDetails: () => setSelectedDetailId(id),
@@ -1989,36 +2112,73 @@ function UpgradesView({
       <section className="panel" aria-labelledby="module-store-title">
         <div className="section-heading compact">
           <div>
-            <span className="eyebrow">Pipeline tradeoffs</span>
+            <span className="eyebrow">
+              Pipeline tradeoffs · compact catalogue
+            </span>
             <h2 id="module-store-title">Module upgrades</h2>
+            <p className="section-note">
+              Current ownership and cash sort the next valid choices first.
+              Every exact module, requirement, and comparison remains available
+              below on request.
+            </p>
           </div>
         </div>
-        <div className="upgrade-list">
-          {[...modules]
-            .filter((item) => item.purchaseCost > 0)
-            .sort((a, b) => {
-              const rank = (id: string, cost: number) =>
-                state.ownedModuleIds.includes(id)
-                  ? 0
-                  : cost <= state.resources.money
-                    ? 1
-                    : 2;
-              return (
-                rank(a.id, a.purchaseCost) - rank(b.id, b.purchaseCost) ||
-                a.purchaseCost - b.purchaseCost
-              );
-            })
-            .map((item) => (
-              <ModuleUpgradeCard
-                key={item.id}
-                state={state}
-                moduleId={item.id}
-                command={command}
-                onChoose={onChooseModule}
-                {...detailProps(`module:${item.id}`)}
-              />
-            ))}
+        <div className="upgrade-inventory-sections">
+          {moduleInventory.map((section) => {
+            const entries = showEveryModule
+              ? section.entries
+              : moduleInventoryDefaultEntries(section);
+            return (
+              <section
+                className={`upgrade-inventory-section ${section.id}`}
+                key={section.id}
+                aria-labelledby={`upgrade-inventory-${section.id}`}
+              >
+                <div className="module-inventory-heading">
+                  <h3 id={`upgrade-inventory-${section.id}`}>
+                    {section.label}
+                  </h3>
+                  <span>{section.entries.length}</span>
+                </div>
+                {entries.length ? (
+                  <div className="upgrade-list">
+                    {entries.map((entry) => (
+                      <ModuleUpgradeCard
+                        key={entry.module.id}
+                        state={state}
+                        entry={entry}
+                        command={command}
+                        onChoose={onChooseModule}
+                        {...detailProps(`module:${entry.module.id}`)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="inventory-empty">
+                    No modules currently match this live state.
+                  </p>
+                )}
+              </section>
+            );
+          })}
         </div>
+        {!showEveryModule ? (
+          <button
+            type="button"
+            className="catalogue-toggle"
+            onClick={() => setShowEveryModule(true)}
+          >
+            Show every module ({modules.length})
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="catalogue-toggle"
+            onClick={() => setShowEveryModule(false)}
+          >
+            Show compact next choices
+          </button>
+        )}
       </section>
     </>
   );
@@ -3512,7 +3672,8 @@ function MetricRow({
         {suffix}
       </td>
       <td>
-        <Delta
+        <ComparisonDelta
+          label={`${label} comparison`}
           current={current}
           baseline={baseline}
           suffix={suffix}
@@ -3829,6 +3990,7 @@ export function App() {
     useState<CareerCompletionFeedback | null>(null);
   const [tab, setTab] = useState<TabId>("build");
   const [selected, setSelected] = useState<PendingPlacement | null>(null);
+  const [selectedStageId, setSelectedStageId] = useState("prepare");
   const [moduleDetail, setModuleDetail] = useState<ModuleDetail | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [presets, setPresets] = useState<SavedPreset[]>(loadPresets);
@@ -4033,6 +4195,16 @@ export function App() {
   }, [clearPlacement, selected, state]);
 
   useEffect(() => {
+    if (state.slots.some((slot) => slot.slotId === selectedStageId)) return;
+    const nextStage = state.slots.find(
+      (slot) => getSlot(slot.slotId).type === "process",
+    );
+    setSelectedStageId(
+      nextStage?.slotId ?? state.slots[0]?.slotId ?? "prepare",
+    );
+  }, [selectedStageId, state.slots]);
+
+  useEffect(() => {
     if (!selected) return;
     const cancelPlacement = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
@@ -4066,7 +4238,8 @@ export function App() {
   };
 
   const onOpenDetails = (moduleId: string, fromSlotId?: string) => {
-    if (!state.ownedModuleIds.includes(moduleId)) return;
+    if (!modules.some((module) => module.id === moduleId)) return;
+    if (fromSlotId) setSelectedStageId(fromSlotId);
     detailOriginRef.current =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
@@ -4074,8 +4247,18 @@ export function App() {
     setModuleDetail({ moduleId, fromSlotId });
   };
 
+  const selectStage = (slotId: string) => {
+    setSelectedStageId(slotId);
+    // A stage-specific Details surface owns remove/bypass. Do not leave it
+    // actionable after the player has selected another rail position.
+    setModuleDetail((current) =>
+      current?.fromSlotId && current.fromSlotId !== slotId ? null : current,
+    );
+  };
+
   const beginPlacement = (moduleId: string, fromSlotId?: string) => {
     if (!state.ownedModuleIds.includes(moduleId)) return;
+    if (fromSlotId) setSelectedStageId(fromSlotId);
     placementOriginRef.current =
       detailOriginRef.current ??
       (document.activeElement instanceof HTMLElement
@@ -4373,7 +4556,9 @@ export function App() {
               state={state}
               command={command}
               selected={selected}
+              selectedStageId={selectedStageId}
               detail={moduleDetail}
+              onSelectStage={selectStage}
               onOpenDetails={onOpenDetails}
               onCloseDetails={closeDetails}
               onBeginPlacement={beginPlacement}

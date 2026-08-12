@@ -16,7 +16,10 @@ export async function beginLibraryPlacement(
   moduleId: string,
   moduleName: string,
 ) {
-  await page.locator(`.module-library [data-module-id="${moduleId}"]`).click();
+  const card = page.locator(`.module-library [data-module-id="${moduleId}"]`);
+  if ((await card.count()) === 0)
+    await page.getByRole("button", { name: "Show every module (17)" }).click();
+  await card.click();
   await expect(
     page.getByRole("region", { name: `${moduleName} details` }),
   ).toBeVisible();

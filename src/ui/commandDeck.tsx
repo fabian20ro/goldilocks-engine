@@ -166,3 +166,42 @@ export function StatusGauge({
     </div>
   );
 }
+
+/** Compact signed comparison used by the existing inspection and upgrade views. */
+export function ComparisonDelta({
+  label,
+  current,
+  baseline,
+  suffix = "",
+  inverse = false,
+  digits = 2,
+}: {
+  label: string;
+  current: number;
+  baseline?: number;
+  suffix?: string;
+  inverse?: boolean;
+  digits?: number;
+}) {
+  if (baseline === undefined)
+    return (
+      <span className="delta neutral" aria-label={`${label}: no comparison`}>
+        —
+      </span>
+    );
+  const difference = current - baseline;
+  const good = inverse ? difference < 0 : difference > 0;
+  const display = new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: digits,
+  }).format(difference);
+  return (
+    <span
+      className={`delta ${Math.abs(difference) < 0.005 ? "neutral" : good ? "good" : "bad"}`}
+      aria-label={`${label}: ${difference > 0 ? "plus " : ""}${display}${suffix}`}
+    >
+      {difference > 0 ? "+" : ""}
+      {display}
+      {suffix}
+    </span>
+  );
+}

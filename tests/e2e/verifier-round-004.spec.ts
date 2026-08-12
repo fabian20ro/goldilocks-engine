@@ -8,7 +8,7 @@ test.describe("verifier round 004 adversarial mobile behavior", () => {
     await page.setViewportSize({ width: 393, height: 742 });
     await page.goto("/");
 
-    const drawer = page.locator(".module-library");
+    const drawer = page.locator('[data-inventory-section="owned"]');
     const firstCard = drawer.locator(".module-card").first();
     await firstCard.scrollIntoViewIfNeeded();
     const dimensions = await drawer.evaluate((element) => ({

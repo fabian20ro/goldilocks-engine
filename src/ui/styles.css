@@ -1130,6 +1130,97 @@ h2 {
   touch-action: pan-x;
 }
 
+.selected-stage-context {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0 0.65rem 0.55rem;
+  padding: 0.55rem 0.6rem;
+  border: 1px solid #37616a;
+  border-radius: 0.45rem;
+  background: #102024;
+}
+
+.selected-stage-context strong {
+  color: var(--cyan);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.68rem;
+}
+
+.selected-stage-context small {
+  color: #c6d7d5;
+  font-size: 0.6rem;
+  line-height: 1.38;
+}
+
+.module-inventory-sections,
+.upgrade-inventory-sections {
+  display: grid;
+  gap: 0.55rem;
+  padding-bottom: 0.6rem;
+}
+
+.module-inventory-section,
+.upgrade-inventory-section {
+  min-width: 0;
+  border-top: 1px solid var(--line);
+}
+
+.module-inventory-heading {
+  display: flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.5rem 0.65rem;
+}
+
+.module-inventory-heading h3 {
+  margin: 0;
+  color: #d7e3da;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.67rem;
+}
+
+.module-inventory-heading > span {
+  display: grid;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  place-items: center;
+  border: 1px solid var(--line-bright);
+  border-radius: 50%;
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.58rem;
+}
+
+.module-inventory-section .module-library {
+  grid-auto-columns: min(84%, 19rem);
+  padding-bottom: 0.45rem;
+}
+
+.module-inventory-section .module-card {
+  min-height: 4.45rem;
+}
+
+.catalogue-toggle {
+  width: calc(100% - 1.3rem);
+  min-height: 44px;
+  margin: 0 0.65rem 0.65rem;
+  border: 1px solid var(--line-bright);
+  border-radius: 0.42rem;
+  background: #101914;
+  color: var(--cyan);
+  font-size: 0.67rem;
+  cursor: pointer;
+}
+
+.inventory-empty {
+  margin: 0;
+  padding: 0 0.75rem 0.65rem;
+  color: var(--muted);
+  font-size: 0.64rem;
+}
+
 .choice-list {
   display: grid;
   gap: 0.48rem;
@@ -3102,6 +3193,56 @@ h1 {
 
 .slot-meta b {
   color: var(--acid);
+}
+
+.stage-select {
+  display: inline-flex;
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center;
+  gap: 0.12rem;
+  padding: 0.2rem 0.28rem;
+  border: 1px solid transparent;
+  border-radius: 0.32rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.stage-select[aria-pressed="true"] {
+  border-color: var(--cyan);
+  background: #102124;
+  color: #d5f3f5;
+}
+
+.pipeline-slot.selected-stage {
+  border-color: var(--cyan);
+  box-shadow: inset 0 0 0 1px #75d5dc33;
+}
+
+.stage-empty-action {
+  width: 100%;
+  cursor: pointer;
+}
+
+.module-card.incompatible {
+  border-color: #645b41;
+  background: #161711;
+}
+
+.module-card.incompatible .module-status,
+.module-card.incompatible .module-requirement {
+  color: #e7c784;
+}
+
+.module-requirement {
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.52rem;
+  line-height: 1.3;
 }
 
 .module-card {

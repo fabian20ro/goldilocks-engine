@@ -1,9 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 
 async function placeModule(page: Page, moduleName: string, slotId: string) {
-  await page
-    .getByRole("button", { name: new RegExp(`^${moduleName}\\.`) })
-    .click();
+  const module = page.getByRole("button", {
+    name: new RegExp(`^${moduleName}\\.`),
+  });
+  if ((await module.count()) === 0)
+    await page.getByRole("button", { name: "Show every module (17)" }).click();
+  await module.click();
   await page
     .getByRole("button", { name: `Place ${moduleName} in Build` })
     .click();

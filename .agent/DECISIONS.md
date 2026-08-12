@@ -426,3 +426,36 @@
 - **Reversal condition:** Move a tool back to `dependencies` only when a
   shipped runtime process imports it; accompany that change with a fresh
   production dependency audit and release-security evidence.
+
+## D-027 — Selected-stage module inventory stays a narrow shared selector
+
+- **Decision:** Build and Upgrades share only `selectModuleInventory`: a pure
+  view of the existing module catalog against current Worker state. It exposes
+  `Owned`, `Affordable / available`, and `Locked` entries with live ownership,
+  cash requirement, installed state, and selected-stage compatibility.
+- **Presentation boundary:** Each section defaults to three relevant cards;
+  `Show every module (17)` is the explicit route to the complete catalog. In
+  Build, the selected rail stage's installed item ranks first, then compatible
+  placement choices. In Upgrades, a paid owned module ranks first so a recent
+  purchase retains its named `Place in Build` handoff without reopening the
+  catalog. No ranking writes state or changes affordability, ownership,
+  placement, capacity, or simulation rules.
+- **Interaction boundary:** The selected stage is transient App presentation
+  state. Existing Details, explicit placement, pending tray, compatible snap,
+  drag, cancellation, focus restoration, and single ordered pipeline remain
+  the only mutation paths. Workstation Expansion I still adds only three empty
+  process positions (3 → 6); it does not claim compute or memory gain.
+- **Reason:** Build and Upgrades previously duplicated ownership and
+  affordability ordering while the full catalog repeated decisions. The one
+  selector removes that proven duplication without creating a generic
+  inventory framework, new page, mechanic, state schema, or Research-facing
+  abstraction.
+- **Evidence policy:** Selector/component coverage verifies grouping, live
+  funds, ownership, compatibility, requirements, and shared comparison delta.
+  Pinned browser coverage verifies 320/393 portrait states at 100%/200%, every
+  item route, empty expansion positions, explicit placement, cancellation,
+  keyboard, touch drag, sticky tray clearance, and retained first-session,
+  upgrade, expansion, persistence, PWA, and Career suites.
+- **Reversal condition:** Add a broader catalog abstraction only after a
+  second independently implemented consumer demonstrates the same domain
+  lifecycle; otherwise keep this selector module-specific.
