@@ -396,3 +396,33 @@
 - **Reversal condition:** Replace this request-keyed presentation lifecycle
   only through explicit product direction with equivalent ordered-boundary,
   durable-acknowledgement, multi-request, rejection, and recovery evidence.
+
+## D-026 — Production dependency boundary excludes Vite build tooling
+
+- **Decision:** `react` and `react-dom` remain production dependencies because
+  they are imported by the browser entrypoint. `vite` and
+  `@vitejs/plugin-react` are development dependencies: they are imported only
+  by Vite configuration or invoked by repository build, preview, fixture, and
+  Playwright workflows; they are never shipped as a browser runtime import.
+- **Lock boundary:** Keep their existing pinned versions and classify the
+  complete Vite/PostCSS transitive chain as development-only in
+  `package-lock.json`. Do not suppress, filter, or weaken the production audit:
+  `npm audit --omit=dev --audit-level=high` remains the release check and must
+  report zero high/critical production findings.
+- **Reproducibility boundary:** `./scripts/setup`, local build/preview, pinned
+  Playwright, verification lanes, and Pages deployment use ordinary locked
+  `npm ci`, which includes dev tooling. A production-only install contains the
+  two browser runtime packages and can audit independently without the build
+  chain.
+- **Reason:** V-065 correctly identified high advisories in Vite's build-time
+  PostCSS/nanoid chain while those packages were misclassified as production
+  dependencies. Reclassifying the boundary fixes the real production audit
+  model without hiding an advisory or changing application behavior.
+- **Evidence policy:** Candidate test reads manifest/lock boundaries and the
+  browser versus build imports. Clean `npm ci --omit=dev`, production audit
+  JSON/tree, clean full setup, build, pinned browser suites, and canonical
+  verification must all pass. Broad development-chain advisories remain
+  documented rather than being relabeled as production-safe.
+- **Reversal condition:** Move a tool back to `dependencies` only when a
+  shipped runtime process imports it; accompany that change with a fresh
+  production dependency audit and release-security evidence.

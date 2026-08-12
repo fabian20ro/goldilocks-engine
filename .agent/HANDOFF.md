@@ -1,4 +1,4 @@
-# Candidate handoff — round 059 V-064 request-keyed Career feedback repair
+# Candidate handoff — round 060 V-065 production dependency boundary repair
 
 ## Implemented behavior summary
 
@@ -36,6 +36,9 @@
 - Compact money values use one shared cents-or-mills precision for the visible
   Career equation; Details retain exact thousandths. Existing Inspect and
   ledger exact accounting remain retained.
+- `vite` and `@vitejs/plugin-react` are now explicitly build/test-only
+  development dependencies. React and ReactDOM remain the shipped browser
+  runtime dependencies; no application or dependency version changed.
 
 ## Plan requirements covered
 
@@ -49,9 +52,15 @@
 | Empty/partial/full/rejected/completed/locked/exit-ready deck                   | committed Playwright deck emits all seven named screenshots at 320 and 393 CSS pixels                                                                                     |
 | Accessibility/responsiveness                                                   | 320/393, keyboard, CDP touch, labels, focus restoration, 100/200% text, reduced-motion, no horizontal/nested composer scrolling                                           |
 | Retained Phase 0/1 persistence/offline/recovery                                | canonical root E2E includes V-051–V-060 and offline/PWA/reload coverage                                                                                                   |
+| Phase 4 production dependency audit                                            | manifest/lock boundary unit test; clean omitted-dev install; zero-result production audit JSON/tree; clean build, Pages, and canonical verification                       |
 
 ## Verifier findings addressed
 
+- V-065: Vite and its React plugin were misclassified as shipped runtime
+  packages despite appearing only in build configuration and build/test scripts.
+  They now live under `devDependencies`, with their locked Vite/PostCSS chain
+  marked `dev`; `npm audit --omit=dev --audit-level=high` reports no
+  vulnerabilities without suppression or version change.
 - V-064: independent request-ID entries retain the first completed safe-offline
   result across a later policy save and zero-hour apply released in the same
   React batch. The candidate-owned and immutable three-command browser probes
@@ -115,6 +124,15 @@ E2E_PORT=4395 npm run test:e2e -- tests/e2e/career.spec.ts --grep "human-paced A
 E2E_PORT=4396 npm run test:e2e -- tests/e2e/career.spec.ts --grep "(visibly holds a failed Career save until a later Worker persistence retry succeeds|keeps an unsubmitted Career evening blocked through an unrelated save failure)" --repeat-each=5 --reporter=dot
 ```
 
+Dependency-boundary checks:
+
+```sh
+npm_config_cache=.cache/npm npm ci --omit=dev --ignore-scripts --prefer-offline
+npm_config_cache=.cache/npm npm audit --omit=dev --audit-level=high --json
+npm_config_cache=.cache/npm npm ls --omit=dev vite @vitejs/plugin-react postcss nanoid --all
+./scripts/setup
+```
+
 `@playwright/test` is pinned in `package.json`; `npm run test:e2e` uses only
 `.cache/ms-playwright`, not a global CLI, profile, or browser. On this macOS
 host Chromium needs a scoped host launch because the workspace sandbox cannot
@@ -134,6 +152,10 @@ create its Mach-port rendezvous server; no browser test was skipped.
   UI-session entry per relevant submitted action. Exact-once claim/completion,
   per-ID invalidation, D-020 durable draining, and run-ending cleanup prevent
   a later request from overwriting or erasing a prior completed feedback item.
+- D-026: React/ReactDOM are browser-runtime dependencies; Vite/plugin-react and
+  their locked transitive build chain are dev-only. Ordinary `npm ci` remains
+  required for local build, browser checks, verification lanes, and Pages CI;
+  the production audit remains an unmodified omit-dev gate.
 - Phase 2 estimates are presentation-only pure calculations over existing
   route/accounting logic. They do not issue commands, create ledger events,
   advance time, or add a parallel simulation model.
@@ -149,51 +171,66 @@ create its Mach-port rendezvous server; no browser test was skipped.
   battery/thermal telemetry, or real quota exhaustion was available. Pinned
   Chromium covers portrait, touch, keyboard, text scale, reduced motion,
   persistence, reload, offline, and injected `QuotaExceededError` recovery.
-- Full `npm audit` reports five high development-only ESLint-chain findings.
-  Canonical production audit (`npm audit --omit=dev --audit-level=high`) is
-  clean; no forced major audit upgrade was applied.
+- Broad `npm audit` reports 13 high development-chain findings after the Vite
+  chain is correctly classified as tooling. Canonical production audit
+  (`npm audit --omit=dev --audit-level=high`) is zero; no advisory suppression,
+  forced major upgrade, or dependency version change was applied.
 - Completion feedback is an in-tab compact recap. Reload retains the durable
   evening outcome in the existing state/ledger but intentionally does not
   preserve that transient recap panel.
 
 ## Checks executed before handoff
 
-- `npm test -- --runInBand src/ui/careerFeedbackTransactions.test.ts
-src/ui/useSimulation.test.tsx --coverage.enabled=false --reporter=dot` —
-  Vitest rejected the unsupported `--runInBand` option before test execution;
-  corrected immediately below.
-- `npm test -- src/ui/careerFeedbackTransactions.test.ts
-src/ui/useSimulation.test.tsx --coverage.enabled=false --reporter=dot` —
-  2 files / 9 tests pass: multiple independent entries, duplicate claim,
-  non-completion, exact-once durable drain, and three real ordered boundaries.
-- `npm run format:check && npm run lint && npm run typecheck` — pass after
-  production and candidate test edits.
-- Candidate V-064 E2E, `E2E_PORT=4392 npm run test:e2e --
-tests/e2e/career.spec.ts --grep "earlier completed offline recap"
---repeat-each=5 --reporter=dot` — 5/5 pass.
-- Immutable V-064 E2E, `E2E_PORT=4393 npm run test:e2e --
+- Baseline V-065 reproduction, `npm audit --omit=dev --audit-level=high
+--json` — failed as expected before the repair: `high: 2`, `critical: 0`,
+  through direct production Vite → PostCSS → nanoid.
+- Lock-only boundary migration, `npm install --package-lock-only
+--ignore-scripts --prefer-offline` — pass; no package, version, or integrity
+  update, only root and transitive production/dev classification.
+- Initial `npm ci --omit=dev --ignore-scripts --prefer-offline` — did not
+  execute because this host's shared `~/.npm` cache contains an unrelated
+  root-owned cache entry (`EPERM`); no project file was changed. The
+  documented repository-local-cache rerun below is the supported clean setup.
+- Production-only clean install, `npm_config_cache=.cache/npm npm ci
+--omit=dev --ignore-scripts --prefer-offline` — pass; 3 packages installed.
+  Follow-up `npm_config_cache=.cache/npm npm ls --omit=dev --depth=0` lists
+  only `react` and `react-dom`; `npm_config_cache=.cache/npm npm audit
+--omit=dev --audit-level=high --json` reports `high: 0`, `critical: 0`; and
+  `npm_config_cache=.cache/npm npm ls --omit=dev vite @vitejs/plugin-react
+postcss nanoid --all` reports an empty production tree.
+- Clean full tooling setup, `./scripts/setup` — pass after the omitted-dev
+  probe; ordinary locked `npm ci` restores build, test, Pages, and Playwright
+  tooling.
+- Focused static and unit boundary check, `npm run format:check && npm run
+lint && npm run typecheck && npm test -- src/test/dependencyBoundary.test.ts
+src/ui/verifierRound059.test.ts src/ui/careerFeedbackTransactions.test.ts
+src/ui/useSimulation.test.tsx --coverage.enabled=false --reporter=dot && npm
+audit --omit=dev --audit-level=high --json && npm ls --omit=dev vite
+@vitejs/plugin-react postcss nanoid --all` — 4 files / 13 tests pass;
+  production audit/tree pass.
+- New immutable Round-059 browser probes, `E2E_PORT=4410 npm run test:e2e --
+tests/e2e/verifier-round-059.spec.ts --repeat-each=10 --reporter=dot` —
+  20/20 pass.
+- Retained V-061/V-062/V-063/V-064 browser stress, `E2E_PORT=4411 npm run
+test:e2e -- tests/e2e/verifier-round-055.spec.ts
+tests/e2e/verifier-round-056.spec.ts tests/e2e/verifier-round-057.spec.ts
 tests/e2e/verifier-round-058.spec.ts --repeat-each=10 --reporter=dot` —
-  10/10 pass.
-- Immutable V-061/V-062/V-063/V-064 E2E, `E2E_PORT=4394 npm run test:e2e --
-tests/e2e/verifier-round-055.spec.ts tests/e2e/verifier-round-056.spec.ts
-tests/e2e/verifier-round-057.spec.ts tests/e2e/verifier-round-058.spec.ts
---repeat-each=10 --reporter=dot` — 60/60 pass.
-- Human-paced App-session draft, `E2E_PORT=4395 npm run test:e2e --
-tests/e2e/career.spec.ts --grep "human-paced App-session draft"
---repeat-each=25 --reporter=dot` — 50/50 pass (25 repeats at each required
-  320px and 393px width).
-- Persistence/recovery E2E, `E2E_PORT=4396 npm run test:e2e --
-tests/e2e/career.spec.ts --grep
-"(visibly holds a failed Career save until a later Worker persistence retry succeeds|keeps an unsubmitted Career evening blocked through an unrelated save failure)"
---repeat-each=5 --reporter=dot` — 10/10 pass.
-- Canonical clean-state check, `E2E_PORT=4397 ./scripts/verify` — completed
-  passing after fresh `npm ci`: format, lint, typecheck, full unit/property
-  suite, numeric and all five deterministic balance runs, production build,
-  production audit, root pinned-Chromium E2E, and Pages/offline E2E. Both final
-  Playwright report markers record `status: passed`.
-- `./scripts/run` — ready at `127.0.0.1:4173` in 167 ms; `/` and `/sw.js`
-  each returned HTTP 200; controlled shutdown left loopback unreachable (HTTP
-  000).
+  60/60 pass.
+- First canonical clean-state run, `E2E_PORT=4412 ./scripts/verify` — exits
+  nonzero only because Prettier found this revised handoff unformatted. It
+  continued through and passed clean setup, lint, typecheck, 40 files / 186
+  unit tests, numeric/balance, build, zero-result production audit, root E2E,
+  and Pages/offline E2E. Both report markers record `status: passed`.
+- Final canonical clean-state run, `E2E_PORT=4413 ./scripts/verify` — pass
+  after fresh `npm ci`: format, lint, typecheck, 40 files / 186 unit tests,
+  numeric and all deterministic balance runs, production build, zero-result
+  production audit, root E2E, and Pages/offline E2E. Both final Playwright
+  report markers record `status: passed`.
+- Final visible Pages/offline confirmation, `E2E_PORT=4414 npm run
+test:e2e:pages -- --reporter=dot` — 2/2 pass.
+- Startup/cleanup, `./scripts/run` — Vite ready at `127.0.0.1:4173` in 81 ms;
+  `/` and `/sw.js` each returned HTTP 200. Controlled `SIGINT` shutdown left
+  the loopback endpoint unreachable (curl HTTP 000).
 - `git diff --check` — pass before documentation finalization.
 
 ## Checks not run
