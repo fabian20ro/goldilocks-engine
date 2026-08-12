@@ -1,4 +1,4 @@
-# Candidate handoff — round 070 Phase 4 accounting disclosure repair
+# Candidate handoff — round 071 Phase 4 exit-target disclosure repair
 
 ## Implemented behavior summary
 
@@ -34,6 +34,11 @@
 - Career model-tier requirement cards format their visible $8/$18 thresholds
   with `formatCompactCurrency` (`$8.00` / `$18.00`) without changing catalog
   eligibility mechanics or Details accounting.
+- The Career Bedroom Developer exit target now reads the engine-owned
+  `BEDROOM_EXIT_SAVINGS_REQUIRED` threshold through `formatCompactCurrency`
+  (`$24.00`). Its adjacent live Current value remains explicitly exact
+  (`$3.000` in the starter state), and the durable exit ledger remains
+  fixed-three (`$24.000`).
 - Inspect's configuration panel now begins with one compact diagnostic strip:
   dominant bottleneck, existing `ComparisonDelta` baseline throughput, and the
   latest retained causal evidence. Existing guidance, upgrade feedback, and
@@ -94,6 +99,10 @@
 - V-074: model-tier requirement cards call the compact formatter for each
   independent threshold. Candidate component and browser coverage lock Harbor
   `$8.00` and Kiln `$18.00`/`$8.00` copy.
+- V-075: the Career exit progress target no longer carries a raw `$24` literal.
+  It imports the engine-owned threshold and renders `save $24.00` with the
+  shared compact formatter; component and browser coverage retain the adjacent
+  exact Current `$3.000` boundary.
 - V-066 and V-067 remain preserved: selected Build ordering still favors a
   compatible actionable owned choice, and the narrow sticky placement tray
   keeps a visible, cancellable 44px action at enlarged text.
@@ -142,6 +151,7 @@ E2E_PORT=4283 npm run test:e2e -- tests/e2e/command-deck.spec.ts tests/e2e/phase
 E2E_PORT=4282 ./scripts/run-e2e
 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright BASE_URL=http://127.0.0.1:4282 OUTPUT_DIR=/tmp/goldlocks-r070-round-067-adversarial node .agent/verification/round-067-adversarial.mjs
 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright BASE_URL=http://127.0.0.1:4282 OUTPUT_DIR=/tmp/goldlocks-r070-round-068-adversarial node .agent/verification/round-068-adversarial.mjs
+PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright BASE_URL=http://127.0.0.1:4282 OUTPUT_DIR=/tmp/goldlocks-r071-round-070-adversarial node .agent/verification/round-070-adversarial.mjs
 ```
 
 The active Pages package remains
@@ -171,7 +181,9 @@ skipped.
 - D-030 additionally distinguishes compact settlement summary precision from
   fixed-three durable capital/exit ledger records. A cash floor is a visible
   member of a related settlement equation; model-tier card thresholds remain
-  independent compact values. Recovery recognizes the prior cents purchase
+  independent compact values. The Career exit target reads its engine-owned
+  savings threshold through compact currency while its Current disclosure and
+  durable ledger remain exact. Recovery recognizes the prior cents purchase
   wording only as historical provenance.
 - Inspect adds one local priority strip and reuses the existing comparison
   component. No new page, drawer, state schema, Worker command, asset, or
@@ -195,16 +207,17 @@ skipped.
 
 - `npm run format:check`; `npm run lint`; `npm run typecheck` — pass.
 - `npx vitest run --coverage=false src/simulation/currency.test.ts src/simulation/capitalLedgerCurrency.test.ts src/simulation/verifierRound041.test.ts src/simulation/verifierRound042.test.ts src/simulation/verifierRound069.test.ts src/ui/careerView.test.tsx`
-  — 6 files / 34 tests pass.
+  — 6 files / 35 tests pass, including the compact `$24.00` exit target and
+  exact `$3.000` Current boundary.
 - Exact verifier browser regression:
   `E2E_PORT=4280 npm run test:e2e -- tests/e2e/verifier-round-069.spec.ts --reporter=list`
   — 3/3 pass.
 - Candidate currency browser regression:
   `E2E_PORT=4281 npm run test:e2e -- tests/e2e/phase-4-currency.spec.ts --reporter=list`
-  — 4/4 pass.
+  — 5/5 pass, including Career exit target/current precision.
 - Focused Phase 3/4 portrait and Career matrix:
   `E2E_PORT=4283 npm run test:e2e -- tests/e2e/command-deck.spec.ts tests/e2e/phase-3-density.spec.ts tests/e2e/career-hierarchy.spec.ts tests/e2e/career.spec.ts tests/e2e/phase-4-currency.spec.ts --reporter=dot`
-  — 38/38 pass; starter/expanded 320×693 and 393×742, 200%-text,
+  — 39/39 pass; starter/expanded 320×693 and 393×742, 200%-text,
   placement, Career, and currency boundaries.
 - Retained purchase/recovery and verifier browser tests:
   `E2E_PORT=4284 npm run test:e2e -- tests/e2e/round-012-upgrades.spec.ts tests/e2e/verifier-round-050.spec.ts tests/e2e/verifier-round-069.spec.ts --reporter=list`
@@ -212,15 +225,21 @@ skipped.
 - Fresh production preview at `127.0.0.1:4282`; unchanged immutable probes:
   round-067 and round-068 commands above — each returned `findings: []`.
   Neither probe was edited or bypassed.
-- Final isolated canonical command from these final files:
-  `E2E_PORT=4291 ./scripts/verify`, captured at
-  `/tmp/goldlocks-r070-canonical.log` — 44 unit files / 217 tests;
-  first-session 41, upgrades 20,001, progression 41, Career 101, and
-  evaluation 121 balance seeds without failures; production audit `0`
-  vulnerabilities; root Playwright 207/207; Pages 2/2. Terminal validation
-  marker: `R070_CANONICAL_EXIT=0`.
+- Fresh production preview at `127.0.0.1:4301`; unchanged immutable
+  `round-070-adversarial.mjs` — `findings: []`. The preview was stopped and
+  the port then refused connections.
+- Final isolated canonical command:
+  `E2E_PORT=4305 ./scripts/verify`, captured at
+  `/tmp/goldlocks-r071-canonical.log` — format, lint, and TypeScript passed;
+  44 unit/property files / 218 tests passed; first-session 41, upgrades
+  20,001, progression 41, Career 101, and evaluation 121 balance seeds had
+  zero failures; production audit found `0` vulnerabilities; root Playwright
+  208/208; Pages 2/2. The zsh tmux wrapper could not write its post-command
+  marker because `status` is zsh's read-only special parameter; the captured
+  `./scripts/verify` output nevertheless reaches its final passing Pages 2/2
+  stage with no failed `run_step` output.
 - `./scripts/run` — `127.0.0.1:4173` returned the `The Goldilocks Engine`
-  shell; temporary `goldlocks-r070-startup` was stopped and the port then
+  shell; temporary `goldlocks-r071-startup` was stopped and the port then
   returned connection refused.
 
 ## Checks not run

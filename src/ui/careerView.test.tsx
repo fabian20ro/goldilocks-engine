@@ -218,6 +218,28 @@ describe("Phase 4 compact money boundaries", () => {
     ).toBeVisible();
   });
 
+  it("formats the exit target compactly while retaining current savings exactly", () => {
+    render(
+      <CareerView
+        state={createInitialState(20_711)}
+        command={vi.fn()}
+        scheduleDraft={emptySchedule}
+        scheduledDraftHours={0}
+        onScheduleDraftChange={vi.fn()}
+        hasDurablePersistenceFailure={false}
+        isRunBlocked={false}
+        onRunScheduledEvening={() => true}
+        onApplySafeOfflinePolicyNow={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText("Show Independent conclusion"));
+
+    expect(screen.getByText(/Bedroom Developer exit:/)).toHaveTextContent(
+      "Bedroom Developer exit: save $24.00, submit one Cup entry, release Deskflow Local, and unlock Kiln 13B. Current: $3.000",
+    );
+  });
+
   it("keeps Queue 10 range endpoints compact despite middle mill quotes", () => {
     const state = createEstablishedScenarioState();
     const quotes = Array.from(

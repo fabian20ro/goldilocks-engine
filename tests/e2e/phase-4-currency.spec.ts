@@ -244,3 +244,25 @@ test("persists capital purchase accounting at fixed three decimals", async ({
   await expect(page.locator(".event-log")).toContainText(expected);
   expect(errors).toEqual([]);
 });
+
+test("keeps the Career exit target compact and live savings exact", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(`page: ${error.message}`));
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(`console: ${message.text()}`);
+  });
+
+  await page.setViewportSize({ width: 393, height: 742 });
+  await page.goto("/");
+  await openTab(page, "Career");
+  await page.getByLabel("Show Independent conclusion", { exact: true }).click();
+
+  const exit = page.locator(".career-exit");
+  await expect(exit).toContainText(
+    "Bedroom Developer exit: save $24.00, submit one Cup entry, release Deskflow Local, and unlock Kiln 13B.",
+  );
+  await expect(exit).toContainText("Current: $3.000");
+  expect(errors).toEqual([]);
+});

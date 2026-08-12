@@ -542,6 +542,11 @@
   choice-card copy. Their visible monetary thresholds use the shared
   cents-default formatter while their catalog eligibility criteria remain
   unchanged.
+- **Exit target boundary:** The Bedroom Developer exit savings requirement is
+  one engine-owned threshold. Its visible Career progress target reads that
+  threshold through the shared compact formatter, while the adjacent current
+  savings remains an explicit fixed-three accounting disclosure and the durable
+  exit ledger stays fixed-three.
 - **Quote-range precision boundary:** Queue 10 is a non-additive preview, not
   a settlement equation. Its first and last labels format each displayed
   endpoint independently; undisplayed reserved quotes never promote either

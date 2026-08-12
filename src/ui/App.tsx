@@ -23,6 +23,7 @@ import {
 } from "../simulation/catalog";
 import {
   calculateMetrics,
+  BEDROOM_EXIT_SAVINGS_REQUIRED,
   endingNextRunResponse,
   estimateWorkloadOffer,
   getPostmortemEvent,
@@ -3677,8 +3678,9 @@ export function CareerView({
             </p>
           </div>
           <p className="career-exit" role="status">
-            Bedroom Developer exit: save $24, submit one Cup entry, release
-            Deskflow Local, and unlock Kiln 13B. Current:{" "}
+            Bedroom Developer exit: save{" "}
+            {compactMoney(BEDROOM_EXIT_SAVINGS_REQUIRED)}, submit one Cup entry,
+            release Deskflow Local, and unlock Kiln 13B. Current:{" "}
             {exactMoney(career.savings)} · {career.competition.submissions}/1
             submission ·{" "}
             {career.product.released
