@@ -1,4 +1,4 @@
-# Candidate handoff — round 071 Phase 4 exit-target disclosure repair
+# Candidate handoff — round 072 hosted CI Phase 3 seed synchronization repair
 
 ## Implemented behavior summary
 
@@ -53,6 +53,18 @@
   explicit placement tray/cancel/focus/drag, 3→6 empty/bypassed expansion, PWA
   scopes, persistence, queueing, and Career behavior have no new mechanics or
   pages.
+- The Phase 3 browser fixture now closes its old dedicated-Worker page before
+  seeding money for a replacement app boot. A marker-gated one-shot init script
+  applies the test fixture once, then the helper waits for the replacement app
+  to durably publish the exact seeded money. This is test synchronization only:
+  no product persistence, Worker protocol, affordability rule, Phase 3 live
+  affordability assertion, or timeout changed.
+- The retained Queue 10 browser regression continues to compare its visible
+  range label against the current persisted quote snapshot through
+  `getWorkloadQuote` and `formatCompactCurrency`. It no longer assumes a
+  dynamically locked endpoint is itself cent-exact after a later Worker
+  boundary; component coverage still proves undisplayed middle mills cannot
+  promote either visible endpoint. No product currency policy changed.
 
 ## Plan requirements covered
 
@@ -64,6 +76,7 @@
 | Bottom-tab scroll consistency                                    | command-deck browser regression saves Build scroll, enters Jobs at its own origin, then restores Build's position                                                                                                                                                    |
 | Portrait/reflow release evidence                                 | command-deck captures Build/Jobs/Career/Upgrades/Inspect for starter and expanded states at 320×693 and 393×742; asserts no document overflow, no nested rail scroll, and no visible button below 44px; 320×693 200%-text reduced-motion Inspect capture is reviewed |
 | Preserve Phase 2/3/PWA/persistence/gameplay                      | canonical suite retains first-session, queue, quote, expansion, malformed-state, offline/PWA, Career, balance, static, production build, and Pages checks                                                                                                            |
+| CI-stable Phase 3 saved-state fixture                            | Worker-safe replacement-page bootstrap and durable-state poll retain the live `Precision Cleaner` affordability assertion at 320/393 without arbitrary delay                                                                                                         |
 
 ## Verifier findings addressed
 
@@ -106,6 +119,13 @@
 - V-066 and V-067 remain preserved: selected Build ordering still favors a
   compatible actionable owned choice, and the narrow sticky placement tray
   keeps a visible, cancellable 44px action at enlarged text.
+- Hosted Verify run `31650754334`: root browser test #50 exposed a test-only
+  seed/reload race at Phase 3 320px. The helper previously wrote localStorage
+  then reloaded while the old page's periodic Worker could still persist its
+  stale snapshot. It now terminates that page before a marker-gated fresh boot
+  and proves the seeded money was durably republished before retaining the
+  original live affordability assertions. No verifier probe, product code,
+  Phase 3 affordability assertion, or timeout was weakened.
 - This candidate adds durable Phase 4 regressions for compact/exact currency,
   Inspect priority/baseline, per-tab scroll restoration, five-tab portrait
   matrix, and reduced-motion 200% text geometry.
@@ -152,6 +172,7 @@ E2E_PORT=4282 ./scripts/run-e2e
 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright BASE_URL=http://127.0.0.1:4282 OUTPUT_DIR=/tmp/goldlocks-r070-round-067-adversarial node .agent/verification/round-067-adversarial.mjs
 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright BASE_URL=http://127.0.0.1:4282 OUTPUT_DIR=/tmp/goldlocks-r070-round-068-adversarial node .agent/verification/round-068-adversarial.mjs
 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright BASE_URL=http://127.0.0.1:4282 OUTPUT_DIR=/tmp/goldlocks-r071-round-070-adversarial node .agent/verification/round-070-adversarial.mjs
+CI=1 E2E_PORT=4313 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright npm_config_cache=.cache/npm npx --yes --package=node@22 node ./node_modules/playwright/cli.js test tests/e2e/phase-3-density.spec.ts --grep 'Phase 3 groups, details, and every-item route at 320px' --repeat-each=50 --reporter=line
 ```
 
 The active Pages package remains
@@ -193,6 +214,13 @@ skipped.
   visually truncating only under constrained enlarged text.
 - D-027/D-028 selected-stage inventory and cancellation boundaries remain
   unchanged. D-008 Pages scope remains `/goldilocks-engine/`.
+- Phase 3 fixture synchronization is deliberately test-local. Direct save
+  mutation cannot safely rely on reload because the outgoing app's periodic
+  Worker may persist after the mutation. The fixture closes that Worker-owning
+  page, applies one marker-gated saved snapshot before the replacement app
+  reads storage, and polls its durable observable state. This preserves the
+  same live affordability assertion without a timing sleep or application
+  change.
 
 ## Known limitations and risks
 
@@ -205,6 +233,34 @@ skipped.
 
 ## Checks executed before handoff
 
+- Hosted failure evidence: `gh run view 31650754334 --log-failed` — only root
+  test #50 failed; after `setSavedMoney(page, 10)`, the original live
+  affordability assertion saw `0` available modules for its full 5s timeout.
+  The same 393 case and 207 remaining root tests passed. This confirms a stale
+  save boot rather than an affordability/product failure.
+- Baseline CI-like current-code stress before repair:
+  `CI=1 E2E_PORT=4310 npm run test:e2e -- tests/e2e/phase-3-density.spec.ts --grep 'Phase 3 groups, details, and every-item route at 320px' --repeat-each=25 --reporter=line`
+  — 25/25 pass locally under Node 26; hosted evidence establishes the
+  timing-sensitive reproduction.
+- Repaired CI-major stress:
+  `CI=1 E2E_PORT=4313 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright npm_config_cache=.cache/npm npx --yes --package=node@22 node ./node_modules/playwright/cli.js test tests/e2e/phase-3-density.spec.ts --grep 'Phase 3 groups, details, and every-item route at 320px' --repeat-each=50 --reporter=line`
+  — Node 22.23.2, 50/50 pass. Representative 393px Node 22 command with the
+  same harness — 1/1 pass.
+- `E2E_PORT=4311 CI=1 npm run test:e2e -- tests/e2e/phase-3-density.spec.ts --reporter=line`
+  — 7/7 Phase 3 density/placement/touch/geometry cases pass.
+- Retained focused Phase 3/4 portrait and Career matrix:
+  `E2E_PORT=4315 CI=1 npm run test:e2e -- tests/e2e/command-deck.spec.ts tests/e2e/phase-3-density.spec.ts tests/e2e/career-hierarchy.spec.ts tests/e2e/career.spec.ts tests/e2e/phase-4-currency.spec.ts --reporter=dot`
+  — 39/39 pass; starter/expanded 320×693 and 393×742, 200%-text,
+  placement, Career, and currency boundaries.
+- Initial R072 canonical root-browser evidence found one retained Queue 10
+  test expectation that rounded a persisted dynamic endpoint to cents
+  (`1.336` observed). This was a test assumption rather than a policy/product
+  failure: a later Worker boundary may legitimately lock a mill quote. The
+  repaired regression retains the data-derived persisted-current-state label
+  assertion through `formatCompactCurrency`, does not hardcode a transient
+  quote, and still verifies middle mill reservations. Node 22 repeat command
+  above — 25/25 after repair; `E2E_PORT=4318 CI=1 npm run test:e2e --
+tests/e2e/phase-4-currency.spec.ts --reporter=list` — 5/5.
 - `npm run format:check`; `npm run lint`; `npm run typecheck` — pass.
 - `npx vitest run --coverage=false src/simulation/currency.test.ts src/simulation/capitalLedgerCurrency.test.ts src/simulation/verifierRound041.test.ts src/simulation/verifierRound042.test.ts src/simulation/verifierRound069.test.ts src/ui/careerView.test.tsx`
   — 6 files / 35 tests pass, including the compact `$24.00` exit target and
@@ -229,17 +285,15 @@ skipped.
   `round-070-adversarial.mjs` — `findings: []`. The preview was stopped and
   the port then refused connections.
 - Final isolated canonical command:
-  `E2E_PORT=4305 ./scripts/verify`, captured at
-  `/tmp/goldlocks-r071-canonical.log` — format, lint, and TypeScript passed;
-  44 unit/property files / 218 tests passed; first-session 41, upgrades
-  20,001, progression 41, Career 101, and evaluation 121 balance seeds had
-  zero failures; production audit found `0` vulnerabilities; root Playwright
-  208/208; Pages 2/2. The zsh tmux wrapper could not write its post-command
-  marker because `status` is zsh's read-only special parameter; the captured
-  `./scripts/verify` output nevertheless reaches its final passing Pages 2/2
-  stage with no failed `run_step` output.
+  `E2E_PORT=4320 ./scripts/verify`, captured at
+  `/tmp/goldlocks-r072-final-canonical.log` — terminal marker
+  `R072_FINAL_CANONICAL_EXIT=0`; format, lint, and TypeScript passed; 44
+  unit/property files / 218 tests passed; first-session 41, upgrades 20,001,
+  progression 41, Career 101, and evaluation 121 balance seeds had zero
+  failures; production audit found `0` vulnerabilities; root Playwright
+  208/208; Pages 2/2.
 - `./scripts/run` — `127.0.0.1:4173` returned the `The Goldilocks Engine`
-  shell; temporary `goldlocks-r071-startup` was stopped and the port then
+  shell; temporary `goldlocks-r072-startup` was stopped and the port then
   returned connection refused.
 
 ## Checks not run

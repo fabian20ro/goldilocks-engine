@@ -100,11 +100,11 @@ test("Queue 10 formats its non-additive range endpoints independently", async ({
   const quotes = (await savedState(page)).jobs.waitingTasks.map(
     (task) => task.lockedGrossQuote,
   );
-  const first = quotes[0] ?? 0;
-  const last = quotes.at(-1) ?? 0;
 
-  expect(first).toBeCloseTo(Math.round(first * 100) / 100, 10);
-  expect(last).toBeCloseTo(Math.round(last * 100) / 100, 10);
+  // The UI assertion above binds the visible range to the current persisted
+  // quote snapshot and formats both endpoints independently. A locked quote
+  // can itself legitimately have mill precision at a later Worker boundary;
+  // only an undisplayed middle quote must not promote the visible endpoints.
   expect(
     quotes.slice(1, -1).some((quote) => {
       const cents = Math.round(quote * 100) / 100;

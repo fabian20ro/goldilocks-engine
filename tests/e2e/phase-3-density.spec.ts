@@ -1,6 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
+const SAVE_BOOTSTRAP_KEY = "goldilocks-e2e-phase-3-save-bootstrap-v1";
+let nextSaveBootstrapToken = 0;
 
 async function openTab(page: Page, name: "Build" | "Upgrades") {
   await page
@@ -15,23 +17,80 @@ async function waitForSave(page: Page) {
     .not.toBeNull();
 }
 
-async function setSavedMoney(page: Page, money: number) {
+/**
+ * A live page can receive a final periodic Worker publication while reload is
+ * tearing it down. Close that Worker-owning page before the next app boot,
+ * then seed exactly one new document and wait for its durable publication.
+ */
+async function setSavedMoney(page: Page, money: number): Promise<Page> {
   await waitForSave(page);
+  const [serialized, viewport] = await Promise.all([
+    page.evaluate((key) => localStorage.getItem(key), SAVE_KEY),
+    page.evaluate(() => ({
+      width: window.innerWidth,
+      height: window.innerHeight,
+    })),
+  ]);
+  if (serialized === null)
+    throw new Error("Expected a persisted simulation state");
+
+  const state = JSON.parse(serialized) as { resources: { money: number } };
+  state.resources.money = money;
+  const seededState = JSON.stringify(state);
+  const token = `money-${++nextSaveBootstrapToken}`;
   await page.evaluate(
-    ({ key, money: nextMoney }) => {
-      const state = JSON.parse(localStorage.getItem(key) ?? "null") as {
-        resources: { money: number };
-      };
-      state.resources.money = nextMoney;
-      localStorage.setItem(key, JSON.stringify(state));
-    },
-    { key: SAVE_KEY, money },
+    ({ markerKey, nextToken }) => localStorage.setItem(markerKey, nextToken),
+    { markerKey: SAVE_BOOTSTRAP_KEY, nextToken: token },
   );
-  await page.reload();
+
+  const context = page.context();
+  await context.addInitScript(
+    ({ markerKey, nextToken, saveKey, saved }) => {
+      try {
+        if (localStorage.getItem(markerKey) !== nextToken) return;
+        localStorage.setItem(saveKey, saved);
+        localStorage.removeItem(markerKey);
+      } catch {
+        // An initial opaque document has no localStorage; the app navigation does.
+      }
+    },
+    {
+      markerKey: SAVE_BOOTSTRAP_KEY,
+      nextToken: token,
+      saveKey: SAVE_KEY,
+      saved: seededState,
+    },
+  );
+  await page.close();
+
+  const restoredPage = await context.newPage();
+  await restoredPage.setViewportSize(viewport);
+  await restoredPage.goto("/", { waitUntil: "domcontentloaded" });
+  await expect
+    .poll(() =>
+      restoredPage.evaluate(
+        ({ saveKey, markerKey }) => {
+          const saved = localStorage.getItem(saveKey);
+          if (saved === null) return null;
+          try {
+            return {
+              money: (JSON.parse(saved) as { resources?: { money?: unknown } })
+                .resources?.money,
+              marker: localStorage.getItem(markerKey),
+            };
+          } catch {
+            return null;
+          }
+        },
+        { saveKey: SAVE_KEY, markerKey: SAVE_BOOTSTRAP_KEY },
+      ),
+    )
+    .toEqual({ money, marker: null });
+  return restoredPage;
 }
 
-async function buyAndActivateExpansion(page: Page) {
-  await setSavedMoney(page, 45);
+async function buyAndActivateExpansion(page: Page): Promise<Page> {
+  page = await setSavedMoney(page, 45);
   await openTab(page, "Upgrades");
   await page
     .getByRole("button", {
@@ -42,6 +101,7 @@ async function buyAndActivateExpansion(page: Page) {
     .getByRole("button", { name: "Activate six-position pipeline" })
     .click();
   await openTab(page, "Build");
+  return page;
 }
 
 async function revealInventory(page: Page) {
@@ -155,23 +215,28 @@ for (const viewport of [
     ).toBeVisible();
     await expect(page.locator(".library-panel .module-card")).toHaveCount(17);
 
-    await setSavedMoney(page, 10);
-    await expect(available).toContainText("Precision Cleaner");
-    await expect(available).toContainText("Available now for $4.00");
+    page = await setSavedMoney(page, 10);
+    const affordableAfterMoney = page.getByRole("region", {
+      name: "Affordable / available",
+    });
+    await expect(affordableAfterMoney).toContainText("Precision Cleaner");
+    await expect(affordableAfterMoney).toContainText("Available now for $4.00");
     await revealInventory(page);
     await assertPortrait(page);
     await page.screenshot({
       path: `test-results/phase-3/${viewport.width}-catalogue-rich-100.png`,
     });
 
-    await buyAndActivateExpansion(page);
+    page = await buyAndActivateExpansion(page);
     await expect(page.getByTestId("slot-process-4")).toContainText(
       "Empty / bypassed",
     );
     await page
       .getByRole("button", { name: "Select Process 4 empty bypassed stage" })
       .click();
-    await expect(context).toContainText("Process 4 · process");
+    await expect(page.getByLabel("Selected stage context")).toContainText(
+      "Process 4 · process",
+    );
     await revealInventory(page);
     await assertPortrait(page);
     await page.screenshot({
@@ -197,7 +262,7 @@ for (const viewport of [
       path: `test-results/phase-3/${viewport.width}-owned-small-200.png`,
     });
 
-    await setSavedMoney(page, 10);
+    page = await setSavedMoney(page, 10);
     await setTwoHundredPercentText(page);
     await expect(
       page.getByRole("region", { name: "Affordable / available" }),
@@ -208,7 +273,7 @@ for (const viewport of [
       path: `test-results/phase-3/${viewport.width}-catalogue-rich-200.png`,
     });
 
-    await buyAndActivateExpansion(page);
+    page = await buyAndActivateExpansion(page);
     await setTwoHundredPercentText(page);
     await page
       .getByRole("button", { name: "Select Process 4 empty bypassed stage" })
@@ -296,7 +361,7 @@ test("Phase 3 explicit placement, tab cancellation, keyboard, and touch-drag ret
 }) => {
   await page.setViewportSize({ width: 393, height: 742 });
   await page.goto("/");
-  await setSavedMoney(page, 4);
+  page = await setSavedMoney(page, 4);
   await openTab(page, "Upgrades");
   await page
     .getByRole("button", { name: "Buy Precision Cleaner for $4.00" })
