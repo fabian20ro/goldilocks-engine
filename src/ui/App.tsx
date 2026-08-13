@@ -68,7 +68,10 @@ import {
   selectFirstSessionPresentation,
   type FirstSessionPresentation,
 } from "./firstSessionPresentation";
-import { selectSettlementPresentation } from "./settlementPresentation";
+import {
+  findSettlementFailureRecord,
+  selectSettlementPresentation,
+} from "./settlementPresentation";
 import {
   latestCareerScheduleWorkerRejection,
   type CareerScheduleDraft,
@@ -1448,10 +1451,7 @@ function MoneyLoop({
     )
     .sort((left, right) => left.purchaseCost - right.purchaseCost);
   const target = targetOptions.find((item) => item.id === targetId) ?? null;
-  const failureEvent =
-    settlement?.failed === 1
-      ? [...state.ledger].reverse().find((event) => event.kind === "failure")
-      : null;
+  const failureEvent = findSettlementFailureRecord(settlement, state.ledger);
   const recoveryQuote = settlement
     ? getWorkloadQuote(state, settlement.workloadId)
     : null;

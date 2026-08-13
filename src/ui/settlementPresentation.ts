@@ -2,7 +2,7 @@ import {
   formatCompactCurrency,
   formatExactCurrency,
 } from "../simulation/currency";
-import type { JobSettlement } from "../simulation/types";
+import type { JobSettlement, LedgerEvent } from "../simulation/types";
 
 export interface SettlementPresentationInput {
   settlement: JobSettlement | null;
@@ -37,6 +37,28 @@ function signedCurrency(
   formatter: (amount: number) => string,
 ): string {
   return `${amount >= 0 ? "+" : "−"}${formatter(Math.abs(amount))}`;
+}
+
+/**
+ * Settlement ledger sentences retain the accepted task ID. Match that durable
+ * provenance instead of treating a later unrelated failure as the settlement's
+ * cause; the ledger is intentionally bounded, so a missing retained record
+ * remains an honest unknown handled by the presentation fallback.
+ */
+export function findSettlementFailureRecord(
+  settlement: JobSettlement | null,
+  ledger: readonly LedgerEvent[],
+): LedgerEvent | null {
+  if (!settlement || settlement.failed !== 1) return null;
+  const taskMarker = ` task ${settlement.taskId} `;
+  return (
+    [...ledger]
+      .reverse()
+      .find(
+        (event) =>
+          event.kind === "failure" && event.message.includes(taskMarker),
+      ) ?? null
+  );
 }
 
 /**
