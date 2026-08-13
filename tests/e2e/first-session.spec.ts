@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { chooseSimulationSpeed } from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 
@@ -97,7 +98,7 @@ test("first-session rail survives reload and placement requires an explicit hand
 
   await openTab(page, "Jobs");
   await page.getByRole("button", { name: "Resume" }).click();
-  await page.getByRole("button", { name: "64×" }).click();
+  await chooseSimulationSpeed(page, "64×");
   await waitForGuideStep(page, "step 3 of 3");
   await expect(page.getByTestId("first-session-guide")).toHaveAttribute(
     "data-onboarding-action",
@@ -339,7 +340,7 @@ test("short portrait keeps the complete guide reason and first Jobs action clear
   await page
     .getByRole("button", { name: "Queue one safe Interactive Chat job" })
     .click();
-  await page.getByRole("button", { name: "64×", exact: true }).click();
+  await chooseSimulationSpeed(page, "64×");
   await waitForGuideStep(page, "step 3 of 3");
   await expect(page.getByTestId("onboarding-explanation")).toContainText(
     "Precision Cleaner costs $4.00",
@@ -471,7 +472,7 @@ test("a failed starter keeps its visible reason and surviving work through manua
   await page
     .getByRole("button", { name: "Queue one safe Interactive Chat job" })
     .click();
-  await page.getByRole("button", { name: "64×" }).click();
+  await chooseSimulationSpeed(page, "64×");
   await expect(page.getByTestId("first-session-guide")).toHaveAttribute(
     "data-onboarding-action",
     "earn-remainder",
@@ -624,7 +625,7 @@ test("reduced motion records first settlement without an animation-only cue", as
   await page
     .getByRole("button", { name: "Queue one safe Interactive Chat job" })
     .click();
-  await page.getByRole("button", { name: "64×" }).click();
+  await chooseSimulationSpeed(page, "64×");
   await expect(
     page.getByText("First successful delivery recorded"),
   ).toContainText("reduced motion", { timeout: 10_000 });

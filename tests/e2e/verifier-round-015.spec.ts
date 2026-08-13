@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { settleStarterJob } from "./helpers";
+import { chooseSimulationSpeed, settleStarterJob } from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 
@@ -71,7 +71,7 @@ test.describe("verifier round 015 task-market legibility", () => {
     await page.goto("/");
     await openJobs(page);
     await settleStarterJob(page);
-    await page.getByRole("button", { name: "1×" }).click();
+    await chooseSimulationSpeed(page, "1×");
     await page
       .getByRole("button", { name: /^Long Document\. Current quote/ })
       .click();

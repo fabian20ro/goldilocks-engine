@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { chooseSimulationSpeed } from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 
@@ -51,7 +52,7 @@ test("an unsealed settled starter cannot fabricate an uninstalled purchase", asy
   await page
     .getByRole("button", { name: "Queue one safe Interactive Chat job" })
     .click();
-  await page.getByRole("button", { name: "64×" }).click();
+  await chooseSimulationSpeed(page, "64×");
   await expect
     .poll(() =>
       page.evaluate((key) => {

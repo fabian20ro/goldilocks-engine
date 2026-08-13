@@ -1,5 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
-import { beginStagePlacement, settleStarterJob } from "./helpers";
+import {
+  beginStagePlacement,
+  chooseSimulationSpeed,
+  settleStarterJob,
+} from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 
@@ -131,7 +135,7 @@ test.describe("round 015 task market and workstation expansion", () => {
     // The assertion below is about clear semantics, not whether 64x work may
     // naturally settle while the confirmation is being operated. Freeze an
     // already-active task so its identity is a stable comparison target.
-    await page.getByRole("button", { name: "1×" }).click();
+    await chooseSimulationSpeed(page, "1×");
     await page.getByRole("button", { name: "Queue 10" }).click();
     await expect
       .poll(() =>

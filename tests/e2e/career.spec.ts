@@ -3,6 +3,7 @@ import {
   createInitialState,
   sealSimulationState,
 } from "../../src/simulation/engine";
+import { chooseSimulationSpeed } from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 
@@ -623,9 +624,9 @@ test.describe("Bedroom Developer career acceptance", () => {
       await waitForHumanPacedWorkerTicks(page);
       await expectFreelanceDraft(page, 3);
 
-      await page.getByRole("button", { name: "64×" }).click();
+      await chooseSimulationSpeed(page, "64×");
       await waitForHumanPacedWorkerTicks(page);
-      await page.getByRole("button", { name: "1×" }).click();
+      await chooseSimulationSpeed(page, "1×");
       await expectFreelanceDraft(page, 3);
 
       await openTab(page, "Jobs");

@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { openHelpAndMotionSettings, openSimulationContext } from "./helpers";
 
 async function assertUncoveredTapTarget(
   page: Page,
@@ -43,11 +44,7 @@ for (const { width, height } of [
       document.documentElement.style.fontSize = "32px";
     });
 
-    const nav = page.getByRole("navigation", { name: "Primary" });
-    const navBox = await nav.boundingBox();
-    expect(navBox).not.toBeNull();
-    if (!navBox) return;
-
+    const settings = await openHelpAndMotionSettings(page);
     const help = page.getByRole("button", {
       name: "Help / Quick start",
       exact: true,
@@ -56,6 +53,10 @@ for (const { width, height } of [
       name: "Animations on",
       exact: true,
     });
+    const nav = page.getByRole("navigation", { name: "Primary" });
+    const navBox = await nav.boundingBox();
+    expect(navBox).not.toBeNull();
+    if (!navBox) return;
     if (!(await assertUncoveredTapTarget(page, help, navBox.y))) return;
     if (!(await assertUncoveredTapTarget(page, motion, navBox.y))) return;
 
@@ -64,10 +65,13 @@ for (const { width, height } of [
       page.getByRole("button", { name: "Animations off", exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
 
-    for (const label of ["1×", "4×", "16×", "64×"]) {
-      const speed = page.getByRole("button", { name: label, exact: true });
+    await settings.locator(":scope > summary").click();
+    const context = await openSimulationContext(page);
+    for (const label of ["1×", "4×", "16×", "64×"] as const) {
+      const speed = context.getByRole("button", { name: label, exact: true });
       if (!(await assertUncoveredTapTarget(page, speed, navBox.y))) return;
       await speed.click();
+      await openSimulationContext(page);
       await expect(speed).toHaveAttribute("aria-pressed", "true");
     }
 

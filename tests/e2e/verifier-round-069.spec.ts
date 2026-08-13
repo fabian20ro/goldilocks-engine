@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { settleStarterJob } from "./helpers";
+import { chooseSimulationSpeed, settleStarterJob } from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 
@@ -84,7 +84,7 @@ test.describe("verifier round 069 exact and related money disclosures", () => {
     await removeStarterProcessingModules(page);
 
     await openTab(page, "Jobs");
-    await page.getByRole("button", { name: "64×", exact: true }).click();
+    await chooseSimulationSpeed(page, "64×");
     await page
       .getByRole("button", {
         name: "Queue one safe Interactive Chat job",

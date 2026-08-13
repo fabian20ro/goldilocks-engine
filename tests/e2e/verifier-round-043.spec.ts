@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { chooseSimulationSpeed, openSimulationContext } from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 
@@ -45,7 +46,7 @@ test("clear waiting preserves a paused accepted task through reload", async ({
   await page
     .getByRole("button", { name: "Queue one safe Interactive Chat job" })
     .click();
-  await page.getByRole("button", { name: "64×" }).click();
+  await chooseSimulationSpeed(page, "64×");
   await expect(page.getByTestId("first-session-guide")).toContainText(
     "step 3 of 3",
   );
@@ -53,11 +54,13 @@ test("clear waiting preserves a paused accepted task through reload", async ({
   // Queue at 1x and pause before confirming the clear. This removes the
   // separate simulation clock as a confounder while exercising the same
   // user-visible command and durable worker path.
-  await page.getByRole("button", { name: "1×" }).click();
-  await expect(page.getByRole("button", { name: "1×" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await chooseSimulationSpeed(page, "1×");
+  await expect(
+    (await openSimulationContext(page)).getByRole("button", {
+      name: "1×",
+      exact: true,
+    }),
+  ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: /^Queue 10/ }).click();
   await expect
     .poll(() => savedQueue(page))

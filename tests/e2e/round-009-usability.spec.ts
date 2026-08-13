@@ -1,5 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
+  chooseSimulationSpeed,
+  openHelpAndMotionSettings,
+  openSimulationContext,
   placeLibraryModule,
   settleStarterJob,
   STARTER_QUEUE_NAME,
@@ -62,6 +65,7 @@ test.describe("round 009 first-session comprehension", () => {
     await page.reload();
     await expect(tutorial).toHaveCount(0);
 
+    await openHelpAndMotionSettings(page);
     const help = page.getByRole("button", { name: "Help / Quick start" });
     const helpBox = await help.boundingBox();
     expect(helpBox?.height).toBeGreaterThanOrEqual(44);
@@ -84,7 +88,7 @@ test.describe("round 009 first-session comprehension", () => {
     await expect(
       page.getByText(/Interactive Chat.*\$1\.40 gross/, { exact: false }),
     ).toBeVisible();
-    await page.getByRole("button", { name: "16×" }).click();
+    await chooseSimulationSpeed(page, "16×");
     await page.getByRole("button", { name: STARTER_QUEUE_NAME }).click();
 
     await expect(page.getByText(/1 paid · 0 failed/)).toBeVisible({
@@ -179,6 +183,7 @@ test.describe("round 009 first-session comprehension", () => {
     );
     await page.getByRole("button", { name: "Jobs" }).click();
     await page.getByRole("button", { name: /Long Document/ }).click();
+    await openSimulationContext(page);
     const warning = page.getByLabel("Current warning and actions");
     await expect(warning).toContainText("only");
     await expect(warning).toContainText("Lower the reserve");
@@ -207,6 +212,7 @@ test.describe("round 009 first-session comprehension", () => {
     await page.getByLabel("Memory reserve percentage").fill("0");
     await page.getByLabel("Compute budget percentage").fill("100");
     await page.getByRole("button", { name: /Competition Training/ }).click();
+    await openSimulationContext(page);
     await expect(warning).toContainText("Lower compute budget");
     await expect(warning).toContainText(
       "Module swaps mainly change memory, throughput, quality, and reliability in this toy—not heat directly",
@@ -224,26 +230,29 @@ test.describe("round 009 first-session comprehension", () => {
   }) => {
     await page.emulateMedia({ reducedMotion: "no-preference" });
     await page.goto("/");
-    await expect(page.getByText("Visual only", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "1×" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    await openHelpAndMotionSettings(page);
+    await expect(
+      page.getByText("Visual only; simulation time is unchanged.", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await openSimulationContext(page);
+    const oneX = page.getByRole("button", { name: "1×" });
+    await expect(oneX).toHaveAttribute("aria-pressed", "true");
+    await openHelpAndMotionSettings(page);
     await page.getByRole("button", { name: "Animations on" }).click();
     await expect(
       page.getByRole("button", { name: "Animations off" }),
     ).toBeVisible();
-    await expect(page.getByRole("button", { name: "1×" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    await expect(oneX).toHaveAttribute("aria-pressed", "true");
 
-    await page.getByRole("button", { name: "16×" }).click();
+    await chooseSimulationSpeed(page, "16×");
     await page.getByRole("button", { name: "Jobs" }).click();
     await page.getByRole("button", { name: STARTER_QUEUE_NAME }).click();
     await expect(page.getByText(/1 paid · 0 failed/)).toBeVisible({
       timeout: 10_000,
     });
+    await openSimulationContext(page);
     await expect(page.getByRole("button", { name: "16×" })).toHaveAttribute(
       "aria-pressed",
       "true",

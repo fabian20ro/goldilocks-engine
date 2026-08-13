@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { openSimulationContext } from "./helpers";
 
 async function assertReadableHeader(page: Page) {
   const clippedText = await page
@@ -44,8 +45,9 @@ async function assertSpeedControlsAreTapReachable(page: Page) {
   expect(navBox.y).toBeGreaterThanOrEqual(0);
   expect(navBox.y + navBox.height).toBeLessThanOrEqual(viewport.height);
 
-  for (const label of ["1×", "4×", "16×", "64×"]) {
-    const speed = page.getByRole("button", { name: label, exact: true });
+  for (const label of ["1×", "4×", "16×", "64×"] as const) {
+    const context = await openSimulationContext(page);
+    const speed = context.getByRole("button", { name: label, exact: true });
     await speed.scrollIntoViewIfNeeded();
     const speedBox = await speed.boundingBox();
     expect(speedBox).not.toBeNull();
@@ -64,7 +66,10 @@ async function assertSpeedControlsAreTapReachable(page: Page) {
     expect(hitTarget).toBe(label);
 
     await page.mouse.click(center.x, center.y);
-    await expect(speed).toHaveAttribute("aria-pressed", "true");
+    const reopened = await openSimulationContext(page);
+    await expect(
+      reopened.getByRole("button", { name: label, exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
 
     const navAfterTap = await nav.boundingBox();
     expect(navAfterTap).not.toBeNull();
@@ -169,6 +174,7 @@ for (const { width, height, rootFontSize, description, requiresScroll } of [
     }, rootFontSize);
 
     await expect(page.getByLabel("Primary resources")).toBeVisible();
+    await openSimulationContext(page);
     await expect(page.getByRole("group", { name: "Time speed" })).toBeVisible();
     await assertReadableHeader(page);
     if (requiresScroll) await assertOneHandedContentScroll(page);

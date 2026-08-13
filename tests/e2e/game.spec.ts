@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { chooseSimulationSpeed, openHelpAndMotionSettings } from "./helpers";
 
 async function placeModule(page: Page, moduleName: string, slotId: string) {
   const module = page.getByRole("button", {
@@ -21,7 +22,7 @@ async function observeStarterSettlement(page: Page) {
   await page
     .getByRole("button", { name: "Queue one safe Interactive Chat job" })
     .click();
-  await page.getByRole("button", { name: "64×" }).click();
+  await chooseSimulationSpeed(page, "64×");
   await expect(page.getByTestId("first-session-guide")).toContainText(
     "step 3 of 3",
     { timeout: 10_000 },
@@ -142,7 +143,9 @@ test.describe("portrait pipeline acceptance", () => {
     await expect(page.getByTestId("slot-prepare")).toContainText(
       "Quantized Model",
     );
-    await expect(page.getByText(/Pipeline order anomaly/)).toBeVisible();
+    await expect(
+      page.getByTestId("simulation-context").locator(":scope > summary"),
+    ).toContainText("Pipeline order anomaly");
   });
 
   test("supports touch drag between compatible active slots", async ({
@@ -206,10 +209,12 @@ test.describe("portrait pipeline acceptance", () => {
     await placeModule(page, "Full Precision Model", "runtime");
     await page.getByRole("button", { name: "Jobs" }).click();
     await page.getByRole("button", { name: /Long Document/ }).click();
-    await page.getByRole("button", { name: "16×" }).click();
+    await chooseSimulationSpeed(page, "16×");
     await page.getByRole("button", { name: "Queue 1", exact: true }).click();
     await page.getByRole("button", { name: "Build" }).click();
-    await expect(page.getByText(/Memory limit exceeded/)).toBeVisible();
+    await expect(
+      page.getByTestId("simulation-context").locator(":scope > summary"),
+    ).toContainText("Memory limit exceeded");
     await expect(page.getByText("FAULT ORIGIN")).toBeVisible({
       timeout: 12_000,
     });
@@ -274,6 +279,7 @@ test.describe("portrait pipeline acceptance", () => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.setViewportSize({ width: 320, height: 742 });
     await page.goto("/");
+    await openHelpAndMotionSettings(page);
     await expect(
       page.getByRole("button", { name: "Animations off" }),
     ).toBeVisible();

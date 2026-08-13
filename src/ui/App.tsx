@@ -665,11 +665,44 @@ function SecondaryControls({
   timeSpeed: TimeSpeed;
   onTimeSpeedChange: (speed: number) => void;
 }) {
+  const simulationContextRef = useRef<HTMLDetailsElement>(null);
+  const nominal = state.lastWarning.includes("inside");
+  const chooseTimeSpeed = (speed: number) => {
+    onTimeSpeedChange(speed);
+    // A speed choice is immediate. Return to the tab's dominant decision
+    // instead of leaving secondary global controls over its first viewport.
+    simulationContextRef.current?.removeAttribute("open");
+  };
   return (
-    <div className="secondary-controls">
-      <TimeSpeedControl value={timeSpeed} onChange={onTimeSpeedChange} />
-      <WarningBanner state={state} />
-    </div>
+    <section className="secondary-controls" aria-label="Simulation context">
+      <details
+        className="simulation-context"
+        data-testid="simulation-context"
+        ref={simulationContextRef}
+      >
+        <summary
+          aria-label={`Simulation time ${timeSpeed}×. ${state.lastWarning} Open controls and warning details.`}
+        >
+          <span className="simulation-context-speed">
+            <DecorativeGlyph>{glyphs.resource.time}</DecorativeGlyph>
+            <strong>Simulation</strong>
+            <small>{timeSpeed}×</small>
+          </span>
+          <span
+            className={`simulation-context-status ${nominal ? "nominal" : "warning"}`}
+          >
+            <DecorativeGlyph>
+              {nominal ? glyphs.status.passed : glyphs.status.warning}
+            </DecorativeGlyph>
+            <span>{state.lastWarning}</span>
+          </span>
+        </summary>
+        <div className="simulation-context-panel">
+          <TimeSpeedControl value={timeSpeed} onChange={chooseTimeSpeed} />
+          <WarningBanner state={state} />
+        </div>
+      </details>
+    </section>
   );
 }
 
@@ -1316,17 +1349,18 @@ function BuildView({
           <button
             type="button"
             aria-pressed={presentation === "build"}
-            aria-label="Edit pipeline presentation"
+            aria-label="Configure current pipeline presentation"
             onClick={() => setPresentation("build")}
           >
-            🛠️ Edit
+            🛠️ Configure
           </button>
           <button
             type="button"
             aria-pressed={presentation === "run"}
+            aria-label="Observe current pipeline presentation"
             onClick={() => setPresentation("run")}
           >
-            ▶ Run
+            ▶ Observe
           </button>
         </div>
       </section>
@@ -4256,6 +4290,8 @@ export function App() {
     () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
   const scrollRegionRef = useRef<HTMLDivElement>(null);
+  const headerSettingsRef = useRef<HTMLDetailsElement>(null);
+  const helpOriginRef = useRef<HTMLElement | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const detailOriginRef = useRef<HTMLElement | null>(null);
   const placementOriginRef = useRef<HTMLElement | null>(null);
@@ -4665,6 +4701,19 @@ export function App() {
       // The tutorial still closes for this session when storage is unavailable.
     }
     setShowTutorial(false);
+    const origin = helpOriginRef.current;
+    helpOriginRef.current = null;
+    if (origin)
+      requestAnimationFrame(() => {
+        if (origin.isConnected) origin.focus();
+      });
+  };
+
+  const openQuickStart = () => {
+    helpOriginRef.current =
+      headerSettingsRef.current?.querySelector<HTMLElement>("summary") ?? null;
+    headerSettingsRef.current?.removeAttribute("open");
+    setShowTutorial(true);
   };
 
   const requestPresetDelete = (id: string) => {
@@ -4778,34 +4827,37 @@ export function App() {
               <span className="brand-kicker">BEDROOM NODE / 01</span>
               <h1>Goldilocks Engine</h1>
             </div>
-            <div className="header-actions">
-              <button
-                type="button"
-                className="help-toggle"
-                aria-label="Help / Quick start"
-                aria-expanded={showTutorial}
-                aria-controls="quick-start-title"
-                onClick={() => {
-                  setShowTutorial(true);
-                }}
-              >
-                Help
-              </button>
-              <div className="animation-control">
+            <details className="header-settings" ref={headerSettingsRef}>
+              <summary aria-label="Help and motion settings">
+                Help &amp; motion
+              </summary>
+              <div className="header-settings-panel">
                 <button
                   type="button"
-                  className="motion-toggle"
-                  aria-label={
-                    reducedMotion ? "Animations off" : "Animations on"
-                  }
-                  aria-pressed={reducedMotion}
-                  onClick={() => setReducedMotion((value) => !value)}
+                  className="help-toggle"
+                  aria-label="Help / Quick start"
+                  aria-expanded={showTutorial}
+                  aria-controls="quick-start-title"
+                  onClick={openQuickStart}
                 >
-                  {reducedMotion ? "Motion off" : "Motion on"}
+                  Open quick start
                 </button>
-                <small>Visual only</small>
+                <div className="animation-control">
+                  <button
+                    type="button"
+                    className="motion-toggle"
+                    aria-label={
+                      reducedMotion ? "Animations off" : "Animations on"
+                    }
+                    aria-pressed={reducedMotion}
+                    onClick={() => setReducedMotion((value) => !value)}
+                  >
+                    {reducedMotion ? "Motion off" : "Motion on"}
+                  </button>
+                  <small>Visual only; simulation time is unchanged.</small>
+                </div>
               </div>
-            </div>
+            </details>
           </div>
           <ResourceStrip state={state} />
         </header>

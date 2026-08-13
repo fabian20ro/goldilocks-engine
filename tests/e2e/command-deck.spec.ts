@@ -1,4 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
+import {
+  chooseSimulationSpeed,
+  openHelpAndMotionSettings,
+  openSimulationContext,
+} from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 const tabs = ["Build", "Jobs", "Career", "Upgrades", "Inspect"] as const;
@@ -132,6 +137,18 @@ async function assertInitialGeometry(page: Page) {
   expect(queueBox!.y + queueBox!.height).toBeLessThanOrEqual(nav!.y);
 }
 
+async function assertCompactGlobalChrome(page: Page) {
+  const context = page.getByTestId("simulation-context");
+  const headerSettings = page.locator(".header-settings");
+  await expect(context).toBeVisible();
+  await expect(headerSettings).toBeVisible();
+  await expect(context).not.toHaveAttribute("open", "");
+  await expect(headerSettings).not.toHaveAttribute("open", "");
+  await expect(context).toContainText("Simulation");
+  await expect(context).toContainText("Evaluation blind spots widen");
+  await expect(context.locator(".simulation-context-panel")).toBeHidden();
+}
+
 async function assertCareerControlGeometry(page: Page, viewportWidth: number) {
   const tokens = page.locator(".hour-tokens button");
   const inputs = page.locator('.career-route input[type="number"]');
@@ -217,6 +234,7 @@ for (const viewport of [
     await page.setViewportSize(viewport);
     await page.goto("/");
     await assertInitialGeometry(page);
+    await assertCompactGlobalChrome(page);
 
     for (const tab of tabs) {
       await openTab(page, tab);
@@ -282,7 +300,106 @@ test("Inspect priority remains readable with reduced motion at 200 percent text"
   });
 });
 
-test("stage details replace, restore focus, and Build/Run is presentation-only", async ({
+test("compact global disclosures accept keyboard and touch without covering the tab", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    baseURL: `http://127.0.0.1:${process.env.E2E_PORT ?? "4173"}`,
+    hasTouch: true,
+    isMobile: true,
+    viewport: { width: 320, height: 693 },
+  });
+  const page = await context.newPage();
+  try {
+    await page.goto("/");
+
+    const settings = page.locator(".header-settings");
+    const settingsSummary = settings.locator(":scope > summary");
+    await settingsSummary.focus();
+    await page.keyboard.press("Space");
+    await expect(settings).toHaveAttribute("open", "");
+    await page.keyboard.press("Space");
+    await expect(settings).not.toHaveAttribute("open", "");
+
+    const simulationContext = page.getByTestId("simulation-context");
+    const summary = simulationContext.locator(":scope > summary");
+    await summary.tap();
+    await expect(simulationContext).toHaveAttribute("open", "");
+    await expect(
+      simulationContext.getByRole("group", { name: "Time speed" }),
+    ).toBeVisible();
+  } finally {
+    await context.close();
+  }
+});
+
+for (const viewport of [
+  { width: 320, height: 693 },
+  { width: 393, height: 742 },
+]) {
+  test(`compact global chrome keeps full controls and focus at ${viewport.width}x${viewport.height}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("/");
+    await page.addStyleTag({
+      content: ":root { font-size: 200% !important; }",
+    });
+    await openTab(page, "Jobs");
+
+    const context = await openSimulationContext(page);
+    await expect(context).toHaveAttribute("open", "");
+    await expect(
+      context.getByRole("group", { name: "Time speed" }),
+    ).toBeVisible();
+    await chooseSimulationSpeed(page, "16×");
+    await expect(context).not.toHaveAttribute("open", "");
+    const reopened = await openSimulationContext(page);
+    await expect(
+      reopened.getByRole("button", { name: "16×", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await context
+      .getByText("Warning details and valid responses", { exact: true })
+      .click();
+    await expect(
+      context.getByLabel("Current warning and actions"),
+    ).toContainText(
+      "more evidence narrows blind spots without guaranteeing correctness",
+    );
+
+    const settings = await openHelpAndMotionSettings(page);
+    const help = settings.getByRole("button", { name: "Help / Quick start" });
+    await help.click();
+    await expect(page.getByTestId("quick-start")).toBeVisible();
+    await page.getByRole("button", { name: "Dismiss tutorial" }).click();
+    await expect(settings.locator(":scope > summary")).toBeFocused();
+
+    const geometry = await page.evaluate(() => ({
+      overflow:
+        document.documentElement.scrollWidth >
+        document.documentElement.clientWidth,
+      undersized: [...document.querySelectorAll("button, summary")]
+        .filter((element) => {
+          const style = getComputedStyle(element);
+          return style.display !== "none" && style.visibility !== "hidden";
+        })
+        .flatMap((element) => {
+          const box = element.getBoundingClientRect();
+          return box.width < 44 || box.height < 44
+            ? [element.getAttribute("aria-label") ?? element.textContent]
+            : [];
+        }),
+    }));
+    expect(geometry.overflow).toBe(false);
+    expect(geometry.undersized).toEqual([]);
+    await page.screenshot({
+      path: `test-results/command-deck/${viewport.width}-global-context-200-percent.png`,
+    });
+  });
+}
+
+test("stage details replace, restore focus, and Configure/Observe is presentation-only", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 393, height: 742 });
@@ -326,9 +443,9 @@ test("stage details replace, restore focus, and Build/Run is presentation-only",
     .locator(".app-scroll-region")
     .evaluate((region) => region.scrollTo({ top: 0, behavior: "auto" }));
   const presentation = page.locator(".presentation-toggle");
-  await presentation.locator("button").filter({ hasText: "Run" }).click();
+  await presentation.locator("button").filter({ hasText: "Observe" }).click();
   await expect(page.getByText(/Observation presentation/)).toBeVisible();
-  await presentation.locator("button").filter({ hasText: "Edit" }).click();
+  await presentation.locator("button").filter({ hasText: "Configure" }).click();
   const after = await page.evaluate((key) => {
     const state = JSON.parse(localStorage.getItem(key) ?? "null") as {
       slots: unknown;

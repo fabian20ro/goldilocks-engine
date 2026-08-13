@@ -633,3 +633,40 @@
   handoff only with an explicit product decision that preserves transparent
   settlement/failure disclosure, explicit placement, no surprise navigation,
   and equivalent mobile browser evidence.
+
+## D-032 — Contextual global chrome after plan §20.7
+
+- **Decision:** Owner-authorized post-§20.7 presentation work keeps identity,
+  live resources, and the one bottom navigation grammar permanent. Simulation
+  time plus the current warning compress into a native `details` summary that
+  names the exact active speed and warning. Its unchanged speed buttons and
+  full warning evidence remain available on demand; selecting a speed closes
+  the disclosure and returns visual priority to the current tab. Help and
+  motion likewise share a native header disclosure. Dismissing Quick Start
+  returns focus to that visible disclosure summary. Build's existing
+  presentation toggle now says Configure/Observe only; it dispatches no new
+  command.
+- **Boundary:** No Worker message, simulation calculation, schema, persistent
+  state, tab routing, tab-scroll restoration, onboarding state, Career draft,
+  Jobs settlement, placement transaction, resource semantics, PWA, or bottom
+  navigation behavior changes. Full warning copy and the existing Details
+  control remain in the simulation disclosure. The speed labels remain exactly
+  1×/4×/16×/64× and motion remains visual-only. No automatic navigation,
+  hidden required consequence, new framework, design system, or speculative
+  control is introduced.
+- **Reason:** Raw 320×693/393×742 first viewports spent roughly 106–109px on
+  the header and another 133–139px on permanent global time/warning controls
+  before the active tab's guide, action, or diagnostic. The presentational
+  disclosures retain all evidence and 44px reachability while giving the
+  active tab earlier first-viewport priority.
+- **Evidence policy:** Candidate browser coverage captures starter and
+  expansion states of every tab at 320×693 and 393×742, raw and 200%-text
+  reduced-motion geometry, no horizontal/nested scroll, 44px controls,
+  keyboard and touch opening, Help focus return, warning Details, tab-scroll
+  restoration, Career-draft handoff, pointer/touch drag, persistence/reload,
+  malformed-save recovery, PWA/offline, and the raw Jobs navigation reserve.
+  Retain immutable prior probes and canonical Node 22 verification.
+- **Reversal condition:** Replace either disclosure only with an equally
+  accessible progressive disclosure that preserves exact simulation controls,
+  full warning consequences, visible focus return, raw Jobs reserve, and the
+  same portrait/text-scale evidence.

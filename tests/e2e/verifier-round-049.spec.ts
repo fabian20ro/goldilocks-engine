@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { chooseSimulationSpeed } from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 const baseURL = `http://127.0.0.1:${process.env.E2E_PORT ?? "4173"}/`;
@@ -31,7 +32,7 @@ async function reachPurchaseStep(page: Page) {
     .getByRole("button", { name: "Queue one safe Interactive Chat job" })
     .click();
   await waitForGuideStep(page, "step 2 of 3");
-  await page.getByRole("button", { name: "64×" }).click();
+  await chooseSimulationSpeed(page, "64×");
   await waitForGuideStep(page, "step 3 of 3");
 }
 

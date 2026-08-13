@@ -5,7 +5,11 @@ import {
 } from "../../src/simulation/currency";
 import { getWorkloadQuote } from "../../src/simulation/engine";
 import type { SimulationState } from "../../src/simulation/types";
-import { settleStarterJob } from "./helpers";
+import {
+  chooseSimulationSpeed,
+  openSimulationContext,
+  settleStarterJob,
+} from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 
@@ -137,6 +141,7 @@ test("keeps V-071 compact disclosures separate from exact failed-settlement acco
 
   await openTab(page, "Build");
   await removeStarterProcessingModules(page);
+  await openSimulationContext(page);
   const warning = page.getByLabel("Current warning and actions", {
     exact: true,
   });
@@ -148,7 +153,7 @@ test("keeps V-071 compact disclosures separate from exact failed-settlement acco
   );
 
   await openTab(page, "Jobs");
-  await page.getByRole("button", { name: "64×", exact: true }).click();
+  await chooseSimulationSpeed(page, "64×");
   await page
     .getByRole("button", {
       name: "Queue one safe Interactive Chat job",
@@ -185,7 +190,7 @@ test("keeps the settlement cash floor in its promoted equation and tier requirem
   await removeStarterProcessingModules(page);
 
   await openTab(page, "Jobs");
-  await page.getByRole("button", { name: "64×", exact: true }).click();
+  await chooseSimulationSpeed(page, "64×");
   await page
     .getByRole("button", {
       name: "Queue one safe Interactive Chat job",

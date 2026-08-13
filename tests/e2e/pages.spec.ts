@@ -1,5 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
-import { settleStarterJob } from "./helpers";
+import {
+  openHelpAndMotionSettings,
+  openSimulationContext,
+  settleStarterJob,
+} from "./helpers";
 
 const pagesPath = "/goldilocks-engine/";
 
@@ -39,9 +43,11 @@ test("the GitHub Pages build loads and remains worker-backed offline", async ({
   await expect(page.getByTestId("quick-start")).toContainText(
     "CU means normalized Compute Units",
   );
+  await openHelpAndMotionSettings(page);
   await expect(
     page.getByRole("button", { name: "Help / Quick start" }),
   ).toBeVisible();
+  await openSimulationContext(page);
   await expect(page.getByRole("button", { name: "16×" })).toBeVisible();
   await page
     .locator("html[data-offline-ready='true']")
@@ -151,7 +157,9 @@ test("the GitHub Pages build loads and remains worker-backed offline", async ({
   await expect(
     page.getByRole("heading", { name: "Goldilocks Engine" }),
   ).toBeVisible();
+  await openSimulationContext(page);
   await expect(page.getByRole("button", { name: "16×" })).toBeVisible();
+  await openHelpAndMotionSettings(page);
   await expect(
     page.getByRole("button", { name: /Animations (on|off)/ }),
   ).toBeVisible();

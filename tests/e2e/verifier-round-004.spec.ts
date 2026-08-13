@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { settleStarterJob } from "./helpers";
+import { openHelpAndMotionSettings, settleStarterJob } from "./helpers";
 
 test.describe("verifier round 004 adversarial mobile behavior", () => {
   test("the touch module drawer exposes modules beyond the first screen", async ({
@@ -65,6 +65,7 @@ test.describe("verifier round 004 adversarial mobile behavior", () => {
     await settleStarterJob(page);
     await page.getByRole("button", { name: "Queue 10" }).click();
     await page.getByRole("button", { name: "Build" }).click();
+    await openHelpAndMotionSettings(page);
     await page.getByRole("button", { name: "Animations on" }).click();
     await expect(
       page.getByRole("button", { name: "Animations off" }),

@@ -2,9 +2,50 @@ import { expect, type Page } from "@playwright/test";
 
 export const STARTER_QUEUE_NAME = "Queue one safe Interactive Chat job";
 
+/** Global controls are intentionally compact until the player asks for them. */
+export async function openSimulationContext(page: Page) {
+  // The anchored Help panel intentionally takes visual precedence while open.
+  // Close that separate disclosure through its own summary before asking for
+  // Simulation; this mirrors sequential keyboard/touch use rather than
+  // bypassing native details state in a test.
+  const settings = page.locator(".header-settings");
+  if (
+    await settings.evaluate((element) => (element as HTMLDetailsElement).open)
+  )
+    await settings.locator(":scope > summary").click();
+  const context = page.getByTestId("simulation-context");
+  await expect(context).toBeVisible();
+  const open = await context.evaluate(
+    (element) => (element as HTMLDetailsElement).open,
+  );
+  if (!open) await context.locator(":scope > summary").click();
+  return context;
+}
+
+export async function chooseSimulationSpeed(
+  page: Page,
+  speed: "1×" | "4×" | "16×" | "64×",
+) {
+  const context = await openSimulationContext(page);
+  const control = context.getByRole("button", { name: speed, exact: true });
+  await control.click();
+  return control;
+}
+
+/** Help and motion share one progressive disclosure in the compact header. */
+export async function openHelpAndMotionSettings(page: Page) {
+  const settings = page.locator(".header-settings");
+  await expect(settings).toBeVisible();
+  const open = await settings.evaluate(
+    (element) => (element as HTMLDetailsElement).open,
+  );
+  if (!open) await settings.locator(":scope > summary").click();
+  return settings;
+}
+
 export async function settleStarterJob(page: Page) {
   await page.getByRole("button", { name: STARTER_QUEUE_NAME }).click();
-  await page.getByRole("button", { name: "64×" }).click();
+  await chooseSimulationSpeed(page, "64×");
   await expect(page.getByTestId("first-session-guide")).toContainText(
     "step 3 of 3",
     { timeout: 10_000 },

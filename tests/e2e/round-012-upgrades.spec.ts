@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { settleStarterJob } from "./helpers";
+import { chooseSimulationSpeed, settleStarterJob } from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 const LEGACY_SAVE_KEY = "goldilocks-simulation-save-v3";
@@ -78,7 +78,7 @@ test.describe("round 012 persistent upgrade economy and UX", () => {
         name: "Buy Precision Cleaner for $4.00",
       }),
     ).toBeDisabled();
-    await page.getByRole("button", { name: "16×" }).click();
+    await chooseSimulationSpeed(page, "16×");
     await page.getByRole("button", { name: "Jobs" }).click();
     await settleStarterJob(page);
     // The early economy is deliberately about choosing a few visible jobs;

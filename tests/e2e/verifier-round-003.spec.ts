@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { settleStarterJob } from "./helpers";
+import { openHelpAndMotionSettings } from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 
@@ -81,6 +82,7 @@ test.describe("verifier round 003 adversarial accessibility", () => {
     await settleStarterJob(page);
     await page.getByRole("button", { name: "Queue 10" }).click();
     await page.getByRole("button", { name: "Build" }).click();
+    await openHelpAndMotionSettings(page);
     await page.getByRole("button", { name: "Animations on" }).click();
     await expect(
       page.getByRole("button", { name: "Animations off" }),

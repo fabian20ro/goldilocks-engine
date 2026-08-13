@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { STARTER_QUEUE_NAME } from "./helpers";
+import { chooseSimulationSpeed, STARTER_QUEUE_NAME } from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 
@@ -72,7 +72,7 @@ test.describe("verifier round 017 settlement feedback", () => {
     await expect(
       page.getByText("Selected-work live quote").locator(".."),
     ).toContainText("Guaranteed failure in this configuration");
-    await page.getByRole("button", { name: "64×" }).click();
+    await chooseSimulationSpeed(page, "64×");
     await page.getByRole("button", { name: STARTER_QUEUE_NAME }).click();
 
     const latestSettlement = page
@@ -101,7 +101,7 @@ test.describe("verifier round 017 settlement feedback", () => {
     await setSavedMoney(page, 0.005);
     await removeProcessModules(page);
     await openTab(page, "Jobs");
-    await page.getByRole("button", { name: "64×" }).click();
+    await chooseSimulationSpeed(page, "64×");
     await page.getByRole("button", { name: STARTER_QUEUE_NAME }).click();
 
     const latestSettlement = page
