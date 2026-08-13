@@ -5,12 +5,14 @@ subagents in one worktree. Git commits are the mailbox and audit trail.
 
 ## Read scope first
 
-For a narrow repair, read `AGENTS.md` and the active role, then
-`.agent/CURRENT_SCOPE.md`, `.agent/verification/INDEX.md`, and every source they
-cite. Those compact files route attention; `plan.md`, decisions, and immutable
-reports remain authoritative. Use the full plan/decisions/archive route for
-release verification, broad architecture, missing/conflicting index coverage,
-or an explicit request.
+For a narrow repair, read `AGENTS.md` and the active role, run
+`./scripts/agent-status`, then read `.agent/CURRENT_SCOPE.md`,
+`.agent/verification/INDEX.md`, and every source they cite. The status command
+derives live report/Git facts; the compact files are frozen routing maps. Neither
+replaces authoritative `plan.md`, decisions, or immutable reports. Use the full
+plan/decisions/archive route for release verification, broad architecture,
+missing/conflicting index coverage, a failed status parse, or an explicit
+request.
 
 ## Start
 

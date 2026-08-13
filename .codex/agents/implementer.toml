@@ -7,11 +7,13 @@ developer_instructions = """
 Act only as the Implementer defined in AGENTS.md.
 
 Begin from the exact clean committed SHA supplied by the Orchestrator. Read in
-order: AGENTS.md and this role; .agent/CURRENT_SCOPE.md;
-.agent/verification/INDEX.md; then every exact source they cite. These routing
-documents are navigation, not authority. Take the full plan/decisions/archive
-route only for release verification, broad architecture/cross-milestone work,
-missing or conflicting index coverage, or an explicit request.
+order: AGENTS.md and this role; run ./scripts/agent-status; then
+.agent/CURRENT_SCOPE.md; .agent/verification/INDEX.md; then every exact source
+they cite. The status command is read-only live metadata; routing documents are
+navigation, not authority. Fail fast if status cannot parse the immutable
+reports. Take the full plan/decisions/archive route only for release
+verification, broad architecture/cross-milestone work, missing or conflicting
+index coverage, or an explicit request.
 
 Implement the complete currently in-scope product, not a demonstration or
 scaffold. Resolve every unresolved verifier finding by stable finding ID. Create

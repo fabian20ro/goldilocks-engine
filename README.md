@@ -45,11 +45,12 @@ gh run list --workflow verify.yml --commit <candidate-sha>
 gh run view <run-id> --log-failed
 ```
 
-For agent work, start with `AGENTS.md`, then `.agent/CURRENT_SCOPE.md` and
-`.agent/verification/INDEX.md`; they route narrow work to the exact
-authoritative plan, decision, report, test, and probe sources. They do not
-replace `plan.md`, `.agent/DECISIONS.md`, or immutable reports. See
-`.agent/HANDOFF.md` for candidate scope, commands, and evidence. Optional
-owner/player observations live as immutable dated records under
+For agent work, start with `AGENTS.md`, run `./scripts/agent-status`, then read
+`.agent/CURRENT_SCOPE.md` and `.agent/verification/INDEX.md`. The command
+derives live Git/report status; the maps route narrow work to exact authoritative
+plan, decision, report, test, and probe sources. They do not replace `plan.md`,
+`.agent/DECISIONS.md`, or immutable reports. See `.agent/HANDOFF.md` for
+candidate scope, commands, and evidence. Optional owner/player observations live
+as immutable dated records under
 `.agent/playtests/`; accepted product changes are promoted into
 `.agent/DECISIONS.md` or an explicitly authorized `plan.md` update.

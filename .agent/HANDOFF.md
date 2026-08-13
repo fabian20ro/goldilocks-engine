@@ -4,10 +4,11 @@
 
 - Added compact routing records: `.agent/CURRENT_SCOPE.md` and
   `.agent/verification/INDEX.md`. For narrow work, agents read protocol/role →
-  current scope → index → cited authorities. The records explicitly require a
-  full plan/decisions/archive read for release verification, broad
-  architecture/cross-milestone work, missing or conflicting coverage, or an
-  explicit request; they never replace the authority order in `AGENTS.md`.
+  live status → frozen scope map → index → cited authorities. The maps
+  explicitly require a full plan/decisions/archive read for release
+  verification, broad architecture/cross-milestone work, missing or
+  conflicting coverage, or an explicit request; they never replace the
+  authority order in `AGENTS.md`.
 - Both Implementer and Verifier profiles now use `gpt-5.6-luna` with maximum
   reasoning. Verifier routing remains independent: scope/index/handoff/tests
   are untrusted navigation, and the verifier builds its own checklist from the
@@ -22,12 +23,51 @@
   `${VERIFY_EVIDENCE_DIR:-.cache/verification/local}` and stops before balance,
   build, or browsers when setup/static/unit preflight fails. A passing run
   still executes every former canonical lane in the same order after preflight.
-- Current acceptance state is deliberately unchanged: last accepted PASS is
-  round 078 / verifier `437b56245b8488cce0ea1193be4200985cace2c7`; product
-  candidate `0bdff6ea88f7496bfb8348c7551652bf53a676ca` is unverified; immutable
-  rounds 079–082 are FAIL; no round-083 PASS exists. The next product gate is
-  a fresh independent PASS and exact-SHA deployment before Milestone 4
-  Research.
+- The original round-083 candidate handoff contained a pre-round-083 status
+  snapshot. It is historical evidence only. Live report/head/gate state must
+  now come from `./scripts/agent-status`, never from this handoff or a frozen
+  routing map.
+
+## Round 084 live status derivation
+
+- Added read-only `./scripts/agent-status` with deterministic human output and
+  optional `--json`. It derives the latest immutable round, verdict, candidate
+  SHA, report creation commit, HEAD/branch, last accepted verifier record,
+  HEAD ancestry, unverified later changes, latest unresolved FAIL, and the next
+  gate.
+- The command scans every `round-*.md` for exactly one valid verdict and one
+  40-character candidate SHA, then fails before reporting a guessed state when
+  a field is missing, malformed, or repeated. It validates the live latest and
+  accepted report commits against their candidate ancestry and rejects a report
+  changed after its creation commit.
+- `CURRENT_SCOPE.md` and `verification/INDEX.md` are now explicitly frozen
+  history/scope maps. They retain the provenance threat model, source mapping,
+  Rule-of-Three seam, and archival probes without hardcoded current-head,
+  latest-round, acceptance, or next-gate claims.
+- Routing in `AGENTS.md`, all role profiles, loop documentation, and README now
+  requires status before frozen maps. Status is live operational metadata, not
+  product authority; the Verifier still treats maps, handoff, and implementation
+  tests as untrusted navigation.
+
+### Round 084 checks and deliberate scope limit
+
+- Shell syntax and real-repository JSON parsing passed:
+  `sh -n scripts/agent-status` and `./scripts/agent-status --json` piped to
+  `JSON.parse`.
+- Focused Node 22 workflow validation passed: `src/test/agentStatus.test.ts`,
+  `src/test/agentWorkflowRouting.test.ts`,
+  `src/test/verifierRound083Workflow.test.ts`, and
+  `src/test/verifyWorkflow.test.ts` — 4 files, 21 tests. Temporary Git
+  fixtures cover accepted PASS at HEAD, an unverified descendant, latest FAIL
+  with a retained earlier acceptance, and repeated/missing/malformed report
+  fields.
+- Node 22 lint and typecheck passed. `npm run format:check` is rerun after this
+  handoff update and passed.
+- `./scripts/verify`, balance, product build, and browser/PWA lanes were not
+  rerun: this candidate changes only read-only status tooling, routing docs, and
+  focused workflow tests; it deliberately leaves product code and canonical
+  verification behavior untouched. The prior canonical evidence remains
+  historical only; an independent verifier decides candidate acceptance.
 
 ### Workflow-optimization checks
 

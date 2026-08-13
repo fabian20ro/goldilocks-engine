@@ -1,28 +1,25 @@
-# Verification index
+# Verification index — frozen provenance-repair map
 
-Status date: 2026-08-14. Compact routing only; reports and plan/decisions remain
-authoritative and immutable.
+Navigation only. Reports and plan/decisions remain authoritative and immutable.
+This map is frozen history: it must not be used to infer live HEAD, latest
+round, accepted verdict, unresolved state, or next gate. Run
+`./scripts/agent-status` first for those facts.
 
-## Current status
+## Freeze label
 
-- Last accepted PASS: [round 078](round-078.md), verifier commit
-  `437b56245b8488cce0ea1193be4200985cace2c7`.
-- Current unverified candidate:
-  `0bdff6ea88f7496bfb8348c7551652bf53a676ca`.
-- No round-083 report/PASS exists.
-- Current unresolved FAIL history: [079](round-079.md),
-  [080](round-080.md), [081](round-081.md), [082](round-082.md).
-- Next gate: fresh independent PASS, then exact-SHA hosted verification and
-  deployment before Milestone 4 Research.
+This map preserves the provenance-repair source set spanning the round-078
+presentation baseline, rounds 079–082 adversarial findings, and the round-083
+workflow/provenance release-verification record. It intentionally remains useful
+after later reports and commits exist.
 
 ## Canonical baseline
 
 `./scripts/verify` is the complete local gate: locked setup; format; lint;
 typecheck; unit/property; deterministic balances; production build/audit; root
 browser/PWA; Pages/offline. `tests/e2e` and `playwright*.report` are generated
-evidence, not authority. The canonical command must retain every lane.
+evidence, not authority. The canonical command retains every lane.
 
-## Open finding map
+## Archived finding map
 
 | Finding | Authoritative report | Candidate regression / normal case | Adversarial / lifecycle evidence | Canonical lane |
 | --- | --- | --- | --- | --- |
@@ -47,7 +44,7 @@ evidence, not authority. The canonical command must retain every lane.
 
 ## Full-read triggers
 
-Take the full plan/decisions/archive route if any cited source is missing,
-conflicting, or insufficient; the change touches another product seam; the role
-is release verification; or the user explicitly requests it. The index never
-authorizes a product change by itself.
+Take the full plan/decisions/archive route if status fails; any cited source is
+missing, conflicting, or insufficient; the change touches another product seam;
+the role is release verification; or the user explicitly requests it. The index
+never authorizes a product change by itself.

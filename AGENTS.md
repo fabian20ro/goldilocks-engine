@@ -28,9 +28,12 @@ authority:
 For a narrow repair, read in this order:
 
 1. This protocol and the active role file.
-2. `CURRENT_SCOPE.md`.
-3. `verification/INDEX.md`.
-4. The exact plan sections, decisions, unresolved reports, last accepted PASS,
+2. Run `./scripts/agent-status` (or `./scripts/agent-status --json`) from the
+   repository. It is the live, read-only Git/report status source; it must
+   succeed before a lean route is trusted.
+3. `CURRENT_SCOPE.md`.
+4. `verification/INDEX.md`.
+5. The exact plan sections, decisions, unresolved reports, last accepted PASS,
    regression tests, and archived probes named there.
 
 Read the full plan, complete decisions log, and complete verification archive
@@ -39,12 +42,14 @@ when the routing records are missing/incomplete/conflicting, or when explicitly
 requested. Expand immediately whenever the cited sources do not establish a
 safe scope. Do not infer missing authority from a summary.
 
-`CURRENT_SCOPE.md` must name the active product boundary, frozen threat model,
-out-of-scope work, last accepted PASS, current unverified candidate, next gate,
-and exact source references. `INDEX.md` must map every currently unresolved
-finding to its report, candidate regression, canonical lane, and retained
-adversarial probe. A stale or incomplete routing record triggers the full-read
-route until it is corrected in an authorized commit.
+`CURRENT_SCOPE.md` and `INDEX.md` are stable routing maps: label frozen
+history/scope explicitly and name exact source references, but never make a
+live current-HEAD, latest-round, acceptance, or next-gate claim. The status
+command derives those facts from immutable reports and Git. `INDEX.md` maps
+the relevant finding history to its report, candidate regression, canonical
+lane, and retained adversarial probe. A failed status command, stale map, or
+incomplete routing record triggers the full-read route until corrected in an
+authorized commit.
 
 ## Goal activation
 

@@ -29,6 +29,7 @@ describe("progressive-disclosure agent workflow", () => {
       const source = readRepositoryFile(`.codex/agents/${role}.toml`);
       expect(source).toMatch(/^model = "gpt-5\.6-luna"$/m);
       expect(source).toMatch(/^model_reasoning_effort = "max"$/m);
+      expect(source).toContain("./scripts/agent-status");
       expect(source).toContain(".agent/CURRENT_SCOPE.md");
       expect(source).toContain(".agent/verification/INDEX.md");
     }
@@ -41,6 +42,7 @@ describe("progressive-disclosure agent workflow", () => {
 
     expect(protocol).toContain("## Progressive-disclosure reading");
     expect(protocol).toContain("For a narrow repair, read in this order:");
+    expect(protocol).toContain("Run `./scripts/agent-status`");
     expect(protocol).toContain("Read the full plan, complete decisions log");
     expect(protocol).toContain("Release verification");
     expect(protocol).toContain("Rule-of-Three same-seam review");
@@ -48,18 +50,19 @@ describe("progressive-disclosure agent workflow", () => {
     expect(protocol).toContain("at most three ordinary milestone checkpoints");
     expect(protocol).toContain("untrusted guidance rather than proof");
 
-    expect(scope).toContain("0bdff6ea88f7496bfb8348c7551652bf53a676ca");
-    expect(scope).toContain("437b56245b8488cce0ea1193be4200985cace2c7");
-    expect(scope).toContain(
-      "No `round-083.md` exists and no round-083 PASS exists.",
-    );
-    expect(scope).toMatch(/Milestone 4 Research must not\s+begin/);
+    expect(scope).toContain("frozen provenance-repair history");
+    expect(scope).toContain("./scripts/agent-status");
+    expect(scope).toContain("round-083 release-verification record");
     expect(scope).toContain("Frozen threat model and out-of-scope boundary");
+    expect(scope).not.toContain("Current product candidate:");
+    expect(scope).not.toContain("No `round-083.md` exists");
 
-    expect(index).toContain("[round 078](round-078.md)");
-    expect(index).toContain("Current unverified candidate");
+    expect(index).toContain("round-078");
+    expect(index).toContain("frozen provenance-repair map");
+    expect(index).toContain("./scripts/agent-status");
+    expect(index).not.toContain("Current unverified candidate");
     for (const report of ["079", "080", "081", "082"])
-      expect(index).toContain(`[${report}](round-${report}.md)`);
+      expect(index).toContain(`[round-${report}](round-${report}.md)`);
   });
 
   it("maps every open provenance finding to retained regression and probe evidence", () => {

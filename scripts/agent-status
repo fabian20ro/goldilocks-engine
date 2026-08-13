@@ -1,0 +1,283 @@
+#!/bin/sh
+set -eu
+
+usage() {
+  cat <<'EOF'
+Usage: ./scripts/agent-status [--json]
+
+Read-only Git/report status for the Implementer-Verifier loop.
+EOF
+}
+
+die() {
+  printf '%s\n' "agent-status: $*" >&2
+  exit 1
+}
+
+json_escape() {
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+json_or_null() {
+  if [ -n "$1" ]; then
+    printf '"%s"' "$(json_escape "$1")"
+  else
+    printf 'null'
+  fi
+}
+
+display_or_none() {
+  if [ -n "$1" ]; then
+    printf '%s' "$1"
+  else
+    printf 'none'
+  fi
+}
+
+count_nonempty_lines() {
+  printf '%s\n' "$1" | awk 'NF { count += 1 } END { print count + 0 }'
+}
+
+normalise_round() {
+  value=$1
+  while [ "${value#0}" != "$value" ]; do
+    value=${value#0}
+  done
+  if [ -z "$value" ]; then
+    value=0
+  fi
+  printf '%s\n' "$value"
+}
+
+parse_report() {
+  report=$1
+  verdict_lines=$(grep -E '^VERDICT:' "$report" || true)
+  verdict_count=$(count_nonempty_lines "$verdict_lines")
+  [ "$verdict_count" -eq 1 ] ||
+    die "$report: expected exactly one VERDICT line"
+  case $verdict_lines in
+    'VERDICT: PASS'|'VERDICT: FAIL'|'VERDICT: BLOCKED') ;;
+    *) die "$report: malformed VERDICT; expected PASS, FAIL, or BLOCKED" ;;
+  esac
+  PARSED_VERDICT=$verdict_lines
+
+  candidate_lines=$(grep -E '^Candidate SHA:' "$report" || true)
+  candidate_count=$(count_nonempty_lines "$candidate_lines")
+  [ "$candidate_count" -eq 1 ] ||
+    die "$report: expected exactly one Candidate SHA line"
+  printf '%s\n' "$candidate_lines" |
+    grep -Eq '^Candidate SHA:[[:space:]]*`?[0-9A-Fa-f]{40}`?[[:space:]]*$' ||
+    die "$report: malformed Candidate SHA; expected 40 hexadecimal characters"
+  PARSED_CANDIDATE=$(printf '%s\n' "$candidate_lines" | sed -E 's/^Candidate SHA:[[:space:]]*`?([0-9A-Fa-f]{40})`?[[:space:]]*$/\1/')
+}
+
+report_commit_for() {
+  report_relative=$1
+  report_commit=$(git log --diff-filter=A --format=%H -1 -- "$report_relative")
+  [ -n "$report_commit" ] ||
+    die "$report_relative: not committed as an immutable report"
+  printf '%s\n' "$report_commit"
+}
+
+validate_report_commit() {
+  report_relative=$1
+  candidate=$2
+  report_commit=$3
+  git cat-file -e "$candidate^{commit}" 2>/dev/null ||
+    die "$report_relative: Candidate SHA does not name a local commit"
+  git merge-base --is-ancestor "$candidate" "$report_commit" ||
+    die "$report_relative: report commit does not descend from Candidate SHA"
+  git diff --quiet "$report_commit" -- "$report_relative" ||
+    die "$report_relative: changed after its immutable report commit"
+}
+
+MODE=human
+case $# in
+  0) ;;
+  1)
+    case $1 in
+      --json) MODE=json ;;
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      *)
+        usage >&2
+        exit 2
+        ;;
+    esac
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac
+
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) ||
+  die "run inside a Git worktree"
+cd "$ROOT"
+
+REPORTS_DIR="$ROOT/.agent/verification"
+[ -d "$REPORTS_DIR" ] || die "missing .agent/verification"
+
+HEAD_SHA=$(git rev-parse --verify 'HEAD^{commit}' 2>/dev/null) ||
+  die "HEAD is not a commit"
+BRANCH=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || printf '%s' detached)
+
+LATEST_ROUND=
+LATEST_NUMBER=
+LATEST_REPORT=
+LATEST_VERDICT=
+LATEST_CANDIDATE=
+LATEST_REPORT_COMMIT=
+ACCEPTED_ROUND=
+ACCEPTED_NUMBER=
+ACCEPTED_REPORT=
+ACCEPTED_CANDIDATE=
+ACCEPTED_REPORT_COMMIT=
+SEEN_ROUNDS=' '
+REPORT_COUNT=0
+
+for REPORT in "$REPORTS_DIR"/round-*.md; do
+  [ -f "$REPORT" ] || continue
+  BASE=${REPORT##*/}
+  ROUND=${BASE#round-}
+  ROUND=${ROUND%.md}
+  case $ROUND in
+    ''|*[!0-9]*) die "$REPORT: malformed round filename" ;;
+  esac
+  ROUND_NUMBER=$(normalise_round "$ROUND")
+  case $SEEN_ROUNDS in
+    *" $ROUND_NUMBER "*) die "$REPORT: duplicate round number $ROUND_NUMBER" ;;
+  esac
+  SEEN_ROUNDS="$SEEN_ROUNDS$ROUND_NUMBER "
+  REPORT_COUNT=$((REPORT_COUNT + 1))
+
+  parse_report "$REPORT"
+  REPORT_RELATIVE=${REPORT#"$ROOT"/}
+
+  if [ -z "$LATEST_NUMBER" ] || [ "$ROUND_NUMBER" -gt "$LATEST_NUMBER" ]; then
+    LATEST_ROUND=$ROUND
+    LATEST_NUMBER=$ROUND_NUMBER
+    LATEST_REPORT=$REPORT_RELATIVE
+    LATEST_VERDICT=${PARSED_VERDICT#VERDICT: }
+    LATEST_CANDIDATE=$PARSED_CANDIDATE
+  fi
+
+  if [ "$PARSED_VERDICT" = 'VERDICT: PASS' ] &&
+    { [ -z "$ACCEPTED_NUMBER" ] || [ "$ROUND_NUMBER" -gt "$ACCEPTED_NUMBER" ]; }; then
+    ACCEPTED_ROUND=$ROUND
+    ACCEPTED_NUMBER=$ROUND_NUMBER
+    ACCEPTED_REPORT=$REPORT_RELATIVE
+    ACCEPTED_CANDIDATE=$PARSED_CANDIDATE
+  fi
+done
+
+[ "$REPORT_COUNT" -gt 0 ] || die "no immutable round-NNN reports found"
+
+LATEST_REPORT_COMMIT=$(report_commit_for "$LATEST_REPORT")
+validate_report_commit "$LATEST_REPORT" "$LATEST_CANDIDATE" "$LATEST_REPORT_COMMIT"
+if [ -n "$ACCEPTED_REPORT" ]; then
+  ACCEPTED_REPORT_COMMIT=$(report_commit_for "$ACCEPTED_REPORT")
+  validate_report_commit \
+    "$ACCEPTED_REPORT" "$ACCEPTED_CANDIDATE" "$ACCEPTED_REPORT_COMMIT"
+fi
+
+HEAD_RELATION=none
+HEAD_EQUALS_OR_DESCENDS=false
+if [ -n "$ACCEPTED_REPORT_COMMIT" ]; then
+  if [ "$HEAD_SHA" = "$ACCEPTED_REPORT_COMMIT" ]; then
+    HEAD_RELATION=equal
+    HEAD_EQUALS_OR_DESCENDS=true
+  elif git merge-base --is-ancestor "$ACCEPTED_REPORT_COMMIT" "$HEAD_SHA"; then
+    HEAD_RELATION=descendant
+    HEAD_EQUALS_OR_DESCENDS=true
+  elif git merge-base --is-ancestor "$HEAD_SHA" "$ACCEPTED_REPORT_COMMIT"; then
+    HEAD_RELATION=ancestor
+  else
+    HEAD_RELATION=diverged
+  fi
+fi
+
+LATEST_IS_UNRESOLVED_FAIL=false
+if [ "$LATEST_VERDICT" = FAIL ]; then
+  LATEST_IS_UNRESOLVED_FAIL=true
+fi
+
+UNVERIFIED_LATER_CHANGES=true
+if [ "$LATEST_VERDICT" = PASS ] &&
+  [ "$HEAD_SHA" = "$ACCEPTED_REPORT_COMMIT" ] &&
+  [ "$LATEST_REPORT_COMMIT" = "$ACCEPTED_REPORT_COMMIT" ]; then
+  UNVERIFIED_LATER_CHANGES=false
+fi
+
+if [ "$LATEST_IS_UNRESOLVED_FAIL" = true ]; then
+  VERIFICATION_STATE=unresolved-latest-fail
+elif [ "$LATEST_VERDICT" = BLOCKED ]; then
+  VERIFICATION_STATE=latest-blocked
+elif [ "$UNVERIFIED_LATER_CHANGES" = false ]; then
+  VERIFICATION_STATE=accepted-pass
+else
+  VERIFICATION_STATE=unverified-later-changes
+fi
+
+if [ "$VERIFICATION_STATE" = accepted-pass ]; then
+  NEXT_GATE=exact-sha-deployment
+  NEXT_GATE_TARGET=$ACCEPTED_CANDIDATE
+  NEXT_ACTION='deploy the accepted candidate SHA'
+elif [ "$LATEST_IS_UNRESOLVED_FAIL" = true ] ||
+  [ "$LATEST_VERDICT" = BLOCKED ]; then
+  NEXT_GATE=fresh-independent-verifier
+  NEXT_GATE_TARGET=
+  NEXT_ACTION='commit a repaired or unblocked candidate before verification'
+else
+  NEXT_GATE=fresh-independent-verifier
+  NEXT_GATE_TARGET=$HEAD_SHA
+  NEXT_ACTION='freeze the current HEAD as the verification candidate'
+fi
+
+if [ "$MODE" = json ]; then
+  cat <<EOF
+{
+  "branch": "$(json_escape "$BRANCH")",
+  "head": "$HEAD_SHA",
+  "latest_round": "$LATEST_ROUND",
+  "latest_verdict": "$LATEST_VERDICT",
+  "latest_candidate_sha": "$LATEST_CANDIDATE",
+  "latest_report_path": "$(json_escape "$LATEST_REPORT")",
+  "latest_report_commit": "$LATEST_REPORT_COMMIT",
+  "latest_is_unresolved_fail": $LATEST_IS_UNRESOLVED_FAIL,
+  "accepted_round": $(json_or_null "$ACCEPTED_ROUND"),
+  "accepted_candidate_sha": $(json_or_null "$ACCEPTED_CANDIDATE"),
+  "accepted_report_path": $(json_or_null "$ACCEPTED_REPORT"),
+  "accepted_verifier_commit": $(json_or_null "$ACCEPTED_REPORT_COMMIT"),
+  "head_relation_to_accepted_verifier": "$HEAD_RELATION",
+  "head_equals_or_descends_accepted_verifier": $HEAD_EQUALS_OR_DESCENDS,
+  "unverified_later_changes": $UNVERIFIED_LATER_CHANGES,
+  "verification_state": "$VERIFICATION_STATE",
+  "next_gate": "$NEXT_GATE",
+  "next_gate_target_sha": $(json_or_null "$NEXT_GATE_TARGET"),
+  "next_action": "$(json_escape "$NEXT_ACTION")"
+}
+EOF
+  exit 0
+fi
+
+printf '%s\n' 'Agent verification status'
+printf 'branch: %s\n' "$BRANCH"
+printf 'HEAD: %s\n' "$HEAD_SHA"
+printf 'latest immutable round: %s\n' "$LATEST_ROUND"
+printf 'latest verdict: %s\n' "$LATEST_VERDICT"
+printf 'latest candidate SHA: %s\n' "$LATEST_CANDIDATE"
+printf 'latest report: %s\n' "$LATEST_REPORT"
+printf 'latest report commit: %s\n' "$LATEST_REPORT_COMMIT"
+printf 'latest unresolved FAIL: %s\n' "$LATEST_IS_UNRESOLVED_FAIL"
+printf 'last accepted PASS round: %s\n' "$(display_or_none "$ACCEPTED_ROUND")"
+printf 'accepted candidate SHA: %s\n' "$(display_or_none "$ACCEPTED_CANDIDATE")"
+printf 'accepted verifier commit: %s\n' "$(display_or_none "$ACCEPTED_REPORT_COMMIT")"
+printf 'HEAD relation to accepted verifier: %s\n' "$HEAD_RELATION"
+printf 'HEAD equals or descends accepted verifier: %s\n' "$HEAD_EQUALS_OR_DESCENDS"
+printf 'unverified later changes: %s\n' "$UNVERIFIED_LATER_CHANGES"
+printf 'verification state: %s\n' "$VERIFICATION_STATE"
+printf 'next gate: %s (%s)\n' "$NEXT_GATE" "$(display_or_none "$NEXT_GATE_TARGET")"
+printf 'next action: %s\n' "$NEXT_ACTION"
