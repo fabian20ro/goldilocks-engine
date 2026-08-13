@@ -106,6 +106,27 @@ describe("latest settlement presentation", () => {
     });
   });
 
+  it("reports an unknown cause instead of inventing one when provenance is unavailable", () => {
+    const result = presentation(
+      {
+        ...successfulSettlement,
+        completed: 0,
+        failed: 1,
+        grossPayout: 0,
+        operatingCost: 0.01,
+        netChange: -0.01,
+      },
+      { completedJobs: 0 },
+    );
+
+    expect(result).toMatchObject({
+      failureCause:
+        "Cause unknown — the retained settlement record is unavailable.",
+      nextCue:
+        "Next: inspect the current configuration or choose a viable route before queueing again.",
+    });
+  });
+
   it("does not invent an outcome, accounting record, or next action before settlement", () => {
     expect(presentation(null)).toMatchObject({
       overview: "No payout yet — queue a job.",

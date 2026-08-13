@@ -2,7 +2,12 @@ import {
   formatCompactCurrency,
   formatExactCurrency,
 } from "../simulation/currency";
-import type { JobSettlement, LedgerEvent } from "../simulation/types";
+import {
+  isJobSettlementFailureCause,
+  JOB_SETTLEMENT_FAILURE_CAUSE_TEXT,
+  type JobSettlement,
+  type LedgerEvent,
+} from "../simulation/types";
 
 export interface SettlementPresentationInput {
   settlement: JobSettlement | null;
@@ -40,25 +45,31 @@ function signedCurrency(
 }
 
 /**
- * Settlement ledger sentences retain the accepted task ID. Match that durable
- * provenance instead of treating a later unrelated failure as the settlement's
- * cause; the ledger is intentionally bounded, so a missing retained record
- * remains an honest unknown handled by the presentation fallback.
+ * New settlements persist the exact ledger-event identity written with them.
+ * Do not infer a cause from a task-shaped message: old or bounded-out records
+ * intentionally fall back to the explicit unknown presentation.
  */
 export function findSettlementFailureRecord(
   settlement: JobSettlement | null,
   ledger: readonly LedgerEvent[],
 ): LedgerEvent | null {
   if (!settlement || settlement.failed !== 1) return null;
-  const taskMarker = ` task ${settlement.taskId} `;
-  return (
-    [...ledger]
-      .reverse()
-      .find(
-        (event) =>
-          event.kind === "failure" && event.message.includes(taskMarker),
-      ) ?? null
-  );
+  const eventId = settlement.ledgerEventId;
+  if (typeof eventId !== "string" || eventId.length === 0) return null;
+  const event = ledger.find((candidate) => candidate.id === eventId);
+  return event?.kind === "failure" &&
+    event.settlementTaskId === settlement.taskId &&
+    isJobSettlementFailureCause(event.settlementFailureCause)
+    ? event
+    : null;
+}
+
+export function settlementFailureCauseText(
+  event: LedgerEvent | null,
+): string | undefined {
+  return isJobSettlementFailureCause(event?.settlementFailureCause)
+    ? JOB_SETTLEMENT_FAILURE_CAUSE_TEXT[event.settlementFailureCause]
+    : undefined;
 }
 
 /**
@@ -109,7 +120,9 @@ export function selectSettlementPresentation({
   const exact = (amount: number) => formatExactCurrency(amount);
   const workload = workloadName ?? "Selected workload";
   const failed = settlement.failed === 1;
-  const defaultCause = "Delivery did not clear the modeled reliability check.";
+  const hasKnownFailureCause = Boolean(failureCause?.trim());
+  const defaultCause =
+    "Cause unknown — the retained settlement record is unavailable.";
   const recognition =
     settlement.completed === 1 && [1, 5, 12].includes(completedJobs)
       ? completedJobs === 1
@@ -118,7 +131,11 @@ export function selectSettlementPresentation({
           ? "Five successful deliveries recorded — no bonus applied."
           : "Twelve successful deliveries recorded — no bonus applied."
       : null;
-  const cause = failed ? (failureCause ?? defaultCause) : null;
+  const cause = failed
+    ? hasKnownFailureCause
+      ? failureCause!.trim()
+      : defaultCause
+    : null;
   const recovery = failed
     ? `Recovery forecast: ${recoveryQuote?.trend ?? "steady"} quote ${formatCompactCurrency(recoveryQuote?.grossQuote ?? 0)} after time recovery. No recovery action was applied.`
     : null;
@@ -133,7 +150,9 @@ export function selectSettlementPresentation({
     recovery,
     nextCue: showNextCue
       ? failed
-        ? "Next: repair the named constraint or choose a viable route before queueing again."
+        ? hasKnownFailureCause
+          ? "Next: repair the named constraint or choose a viable route before queueing again."
+          : "Next: inspect the current configuration or choose a viable route before queueing again."
         : "Next: choose a workload or queue another job above."
       : null,
     accounting: {

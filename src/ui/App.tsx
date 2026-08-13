@@ -71,6 +71,7 @@ import {
 import {
   findSettlementFailureRecord,
   selectSettlementPresentation,
+  settlementFailureCauseText,
 } from "./settlementPresentation";
 import {
   latestCareerScheduleWorkerRejection,
@@ -1459,7 +1460,7 @@ function MoneyLoop({
     settlement,
     workloadName: settlement ? getWorkload(settlement.workloadId).name : null,
     completedJobs: state.jobs.completed,
-    failureCause: failureEvent?.directCause,
+    failureCause: settlementFailureCauseText(failureEvent),
     recoveryQuote,
     // The finite guide already owns the exact current first-session action;
     // repeating it in the settlement would create duplicate onboarding copy.

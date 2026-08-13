@@ -716,3 +716,30 @@
   similarly native, one-control accessible treatment that retains every exact
   accounting field, actual-versus-economic-net distinction, first-session
   ownership, raw Jobs reserve, and equivalent portrait/text-scale evidence.
+
+## D-034 — Structural latest-settlement causal provenance
+
+- **Decision:** A newly emitted failed Job settlement persists the exact ID of
+  its own ledger event. That engine-owned failure event persists the accepted
+  settlement task ID and one closed job-failure marker. Jobs may show the
+  engine-owned cause only when the settlement ID resolves to a failure event
+  with the same task ID and a valid closed marker; it maps the marker rather
+  than reading ledger message or `directCause` prose.
+- **Compatibility and recovery:** These are optional schema-7 fields. Older,
+  bounded-out, missing, stale, malformed, or non-matching provenance has the
+  honest `Cause unknown` presentation; it is never inferred from free text or
+  borrowed from a later unrelated event. Normal structural validation and
+  malformed-save recovery remain authoritative for invalid state.
+- **Reason:** V-078 showed that event recency is not causal provenance; V-079
+  showed that matching a task-shaped substring can select forged unrelated
+  evidence. Durable event identity plus typed engine semantics is the narrow
+  association available without changing the simulation model or creating a
+  migration framework.
+- **Evidence policy:** Candidate engine/selector/UI coverage exercises a real
+  Job failure, later Career failure, same-task decoy, changed causal prose,
+  malformed relink, legacy absence, restore/reseal, and safe malformed-state
+  recovery. Immutable V-079/V-080 regressions, the adversarial offline probe,
+  and canonical Node 22 browser lanes remain required.
+- **Reversal condition:** Replace this association only with a durable,
+  structurally verified settlement-to-event relation that retains honest legacy
+  fallback and proves it cannot borrow message-derived or later-event causes.

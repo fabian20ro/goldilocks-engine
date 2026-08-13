@@ -364,6 +364,12 @@ describe("deterministic simulation engine", () => {
     expect((settlement?.completed ?? 0) + (settlement?.failed ?? 0)).toBe(1);
     expect(settlement?.taskId).toMatch(/^task-/);
     expect(settlement?.lockedGrossQuote).toBeGreaterThan(0);
+    expect(
+      settled.ledger.find((event) => event.id === settlement?.ledgerEventId),
+    ).toMatchObject({
+      kind: "success",
+      settlementTaskId: settlement?.taskId,
+    });
     expect(settled.jobs.grossEarned).toBeGreaterThan(0);
     expect(settled.jobs.grossEarned).toBeLessThanOrEqual(7);
     expect(settled.resources.money - queued.resources.money).toBeCloseTo(
@@ -397,6 +403,16 @@ describe("deterministic simulation engine", () => {
       failed: 1,
       grossPayout: 0,
       operatingCost: 0.01,
+    });
+    expect(
+      state.ledger.find(
+        (event) => event.id === state.lastSettlement?.ledgerEventId,
+      ),
+    ).toMatchObject({
+      kind: "failure",
+      settlementTaskId: state.lastSettlement?.taskId,
+      settlementFailureCause: "no-model-stage",
+      directCause: "The active pipeline had no model stage.",
     });
     expect(state.ledger.at(-1)?.message).toContain(
       "Locked quote paid $0.000 gross; configured actual cost was $0.010. $0.000 was paid and $0.010 remains unpaid because cash cannot go below $0.000.",

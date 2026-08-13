@@ -31,6 +31,9 @@ import {
   type EvaluationState,
   type FirstSessionProgress,
   type FirstSessionStep,
+  isJobSettlementFailureCause,
+  JOB_SETTLEMENT_FAILURE_CAUSE_TEXT,
+  type JobSettlementFailureCause,
   type LedgerEvent,
   type CareerRoute,
   type CareerState,
@@ -719,6 +722,12 @@ export function calculateMetrics(
   };
 }
 
+function nextLedgerEventId(
+  state: Pick<SimulationState, "eventSequence" | "tick">,
+): string {
+  return `evt-${state.tick}-${state.eventSequence + 1}`;
+}
+
 function appendEvent(
   state: SimulationState,
   event: Omit<LedgerEvent, "id" | "tick">,
@@ -728,7 +737,7 @@ function appendEvent(
     ...state.ledger,
     {
       ...event,
-      id: `evt-${state.tick}-${eventSequence}`,
+      id: nextLedgerEventId(state),
       tick: state.tick,
     },
   ].slice(-MAX_LEDGER_EVENTS);
@@ -3400,6 +3409,13 @@ function advanceTickQuantum(
   const missingModel = taskMetrics.orderWarnings.includes("no model stage");
   const failed =
     memoryFailure || missingModel || sample.value > taskMetrics.reliability;
+  const settlementFailureCause: JobSettlementFailureCause | null = failed
+    ? missingModel
+      ? "no-model-stage"
+      : memoryFailure
+        ? "memory-capacity-exceeded"
+        : "malformed-output"
+    : null;
   const grossPayout = failed ? 0 : task.lockedGrossQuote;
   const operatingCost = taskMetrics.operatingCost;
   const operatingCostPaid = round(
@@ -3413,6 +3429,7 @@ function advanceTickQuantum(
   const settlementCurrency = (amount: number) => formatExactCurrency(amount);
   const signedSettlementCurrency = (amount: number) =>
     `${amount >= 0 ? "+" : "−"}${formatExactCurrency(Math.abs(amount))}`;
+  const settlementLedgerEventId = nextLedgerEventId(next);
   const moneyAfter = round(
     Math.max(0, moneyBeforeSettlement + grossPayout - operatingCost),
     3,
@@ -3467,6 +3484,7 @@ function advanceTickQuantum(
       netChange: round(moneyAfter - moneyBeforeSettlement, 3),
       taskId: task.id,
       lockedGrossQuote: task.lockedGrossQuote,
+      ledgerEventId: settlementLedgerEventId,
     },
   };
 
@@ -3491,21 +3509,23 @@ function advanceTickQuantum(
     };
     next = appendEvent(next, {
       kind: "success",
+      settlementTaskId: task.id,
       message: `${workload.name} task ${task.id} completed; ${settlementCurrency(task.lockedGrossQuote)} gross payout earned before operating cost (locked quote) − ${settlementCurrency(operatingCost)} configured actual cost = ${signedSettlementCurrency(economicNet)} net. ${unpaidOperatingCost > 0 ? `${settlementCurrency(operatingCostPaid)} was paid and ${settlementCurrency(unpaidOperatingCost)} remains unpaid because cash cannot go below ${settlementCurrency(0)}.` : "The configured cost was paid in full."} Future ${workload.name} demand is lower and recovers with simulated time.`,
     });
   } else {
     next = appendEvent(next, {
       kind: "failure",
+      settlementTaskId: task.id,
+      settlementFailureCause: settlementFailureCause ?? undefined,
       message: missingModel
         ? `${workload.name} task ${task.id} failed before delivery: no model stage produced an answer. Locked quote paid ${settlementCurrency(0)} gross; configured actual cost was ${settlementCurrency(operatingCost)}. ${unpaidOperatingCost > 0 ? `${settlementCurrency(operatingCostPaid)} was paid and ${settlementCurrency(unpaidOperatingCost)} remains unpaid because cash cannot go below ${settlementCurrency(0)}.` : "The configured cost was paid in full."}`
         : memoryFailure
           ? `${workload.name} task ${task.id} failed before delivery: memory capacity exceeded. Locked quote paid ${settlementCurrency(0)} gross; configured actual cost was ${settlementCurrency(operatingCost)}. ${unpaidOperatingCost > 0 ? `${settlementCurrency(operatingCostPaid)} was paid and ${settlementCurrency(unpaidOperatingCost)} remains unpaid because cash cannot go below ${settlementCurrency(0)}.` : "The configured cost was paid in full."}`
           : `${workload.name} task ${task.id} produced unstable output and was rejected. Locked quote paid ${settlementCurrency(0)} gross; configured actual cost was ${settlementCurrency(operatingCost)}. ${unpaidOperatingCost > 0 ? `${settlementCurrency(operatingCostPaid)} was paid and ${settlementCurrency(unpaidOperatingCost)} remains unpaid because cash cannot go below ${settlementCurrency(0)}.` : "The configured cost was paid in full."}`,
-      directCause: missingModel
-        ? "The active pipeline had no model stage."
-        : memoryFailure
-          ? "Required memory exceeded available memory."
-          : "A processor emitted malformed output.",
+      directCause:
+        settlementFailureCause === null
+          ? undefined
+          : JOB_SETTLEMENT_FAILURE_CAUSE_TEXT[settlementFailureCause],
       contributingCondition:
         taskMetrics.observability < 0.6
           ? "Low observability delayed isolation."
@@ -4186,6 +4206,9 @@ function isStateStructurallyValid(value: unknown): value is SimulationState {
       (state.lastSettlement === null ||
         (isText(state.lastSettlement.taskId, 128) &&
           state.lastSettlement.taskId.length > 0 &&
+          (state.lastSettlement.ledgerEventId === undefined ||
+            (isText(state.lastSettlement.ledgerEventId, 128) &&
+              state.lastSettlement.ledgerEventId.length > 0)) &&
           Number.isFinite(state.lastSettlement.lockedGrossQuote) &&
           state.lastSettlement.lockedGrossQuote >= 0 &&
           state.lastSettlement.lockedGrossQuote <=
@@ -4227,6 +4250,13 @@ function isStateStructurallyValid(value: unknown): value is SimulationState {
           event.tick <= state.tick &&
           isEventKind(event.kind) &&
           isText(event.message, 800) &&
+          (event.settlementTaskId === undefined ||
+            (isText(event.settlementTaskId, 128) &&
+              event.settlementTaskId.length > 0)) &&
+          (event.settlementFailureCause === undefined ||
+            (event.kind === "failure" &&
+              event.settlementTaskId !== undefined &&
+              isJobSettlementFailureCause(event.settlementFailureCause))) &&
           (event.directCause === undefined || isText(event.directCause, 800)) &&
           (event.contributingCondition === undefined ||
             isText(event.contributingCondition, 800)) &&

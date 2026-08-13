@@ -334,6 +334,11 @@ export interface JobSettlement {
   netChange: number;
   taskId: string;
   lockedGrossQuote: number;
+  /**
+   * Exact event identity written with a new settlement. Older schema-7 saves
+   * legitimately lack it, so presentation must treat their cause as unknown.
+   */
+  ledgerEventId?: string;
 }
 
 export interface UpgradeNotice {
@@ -349,6 +354,33 @@ export interface Resources {
 }
 
 export type EventKind = "info" | "success" | "warning" | "failure";
+
+/** Closed engine causes for a failed job settlement's own ledger record. */
+export const JOB_SETTLEMENT_FAILURE_CAUSES = [
+  "no-model-stage",
+  "memory-capacity-exceeded",
+  "malformed-output",
+] as const;
+
+export type JobSettlementFailureCause =
+  (typeof JOB_SETTLEMENT_FAILURE_CAUSES)[number];
+
+export const JOB_SETTLEMENT_FAILURE_CAUSE_TEXT: Readonly<
+  Record<JobSettlementFailureCause, string>
+> = {
+  "no-model-stage": "The active pipeline had no model stage.",
+  "memory-capacity-exceeded": "Required memory exceeded available memory.",
+  "malformed-output": "A processor emitted malformed output.",
+};
+
+export function isJobSettlementFailureCause(
+  value: unknown,
+): value is JobSettlementFailureCause {
+  return (
+    typeof value === "string" &&
+    (JOB_SETTLEMENT_FAILURE_CAUSES as readonly string[]).includes(value)
+  );
+}
 
 /**
  * Causal categories are evidence annotations, not an omniscient narrative.
@@ -367,6 +399,12 @@ export interface LedgerEvent {
   tick: number;
   kind: EventKind;
   message: string;
+  /**
+   * Exact task linkage written only for engine-owned job settlement records.
+   * It avoids treating descriptive ledger prose as causal provenance.
+   */
+  settlementTaskId?: string;
+  settlementFailureCause?: JobSettlementFailureCause;
   directCause?: string;
   contributingCondition?: string;
   causal?: CausalEvidence;
