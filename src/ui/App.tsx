@@ -2356,7 +2356,10 @@ export function JobsView({
   };
   return (
     <>
-      <section className="panel" aria-labelledby="workload-title">
+      <section
+        className="panel workload-panel"
+        aria-labelledby="workload-title"
+      >
         <div className="section-heading">
           <div>
             <span className="eyebrow">Route work</span>

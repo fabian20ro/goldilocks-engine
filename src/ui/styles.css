@@ -3700,13 +3700,24 @@ h1 {
 
 /*
  * The raw 320×693 Jobs route needs clearance for its first dispatch action,
- * not a boundary match against the fixed navigation.  This removes 12px from
- * the two gaps before the selected workload on short, narrow portraits while
- * leaving the 393×742 command-deck rhythm unchanged.
+ * not a boundary match against the fixed navigation. This compacts only the
+ * Jobs spacing around the selected workload on short, narrow portraits,
+ * preserving its copy and every 44px control while leaving the 393×742
+ * command-deck rhythm unchanged.
  */
 @media (max-width: 350px) and (max-height: 44rem) {
   .main-content.jobs-content {
     gap: 0.125rem;
+  }
+
+  .jobs-content .workload-panel > .section-heading {
+    padding-block: 0.45rem;
+  }
+
+  .jobs-content .selected-dispatch {
+    gap: 0.25rem;
+    margin-top: 0;
+    padding: 0.45rem;
   }
 }
 

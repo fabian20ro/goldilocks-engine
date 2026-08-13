@@ -1,7 +1,17 @@
-# Candidate handoff — round 074 V-076 explanatory-rail repair
+# Candidate handoff — round 075 hosted CI portrait-geometry repair
 
 ## Implemented behavior summary
 
+- The active-pipeline drag acceptance fixture now scrolls both its source and
+  Runtime destination into the app scroll region before calculating real
+  pointer/touch coordinates. The hosted trace showed the old Runtime center
+  beneath the fixed navigation, so the interaction landed on navigation rather
+  than the compatible slot; production drag behavior is unchanged.
+- At raw 320×693, Jobs compacts only non-target Workloads/dispatch spacing.
+  The first selected-workload action now retains its required reserve above the
+  fixed navigation without shrinking copy or any 44px control. A named
+  `workload-panel` hook keeps that localized portrait rule out of other panels
+  and the 393×742 rhythm.
 - Added `selectFirstSessionPresentation`, a pure UI selector over the durable
   first-session state and transient explicit-placement selection. It derives
   the finite next action without dispatching commands, navigation, persistence,
@@ -33,18 +43,26 @@
 
 ## Plan requirements covered
 
-| Requirement                                             | Evidence                                                                                                                                                                                                       |
-| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| State-derived first-session sequence                    | Pure selector tests cover queue, observe, shortfall, affordable buy, owned handoff, pending placement, completion, failed settlement, and valid alternative purchase.                                          |
-| One visible handoff / required tab / no auto-navigation | First-session Playwright flow asserts action attributes, required tab, intact Upgrades tab after placement start, no tray until manual Build, and pending tray after the manual switch.                        |
-| No premature expansion priority                         | Build mission test excludes Workstation Expansion during onboarding; Upgrades test proves Precision Cleaner precedes its expansion section and the expansion action is not the primary onboarding action.      |
-| Cross-tab, scroll, and input preservation               | Browser checks retain Upgrades scroll across the placement handoff and a Career draft plus per-tab scroll across manual navigation.                                                                            |
-| Errors without work loss                                | Browser failure/recovery test removes the model, retains the failed settlement reason and all other slots, restores the model explicitly, and queues recovery.                                                 |
-| Mobile/accessibility behavior                           | Pinned browser checks cover 320×693, iPhone-SE-like 375×667, and 393×742; 200% text, reduced motion, touch drag, keyboard cancellation, reload/resume, offline/PWA, and retained Phase 3 geometry regressions. |
-| Preserve mechanics/persistence/PWA                      | No simulation command, schema, economy, Worker, PWA, or persistence path changed; canonical retained suites cover them.                                                                                        |
+| Requirement                                             | Evidence                                                                                                                                                                                                                                               |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| State-derived first-session sequence                    | Pure selector tests cover queue, observe, shortfall, affordable buy, owned handoff, pending placement, completion, failed settlement, and valid alternative purchase.                                                                                  |
+| One visible handoff / required tab / no auto-navigation | First-session Playwright flow asserts action attributes, required tab, intact Upgrades tab after placement start, no tray until manual Build, and pending tray after the manual switch.                                                                |
+| No premature expansion priority                         | Build mission test excludes Workstation Expansion during onboarding; Upgrades test proves Precision Cleaner precedes its expansion section and the expansion action is not the primary onboarding action.                                              |
+| Cross-tab, scroll, and input preservation               | Browser checks retain Upgrades scroll across the placement handoff and a Career draft plus per-tab scroll across manual navigation.                                                                                                                    |
+| Errors without work loss                                | Browser failure/recovery test removes the model, retains the failed settlement reason and all other slots, restores the model explicitly, and queues recovery.                                                                                         |
+| Mobile/accessibility behavior                           | Pinned browser checks cover 320×693, iPhone-SE-like 375×667, and 393×742; 200% text, reduced motion, direct pointer/touch drag, keyboard cancellation, reload/resume, offline/PWA, the 44px target floor, and the 8px raw-320 Jobs navigation reserve. |
+| Preserve mechanics/persistence/PWA                      | No simulation command, schema, economy, Worker, PWA, or persistence path changed; canonical retained suites cover them.                                                                                                                                |
 
 ## Verifier findings addressed
 
+- **Hosted Verify 31679283386 / root browser-PWA job 94380784738 resolved:**
+  the two `game.spec.ts` direct-drag failures were fixture geometry failures,
+  not a module-move regression. The CI trace put the Runtime slot center at
+  828.84375px while fixed navigation began at 826.21875px. Both endpoints are
+  now made visible before coordinate dispatch. The raw-320 first-session and
+  retained round-049 bounds were 5.53125px short under CI/Linux font metrics;
+  the scoped Jobs compaction restores clearance while retaining complete guide
+  content, manual handoff, current input state, and 44px targets.
 - **V-076 resolved:** `FirstSessionGuide` now renders the existing pure
   selector's `presentation.body` in one concise wrapping paragraph. This makes
   the queue reason, observe-settlement accounting location, earn-remainder
@@ -89,6 +107,15 @@ up every web-server process:
 E2E_PORT=4195 ./scripts/verify
 ```
 
+Round-075 executed the same canonical command through the repository-local
+Node 22 package cache:
+
+```sh
+E2E_PORT=4199 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright \
+  npm_config_cache="$PWD/.cache/npm" \
+  npm exec --yes --package=node@22 -- sh ./scripts/verify
+```
+
 Focused first-session evidence:
 
 ```sh
@@ -105,6 +132,12 @@ sandbox because its local Mach-port rendezvous cannot be created inside it.
 
 ## Important architectural decisions
 
+- No `.agent/DECISIONS.md` entry changed: D-018 already requires a raw-320
+  Jobs navigation reserve. `workload-panel` is only a local CSS ownership hook;
+  it introduces no state, navigation, persistence, or simulation behavior.
+- The direct-drag tests retain their original visible, coordinate-based input
+  contract. Scrolling the target first fixes the test fixture's impossible
+  behind-navigation endpoint rather than relaxing its post-move assertion.
 - D-031 records the product boundary: a thin pure presenter derives only the
   finite onboarding handoff. Existing engine progress remains authoritative;
   tab navigation, placement transaction state, and all Worker commands stay in
@@ -124,6 +157,11 @@ sandbox because its local Mach-port rendezvous cannot be created inside it.
 
 ## Known limitations and risks
 
+- A local Linux container reproduction was not available: the managed safety
+  boundary rejected mounting this repository into the third-party Playwright
+  image. Node 22 plus pinned Chromium ran locally; the downloaded hosted trace
+  and Linux-font probe supplied the CI-specific geometry evidence. Hosted CI
+  remains an external follow-up.
 - No physical mobile-device, non-Chromium browser, or external screen-reader
   session was available. Pinned Chromium covers required portrait, text-scale,
   touch, keyboard, reduced-motion, persistence/reload, offline, recovery, and
@@ -136,6 +174,28 @@ sandbox because its local Mach-port rendezvous cannot be created inside it.
 
 ## Checks executed before handoff
 
+- Round-075 final canonical Node 22 command:
+  `E2E_PORT=4199 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright
+npm_config_cache="$PWD/.cache/npm" npm exec --yes --package=node@22 -- sh
+./scripts/verify` completed with terminal marker
+  `R075_CANONICAL_CLEAN_EXIT=0` in
+  `/tmp/goldlocks-r075-canonical-clean.log`. Format, lint, TypeScript,
+  45 unit/property files / 223 tests, numeric viability, first-session 41,
+  upgrades 20,001, progression 41, Career 101, and evaluation 121 balance
+  seeds all passed with zero failures; build and production audit were clean;
+  root Playwright passed 212/212 and Pages passed 2/2.
+- Round-075 CI-focused Node 22 browser repeat:
+  `E2E_PORT=4199 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright
+npm_config_cache="$PWD/.cache/npm" npm exec --yes --package=node@22 -- node
+node_modules/@playwright/test/cli.js test tests/e2e/game.spec.ts
+tests/e2e/first-session.spec.ts tests/e2e/verifier-round-049.spec.ts --grep
+'supports pointer drag and compatible active-module reordering|supports touch
+drag between compatible active slots|short portrait keeps the complete guide
+reason and first Jobs action clear of navigation|pre-boot seed persists
+through reload at 320px|touch-drag starts placement only after movement and
+cancellation changes no slot' --repeat-each=5 --reporter=line` passed 25/25.
+  It exercises both original drag defects, both raw-320 geometry bounds, and
+  the previously observed first-session Worker-init path.
 - Round-074 focused static/unit checks: `npm run format:check` and
   `npm run typecheck` passed; `npx vitest run
 src/ui/firstSessionPresentation.test.ts src/ui/careerView.test.tsx
@@ -179,6 +239,7 @@ OUTPUT_DIR=/tmp/goldlocks-r074-final-adversarial node
 
 - No required local check is intentionally skipped. No verifier report or
   immutable verification artifact was changed.
-- Deployment, push, hosted CI, physical-device, non-Chromium, and external
-  screen-reader checks were not run because they are outside this Implementer
-  handoff.
+- Linux-container reproduction, deployment, push, hosted CI, physical-device,
+  non-Chromium, and external screen-reader checks were not run. The local
+  Linux-container mount was denied by the managed safety boundary; the rest are
+  external to this Implementer handoff.

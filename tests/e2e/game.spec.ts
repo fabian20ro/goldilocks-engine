@@ -122,6 +122,7 @@ test.describe("portrait pipeline acceptance", () => {
       .locator('[data-module-id="basic-cleaner"]');
     const destination = page.getByTestId("slot-runtime");
     await source.scrollIntoViewIfNeeded();
+    await destination.scrollIntoViewIfNeeded();
     const from = await source.boundingBox();
     const to = await destination.boundingBox();
     expect(from).not.toBeNull();
@@ -154,6 +155,7 @@ test.describe("portrait pipeline acceptance", () => {
       .locator('[data-module-id="basic-cleaner"]');
     const destination = page.getByTestId("slot-runtime");
     await source.scrollIntoViewIfNeeded();
+    await destination.scrollIntoViewIfNeeded();
     const from = await source.boundingBox();
     const to = await destination.boundingBox();
     expect(from).not.toBeNull();
