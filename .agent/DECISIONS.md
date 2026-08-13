@@ -743,3 +743,36 @@
 - **Reversal condition:** Replace this association only with a durable,
   structurally verified settlement-to-event relation that retains honest legacy
   fallback and proves it cannot borrow message-derived or later-event causes.
+
+## D-035 — Untrusted restored ledger canonicalization
+
+- **Decision:** A schema-7 record with invalid or absent integrity is treated
+  as untrusted for retained ledger identity. Restore reconstructs the bounded
+  ledger's deterministic `evt-{tick}-{sequence}` tail from ordered retained
+  events and authoritative `eventSequence`. It keeps a failed settlement link
+  only when that reconstructed link still names the first engine event at the
+  settlement tick; otherwise it removes the optional link so D-034 renders
+  the existing honest unknown. The closed marker remains the only source of
+  player-facing cause text; message and `directCause` prose remain ignored.
+- **Allocation boundary:** Every append obtains its next ID through one
+  collision-aware allocator. Normal restored tails are contiguous again; a
+  directly supplied valid-looking retained collision is skipped rather than
+  duplicated. Exhausted safe-integer allocation rejects the enclosing
+  transactional update instead of committing state without its audit event.
+- **Compatibility:** Original-integrity-valid current saves are unchanged.
+  Legacy optional settlement provenance remains absent/unknown. A malformed
+  ledger tail that cannot be safely reconstructed follows the existing
+  structural validation/recovery path rather than inventing provenance.
+- **Reason:** V-080 showed a later same-tick Capture event can be relinked as
+  a settlement; V-081 showed a predicted future ID can freeze post-restore
+  Worker progress. The event order and allocator are engine invariants, unlike
+  stale descriptive fields.
+- **Evidence policy:** Candidate engine tests cover future-ID repair,
+  collision-aware direct allocation, and repeated ticks. Candidate Playwright
+  covers 320px stale relink reload/offline and 393px future-ID restore/resume.
+  Immutable V-079/V-080/V-081 unit/probe lanes and clean Node-22 canonical
+  verification remain required.
+- **Reversal condition:** Replace this repair only with an equally narrow,
+  deterministic engine-owned identity/authentication mechanism that preserves
+  current saves, legacy unknown fallback, unique post-restore allocation, and
+  no-free-text causal selection.

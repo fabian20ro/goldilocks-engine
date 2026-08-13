@@ -54,6 +54,12 @@ import {
   type WorkloadQuote,
 } from "./types";
 import { formatCurrency, formatExactCurrency } from "./currency";
+import {
+  allocateNextLedgerEvent,
+  canonicalizeLedgerEventIds,
+  firstLedgerEventAtTick,
+  hasCanonicalLedgerEventIds,
+} from "./ledgerIdentity";
 
 const MAX_LEDGER_EVENTS = 80;
 const MAX_QUEUED_TASKS = 99;
@@ -722,26 +728,26 @@ export function calculateMetrics(
   };
 }
 
-function nextLedgerEventId(
-  state: Pick<SimulationState, "eventSequence" | "tick">,
-): string {
-  return `evt-${state.tick}-${state.eventSequence + 1}`;
-}
-
 function appendEvent(
   state: SimulationState,
   event: Omit<LedgerEvent, "id" | "tick">,
 ): SimulationState {
-  const eventSequence = state.eventSequence + 1;
+  const allocation = allocateNextLedgerEvent(state);
+  // Callers may already have prepared a candidate state before appending its
+  // audit event. Preserve the transactional boundary by making an exhausted
+  // allocation structurally invalid, so the outer apply/tick returns its
+  // original state instead of committing an unaudited mutation.
+  if (!allocation)
+    return { ...state, eventSequence: Number.MAX_SAFE_INTEGER + 1 };
   const ledger = [
     ...state.ledger,
     {
       ...event,
-      id: nextLedgerEventId(state),
+      id: allocation.id,
       tick: state.tick,
     },
   ].slice(-MAX_LEDGER_EVENTS);
-  return { ...state, eventSequence, ledger };
+  return { ...state, eventSequence: allocation.eventSequence, ledger };
 }
 
 type EvaluationWarningKey = keyof EvaluationState["warnings"];
@@ -3429,7 +3435,8 @@ function advanceTickQuantum(
   const settlementCurrency = (amount: number) => formatExactCurrency(amount);
   const signedSettlementCurrency = (amount: number) =>
     `${amount >= 0 ? "+" : "−"}${formatExactCurrency(Math.abs(amount))}`;
-  const settlementLedgerEventId = nextLedgerEventId(next);
+  const settlementLedgerEventId = allocateNextLedgerEvent(next)?.id;
+  if (!settlementLedgerEventId) return state;
   const moneyAfter = round(
     Math.max(0, moneyBeforeSettlement + grossPayout - operatingCost),
     3,
@@ -4324,6 +4331,50 @@ function withMigrationStep(
   };
 }
 
+/**
+ * A stale save can retain gameplay state after the established semantic
+ * recovery checks, but its ledger IDs and optional settlement link are input,
+ * not historical proof. Rebuild the deterministic ID tail, then keep a link
+ * only when it still names the first engine event emitted at that settlement
+ * tick. Do not infer a replacement cause from any descriptive ledger text.
+ */
+function normalizeUntrustedLedgerState(
+  state: SimulationState,
+): SimulationState {
+  if (
+    !Array.isArray(state.ledger) ||
+    !state.ledger.every((event) => typeof event === "object" && event !== null)
+  )
+    return state;
+  const idsAreCanonical = hasCanonicalLedgerEventIds(
+    state.ledger,
+    state.eventSequence,
+  );
+  const ledger = canonicalizeLedgerEventIds(state.ledger, state.eventSequence);
+  if (!ledger) return state;
+  const settlement = state.lastSettlement;
+  if (
+    settlement === null ||
+    typeof settlement !== "object" ||
+    typeof settlement.ledgerEventId !== "string"
+  )
+    return { ...state, ledger };
+  const linked = ledger.find((event) => event.id === settlement.ledgerEventId);
+  const firstAtSettlementTick = firstLedgerEventAtTick(ledger, settlement.tick);
+  if (
+    idsAreCanonical &&
+    linked !== undefined &&
+    firstAtSettlementTick !== null &&
+    firstAtSettlementTick.id === linked.id
+  )
+    return { ...state, ledger };
+  return {
+    ...state,
+    ledger,
+    lastSettlement: { ...settlement, ledgerEventId: undefined },
+  };
+}
+
 /** Restores current saves or migrates legacy Pipeline Toy/Career saves safely. */
 export function restoreSimulationState(
   value: unknown,
@@ -4366,6 +4417,8 @@ export function restoreSimulationState(
         migration,
         "schema-v7-first-session-guide-added",
       );
+    if (!originalIntegrityValid)
+      candidate = normalizeUntrustedLedgerState(candidate);
     const structurallyValid = isStateStructurallyValid(candidate);
     if (
       storedFirstSession !== undefined &&

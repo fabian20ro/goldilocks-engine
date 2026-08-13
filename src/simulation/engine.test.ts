@@ -680,6 +680,74 @@ describe("deterministic simulation engine", () => {
     expect(isStateValid(restored)).toBe(true);
   });
 
+  it("repairs a stale future ledger ID before repeated restored ticks", () => {
+    let state = createInitialState(82_081);
+    state = applyCommand(state, { type: "REMOVE_MODULE", slotId: "runtime" });
+    state = applyCommand(state, { type: "QUEUE_JOBS", count: 1 });
+    state = tick(state, 60);
+    state = applyCommand(state, {
+      type: "CAPTURE_BASELINE",
+      label: "Collision target",
+    });
+    state = applyCommand(state, { type: "QUEUE_JOBS", count: 1 });
+
+    const stale = structuredClone(state);
+    const target = stale.ledger.find(
+      (event) =>
+        event.message === "Current configuration captured for comparison.",
+    );
+    expect(target).toBeDefined();
+    const originalId = target?.id;
+    stale.ledger = stale.ledger.map((event) =>
+      event.id === target?.id
+        ? {
+            ...event,
+            id: `evt-${stale.tick + 10_000}-${stale.eventSequence + 1}`,
+          }
+        : event,
+    );
+
+    let restored = restoreSimulationState(stale, 82_081);
+    expect(restored.lastSettlement?.ledgerEventId).toBeUndefined();
+    expect(
+      restored.ledger.find(
+        (event) =>
+          event.message === "Current configuration captured for comparison.",
+      )?.id,
+    ).toBe(originalId);
+    expect(isStateValid(restored)).toBe(true);
+    for (let index = 0; index < 3; index += 1) {
+      const before = restored.tick;
+      restored = tick(restored, 10);
+      expect(restored.tick).toBeGreaterThan(before);
+      expect(new Set(restored.ledger.map((event) => event.id)).size).toBe(
+        restored.ledger.length,
+      );
+    }
+  });
+
+  it("allocates around a retained future-looking ledger ID", () => {
+    const initial = createInitialState(82_082);
+    const forged = sealSimulationState({
+      ...initial,
+      ledger: initial.ledger.map((event) => ({
+        ...event,
+        id: `evt-${initial.tick}-${initial.eventSequence + 1}`,
+      })),
+    });
+
+    const advanced = applyCommand(forged, {
+      type: "CAPTURE_BASELINE",
+      label: "Collision-safe allocation",
+    });
+
+    expect(advanced.eventSequence).toBe(initial.eventSequence + 2);
+    expect(new Set(advanced.ledger.map((event) => event.id)).size).toBe(
+      advanced.ledger.length,
+    );
+    expect(isStateValid(advanced)).toBe(true);
+  });
+
   it("rejects malformed persisted fields before they can reach rendering", () => {
     const initial = createInitialState(43);
     const invalidStates: unknown[] = [

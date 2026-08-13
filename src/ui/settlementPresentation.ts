@@ -8,6 +8,7 @@ import {
   type JobSettlement,
   type LedgerEvent,
 } from "../simulation/types";
+import { firstLedgerEventAtTick } from "../simulation/ledgerIdentity";
 
 export interface SettlementPresentationInput {
   settlement: JobSettlement | null;
@@ -57,7 +58,9 @@ export function findSettlementFailureRecord(
   const eventId = settlement.ledgerEventId;
   if (typeof eventId !== "string" || eventId.length === 0) return null;
   const event = ledger.find((candidate) => candidate.id === eventId);
+  const firstAtSettlementTick = firstLedgerEventAtTick(ledger, settlement.tick);
   return event?.kind === "failure" &&
+    firstAtSettlementTick?.id === event.id &&
     event.settlementTaskId === settlement.taskId &&
     isJobSettlementFailureCause(event.settlementFailureCause)
     ? event

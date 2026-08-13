@@ -1,4 +1,4 @@
-# Candidate handoff — round 081 settlement structural provenance repair
+# Candidate handoff — round 082 stale ledger recovery repair
 
 ## Implemented behavior summary
 
@@ -8,11 +8,16 @@
   forecast. Outside finite onboarding it names the next valid decision; during
   onboarding, the existing guide remains the sole current-action owner.
 - New failed settlements retain the exact event identity plus engine-owned
-  task/cause markers. Jobs requires all of those structural associations and
-  maps the closed engine cause rather than reading free-form event prose. A
-  later Career failure, a decoy task-shaped message, a changed direct-cause
-  string, malformed relink, or bounded-out record cannot impersonate a
-  settlement cause. Legacy or unavailable provenance visibly reports unknown.
+  task/cause markers. Jobs requires the settlement link to resolve to the
+  first deterministic ledger event at that settlement tick, then maps the
+  closed marker rather than reading free-form event prose. A stale relink,
+  later Career failure, decoy task-shaped message, bounded-out record, or
+  unavailable legacy provenance visibly reports unknown.
+- A stale or integrity-invalid current save reconstructs retained ledger IDs
+  from its ordered event tail and `eventSequence`, then removes a settlement
+  link that no longer names its engine-order record. The shared allocator
+  scans retained IDs before every append, preventing a predicted future ID
+  from colliding and freezing Worker progress after restore.
 - One native `Settlement accounting and provenance` disclosure contains the
   exact task ID, locked gross quote, completed/failed result, gross-minus-cost
   economic-net equation, paid/unpaid/cash-floor equation, actual cash change,
@@ -33,15 +38,15 @@
 
 ## Plan requirements covered
 
-| Requirement                                      | Evidence                                                                                                                                                                                                                                       |
-| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| One-scan success/failure identity and net change | `settlementPresentation.test.ts` plus `jobs-settlement-density.spec.ts` cover success, zero-payout/full-payment failure, and partial-cash failure at 320×693 and 393×742.                                                                      |
-| Exact accounting on demand                       | One native Details per settlement holds task, quote, counts, full equation, payment/floor, cash change, and fixed-three rationale. Unit and keyboard/touch browser checks assert it.                                                           |
-| Recovery/recognition/action ownership            | The selector preserves direct failure/recovery and success recognition. Browser coverage asserts the finite guide owns its action and settlement does not duplicate it.                                                                        |
-| Portrait/accessible layout                       | Raw 320/393 and 200%-text/reduced-motion checks assert 44px visible controls, no horizontal/nested scroll, and raw D-018 Jobs reserve.                                                                                                         |
-| Preserved system behavior                        | Retained focused/browser lanes cover first session, existing Jobs reflow/reserve, currency, pointer/touch drag, Career draft, placement cancellation, tab restoration, malformed save/reload, PWA/offline, and Pages behavior.                 |
-| Cross-feature failure provenance                 | `settlementProvenance.test.tsx` creates a failed Jobs task, later produces a Career distribution-shift failure through the Worker boundary, serializes/restores state, and asserts that `JobsView` retains the task's own direct cause.        |
-| Structural stale-save provenance                 | `settlementProvenance.test.tsx` covers same-task decoy text, rewritten direct-cause prose, malformed relink, missing/malformed legacy link, restore/reseal, and Jobs rendering. The immutable V-079 verifier test remains unchanged and green. |
+| Requirement                                      | Evidence                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One-scan success/failure identity and net change | `settlementPresentation.test.ts` plus `jobs-settlement-density.spec.ts` cover success, zero-payout/full-payment failure, and partial-cash failure at 320×693 and 393×742.                                                                                                                                                                                           |
+| Exact accounting on demand                       | One native Details per settlement holds task, quote, counts, full equation, payment/floor, cash change, and fixed-three rationale. Unit and keyboard/touch browser checks assert it.                                                                                                                                                                                |
+| Recovery/recognition/action ownership            | The selector preserves direct failure/recovery and success recognition. Browser coverage asserts the finite guide owns its action and settlement does not duplicate it.                                                                                                                                                                                             |
+| Portrait/accessible layout                       | Raw 320/393 and 200%-text/reduced-motion checks assert 44px visible controls, no horizontal/nested scroll, and raw D-018 Jobs reserve.                                                                                                                                                                                                                              |
+| Preserved system behavior                        | Retained focused/browser lanes cover first session, existing Jobs reflow/reserve, currency, pointer/touch drag, Career draft, placement cancellation, tab restoration, malformed save/reload, PWA/offline, and Pages behavior.                                                                                                                                      |
+| Cross-feature failure provenance                 | `settlementProvenance.test.tsx` creates a failed Jobs task, later produces a Career distribution-shift failure through the Worker boundary, serializes/restores state, and asserts that `JobsView` retains the task's own direct cause.                                                                                                                             |
+| Structural stale-save provenance                 | `settlementProvenance.test.tsx` covers same-task decoy text, mutable prose, malformed structural relink, legacy absence, restore/reseal, and Jobs rendering. `engine.test.ts` and `jobs-settlement-provenance.spec.ts` cover future-ID repair, collision-aware allocation, repeated ticks, reload, and offline. Immutable V-079–V-081 regressions remain unchanged. |
 
 ## Verifier findings addressed
 
@@ -51,6 +56,12 @@
   provenance. It requires event identity, engine-written task identity, and a
   closed engine failure marker; absent, stale, malformed, or bounded-out
   provenance renders `Cause unknown` rather than borrowing an event.
+- **V-080 resolved:** stale integrity restore canonicalizes the bounded
+  deterministic ledger tail and drops a relink that points to a later
+  same-tick event, so the compact card cannot promote it into a direct cause.
+- **V-081 resolved:** restored future/colliding IDs are repaired before
+  reseal; the shared collision-aware allocator preserves unique subsequent
+  audit IDs and Worker tick progress.
 - Existing V-049/V-077 raw/scaled Jobs reserve/reflow coverage remains retained;
   the settlement stacks only as a later card at portrait <=393px.
 - Existing hosted pointer/touch drag regression coverage remains retained; this
@@ -106,6 +117,11 @@ browser, or existing profile.
   engine-owned cause text and never reads mutable free-form prose. All fields
   are optional for schema-7 compatibility, so legacy/malformed/bounded data
   has an honest unknown fallback instead of a speculative migration.
+- D-035 applies the existing safe stale-save recovery boundary to ledger
+  identity. A damaged seal is not proof of optional provenance: restoration
+  rebuilds only deterministic retained IDs and retains only an engine-order
+  settlement link. Allocation is centralized so the engine never emits a
+  duplicate ID from a restored collision.
 - The first-level cash change deliberately uses durable `netChange`; Details
   separately names economic gross minus configured cost. This prevents the
   partial-cash state from falsely leading with `−$0.010` when cash changed by
@@ -156,6 +172,49 @@ NotificationShade`); attempted screenshots were lock-screen/black, so no
 
   passed 5 files / 65 tests. This includes both immutable verifier regressions
   unchanged. Node 22 `npm run lint` and `npm run typecheck` also passed.
+
+- Round-082 focused provenance lane after ledger canonicalization:
+
+  ```sh
+  E2E_PORT=43225 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright \
+    npm_config_cache="$PWD/.cache/npm" \
+    npm exec --yes --package=node@22 -- npx vitest run --coverage=false \
+    src/ui/verifierRound079.test.tsx \
+    src/ui/verifierRound080.test.tsx \
+    src/ui/verifierRound081.test.tsx \
+    src/ui/settlementProvenance.test.tsx \
+    src/simulation/engine.test.ts
+  ```
+
+  passed 5 files / 64 tests, including every immutable V-079–V-081 regression
+  unchanged.
+
+- Round-082 candidate browser provenance lane:
+
+  ```sh
+  E2E_PORT=43226 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright \
+    npm_config_cache="$PWD/.cache/npm" \
+    npm exec --yes --package=node@22 -- npx playwright test \
+    tests/e2e/jobs-settlement-provenance.spec.ts --reporter=line
+  ```
+
+  passed 2/2: raw-320 stale structural relink stays unknown through reload and
+  service-worker offline reload; raw-393 future-ID restore has unique ledger
+  IDs and progresses across a second reload/resume.
+
+- Immutable round-081 adversarial probe, against a temporary Node-22 loopback
+  production preview, then explicitly stopped with its port closed:
+
+  ```sh
+  BASE_URL=http://127.0.0.1:43227 \
+    OUTPUT_DIR=/private/tmp/goldlocks-r082-last-v081 \
+    PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright \
+    npm_config_cache="$PWD/.cache/npm" \
+    npm exec --yes --package=node@22 -- node \
+    .agent/verification/round-081-adversarial.mjs
+  ```
+
+  passed `findings: []` for the exact V-080 relink and V-081 future-ID attack.
 
 - Node 22 focused browser lane:
 
@@ -249,17 +308,16 @@ NotificationShade`); attempted screenshots were lock-screen/black, so no
   passing:
 
   ```sh
-  E2E_PORT=42113 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright \
+  E2E_PORT=43228 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright \
     npm_config_cache="$PWD/.cache/npm" \
     npm exec --yes --package=node@22 -- sh ./scripts/verify
   ```
 
-  Fresh setup, format, lint, typecheck, 49 unit/property files / 236 tests,
+  Fresh setup, format, lint, typecheck, 50 unit/property files / 241 tests,
   deterministic/balance lanes, production build, production audit, root
-  Playwright 226/226, and Pages Playwright 2/2 passed (zero unexpected or
-  flaky tests). The canonical process exited before the report inspection;
-  both HTML report payloads were decoded afterwards to confirm the exact
-  browser totals and zero report errors.
+  Playwright 228/228, and Pages Playwright 2/2 passed (zero unexpected or
+  flaky tests). Both HTML report payloads were decoded afterwards to confirm
+  the exact browser totals and zero report errors.
 
 ## Checks not run
 

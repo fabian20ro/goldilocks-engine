@@ -185,7 +185,7 @@ describe("latest settlement failure provenance", () => {
     ).not.toHaveTextContent("Forged unrelated cause.");
   });
 
-  it("does not follow a malformed relink to an unrelated failure", () => {
+  it("does not reseal a forged structural relink as a precise failure", () => {
     let state = failedStarter(81_004);
     state = applyCommand(state, {
       type: "CAPTURE_BASELINE",
@@ -199,7 +199,9 @@ describe("latest settlement failure provenance", () => {
         ? {
             ...event,
             kind: "failure" as const,
-            directCause: "Forged unrelated cause.",
+            settlementTaskId: corrupted.lastSettlement?.taskId,
+            settlementFailureCause: "memory-capacity-exceeded" as const,
+            directCause: "Required memory exceeded available memory.",
           }
         : event,
     );
@@ -220,6 +222,41 @@ describe("latest settlement failure provenance", () => {
     expect(
       screen.getByText("Failure record:").parentElement,
     ).not.toHaveTextContent("Forged unrelated cause.");
+  });
+
+  it("does not trust a reordered stale tail as settlement provenance", () => {
+    let state = failedStarter(81_005);
+    state = applyCommand(state, {
+      type: "CAPTURE_BASELINE",
+      label: "After failed delivery",
+    });
+    const corrupted = structuredClone(state);
+    const settlementIndex = corrupted.ledger.findIndex(
+      (event) => event.id === corrupted.lastSettlement?.ledgerEventId,
+    );
+    const decoyIndex = corrupted.ledger.length - 1;
+    expect(settlementIndex).toBeGreaterThanOrEqual(0);
+    expect(decoyIndex).toBeGreaterThan(settlementIndex);
+    const reordered = [...corrupted.ledger];
+    const settlementEvent = reordered[settlementIndex];
+    reordered[settlementIndex] = reordered[decoyIndex]!;
+    reordered[decoyIndex] = settlementEvent!;
+    corrupted.ledger = reordered;
+    if (corrupted.lastSettlement)
+      corrupted.lastSettlement.ledgerEventId = reordered[settlementIndex]?.id;
+
+    const restored = restoreSimulationState(corrupted, 81_005);
+
+    expect(isStateValid(restored)).toBe(true);
+    expect(restored.lastSettlement?.ledgerEventId).toBeUndefined();
+    expect(
+      findSettlementFailureRecord(restored.lastSettlement, restored.ledger),
+    ).toBeNull();
+
+    renderJobs(restored);
+    expect(screen.getByText("Failure record:").parentElement).toHaveTextContent(
+      "Cause unknown — the retained settlement record is unavailable.",
+    );
   });
 
   it("keeps legacy or malformed provenance as an honest unknown", () => {
