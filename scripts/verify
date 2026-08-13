@@ -1,31 +1,49 @@
 #!/bin/sh
-set -u
+set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
 
-if ! ./scripts/setup; then
-  exit 1
-fi
-
-failed=0
+EVIDENCE_DIR=${VERIFY_EVIDENCE_DIR:-"$ROOT/.cache/verification/local"}
+mkdir -p "$EVIDENCE_DIR"
+SUMMARY="$EVIDENCE_DIR/summary.txt"
+LOG="$EVIDENCE_DIR/checks.log"
+: > "$SUMMARY"
+: > "$LOG"
 
 run_step() {
-  if "$@"; then
+  name=$1
+  shift
+  step_log="$EVIDENCE_DIR/$name.log"
+  printf '%s\n' "==> $name" | tee -a "$LOG"
+  if "$@" >"$step_log" 2>&1; then
+    cat "$step_log"
+    cat "$step_log" >> "$LOG"
+    printf '%s=passed\n' "$name" >> "$SUMMARY"
     return 0
+  else
+    status=$?
   fi
-
-  failed=1
+  cat "$step_log" >&2
+  cat "$step_log" >> "$LOG"
+  printf '%s=failed (%s)\n' "$name" "$status" >> "$SUMMARY"
+  printf '%s\n' "Verification stopped at $name. Evidence: $EVIDENCE_DIR" >&2
+  return "$status"
 }
 
-run_step npm run format:check
-run_step npm run lint
-run_step npm run typecheck
-run_step npm run test
-run_step npm run balance
-run_step npm run build
-run_step npm audit --omit=dev --audit-level=high
-run_step npm run test:e2e
-run_step npm run test:e2e:pages
+preflight() {
+  run_step setup ./scripts/setup
+  run_step format npm run format:check
+  run_step lint npm run lint
+  run_step typecheck npm run typecheck
+  run_step unit npm run test
+}
 
-exit "$failed"
+preflight
+run_step balance npm run balance
+run_step build npm run build
+run_step production-audit npm audit --omit=dev --audit-level=high
+run_step root-browser-pwa npm run test:e2e
+run_step pages-offline npm run test:e2e:pages
+
+printf '%s\n' "Verification passed. Evidence: $EVIDENCE_DIR" | tee -a "$LOG"

@@ -1,4 +1,49 @@
-# Candidate handoff — round 083 integrity-gated settlement provenance
+# Candidate handoff — provenance repair and workflow routing
+
+## Workflow-optimization delta (2026-08-14)
+
+- Added compact routing records: `.agent/CURRENT_SCOPE.md` and
+  `.agent/verification/INDEX.md`. For narrow work, agents read protocol/role →
+  current scope → index → cited authorities. The records explicitly require a
+  full plan/decisions/archive read for release verification, broad
+  architecture/cross-milestone work, missing or conflicting coverage, or an
+  explicit request; they never replace the authority order in `AGENTS.md`.
+- Both Implementer and Verifier profiles now use `gpt-5.6-luna` with maximum
+  reasoning. Verifier routing remains independent: scope/index/handoff/tests
+  are untrusted navigation, and the verifier builds its own checklist from the
+  cited authoritative sources.
+- The lean loop requires a Rule-of-Three same-seam review (normal,
+  malformed/adversarial recovery, lifecycle/cross-feature), frozen threat
+  model/out-of-scope boundary, at most three milestones, and at most one final
+  canonical gate per role. Release verification still requires a full read,
+  complete canonical coverage plus retained probes, fresh independent PASS,
+  and exact-SHA deployment.
+- `scripts/verify` now writes compact per-step logs plus `summary.txt` below
+  `${VERIFY_EVIDENCE_DIR:-.cache/verification/local}` and stops before balance,
+  build, or browsers when setup/static/unit preflight fails. A passing run
+  still executes every former canonical lane in the same order after preflight.
+- Current acceptance state is deliberately unchanged: last accepted PASS is
+  round 078 / verifier `437b56245b8488cce0ea1193be4200985cace2c7`; product
+  candidate `0bdff6ea88f7496bfb8348c7551652bf53a676ca` is unverified; immutable
+  rounds 079–082 are FAIL; no round-083 PASS exists. The next product gate is
+  a fresh independent PASS and exact-SHA deployment before Milestone 4
+  Research.
+
+### Workflow-optimization checks
+
+- Focused Node 22 check passed: `src/test/agentWorkflowRouting.test.ts`,
+  `src/test/verifyWorkflow.test.ts`, and `src/test/verifierRound019Workflow.test.ts`
+  — 3 files, 10 tests.
+- Final Node 22 canonical check passed under browser-capable host authority:
+  `E2E_PORT=43410 VERIFY_EVIDENCE_DIR="$PWD/.cache/verification/workflow-optimization-escalated" PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright npm_config_cache="$PWD/.cache/npm" npm exec --yes --package=node@22 -- sh ./scripts/verify`.
+  It passed setup, format, lint, typecheck, 52 unit files / 247 tests, all
+  balance simulators, build, production audit, 229 root browser/PWA tests, and
+  2 Pages/offline tests. Compact evidence:
+  `.cache/verification/workflow-optimization-escalated/{summary.txt,checks.log}`.
+- An earlier sandbox-only attempt reached the root browser lane but macOS denied
+  Chromium Mach-port registration before test execution. The browser-capable
+  canonical run above is the recorded final gate; no application failure was
+  observed.
 
 ## Implemented behavior summary
 

@@ -3,6 +3,15 @@
 This repository uses one root Orchestrator and sequential Implementer/Verifier
 subagents in one worktree. Git commits are the mailbox and audit trail.
 
+## Read scope first
+
+For a narrow repair, read `AGENTS.md` and the active role, then
+`.agent/CURRENT_SCOPE.md`, `.agent/verification/INDEX.md`, and every source they
+cite. Those compact files route attention; `plan.md`, decisions, and immutable
+reports remain authoritative. Use the full plan/decisions/archive route for
+release verification, broad architecture, missing/conflicting index coverage,
+or an explicit request.
+
 ## Start
 
 1. Commit and push this setup.
@@ -19,6 +28,15 @@ subagents in one worktree. Git commits are the mailbox and audit trail.
 The root task reads `orchestrator.toml`; it does not spawn that profile. With
 `agents.max_depth = 1`, the root can spawn `implementer` and fresh `verifier`
 children, while children cannot recursively delegate.
+
+## Loop discipline
+
+- Lean repair: exact seam, Rule-of-Three normal/adversarial/lifecycle review,
+  mapped focused checks, then at most one final canonical gate.
+- Release: full read, canonical gate plus archived probes, fresh independent
+  PASS, then exact-SHA deployment.
+- Keep at most three ordinary updates per role: scope/root cause, focused
+  evidence, final handoff. Git SHAs—not summaries—carry state.
 
 ## Expected history
 

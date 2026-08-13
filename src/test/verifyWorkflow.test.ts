@@ -100,20 +100,24 @@ describe("Linux verification workflow", () => {
 
   it("keeps every local verification check in the canonical command", () => {
     const verification = readRepositoryFile("scripts/verify");
-    const rootBrowser = verification.indexOf("run_step npm run test:e2e\n");
-    const pagesBrowser = verification.indexOf(
-      "run_step npm run test:e2e:pages\n",
+    const rootBrowser = verification.indexOf(
+      "run_step root-browser-pwa npm run test:e2e\n",
     );
-    const finalExit = verification.indexOf('exit "$failed"');
+    const pagesBrowser = verification.indexOf(
+      "run_step pages-offline npm run test:e2e:pages\n",
+    );
 
-    expect(verification).toContain("failed=0");
+    expect(verification).toContain("set -eu");
     expect(verification).toContain("run_step() {");
-    expect(verification).toContain("if ! ./scripts/setup; then");
+    expect(verification).toContain("run_step setup ./scripts/setup");
+    expect(verification).toContain("VERIFY_EVIDENCE_DIR");
     expect(verification).toContain(
-      "run_step npm audit --omit=dev --audit-level=high",
+      "run_step production-audit npm audit --omit=dev --audit-level=high",
     );
     expect(rootBrowser).toBeGreaterThanOrEqual(0);
     expect(pagesBrowser).toBeGreaterThan(rootBrowser);
-    expect(finalExit).toBeGreaterThan(pagesBrowser);
+    expect(
+      verification.indexOf("run_step balance npm run balance\n"),
+    ).toBeGreaterThan(verification.indexOf("run_step unit npm run test\n"));
   });
 });

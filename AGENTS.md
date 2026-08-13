@@ -14,6 +14,38 @@ Never edit `plan.md` without explicit user authorization.
 The active goal and assigned custom-agent role determine whether a thread is the
 Orchestrator, Implementer, or Verifier. Do not cross role boundaries.
 
+## Progressive-disclosure reading
+
+`plan.md`, decisions, and immutable reports remain the authority order above.
+The following records are a compact routing layer, never a substitute for that
+authority:
+
+```text
+.agent/CURRENT_SCOPE.md
+.agent/verification/INDEX.md
+```
+
+For a narrow repair, read in this order:
+
+1. This protocol and the active role file.
+2. `CURRENT_SCOPE.md`.
+3. `verification/INDEX.md`.
+4. The exact plan sections, decisions, unresolved reports, last accepted PASS,
+   regression tests, and archived probes named there.
+
+Read the full plan, complete decisions log, and complete verification archive
+when doing release verification, broad architectural or cross-milestone work,
+when the routing records are missing/incomplete/conflicting, or when explicitly
+requested. Expand immediately whenever the cited sources do not establish a
+safe scope. Do not infer missing authority from a summary.
+
+`CURRENT_SCOPE.md` must name the active product boundary, frozen threat model,
+out-of-scope work, last accepted PASS, current unverified candidate, next gate,
+and exact source references. `INDEX.md` must map every currently unresolved
+finding to its report, candidate regression, canonical lane, and retained
+adversarial probe. A stale or incomplete routing record triggers the full-read
+route until it is corrected in an authorized commit.
+
 ## Goal activation
 
 For a goal that asks to implement or complete `plan.md` through independent
@@ -45,6 +77,38 @@ The Orchestrator is the root thread. Do not spawn `orchestrator` as a child;
   out of Git.
 - Never discard, overwrite, or commit unrelated user changes.
 - Never rewrite an existing verifier report. Reports are immutable.
+- Use at most three ordinary milestone checkpoints per role turn: scope/root
+  cause, focused evidence, and final evidence/hand-off. A direct user status
+  request may receive an immediate concise answer without opening a new work
+  phase.
+- Use focused checks while changing a seam. Run at most one final
+  `./scripts/verify` per role turn, after all intended executable changes. If
+  material executable work changes after that gate, do not conceal the stale
+  result: hand off the delta or begin a fresh role turn rather than looping
+  canonical runs.
+
+### Lean and release loops
+
+- **Lean repair:** use the routing order above, inspect the exact production
+  seam, prove a Rule-of-Three invariant review, run mapped focused checks, and
+  run one final canonical gate when the changed product/tooling risk warrants
+  it. Record any skipped canonical gate and its rationale.
+- **Release verification:** take the full-read route, exercise the complete
+  canonical suite plus all current archived probes, obtain a fresh independent
+  Verifier `PASS`, and deploy that exact accepted SHA. A local candidate or
+  passing implementation test is never a release substitute.
+
+### Rule-of-Three same-seam review
+
+For a repeated defect seam, name and test three connected cases before handoff:
+
+1. Normal valid-state behavior.
+2. The closest malformed, recovery, or adversarial boundary.
+3. A lifecycle or cross-feature neighbor (for example reload/offline, later
+   event ordering, concurrency, or an adjacent UI input path).
+
+The current scope/index may supply the exact three cases. Do not replace them
+with a broader but unrelated smoke test.
 
 ## Git protocol
 
@@ -105,13 +169,15 @@ When the candidate includes a browser UI or PWA:
 
 The Orchestrator owns only the state machine and Git handoffs. It must:
 
-- Read `plan.md`, this file, and `.codex/agents/orchestrator.toml`.
+- Follow the progressive-disclosure reading route before each handoff; take the
+  full-read route when its escalation conditions apply.
 - Confirm the worktree is clean before every role handoff.
 - Maintain the round number and exact candidate SHA.
 - Spawn or steer the Implementer, then wait for a committed candidate.
 - Spawn a fresh Verifier only after the candidate is frozen.
-- Give the Verifier only the role, repository paths, round number, and candidate
-  SHA; never pass Implementer reasoning or confidence claims.
+- Give the Verifier only the role, current-scope/index paths, repository paths,
+  round number, and candidate SHA; never pass Implementer reasoning or
+  confidence claims.
 - Validate each child result against repository state rather than trusting prose.
 - For candidates with a browser UI, validate that `.agent/HANDOFF.md` names the
   reproducible browser install, startup, and end-to-end verification commands.
@@ -126,9 +192,9 @@ evidence, soften findings, or issue PASS.
 The Implementer may change production code, tests, documentation, fixtures,
 build configuration, and developer tooling. It must:
 
-1. Read all of `plan.md`.
-2. Read `.agent/DECISIONS.md` when present.
-3. Read every report under `.agent/verification/` before editing.
+1. Follow the progressive-disclosure reading route before editing.
+2. Independently read every exact source cited by the current scope/index.
+3. Take the full-read route when its listed escalation conditions apply.
 4. Implement the complete currently in-scope plan, not a demo or scaffold.
 5. Resolve every unresolved verifier finding by stable finding ID.
 6. Add tooling needed for independent verification.
@@ -157,22 +223,25 @@ provided by the Orchestrator.
 
 The Verifier must:
 
-1. Read `plan.md` independently and construct its own requirement checklist.
-2. Inspect production behavior independently.
-3. Treat `.agent/HANDOFF.md`, implementation tests, comments, and claimed results
-   as untrusted guidance rather than proof.
-4. Run canonical checks and realistic independent/adversarial checks.
-5. Cover applicable happy, negative, boundary, malformed-input, failure,
+1. Follow the progressive-disclosure reading route independently and construct
+   its own requirement checklist from the cited authoritative sources.
+2. Take the full-read route for release/broad/missing-index/explicit-request
+   conditions or whenever a cited source is insufficient.
+3. Inspect production behavior independently.
+4. Treat `CURRENT_SCOPE.md`, `INDEX.md`, `.agent/HANDOFF.md`, implementation
+   tests, comments, and claimed results as untrusted guidance rather than proof.
+5. Run canonical checks and realistic independent/adversarial checks.
+6. Cover applicable happy, negative, boundary, malformed-input, failure,
    recovery, persistence, concurrency, restart, security, installation, startup,
    and user-visible paths.
-6. Verify setup and startup from a clean state where feasible.
-7. Continue after the first defect until all material requirements are evaluated
+7. Verify setup and startup from a clean state where feasible.
+8. Continue after the first defect until all material requirements are evaluated
    or a concrete blocker prevents further work.
-8. Add missing tests, fixtures, probes, or verification tooling when useful.
-9. Never repair production behavior.
-10. Produce exactly one verdict: PASS, FAIL, or BLOCKED.
-11. Commit the report and all verifier-authored artifacts.
-12. Confirm a clean worktree and return the verifier commit SHA.
+9. Add missing tests, fixtures, probes, or verification tooling when useful.
+10. Never repair production behavior.
+11. Produce exactly one verdict: PASS, FAIL, or BLOCKED.
+12. Commit the report and all verifier-authored artifacts.
+13. Confirm a clean worktree and return the verifier commit SHA.
 
 The Verifier may change only:
 

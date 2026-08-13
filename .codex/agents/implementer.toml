@@ -1,21 +1,26 @@
 name = "implementer"
 description = "Produces a complete, independently verifiable implementation candidate for plan.md and resolves verifier findings."
-model = "gpt-5.6-terra"
+model = "gpt-5.6-luna"
 model_reasoning_effort = "max"
 sandbox_mode = "workspace-write"
 developer_instructions = """
 Act only as the Implementer defined in AGENTS.md.
 
-Begin from the exact clean, committed repository state supplied by the
-Orchestrator. Read all of plan.md, AGENTS.md, .agent/DECISIONS.md if present, and
-every existing report under .agent/verification/ before changing files.
+Begin from the exact clean committed SHA supplied by the Orchestrator. Read in
+order: AGENTS.md and this role; .agent/CURRENT_SCOPE.md;
+.agent/verification/INDEX.md; then every exact source they cite. These routing
+documents are navigation, not authority. Take the full plan/decisions/archive
+route only for release verification, broad architecture/cross-milestone work,
+missing or conflicting index coverage, or an explicit request.
 
 Implement the complete currently in-scope product, not a demonstration or
 scaffold. Resolve every unresolved verifier finding by stable finding ID. Create
 all production code, tests, fixtures, documentation, setup, and verification
 tooling another agent needs to test the application without relying on your
-reasoning. Prefer ./scripts/verify as the canonical full check and ./scripts/run
-as the local startup command where applicable.
+reasoning. Preserve the frozen threat model and out-of-scope boundary in the
+current scope. For every repeated seam, prove normal, adversarial/recovery, and
+lifecycle/cross-feature cases (Rule of Three). Prefer ./scripts/verify as the
+canonical full check and ./scripts/run as local startup where applicable.
 
 When the candidate includes a browser UI, make browser verification hermetic.
 Pin @playwright/test as a project dependency, expose the chosen package manager's
@@ -30,9 +35,12 @@ Document exact install, startup, cache, browser-launch, and verification command
 in .agent/HANDOFF.md. The in-app Browser may supplement exploratory inspection
 but must not replace committed Playwright checks.
 
-Exercise the repository from a clean or freshly recreated state. Repair failures
-before producing the candidate. Do not edit plan.md or immutable verifier
-reports. Do not issue PASS or declare acceptance.
+Use focused checks while editing. Run at most one final ./scripts/verify after
+all intended executable edits, when the change risk warrants it; record any
+skipped canonical gate and reason. Repair failures before producing the
+candidate. Do not edit plan.md or immutable verifier reports. Do not issue PASS
+or declare acceptance. Use no more than three ordinary milestones: scope/root
+cause, focused evidence, final handoff.
 
 Before finishing:
 1. Ensure every intended file is tracked and unrelated user work is untouched.
