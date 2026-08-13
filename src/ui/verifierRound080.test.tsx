@@ -15,7 +15,7 @@ import { selectFirstSessionPresentation } from "./firstSessionPresentation";
 afterEach(cleanup);
 
 describe("verifier round 080 settlement provenance recovery", () => {
-  it("does not let a later stale-ledger failure impersonate the retained settlement task", () => {
+  it("does not let stale-integrity recovery promote any settlement cause", () => {
     let state = createInitialState(80_080);
     state = applyCommand(state, { type: "REMOVE_MODULE", slotId: "runtime" });
     state = applyCommand(state, { type: "QUEUE_JOBS", count: 1 });
@@ -39,9 +39,8 @@ describe("verifier round 080 settlement provenance recovery", () => {
 
     // This is untrusted persisted state: it preserves every required shape and
     // the genuine task event, but changes a later unrelated baseline record
-    // into a failure mentioning the task marker. Restore deliberately supports
-    // benign stale-seal recovery, so presentation must still bind to the real
-    // settlement record rather than the latest substring match.
+    // into a failure mentioning the task marker. Recovery keeps gameplay but
+    // must not reseal any precise settlement provenance from a stale seal.
     const corrupted: SimulationState = structuredClone(state);
     const laterEvent = corrupted.ledger.at(-1);
     expect(laterEvent).toBeDefined();
@@ -62,6 +61,7 @@ describe("verifier round 080 settlement provenance recovery", () => {
       failed: 1,
       taskId: settlement?.taskId,
     });
+    expect(restored.lastSettlement?.ledgerEventId).toBeUndefined();
 
     render(
       <JobsView
@@ -77,7 +77,7 @@ describe("verifier round 080 settlement provenance recovery", () => {
 
     const failureRecord = screen.getByText("Failure record:").parentElement;
     expect(failureRecord).toHaveTextContent(
-      "The active pipeline had no model stage.",
+      "Cause unknown — the retained settlement record is unavailable.",
     );
     expect(failureRecord).not.toHaveTextContent("Forged unrelated cause.");
   });

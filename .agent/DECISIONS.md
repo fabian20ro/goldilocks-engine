@@ -776,3 +776,31 @@
   deterministic engine-owned identity/authentication mechanism that preserves
   current saves, legacy unknown fallback, unique post-restore allocation, and
   no-free-text causal selection.
+
+## D-036 — Integrity-gated settlement-cause precision
+
+- **Decision:** This supersedes only D-035's stale-link-retention clause: an
+  original valid integrity seal is the sole authority for a
+  `lastSettlement.ledgerEventId` causal association. When a current-schema
+  save has stale, invalid, or absent integrity but otherwise recovers, restore
+  may canonicalize retained ledger IDs only for future operational safety and
+  must clear that optional link before resealing. Jobs then uses its existing
+  honest unknown cause fallback.
+- **Boundary:** The recovery retains valid gameplay, settlement accounting,
+  task identity, bounded ledger events, and collision-safe later allocation.
+  It neither reconstructs a precise cause from IDs, ordering, task fields,
+  typed markers, `directCause`, nor message text. Original-integrity-valid
+  saves retain the exact engine-written association; legacy optional-field
+  absence remains unknown.
+- **Reason:** V-082 proved that an attacker can preserve canonical-looking
+  IDs, order, tick, sequence, and link while mutating the genuine event's
+  closed marker. Identity repair cannot authenticate mutable event semantics;
+  removing optional precision at the stale trust boundary is narrower and more
+  honest than a new historical-signing or migration system.
+- **Evidence policy:** Candidate engine/UI/browser coverage distinguishes a
+  valid-integrity later-Career event from stale same-task/marker/relink attacks
+  across restore, reseal, reload, and offline reload. Retain collision/tick
+  progress, D-033 accounting, portrait, and canonical Node-22 coverage.
+- **Reversal condition:** Permit unsealed precise settlement causes only with
+  a durable, independently verifiable authentication mechanism for immutable
+  event semantics that preserves legacy fallback and no-free-text selection.

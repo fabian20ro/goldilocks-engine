@@ -57,8 +57,6 @@ import { formatCurrency, formatExactCurrency } from "./currency";
 import {
   allocateNextLedgerEvent,
   canonicalizeLedgerEventIds,
-  firstLedgerEventAtTick,
-  hasCanonicalLedgerEventIds,
 } from "./ledgerIdentity";
 
 const MAX_LEDGER_EVENTS = 80;
@@ -4333,10 +4331,11 @@ function withMigrationStep(
 
 /**
  * A stale save can retain gameplay state after the established semantic
- * recovery checks, but its ledger IDs and optional settlement link are input,
- * not historical proof. Rebuild the deterministic ID tail, then keep a link
- * only when it still names the first engine event emitted at that settlement
- * tick. Do not infer a replacement cause from any descriptive ledger text.
+ * recovery checks, but its ledger IDs and optional settlement provenance are
+ * input, not historical proof. Rebuild the deterministic ID tail solely to
+ * keep future appends operable, then remove the optional causal link before
+ * resealing. Canonical-looking IDs, order, task fields, and typed markers are
+ * all mutable with a stale seal and cannot authenticate a precise cause.
  */
 function normalizeUntrustedLedgerState(
   state: SimulationState,
@@ -4346,27 +4345,10 @@ function normalizeUntrustedLedgerState(
     !state.ledger.every((event) => typeof event === "object" && event !== null)
   )
     return state;
-  const idsAreCanonical = hasCanonicalLedgerEventIds(
-    state.ledger,
-    state.eventSequence,
-  );
   const ledger = canonicalizeLedgerEventIds(state.ledger, state.eventSequence);
   if (!ledger) return state;
   const settlement = state.lastSettlement;
-  if (
-    settlement === null ||
-    typeof settlement !== "object" ||
-    typeof settlement.ledgerEventId !== "string"
-  )
-    return { ...state, ledger };
-  const linked = ledger.find((event) => event.id === settlement.ledgerEventId);
-  const firstAtSettlementTick = firstLedgerEventAtTick(ledger, settlement.tick);
-  if (
-    idsAreCanonical &&
-    linked !== undefined &&
-    firstAtSettlementTick !== null &&
-    firstAtSettlementTick.id === linked.id
-  )
+  if (settlement === null || typeof settlement !== "object")
     return { ...state, ledger };
   return {
     ...state,

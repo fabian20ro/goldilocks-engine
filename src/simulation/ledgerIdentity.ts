@@ -69,35 +69,6 @@ export function canonicalizeLedgerEventIds(
 }
 
 /**
- * Only an unchanged contiguous retained tail can corroborate a stale optional
- * settlement link. A repair may preserve operability, but cannot turn its
- * rebuilt IDs into historical provenance.
- */
-export function hasCanonicalLedgerEventIds(
-  ledger: readonly LedgerEvent[],
-  eventSequence: number,
-): boolean {
-  if (
-    !Number.isSafeInteger(eventSequence) ||
-    eventSequence < ledger.length ||
-    eventSequence < 0
-  )
-    return false;
-  const firstSequence = eventSequence - ledger.length + 1;
-  return (
-    firstSequence >= 1 &&
-    ledger.every((event, index) => {
-      const identity = parseLedgerEventId(event.id);
-      return (
-        identity !== null &&
-        identity.tick === event.tick &&
-        identity.sequence === firstSequence + index
-      );
-    })
-  );
-}
-
-/**
  * Return the first engine event emitted at one simulation tick. A Job
  * settlement appends before later same-tick unlocks or player commands.
  */

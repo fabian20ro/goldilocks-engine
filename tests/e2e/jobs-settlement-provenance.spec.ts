@@ -5,9 +5,13 @@ const SAVE_KEY = "goldilocks-simulation-save-v4";
 
 type SavedState = {
   eventSequence: number;
-  jobs: { queued: number };
+  jobs: { paused?: boolean; queued: number };
   lastSettlement: { failed: number; ledgerEventId?: string } | null;
-  ledger: Array<{ id: string; message: string }>;
+  ledger: Array<{
+    id: string;
+    message: string;
+    settlementFailureCause?: string;
+  }>;
   tick: number;
 };
 
@@ -98,6 +102,46 @@ async function writeForgedSettlementRelink(page: Page) {
   }, SAVE_KEY);
 }
 
+async function armForgedSettlementMarkerForNextDocument(page: Page) {
+  await page.addInitScript((key) => {
+    if (sessionStorage.getItem("r083-stale-integrity") !== null) return;
+    const raw = localStorage.getItem(key);
+    if (raw === null) throw new Error("Simulation save is not available.");
+    const state = JSON.parse(raw) as {
+      integrity?: { digest?: string };
+      ledger: Array<{
+        id: string;
+        settlementFailureCause?: string;
+      }>;
+      lastSettlement: {
+        ledgerEventId?: string;
+      } | null;
+    };
+    const eventId = state.lastSettlement?.ledgerEventId;
+    const settlementEvent = state.ledger.find((event) => event.id === eventId);
+    if (!settlementEvent)
+      throw new Error("Expected a linked failed settlement event.");
+    settlementEvent.settlementFailureCause = "memory-capacity-exceeded";
+    const payload = { ...state } as Record<string, unknown>;
+    delete payload.integrity;
+    const serialized = JSON.stringify(payload);
+    let hash = 0x811c9dc5;
+    for (let index = 0; index < serialized.length; index += 1) {
+      hash ^= serialized.charCodeAt(index);
+      hash = Math.imul(hash, 0x01000193);
+    }
+    sessionStorage.setItem(
+      "r083-stale-integrity",
+      JSON.stringify({
+        computed: (hash >>> 0).toString(16).padStart(8, "0"),
+        marker: settlementEvent.settlementFailureCause,
+        stored: state.integrity?.digest,
+      }),
+    );
+    localStorage.setItem(key, JSON.stringify(state));
+  }, SAVE_KEY);
+}
+
 async function expectUnknownSettlementCause(page: Page) {
   await openTab(page, "Jobs");
   const record = page.locator(".settlement-recovery");
@@ -131,6 +175,62 @@ test("keeps a forged stale settlement link unknown through reload and offline", 
   try {
     await page.reload({ waitUntil: "domcontentloaded" });
     await waitForSave(page);
+    await expectUnknownSettlementCause(page);
+  } finally {
+    await context.setOffline(false);
+  }
+});
+
+test("clears a stale settlement marker through restore, reseal, and offline reload", async ({
+  page,
+  context,
+}) => {
+  await page.setViewportSize({ width: 320, height: 693 });
+  await page.goto("/");
+  await waitForSave(page);
+  await removeRuntime(page);
+  await settleFailedStarter(page);
+  await page.getByRole("button", { name: "Pause", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Resume", exact: true }),
+  ).toBeVisible();
+  await expect
+    .poll(async () => (await savedState(page)).jobs.paused)
+    .toBe(true);
+  await armForgedSettlementMarkerForNextDocument(page);
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await waitForSave(page);
+  const staleIntegrity = await page.evaluate(
+    () =>
+      JSON.parse(sessionStorage.getItem("r083-stale-integrity") ?? "null") as {
+        computed: string;
+        marker: string;
+        stored: string;
+      },
+  );
+  expect(staleIntegrity.computed).not.toBe(staleIntegrity.stored);
+  expect(staleIntegrity.marker).toBe("memory-capacity-exceeded");
+  await expectUnknownSettlementCause(page);
+  await expect
+    .poll(async () => (await savedState(page)).lastSettlement?.ledgerEventId)
+    .toBeUndefined();
+  const restored = await savedState(page);
+  expect(restored.lastSettlement).toMatchObject({ failed: 1 });
+  expect(restored.lastSettlement?.ledgerEventId).toBeUndefined();
+
+  await page.locator("html[data-offline-ready='true']").waitFor({
+    timeout: 15_000,
+  });
+  await context.setOffline(true);
+  try {
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await waitForSave(page);
+    await expect
+      .poll(async () => (await savedState(page)).lastSettlement?.ledgerEventId)
+      .toBeUndefined();
+    const offlineRestored = await savedState(page);
+    expect(offlineRestored.lastSettlement).toMatchObject({ failed: 1 });
+    expect(offlineRestored.lastSettlement?.ledgerEventId).toBeUndefined();
     await expectUnknownSettlementCause(page);
   } finally {
     await context.setOffline(false);

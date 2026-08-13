@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   applyCommand,
   createInitialState,
+  hasValidStateIntegrity,
   isStateValid,
   restoreSimulationState,
   sealSimulationState,
@@ -39,8 +40,9 @@ describe("latest settlement failure provenance", () => {
     );
   }
 
-  it("keeps the task's own ledger cause after a later Career incident and restore", () => {
+  it("retains an integrity-valid task cause after a later Career incident and restore", () => {
     let state = failedStarter(80_078);
+    const settlementEventId = state.lastSettlement?.ledgerEventId;
 
     expect(state.lastSettlement).toMatchObject({
       failed: 1,
@@ -84,6 +86,7 @@ describe("latest settlement failure provenance", () => {
       event.message.startsWith("Distribution-shift reliability incident"),
     );
     expect(laterCareerFailure?.kind).toBe("failure");
+    expect(hasValidStateIntegrity(state)).toBe(true);
 
     const restored = restoreSimulationState(
       JSON.parse(JSON.stringify(state)),
@@ -98,6 +101,8 @@ describe("latest settlement failure provenance", () => {
       failed: 1,
       taskId: "task-0-1",
     });
+    expect(restored.lastSettlement?.ledgerEventId).toBe(settlementEventId);
+    expect(hasValidStateIntegrity(restored)).toBe(true);
     expect(settlementRecord).toMatchObject({
       directCause: "The active pipeline had no model stage.",
     });
@@ -110,7 +115,7 @@ describe("latest settlement failure provenance", () => {
     );
   });
 
-  it("uses the persisted event identity, not a later same-task decoy", () => {
+  it("clears stale provenance instead of trusting a later same-task decoy", () => {
     let state = failedStarter(81_001);
     const settlementEventId = state.lastSettlement?.ledgerEventId;
     state = applyCommand(state, {
@@ -142,47 +147,46 @@ describe("latest settlement failure provenance", () => {
     );
 
     expect(isStateValid(restored)).toBe(true);
-    expect(restored.lastSettlement?.ledgerEventId).toBe(settlementEventId);
-    expect(settlementRecord).toMatchObject({
-      directCause: "The active pipeline had no model stage.",
-    });
-    expect(settlementRecord?.id).not.toBe(decoy?.id);
+    expect(settlementEventId).toEqual(expect.any(String));
+    expect(restored.lastSettlement?.ledgerEventId).toBeUndefined();
+    expect(settlementRecord).toBeNull();
 
     renderJobs(restored);
     expect(screen.getByText("Failure record:").parentElement).toHaveTextContent(
-      "The active pipeline had no model stage.",
+      "Cause unknown — the retained settlement record is unavailable.",
     );
     expect(
       screen.getByText("Failure record:").parentElement,
     ).not.toHaveTextContent("Forged unrelated cause.");
   });
 
-  it("uses the settlement record's closed cause instead of mutable ledger prose", () => {
+  it("clears a stale cause-only marker mutation before resealing", () => {
     const state = failedStarter(81_003);
     const corrupted = structuredClone(state);
     corrupted.ledger = corrupted.ledger.map((event) =>
       event.id === corrupted.lastSettlement?.ledgerEventId
-        ? { ...event, directCause: "Forged unrelated cause." }
+        ? {
+            ...event,
+            settlementFailureCause: "memory-capacity-exceeded" as const,
+          }
         : event,
     );
 
     const restored = restoreSimulationState(corrupted, 81_003);
 
     expect(isStateValid(restored)).toBe(true);
+    expect(restored.lastSettlement?.ledgerEventId).toBeUndefined();
     expect(
       findSettlementFailureRecord(restored.lastSettlement, restored.ledger),
-    ).toMatchObject({
-      directCause: "Forged unrelated cause.",
-      settlementFailureCause: "no-model-stage",
-    });
+    ).toBeNull();
 
     renderJobs(restored);
     expect(screen.getByText("Failure record:").parentElement).toHaveTextContent(
-      "The active pipeline had no model stage.",
+      "Cause unknown — the retained settlement record is unavailable.",
     );
     expect(
       screen.getByText("Failure record:").parentElement,
-    ).not.toHaveTextContent("Forged unrelated cause.");
+    ).not.toHaveTextContent("Required memory exceeded available memory.");
   });
 
   it("does not reseal a forged structural relink as a precise failure", () => {
@@ -291,7 +295,11 @@ describe("latest settlement failure provenance", () => {
 
     expect(isStateValid(restoredLegacy)).toBe(true);
     expect(isStateValid(restoredMalformed)).toBe(true);
-    expect(restoredMalformed.lastSettlement).toBeNull();
+    expect(restoredMalformed.lastSettlement).toMatchObject({
+      failed: 1,
+      taskId: legacy.lastSettlement?.taskId,
+    });
+    expect(restoredMalformed.lastSettlement?.ledgerEventId).toBeUndefined();
     expect(
       findSettlementFailureRecord(
         restoredLegacy.lastSettlement,

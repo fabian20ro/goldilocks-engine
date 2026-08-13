@@ -1,4 +1,4 @@
-# Candidate handoff — round 082 stale ledger recovery repair
+# Candidate handoff — round 083 integrity-gated settlement provenance
 
 ## Implemented behavior summary
 
@@ -8,16 +8,19 @@
   forecast. Outside finite onboarding it names the next valid decision; during
   onboarding, the existing guide remains the sole current-action owner.
 - New failed settlements retain the exact event identity plus engine-owned
-  task/cause markers. Jobs requires the settlement link to resolve to the
-  first deterministic ledger event at that settlement tick, then maps the
-  closed marker rather than reading free-form event prose. A stale relink,
-  later Career failure, decoy task-shaped message, bounded-out record, or
-  unavailable legacy provenance visibly reports unknown.
+  task/cause markers. Only an original-integrity-valid save may use that
+  optional association; Jobs maps its closed marker rather than free-form
+  event prose. A stale relink, marker-only mutation, later Career failure,
+  decoy task-shaped message, bounded-out record, or unavailable legacy
+  provenance visibly reports unknown.
 - A stale or integrity-invalid current save reconstructs retained ledger IDs
-  from its ordered event tail and `eventSequence`, then removes a settlement
-  link that no longer names its engine-order record. The shared allocator
-  scans retained IDs before every append, preventing a predicted future ID
-  from colliding and freezing Worker progress after restore.
+  from its ordered event tail and `eventSequence` only for operational safety,
+  then unconditionally clears the optional settlement causal link before
+  resealing. This preserves recoverable accounting/task state while preventing
+  canonical-looking IDs, order, task fields, or typed markers from becoming
+  false historical proof. The shared allocator scans retained IDs before every
+  append, preventing a predicted future ID from colliding and freezing Worker
+  progress after restore.
 - One native `Settlement accounting and provenance` disclosure contains the
   exact task ID, locked gross quote, completed/failed result, gross-minus-cost
   economic-net equation, paid/unpaid/cash-floor equation, actual cash change,
@@ -38,15 +41,15 @@
 
 ## Plan requirements covered
 
-| Requirement                                      | Evidence                                                                                                                                                                                                                                                                                                                                                            |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| One-scan success/failure identity and net change | `settlementPresentation.test.ts` plus `jobs-settlement-density.spec.ts` cover success, zero-payout/full-payment failure, and partial-cash failure at 320×693 and 393×742.                                                                                                                                                                                           |
-| Exact accounting on demand                       | One native Details per settlement holds task, quote, counts, full equation, payment/floor, cash change, and fixed-three rationale. Unit and keyboard/touch browser checks assert it.                                                                                                                                                                                |
-| Recovery/recognition/action ownership            | The selector preserves direct failure/recovery and success recognition. Browser coverage asserts the finite guide owns its action and settlement does not duplicate it.                                                                                                                                                                                             |
-| Portrait/accessible layout                       | Raw 320/393 and 200%-text/reduced-motion checks assert 44px visible controls, no horizontal/nested scroll, and raw D-018 Jobs reserve.                                                                                                                                                                                                                              |
-| Preserved system behavior                        | Retained focused/browser lanes cover first session, existing Jobs reflow/reserve, currency, pointer/touch drag, Career draft, placement cancellation, tab restoration, malformed save/reload, PWA/offline, and Pages behavior.                                                                                                                                      |
-| Cross-feature failure provenance                 | `settlementProvenance.test.tsx` creates a failed Jobs task, later produces a Career distribution-shift failure through the Worker boundary, serializes/restores state, and asserts that `JobsView` retains the task's own direct cause.                                                                                                                             |
-| Structural stale-save provenance                 | `settlementProvenance.test.tsx` covers same-task decoy text, mutable prose, malformed structural relink, legacy absence, restore/reseal, and Jobs rendering. `engine.test.ts` and `jobs-settlement-provenance.spec.ts` cover future-ID repair, collision-aware allocation, repeated ticks, reload, and offline. Immutable V-079–V-081 regressions remain unchanged. |
+| Requirement                                      | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One-scan success/failure identity and net change | `settlementPresentation.test.ts` plus `jobs-settlement-density.spec.ts` cover success, zero-payout/full-payment failure, and partial-cash failure at 320×693 and 393×742.                                                                                                                                                                                                                                                                                                        |
+| Exact accounting on demand                       | One native Details per settlement holds task, quote, counts, full equation, payment/floor, cash change, and fixed-three rationale. Unit and keyboard/touch browser checks assert it.                                                                                                                                                                                                                                                                                             |
+| Recovery/recognition/action ownership            | The selector preserves direct failure/recovery and success recognition. Browser coverage asserts the finite guide owns its action and settlement does not duplicate it.                                                                                                                                                                                                                                                                                                          |
+| Portrait/accessible layout                       | Raw 320/393 and 200%-text/reduced-motion checks assert 44px visible controls, no horizontal/nested scroll, and raw D-018 Jobs reserve.                                                                                                                                                                                                                                                                                                                                           |
+| Preserved system behavior                        | Retained focused/browser lanes cover first session, existing Jobs reflow/reserve, currency, pointer/touch drag, Career draft, placement cancellation, tab restoration, malformed save/reload, PWA/offline, and Pages behavior.                                                                                                                                                                                                                                                   |
+| Cross-feature failure provenance                 | `settlementProvenance.test.tsx` creates a failed Jobs task, later produces a Career distribution-shift failure through the Worker boundary, serializes/restores state, and asserts that `JobsView` retains the task's own direct cause.                                                                                                                                                                                                                                          |
+| Structural stale-save provenance                 | `settlementProvenance.test.tsx` distinguishes valid-integrity later-Career provenance from stale same-task decoy and marker-only mutation unknown fallbacks. `engine.test.ts` and `jobs-settlement-provenance.spec.ts` cover future-ID repair, collision-aware allocation, repeated ticks, stale marker restore/reseal, reload, and offline. Immutable V-079/V-081/V-082 regressions remain retained; the narrow V-080 stale-precision expectation is owner-superseded by D-036. |
 
 ## Verifier findings addressed
 
@@ -62,6 +65,14 @@
 - **V-081 resolved:** restored future/colliding IDs are repaired before
   reseal; the shared collision-aware allocator preserves unique subsequent
   audit IDs and Worker tick progress.
+- **V-082 resolved:** a stale/invalid integrity record may retain recoverable
+  gameplay but cannot retain any precise `lastSettlement` causal association.
+  Restore clears the optional link before resealing, so marker-only mutation
+  renders `Cause unknown`; valid-integrity V-078 provenance remains exact.
+- **V-080 strengthened under D-036:** its stale-integrity unit regression now
+  expects honest unknown rather than a precise cause. Its immutable historical
+  browser probe remains unchanged and therefore records only that superseded
+  expectation; it is not a current acceptance failure.
 - Existing V-049/V-077 raw/scaled Jobs reserve/reflow coverage remains retained;
   the settlement stacks only as a later card at portrait <=393px.
 - Existing hosted pointer/touch drag regression coverage remains retained; this
@@ -117,11 +128,12 @@ browser, or existing profile.
   engine-owned cause text and never reads mutable free-form prose. All fields
   are optional for schema-7 compatibility, so legacy/malformed/bounded data
   has an honest unknown fallback instead of a speculative migration.
-- D-035 applies the existing safe stale-save recovery boundary to ledger
-  identity. A damaged seal is not proof of optional provenance: restoration
-  rebuilds only deterministic retained IDs and retains only an engine-order
-  settlement link. Allocation is centralized so the engine never emits a
-  duplicate ID from a restored collision.
+- D-035 remains the ledger-operability boundary; D-036 supersedes only its
+  former stale-link retention clause. A damaged seal is not proof of optional
+  provenance: restoration rebuilds deterministic retained IDs, clears every
+  precise `lastSettlement` causal link before resealing, and leaves Jobs at
+  the existing honest unknown fallback. Allocation remains centralized so the
+  engine never emits a duplicate ID from a restored collision.
 - The first-level cash change deliberately uses durable `netChange`; Details
   separately names economic gross minus configured cost. This prevents the
   partial-cash state from falsely leading with `−$0.010` when cash changed by
@@ -129,9 +141,10 @@ browser, or existing profile.
 - There is exactly one settlement/accounting disclosure. Existing selected
   quote Details stays associated with configuration, not settlement
   provenance. Run totals remain distinct lifetime context.
-- Existing verifier-authored regression tests were migrated to open the native
-  disclosure and assert stronger fixed-three provenance. No immutable report
-  under `.agent/verification/` was edited.
+- The owner-authorized R083 update narrows the committed R080 unit regression
+  to stale-integrity unknown behavior while retaining V-078's valid-integrity
+  later-Career cause case. No immutable report or adversarial probe under
+  `.agent/verification/` was edited.
 
 ## Device smoke availability
 
@@ -155,7 +168,104 @@ NotificationShade`); attempted screenshots were lock-screen/black, so no
 - Lockfile installation may report development-dependency advisories; the
   canonical production-only audit is the release gate.
 
-## Checks executed before handoff
+## R083 checks executed
+
+- Node 22 focused provenance/unit lane:
+
+  ```sh
+  E2E_PORT=43390 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright \
+    npm_config_cache="$PWD/.cache/npm" \
+    npm exec --yes --package=node@22 -- npx vitest run --coverage=false \
+    src/simulation/engine.test.ts \
+    src/ui/settlementPresentation.test.ts \
+    src/ui/settlementProvenance.test.tsx \
+    src/ui/verifierRound079.test.tsx \
+    src/ui/verifierRound080.test.tsx \
+    src/ui/verifierRound081.test.tsx \
+    src/ui/verifierRound082.test.tsx
+  ```
+
+  passed 7 files / 71 tests. It distinguishes valid-integrity V-078 from
+  stale-integrity V-080/V-082 unknown fallback and retains V-081 progress.
+
+- Node 22 formatting, lint, and typecheck:
+
+  ```sh
+  npm exec --yes --package=node@22 -- npx prettier --write \
+    .agent/DECISIONS.md src/simulation/engine.ts \
+    src/simulation/ledgerIdentity.ts src/ui/settlementProvenance.test.tsx \
+    src/ui/verifierRound080.test.tsx \
+    tests/e2e/jobs-settlement-provenance.spec.ts
+  npm exec --yes --package=node@22 -- npm run lint
+  npm exec --yes --package=node@22 -- npm run typecheck
+  ```
+
+  passed.
+
+- Candidate Node 22 browser provenance lane:
+
+  ```sh
+  E2E_PORT=43391 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright \
+    npm_config_cache="$PWD/.cache/npm" \
+    npm exec --yes --package=node@22 -- npx playwright test \
+    tests/e2e/jobs-settlement-provenance.spec.ts --reporter=line
+  ```
+
+  passed 3/3: raw-320 stale structural relink, exact stale marker mutation
+  through restore/reseal/offline reload, and raw-393 collision-safe repeated
+  progress. The marker fixture writes at next-document initialization and
+  waits for the Worker’s durable reseal write, avoiding a live Worker race.
+
+- Exact immutable probes against a Node 22 production preview at
+  `127.0.0.1:43392`, explicitly stopped afterward with the port closed:
+
+  ```sh
+  BASE_URL=http://127.0.0.1:43392 OUTPUT_DIR=/private/tmp/goldlocks-r083-r079 \
+    PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright \
+    npm_config_cache="$PWD/.cache/npm" \
+    npm exec --yes --package=node@22 -- node \
+    .agent/verification/round-079-adversarial.mjs
+  BASE_URL=http://127.0.0.1:43392 OUTPUT_DIR=/private/tmp/goldlocks-r083-r081 \
+    PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright \
+    npm_config_cache="$PWD/.cache/npm" \
+    npm exec --yes --package=node@22 -- node \
+    .agent/verification/round-081-adversarial.mjs
+  BASE_URL=http://127.0.0.1:43392 OUTPUT_DIR=/private/tmp/goldlocks-r083-r082 \
+    PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright \
+    npm_config_cache="$PWD/.cache/npm" \
+    npm exec --yes --package=node@22 -- node \
+    .agent/verification/round-082-adversarial.mjs
+  ```
+
+  passed: R079 full settlement/accounting/layout matrix, D-018 reserves
+  136.453125px at 320 and 157.3125px at 393, R081 `findings: []`, and R082
+  `findings: []` at raw 320 keyboard/393 touch plus offline and 200%-text
+  reduced-motion paths.
+
+- The exact immutable R080 browser probe was also run and intentionally has
+  two historical stale-precision assertion findings: it expects a stale save
+  to retain `The active pipeline had no model stage.`, while D-036 now
+  requires the observed honest unknown at 320 and 393. The probe is unchanged
+  by authorization and is not treated as current acceptance evidence.
+
+- Final clean canonical Node 22 command:
+
+  ```sh
+  E2E_PORT=43395 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright \
+    npm_config_cache="$PWD/.cache/npm" \
+    npm exec --yes --package=node@22 -- sh ./scripts/verify
+  ```
+
+  completed after the handoff was formatted. Observed stages: Prettier, lint,
+  and typecheck passed; Vitest passed 51 files / 242 tests; fresh
+  `playwright-report/index.html` (21:33:07 EEST) and
+  `playwright-pages-report/index.html` (21:33:12 EEST) were produced; the
+  final `test-results/.last-run.json` is `{ "status": "passed",
+"failedTests": [] }`. The platform detached the command's terminal result
+  after it completed, so its process exit code is not recoverable separately;
+  its processes are gone and no failed browser artifact remains.
+
+## Historical R082 checks
 
 - Node 22 focused provenance/unit lane:
 
