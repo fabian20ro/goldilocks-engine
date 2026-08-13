@@ -1,12 +1,13 @@
-# Candidate handoff — round 076 selected-workload scaled-text repair
+# Candidate handoff — round 077 selected-workload raw/scaled responsive repair
 
 ## Implemented behavior summary
 
-- At portrait widths, the selected Jobs workload now uses a two-column grid
-  with the quote reflowing below its title/summary. This prevents an enlarged
-  title from colliding with the independently readable price at 200% text,
-  without clipping either value or changing Jobs state, routing, queueing,
-  persistence, or Worker behavior.
+- The selected Jobs workload now measures its own inline size. Raw 100%-text
+  320×693 and 393×742 portraits retain the original compact three-track
+  header, preserving the short Jobs route's navigation reserve. At 200% text,
+  the same cards reflow the complete quote below their title/summary, keeping
+  the independently readable values distinct without changing Jobs state,
+  routing, queueing, persistence, or Worker behavior.
 - The active-pipeline drag acceptance fixture now scrolls both its source and
   Runtime destination into the app scroll region before calculating real
   pointer/touch coordinates. The hosted trace showed the old Runtime center
@@ -60,14 +61,16 @@
 
 ## Verifier findings addressed
 
-- **V-077 resolved:** the selected workload previously retained the generic
-  glyph / minmax summary / auto-price grid at all widths. At 200% portrait
-  text, the long workload name exceeded the constrained middle track and
-  painted beneath the price. The selected workload alone now intrinsically
-  reflows the price onto its own summary-column row at `max-width: 31rem`.
-  Exact retained probe evidence confirms no title/price overlap or horizontal
-  overflow at 320×693 and 393×742, while raw Queue 1 keeps its 30.734375px and
-  49.0625px navigation reserves respectively.
+- **V-077 and hosted Verify 31688017845 resolved:** the former `max-width:
+31rem` selected-workload reflow correctly separated enlarged text but also
+  matched raw 320px. Under CI/Linux font metrics that added a second header row
+  and put Queue 1 behind Primary navigation. The selected card is now a named
+  inline-size container; its `12em` query preserves the raw compact three-track
+  layout while root 200%-text scales the threshold and activates the complete
+  two-row quote reflow at both 320×693 and 393×742. The direct candidate test
+  asserts those computed states and raw post-settlement reserve; retained
+  probes confirm no title/price overlap, horizontal overflow, or undersized
+  visible controls.
 - **Hosted Verify 31679283386 / root browser-PWA job 94380784738 resolved:**
   the two `game.spec.ts` direct-drag failures were fixture geometry failures,
   not a module-move regression. The CI trace put the Runtime slot center at
@@ -146,9 +149,11 @@ sandbox because its local Mach-port rendezvous cannot be created inside it.
 ## Important architectural decisions
 
 - No `.agent/DECISIONS.md` entry changed: D-018 already owns raw Jobs
-  portrait safety and retains 200%-text evidence. The existing
-  `workload-panel` hook and selected-workload grid are local presentational
-  reflows; they create no state and alter neither the onboarding rationale,
+  portrait safety and retains 200%-text evidence. The named
+  `selected-workload` inline-size container and its 12em query are a local
+  presentational reflow: raw card content is wider than 12em, while the same
+  card at 200% text is narrower than the scaled threshold at both required
+  widths. They create no state and alter neither the onboarding rationale,
   manual handoff, controls, nor input state.
 - The immutable round-075 adversarial probe remains unchanged and is the
   candidate regression for V-077. Its range-rectangle assertion now covers
@@ -191,6 +196,35 @@ sandbox because its local Mach-port rendezvous cannot be created inside it.
   audit reports zero. No dependency change was in this bounded UI repair.
 
 ## Checks executed before handoff
+
+- Round-077 focused Node 22 hosted-regression repeat:
+  `E2E_PORT=42078 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright
+npm_config_cache="$PWD/.cache/npm" npm exec --yes --package=node@22 -- node
+node_modules/@playwright/test/cli.js test tests/e2e/first-session.spec.ts
+tests/e2e/verifier-round-049.spec.ts tests/e2e/jobs-portrait-margin.spec.ts
+--grep 'short portrait keeps the complete guide reason and first Jobs action
+clear of navigation|pre-boot seed persists through reload at (320|393)px|
+selected Jobs workload stays compact at raw text and reflows its quote at
+200% text' --repeat-each=5 --reporter=line` passed 25/25. It includes both
+  hosted raw-reserve failures, raw three-track versus scaled two-track computed
+  layout, complete title/price text, zero scaled overlap, and containment.
+- Round-077 immutable retained probes, unchanged and run against a fresh Node
+  22 loopback preview: `round-075-adversarial.mjs` returned `findings: []`
+  (raw Queue 1 reserves 56.734375px / 75.0625px at 320×693 / 393×742, ten real
+  pointer and ten CDP-touch drags, persistence, offline, malformed-save, and
+  recovery); `round-076-adversarial.mjs` returned `findings: []` (raw compact
+  layout plus 100%/200% reduced-motion text, 44px controls, overflow, drag,
+  persistence, and expanded-pipeline coverage).
+- Round-077 static Node 22 checks before browser verification:
+  `npm run format:check` and `npm run typecheck` passed.
+- Round-077 canonical Node 22 command:
+  `E2E_PORT=42081 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright
+npm_config_cache="$PWD/.cache/npm" npm exec --yes --package=node@22 -- sh
+./scripts/verify` completed all canonical lanes. Format, lint, TypeScript,
+  45 unit/property files / 223 tests, numeric and seeded balance checks,
+  build, production audit, root Playwright 214/214, and Pages Playwright 2/2
+  completed; generated Playwright report stats record zero unexpected, flaky,
+  or skipped tests in both browser suites.
 
 - Round-076 final canonical Node 22 command:
   `E2E_PORT=42079 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright

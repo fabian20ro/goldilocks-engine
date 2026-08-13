@@ -3757,7 +3757,15 @@ h1 {
   }
 }
 
-@media (max-width: 31rem) {
+/* A viewport query cannot distinguish raw 320px from 200%-text 320px. The
+ * selected card's inline size can: raw portrait cards remain wider than 12em,
+ * while both scaled portrait cards reflow their quote without clipping it. */
+.selected-dispatch {
+  container-name: selected-workload;
+  container-type: inline-size;
+}
+
+@container selected-workload (max-width: 12em) {
   /* Keep the selected workload's name and price distinct when scaled portrait
    * text cannot share the original three-column header row. */
   .selected-dispatch > div {
