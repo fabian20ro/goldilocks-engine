@@ -369,6 +369,7 @@ test("Phase 3 explicit placement, tab cancellation, keyboard, and touch-drag ret
   await page
     .getByRole("button", { name: "Place Precision Cleaner in Build" })
     .click();
+  await openTab(page, "Build");
   const tray = page.locator(".placement-tray");
   await expect(tray).toContainText("Place Precision Cleaner");
   await tray.scrollIntoViewIfNeeded();

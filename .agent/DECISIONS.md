@@ -588,3 +588,48 @@
 - **Reversal condition:** Replace this policy only with a demonstrated
   accounting-display requirement that preserves an equally explicit exact-value
   route and the same portrait/reduced-motion evidence.
+
+## D-031 — State-derived first-session primary-action handoff
+
+- **Decision:** The finite first-session rail presents one contextual next
+  action from durable simulation state: queue the safe Interactive Chat
+  starter, observe its settlement, earn the exact remaining amount for the
+  recommended Precision Cleaner in Jobs, buy it once affordable, then begin
+  placement in Upgrades and manually select Build to place it. A valid
+  already-purchased alternative remains named by the existing engine-owned
+  first-session progress rather than being replaced or invalidated.
+- **Presentation boundary:** A narrow pure UI selector may observe the durable
+  guide, resources, job state, owned/installed modules, and the transient
+  pending placement. It never dispatches, navigates, persists, changes
+  economy, or changes guide validation. The bottom tab remains the only route
+  between areas; starting the recommended placement leaves the player in
+  Upgrades with their scroll/input intact, and selecting Build is explicit.
+  Jobs keeps its settlement and recovery record visible when the starter
+  fails; the guide names that recovery instead of replacing its reason.
+- **Priority boundary:** Until the guide completes, Build's current objective
+  no longer promotes the $45 Workstation Expansion, Jobs demotes Queue 10 and
+  hides the optional target picker; when the required tab has moved to
+  Upgrades or Build, Jobs also demotes Queue 1. Upgrades puts the named
+  recommended module before the expansion, rigs, and remaining catalogue.
+  Existing lower choices remain available and no second onboarding routing
+  control is added.
+- **Details boundary:** Upgrades retains exactly one primary item Details
+  disclosure. During onboarding the recommended module owns that initial
+  disclosure; after completion the established equipped-rig default remains.
+- **Reason:** The live first session previously described a generic buy/install
+  goal while a premature expansion objective and several equally styled actions
+  competed with it. A single state-derived handoff makes the required
+  cross-tab sequence legible without inventing a state framework, new
+  navigation, or a tutorial rewrite.
+- **Evidence policy:** Pure selector coverage enumerates queue, observe,
+  shortfall, affordable purchase, owned handoff, pending placement, completion,
+  failed-settlement recovery, and valid alternate purchase states. Pinned
+  Playwright coverage verifies manual cross-tab routing, scroll/input
+  preservation, failure without pipeline loss, persistence/reload, touch,
+  keyboard, reduced motion, and 320×693, 375×667, and 393×742 portrait
+  layouts, alongside retained PWA/offline/Phase 3 regressions and canonical
+  verification.
+- **Reversal condition:** Replace the recommended-module order or manual tab
+  handoff only with an explicit product decision that preserves transparent
+  settlement/failure disclosure, explicit placement, no surprise navigation,
+  and equivalent mobile browser evidence.

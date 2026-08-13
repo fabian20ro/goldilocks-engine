@@ -66,6 +66,10 @@ import {
   type ModuleInventoryEntry,
 } from "./moduleInventory";
 import {
+  selectFirstSessionPresentation,
+  type FirstSessionPresentation,
+} from "./firstSessionPresentation";
+import {
   latestCareerScheduleWorkerRejection,
   type CareerScheduleDraft,
   useCareerScheduleDraft,
@@ -517,44 +521,45 @@ function QuickStart({ onDismiss }: { onDismiss: () => void }) {
   );
 }
 
-function FirstSessionGuide({ state }: { state: SimulationState }) {
-  const guide = state.firstSession;
-  if (guide.step === "complete") return null;
-  const starterTask = [state.jobs.activeTask, ...state.jobs.waitingTasks].find(
-    (task) => task?.id === guide.starterTaskId,
-  );
-  const content =
-    guide.step === "queue-starter"
-      ? {
-          eyebrow: "First session · step 1 of 3",
-          title: "Queue one safe Interactive Chat job",
-          body: "Jobs contains the only queue action. Interactive Chat is the reliable starter route; its live quote and cost remain visible before you accept it.",
-        }
-      : guide.step === "observe-settlement"
-        ? {
-            eyebrow: "First session · step 2 of 3",
-            title: "Observe that job settle",
-            body: starterTask
-              ? `${getWorkload(starterTask.workloadId).name} ${starterTask.id} is ${state.jobs.activeTask?.id === starterTask.id ? `${Math.round(starterTask.progress * 100)}% complete` : "waiting"}. Its locked quote will settle in Jobs; no follow-up was queued for you.`
-              : "The accepted starter job is resolving. Its exact locked quote, cost, and outcome stay in the Jobs settlement record.",
-          }
-        : {
-            eyebrow: "First session · step 3 of 3",
-            title: "Buy and explicitly install one meaningful module",
-            body: guide.purchasedModuleId
-              ? `${getModule(guide.purchasedModuleId).name} is owned. Use its named Place in Build action; purchase never equips it automatically.`
-              : "The settlement is recorded. Use the bottom Upgrades tab to compare a paid module, then place it explicitly in a compatible Build position.",
-          };
+function FirstSessionGuide({
+  presentation,
+  currentTab,
+}: {
+  presentation: FirstSessionPresentation;
+  currentTab: TabId;
+}) {
+  if (!presentation.active) return null;
+  const inRequiredTab = presentation.requiredTab === currentTab;
+  const step =
+    presentation.action === "queue-starter"
+      ? "1"
+      : presentation.action === "observe-settlement"
+        ? "2"
+        : "3";
   return (
     <section
       className="first-session-guide"
       aria-live="polite"
       aria-labelledby="first-session-guide-title"
       data-testid="first-session-guide"
+      data-onboarding-action={presentation.action}
     >
-      <span className="eyebrow">{content.eyebrow}</span>
-      <h2 id="first-session-guide-title">{content.title}</h2>
-      <p>{content.body}</p>
+      <div className="onboarding-guide-heading">
+        <span className="eyebrow">First session · step {step} of 3</span>
+        <span
+          className="onboarding-required-tab"
+          data-testid="onboarding-required-tab"
+        >
+          Required tab · {presentation.requiredTabLabel}
+        </span>
+      </div>
+      <h2 id="first-session-guide-title">{presentation.title}</h2>
+      {inRequiredTab ? null : (
+        <p className="onboarding-handoff" data-testid="onboarding-handoff">
+          Use the bottom {presentation.requiredTabLabel} tab. This handoff does
+          not navigate or change your current work.
+        </p>
+      )}
     </section>
   );
 }
@@ -1200,6 +1205,7 @@ function PlacementTray({
 function BuildView({
   state,
   command,
+  onboarding,
   selected,
   selectedStageId,
   detail,
@@ -1215,6 +1221,7 @@ function BuildView({
 }: {
   state: SimulationState;
   command: (command: SimulationCommand) => void;
+  onboarding: FirstSessionPresentation;
   selected: PendingPlacement | null;
   selectedStageId: string;
   detail: ModuleDetail | null;
@@ -1237,35 +1244,47 @@ function BuildView({
   const expansionOwned = expansion
     ? state.ownedExpansionIds.includes(expansion.id)
     : false;
-  const objective = !expansionOwned
-    ? `Fund ${expansion?.name ?? "pipeline expansion"}`
-    : state.activeExpansionId
-      ? "Configure six process positions"
-      : "Activate the owned expansion";
-  const objectiveProgress = !expansionOwned
-    ? Math.min(
-        100,
-        (state.resources.money / (expansion?.purchaseCost ?? 1)) * 100,
-      )
-    : state.activeExpansionId
+  const objective = onboarding.active
+    ? onboarding.title
+    : !expansionOwned
+      ? `Fund ${expansion?.name ?? "pipeline expansion"}`
+      : state.activeExpansionId
+        ? "Configure six process positions"
+        : "Activate the owned expansion";
+  const objectiveProgress = onboarding.active
+    ? onboarding.progressPercent
+    : !expansionOwned
       ? Math.min(
           100,
-          (state.slots.filter(
-            (slot) => getSlot(slot.slotId).type === "process" && slot.moduleId,
-          ).length /
-            6) *
-            100,
+          (state.resources.money / (expansion?.purchaseCost ?? 1)) * 100,
         )
-      : 0;
+      : state.activeExpansionId
+        ? Math.min(
+            100,
+            (state.slots.filter(
+              (slot) =>
+                getSlot(slot.slotId).type === "process" && slot.moduleId,
+            ).length /
+              6) *
+              100,
+          )
+        : 0;
   return (
     <>
       <section
-        className="mission-card"
+        className={`mission-card ${onboarding.active ? "onboarding-mission" : ""}`}
         aria-label="Current objective and bottleneck"
       >
         <div>
-          <span className="eyebrow">Current objective</span>
+          <span className="eyebrow">
+            {onboarding.active ? "First-session action" : "Current objective"}
+          </span>
           <strong>{objective}</strong>
+          {onboarding.active ? (
+            <small className="objective-handoff">
+              Required tab · {onboarding.requiredTabLabel}
+            </small>
+          ) : null}
           <div
             className="progress-track"
             aria-label={`${Math.round(objectiveProgress)} percent of current objective`}
@@ -1362,11 +1381,13 @@ function MoneyLoop({
   reducedMotion,
   targetId,
   onTargetChange,
+  onboardingActive,
 }: {
   state: SimulationState;
   reducedMotion: boolean;
   targetId: string | null;
   onTargetChange: (targetId: string | null) => void;
+  onboardingActive: boolean;
 }) {
   const workload = getWorkload(state.workloadId);
   const quote = getWorkloadQuote(state, workload.id);
@@ -1516,48 +1537,50 @@ function MoneyLoop({
           )}
         </div>
       </div>
-      <section className="next-target" aria-label="Next useful target">
-        <div>
-          <span className="eyebrow">Next useful target</span>
-          {target ? (
-            <strong>
-              {target.name} · {formatCompactCurrency(target.purchaseCost)} ·{" "}
-              {state.resources.money >= target.purchaseCost
-                ? "affordable now"
-                : `${formatCompactCurrency(target.purchaseCost - state.resources.money)} remaining`}
-            </strong>
-          ) : targetOptions.length ? (
-            <strong>No target selected</strong>
-          ) : (
-            <strong>All paid modules owned</strong>
-          )}
-        </div>
-        {targetOptions.length ? (
-          <div className="target-controls">
-            <label>
-              <span className="visually-hidden">Next useful target</span>
-              <select
-                value={targetId ?? ""}
-                onChange={(event) =>
-                  onTargetChange(event.currentTarget.value || null)
-                }
-              >
-                <option value="">No target</option>
-                {targetOptions.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name} · {formatCompactCurrency(item.purchaseCost)}
-                  </option>
-                ))}
-              </select>
-            </label>
+      {!onboardingActive ? (
+        <section className="next-target" aria-label="Next useful target">
+          <div>
+            <span className="eyebrow">Next useful target</span>
             {target ? (
-              <button type="button" onClick={() => onTargetChange(null)}>
-                Dismiss target
-              </button>
-            ) : null}
+              <strong>
+                {target.name} · {formatCompactCurrency(target.purchaseCost)} ·{" "}
+                {state.resources.money >= target.purchaseCost
+                  ? "affordable now"
+                  : `${formatCompactCurrency(target.purchaseCost - state.resources.money)} remaining`}
+              </strong>
+            ) : targetOptions.length ? (
+              <strong>No target selected</strong>
+            ) : (
+              <strong>All paid modules owned</strong>
+            )}
           </div>
-        ) : null}
-      </section>
+          {targetOptions.length ? (
+            <div className="target-controls">
+              <label>
+                <span className="visually-hidden">Next useful target</span>
+                <select
+                  value={targetId ?? ""}
+                  onChange={(event) =>
+                    onTargetChange(event.currentTarget.value || null)
+                  }
+                >
+                  <option value="">No target</option>
+                  {targetOptions.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name} · {formatCompactCurrency(item.purchaseCost)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {target ? (
+                <button type="button" onClick={() => onTargetChange(null)}>
+                  Dismiss target
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
       <p className="earnings-total">
         Run totals: {formatCompactCurrency(state.jobs.grossEarned)} gross earned
         · {formatCompactCurrency(state.jobs.operatingCostsPaid)} operating costs
@@ -1762,6 +1785,8 @@ function ModuleUpgradeCard({
   detailOpen,
   onOpenDetails,
   onCloseDetails,
+  recommended = false,
+  placementPending = false,
 }: {
   state: SimulationState;
   entry: ModuleInventoryEntry;
@@ -1770,6 +1795,8 @@ function ModuleUpgradeCard({
   detailOpen: boolean;
   onOpenDetails: () => void;
   onCloseDetails: () => void;
+  recommended?: boolean;
+  placementPending?: boolean;
 }) {
   const item = entry.module;
   const { affordable, equipped, owned } = entry;
@@ -1779,11 +1806,17 @@ function ModuleUpgradeCard({
   const reasonId = `module-reason-${item.id}`;
   return (
     <article
-      className={`upgrade-card ${equipped ? "equipped" : owned ? "owned" : "locked"}`}
+      className={`upgrade-card ${equipped ? "equipped" : owned ? "owned" : "locked"} ${recommended ? "recommended-upgrade" : ""}`}
       aria-labelledby={`module-title-${item.id}`}
+      data-testid={recommended ? "recommended-first-module" : undefined}
     >
       <div className="upgrade-card-heading">
         <div>
+          {recommended ? (
+            <span className="onboarding-recommendation-label">
+              Recommended next module
+            </span>
+          ) : null}
           <span className="equipment-state">
             {equipped
               ? "EQUIPPED"
@@ -1895,18 +1928,29 @@ function ModuleUpgradeCard({
       {!owned ? (
         <button
           type="button"
-          className="purchase-action"
+          className={`${recommended ? "primary-action " : ""}purchase-action`}
           disabled={!affordable}
           aria-describedby={reasonId}
           onClick={() => command({ type: "BUY_MODULE", moduleId: item.id })}
+          data-testid={recommended ? "onboarding-primary-action" : undefined}
         >
           Buy {item.name} for {formatCompactCurrency(item.purchaseCost)}
         </button>
+      ) : placementPending ? (
+        <p
+          className="placement-handoff"
+          role="status"
+          data-testid="placement-handoff"
+        >
+          Placement ready in Build. Use the Build tab to choose a highlighted
+          compatible position; no navigation or install happened here.
+        </p>
       ) : (
         <button
           type="button"
-          className="equip-action"
+          className={`${recommended ? "primary-action " : ""}equip-action`}
           onClick={() => onChoose(item.id)}
+          data-testid={recommended ? "onboarding-primary-action" : undefined}
         >
           Place {item.name} in Build
         </button>
@@ -2048,16 +2092,36 @@ function UpgradesView({
   state,
   command,
   onChooseModule,
+  onboarding,
+  pendingPlacementModuleId,
 }: {
   state: SimulationState;
   command: (command: SimulationCommand) => void;
   onChooseModule: (moduleId: string) => void;
+  onboarding: FirstSessionPresentation;
+  pendingPlacementModuleId: string | null;
 }) {
-  const [selectedDetailId, setSelectedDetailId] = useState<string | null>(
-    `rig:${state.hardwareId}`,
+  const moduleInventory = selectModuleInventory(state);
+  const recommendedEntry = onboarding.recommendedModuleId
+    ? moduleInventory
+        .flatMap((section) => section.entries)
+        .find((entry) => entry.module.id === onboarding.recommendedModuleId)
+    : null;
+  const [selectedDetailId, setSelectedDetailId] = useState<string | null>(() =>
+    onboarding.active && recommendedEntry
+      ? `module:${recommendedEntry.module.id}`
+      : `rig:${state.hardwareId}`,
   );
   const [showEveryModule, setShowEveryModule] = useState(false);
-  const moduleInventory = selectModuleInventory(state);
+  const catalogueInventory =
+    onboarding.active && recommendedEntry
+      ? moduleInventory.map((section) => ({
+          ...section,
+          entries: section.entries.filter(
+            (entry) => entry.module.id !== recommendedEntry.module.id,
+          ),
+        }))
+      : moduleInventory;
   const detailProps = (id: string) => ({
     detailOpen: selectedDetailId === id,
     onOpenDetails: () => setSelectedDetailId(id),
@@ -2083,6 +2147,41 @@ function UpgradesView({
           latency, reliability, observability, or operating cost.
         </p>
       </section>
+      {onboarding.active && recommendedEntry ? (
+        <section
+          className="panel onboarding-recommendation"
+          aria-labelledby="onboarding-recommendation-title"
+        >
+          <div className="section-heading compact">
+            <div>
+              <span className="eyebrow">First-session next choice</span>
+              <h2 id="onboarding-recommendation-title">
+                Recommended module before expansion
+              </h2>
+              <p className="section-note">
+                {onboarding.action === "earn-remainder"
+                  ? `Earn ${formatCompactCurrency(onboarding.remainingMoney ?? 0)} more in Jobs before this purchase.`
+                  : onboarding.action === "buy-module"
+                    ? "This is the next paid module to compare and buy. Expansion and rigs remain available after this focused choice."
+                    : "This module remains the first-session handoff. Expansion and rigs stay available below without displacing it."}
+              </p>
+            </div>
+          </div>
+          <div className="upgrade-list">
+            <ModuleUpgradeCard
+              state={state}
+              entry={recommendedEntry}
+              command={command}
+              onChoose={onChooseModule}
+              recommended
+              placementPending={
+                pendingPlacementModuleId === recommendedEntry.module.id
+              }
+              {...detailProps(`module:${recommendedEntry.module.id}`)}
+            />
+          </div>
+        </section>
+      ) : null}
       <section className="panel" aria-labelledby="pipeline-store-title">
         <div className="section-heading compact">
           <div>
@@ -2143,7 +2242,7 @@ function UpgradesView({
           </div>
         </div>
         <div className="upgrade-inventory-sections">
-          {moduleInventory.map((section) => {
+          {catalogueInventory.map((section) => {
             const entries = showEveryModule
               ? section.entries
               : moduleInventoryDefaultEntries(section);
@@ -2210,6 +2309,7 @@ export function JobsView({
   reducedMotion,
   usefulTarget,
   onUsefulTargetChange,
+  onboarding,
 }: {
   state: SimulationState;
   command: (command: SimulationCommand) => void;
@@ -2217,12 +2317,16 @@ export function JobsView({
   reducedMotion: boolean;
   usefulTarget: string | null;
   onUsefulTargetChange: (targetId: string | null) => void;
+  onboarding: FirstSessionPresentation;
 }) {
   const [confirmClear, setConfirmClear] = useState(false);
   const waitingCount = state.jobs.waitingTasks.length;
   const selectedWorkload = getWorkload(state.workloadId);
   const guidingStarter = state.firstSession.step === "queue-starter";
   const observingStarter = state.firstSession.step === "observe-settlement";
+  const earningRecommendedModule = onboarding.action === "earn-remainder";
+  const queueOneIsPrimary =
+    !onboarding.active || guidingStarter || earningRecommendedModule;
   const queueControlsLocked = guidingStarter || observingStarter;
   const displayedWorkload = queueControlsLocked
     ? getWorkload("interactive-chat")
@@ -2292,11 +2396,17 @@ export function JobsView({
           ) : (
             <button
               type="button"
-              className="primary-action queue-one"
+              className={`${queueOneIsPrimary ? "primary-action" : "secondary-action"} queue-one`}
               onClick={
                 guidingStarter
                   ? queueStarter
                   : () => command({ type: "QUEUE_JOBS", count: 1 })
+              }
+              data-testid={
+                queueOneIsPrimary &&
+                (guidingStarter || earningRecommendedModule)
+                  ? "onboarding-primary-action"
+                  : undefined
               }
             >
               {guidingStarter
@@ -2322,6 +2432,7 @@ export function JobsView({
           reducedMotion={reducedMotion}
           targetId={usefulTarget}
           onTargetChange={onUsefulTargetChange}
+          onboardingActive={onboarding.active}
         />
         <p className="concept-note">
           <strong>CU = normalized Compute Units.</strong> Use CU to compare this
@@ -2394,7 +2505,9 @@ export function JobsView({
           {!queueControlsLocked ? (
             <button
               type="button"
-              className="primary-action"
+              className={
+                onboarding.active ? "secondary-action" : "primary-action"
+              }
               onClick={() => command({ type: "QUEUE_JOBS", count: 10 })}
             >
               Queue 10 · locks {formatCompactCurrency(queueTenFirst)} →{" "}
@@ -4348,6 +4461,10 @@ export function App() {
     () => (selected ? getModule(selected.moduleId).name : null),
     [selected],
   );
+  const onboarding = selectFirstSessionPresentation(
+    state,
+    selected?.moduleId ?? null,
+  );
 
   const switchTab = (next: TabId, preservePlacement = false) => {
     const region = scrollRegionRef.current;
@@ -4631,7 +4748,6 @@ export function App() {
   const inspectSupplemental = (
     <>
       <UpgradeFeedback state={state} />
-      <FirstSessionGuide state={state} />
       {secondaryControls}
     </>
   );
@@ -4687,13 +4803,16 @@ export function App() {
 
         <main id="main-content" className={`main-content ${tab}-content`}>
           {tab !== "build" && tab !== "inspect" ? secondaryControls : null}
-          {tab !== "inspect" ? <FirstSessionGuide state={state} /> : null}
+          {tab !== "inspect" && tab !== "jobs" ? (
+            <FirstSessionGuide presentation={onboarding} currentTab={tab} />
+          ) : null}
           {tab !== "inspect" ? <UpgradeFeedback state={state} /> : null}
 
           {tab === "build" ? (
             <BuildView
               state={state}
               command={command}
+              onboarding={onboarding}
               selected={selected}
               selectedStageId={selectedStageId}
               detail={moduleDetail}
@@ -4708,14 +4827,18 @@ export function App() {
               secondaryControls={secondaryControls}
             />
           ) : tab === "jobs" ? (
-            <JobsView
-              state={state}
-              command={command}
-              commandBatch={commandBatch}
-              reducedMotion={reducedMotion}
-              usefulTarget={usefulTarget}
-              onUsefulTargetChange={setUsefulTarget}
-            />
+            <>
+              <FirstSessionGuide presentation={onboarding} currentTab={tab} />
+              <JobsView
+                state={state}
+                command={command}
+                commandBatch={commandBatch}
+                reducedMotion={reducedMotion}
+                usefulTarget={usefulTarget}
+                onUsefulTargetChange={setUsefulTarget}
+                onboarding={onboarding}
+              />
+            </>
           ) : tab === "career" ? (
             <CareerView
               state={state}
@@ -4733,11 +4856,21 @@ export function App() {
             <UpgradesView
               state={state}
               command={command}
+              onboarding={onboarding}
+              pendingPlacementModuleId={selected?.moduleId ?? null}
               onChooseModule={(moduleId) => {
                 const equippedSlot = state.slots.find(
                   (slot) => slot.moduleId === moduleId,
                 );
                 beginPlacement(moduleId, equippedSlot?.slotId);
+                // The first-session handoff intentionally leaves the player on
+                // Upgrades: they choose when to switch to Build, preserving the
+                // current scroll position and any in-progress comparison.
+                if (
+                  onboarding.active &&
+                  moduleId === onboarding.recommendedModuleId
+                )
+                  return;
                 switchTab("build", true);
               }}
             />
@@ -4769,7 +4902,7 @@ export function App() {
             className={tab === id ? "active" : ""}
             aria-current={tab === id ? "page" : undefined}
             aria-label={label}
-            onClick={() => switchTab(id)}
+            onClick={() => switchTab(id, id === "build" && selected !== null)}
           >
             <DecorativeGlyph>{icon}</DecorativeGlyph>
             <span className="tab-label">{label}</span>

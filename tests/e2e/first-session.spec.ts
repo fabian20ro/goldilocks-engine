@@ -57,6 +57,19 @@ test("first-session rail survives reload and placement requires an explicit hand
   await page.goto("/");
   await waitForSave(page);
   await waitForGuideStep(page, "step 1 of 3");
+  await expect(page.getByTestId("first-session-guide")).toHaveAttribute(
+    "data-onboarding-action",
+    "queue-starter",
+  );
+  await expect(page.getByTestId("onboarding-required-tab")).toHaveText(
+    "Required tab · Jobs",
+  );
+  await expect(
+    page.getByLabel("Current objective and bottleneck"),
+  ).toContainText("Queue one safe Interactive Chat job");
+  await expect(
+    page.getByLabel("Current objective and bottleneck"),
+  ).not.toContainText("Workstation Expansion I");
 
   await openTab(page, "Jobs");
   await expect(page.getByRole("button", { name: "Queue 10" })).toHaveCount(0);
@@ -68,6 +81,10 @@ test("first-session rail survives reload and placement requires an explicit hand
     .getByRole("button", { name: "Queue one safe Interactive Chat job" })
     .click();
   await waitForGuideStep(page, "step 2 of 3");
+  await expect(page.getByTestId("first-session-guide")).toHaveAttribute(
+    "data-onboarding-action",
+    "observe-settlement",
+  );
   await expect(page.getByRole("button", { name: "Queue 10" })).toHaveCount(0);
   await page.reload();
   await waitForGuideStep(page, "step 2 of 3");
@@ -76,18 +93,99 @@ test("first-session rail survives reload and placement requires an explicit hand
   await page.getByRole("button", { name: "Resume" }).click();
   await page.getByRole("button", { name: "64×" }).click();
   await waitForGuideStep(page, "step 3 of 3");
+  await expect(page.getByTestId("first-session-guide")).toHaveAttribute(
+    "data-onboarding-action",
+    "earn-remainder",
+  );
+  await expect(page.getByTestId("onboarding-required-tab")).toHaveText(
+    "Required tab · Jobs",
+  );
+  await expect(
+    page.getByRole("button", { name: "Queue 1", exact: true }),
+  ).toHaveAttribute("data-testid", "onboarding-primary-action");
+  await expect(page.getByRole("button", { name: /^Queue 10/ })).toHaveClass(
+    /secondary-action/,
+  );
 
   page = await setSavedMoney(page, 4);
   await waitForGuideStep(page, "step 3 of 3");
+  await expect(page.getByTestId("first-session-guide")).toHaveAttribute(
+    "data-onboarding-action",
+    "buy-module",
+  );
+  await openTab(page, "Jobs");
+  await expect(
+    page.getByRole("button", { name: "Queue 1", exact: true }),
+  ).toHaveClass(/secondary-action/);
   await openTab(page, "Upgrades");
+  const recommendedModule = page.getByTestId("recommended-first-module");
+  await expect(recommendedModule).toContainText("Precision Cleaner");
+  const openUpgradeDetails = page.locator("article.upgrade-card details[open]");
+  await expect(openUpgradeDetails).toHaveCount(1);
+  await expect(recommendedModule.locator("details[open]")).toHaveCount(1);
+  expect(
+    await page.evaluate(() => {
+      const recommended = document.querySelector(
+        "[data-testid='recommended-first-module']",
+      );
+      const expansion = document.querySelector("#pipeline-store-title");
+      return Boolean(
+        recommended &&
+          expansion &&
+          recommended.compareDocumentPosition(expansion) &
+            Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+    }),
+  ).toBe(true);
+  await expect(
+    page.getByRole("button", {
+      name: "Buy Workstation Expansion I for $45.00",
+    }),
+  ).not.toHaveClass(/primary-action/);
   const buyPrecisionCleaner = page.getByRole("button", {
     name: "Buy Precision Cleaner for $4.00",
   });
   await expect(buyPrecisionCleaner).toBeEnabled();
   await buyPrecisionCleaner.click();
+  await expect(page.getByTestId("first-session-guide")).toHaveAttribute(
+    "data-onboarding-action",
+    "start-placement",
+  );
+  await expect(
+    page
+      .getByRole("navigation", { name: "Primary" })
+      .getByRole("button", { name: "Upgrades", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+
+  const scrollRegion = page.locator(".app-scroll-region");
+  await scrollRegion.evaluate((region) => {
+    region.scrollTop = Math.min(80, region.scrollHeight - region.clientHeight);
+  });
+  const scrollBeforePlacement = await scrollRegion.evaluate(
+    (region) => region.scrollTop,
+  );
+  expect(scrollBeforePlacement).toBeGreaterThan(0);
   await page
     .getByRole("button", { name: "Place Precision Cleaner in Build" })
-    .click();
+    .evaluate((button: HTMLButtonElement) => button.click());
+  await expect(page.getByTestId("first-session-guide")).toHaveAttribute(
+    "data-onboarding-action",
+    "place-module",
+  );
+  await expect(
+    page
+      .getByRole("navigation", { name: "Primary" })
+      .getByRole("button", { name: "Upgrades", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+  await expect(page.getByTestId("placement-handoff")).toContainText(
+    "no navigation or install happened here",
+  );
+  await expect(page.locator(".placement-tray")).toHaveCount(0);
+  await expect
+    .poll(() => scrollRegion.evaluate((region) => region.scrollTop))
+    .toBeGreaterThan(0);
+
+  await openTab(page, "Build");
   await expect(page.locator(".placement-tray")).toContainText(
     "Place Precision Cleaner",
   );
@@ -130,6 +228,7 @@ test("first-session rail survives reload and placement requires an explicit hand
   await page
     .getByRole("button", { name: "Place Precision Cleaner in Build" })
     .click();
+  await openTab(page, "Build");
   await expect(page.locator(".placement-tray")).toContainText(
     "Place Precision Cleaner",
   );
@@ -141,10 +240,57 @@ test("first-session rail survives reload and placement requires an explicit hand
     "Precision Cleaner",
   );
   await expect(page.getByTestId("first-session-guide")).toHaveCount(0);
+
+  await openTab(page, "Upgrades");
+  await expect(openUpgradeDetails).toHaveCount(1);
+  await expect(
+    page.locator(
+      "article.upgrade-card:has(#rig-title-bedroom-cpu) details[open]",
+    ),
+  ).toHaveCount(1);
+});
+
+test("first-session handoff preserves a Career draft and scroll until the player changes tabs", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 393, height: 742 });
+  await page.goto("/");
+  await waitForSave(page);
+  await openTab(page, "Career");
+
+  const freelance = page.getByLabel("Freelance delivery evening hours");
+  await freelance.fill("1");
+  await expect(freelance).toHaveValue("1");
+  const scrollRegion = page.locator(".app-scroll-region");
+  await scrollRegion.evaluate((region) => {
+    region.scrollTop = Math.min(180, region.scrollHeight - region.clientHeight);
+  });
+  const careerScroll = await scrollRegion.evaluate(
+    (region) => region.scrollTop,
+  );
+  expect(careerScroll).toBeGreaterThan(0);
+
+  await expect(page.getByTestId("onboarding-handoff")).toContainText(
+    "Use the bottom Jobs tab",
+  );
+  await expect(
+    page
+      .getByRole("navigation", { name: "Primary" })
+      .getByRole("button", { name: "Career", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+  await expect(freelance).toHaveValue("1");
+
+  await openTab(page, "Upgrades");
+  await openTab(page, "Career");
+  await expect(freelance).toHaveValue("1");
+  await expect
+    .poll(() => scrollRegion.evaluate((region) => region.scrollTop))
+    .toBeGreaterThan(0);
 });
 
 for (const viewport of [
   { width: 320, height: 693 },
+  { width: 375, height: 667 },
   { width: 393, height: 742 },
 ]) {
   test(`first-session rail remains usable at ${viewport.width}px and 200% text`, async ({
@@ -170,6 +316,106 @@ for (const viewport of [
     ).toBe(true);
   });
 }
+
+test("a failed starter keeps its visible reason and surviving work through manual recovery", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 667 });
+  await page.goto("/");
+  await waitForSave(page);
+
+  await page
+    .getByTestId("slot-runtime")
+    .getByRole("button", { name: /^Quantized Model/ })
+    .click();
+  await page
+    .getByRole("button", { name: /Remove Quantized Model from Runtime/ })
+    .click();
+  await expect
+    .poll(() =>
+      page.evaluate((key) => {
+        const state = JSON.parse(localStorage.getItem(key) ?? "null") as {
+          slots: { slotId: string; moduleId: string | null }[];
+        };
+        return state.slots.find((slot) => slot.slotId === "runtime")?.moduleId;
+      }, SAVE_KEY),
+    )
+    .toBeNull();
+  const slotsAfterRemoval = await page.evaluate((key) => {
+    const state = JSON.parse(localStorage.getItem(key) ?? "null") as {
+      slots: unknown;
+    };
+    return JSON.stringify(state.slots);
+  }, SAVE_KEY);
+
+  await openTab(page, "Jobs");
+  await page
+    .getByRole("button", { name: "Queue one safe Interactive Chat job" })
+    .click();
+  await page.getByRole("button", { name: "64×" }).click();
+  await expect(page.getByTestId("first-session-guide")).toHaveAttribute(
+    "data-onboarding-action",
+    "earn-remainder",
+    { timeout: 10_000 },
+  );
+  await expect(page.getByTestId("first-session-guide")).toContainText(
+    "Review failed settlement",
+  );
+  await expect(page.locator(".settlement-recovery")).toContainText(
+    "Failure record",
+  );
+  expect(
+    await page.evaluate((key) => {
+      const state = JSON.parse(localStorage.getItem(key) ?? "null") as {
+        lastSettlement: { failed: number } | null;
+        slots: unknown;
+      };
+      return {
+        failed: state.lastSettlement?.failed,
+        slots: JSON.stringify(state.slots),
+      };
+    }, SAVE_KEY),
+  ).toEqual({ failed: 1, slots: slotsAfterRemoval });
+
+  await page.getByRole("button", { name: "Pause" }).click();
+  await openTab(page, "Build");
+  let runtimeCard = page
+    .locator('.module-library [data-module-id="quantized-model"]')
+    .first();
+  if ((await runtimeCard.count()) === 0) {
+    await page.getByRole("button", { name: "Show every module (17)" }).click();
+    runtimeCard = page
+      .locator('.module-library [data-module-id="quantized-model"]')
+      .first();
+  }
+  await runtimeCard.click();
+  await page
+    .getByRole("button", { name: "Place Quantized Model in Build" })
+    .click();
+  await page
+    .getByTestId("slot-runtime")
+    .getByRole("button", { name: "Snap here" })
+    .click();
+  await expect(page.getByTestId("slot-runtime")).toContainText(
+    "Quantized Model",
+  );
+
+  await openTab(page, "Jobs");
+  await page.getByRole("button", { name: "Queue 1", exact: true }).click();
+  await expect
+    .poll(() =>
+      page.evaluate((key) => {
+        const state = JSON.parse(localStorage.getItem(key) ?? "null") as {
+          jobs: { activeTask: unknown; waitingTasks: unknown[] };
+        };
+        return (
+          Number(Boolean(state.jobs.activeTask)) +
+          state.jobs.waitingTasks.length
+        );
+      }, SAVE_KEY),
+    )
+    .toBeGreaterThan(0);
+});
 
 test("touch-drag starts placement only after movement and cancellation changes no slot", async ({
   page,

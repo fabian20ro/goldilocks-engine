@@ -9,6 +9,7 @@ import {
   projectCareerRoute,
 } from "../simulation/engine";
 import { CareerView, JobsView } from "./App";
+import { selectFirstSessionPresentation } from "./firstSessionPresentation";
 
 const emptySchedule = {
   freelance: 0,
@@ -155,14 +156,16 @@ describe("Phase 4 compact money boundaries", () => {
   });
 
   it("formats the selected Jobs failed payout through the shared compact policy", () => {
+    const state = createInitialState(20_706);
     render(
       <JobsView
-        state={createInitialState(20_706)}
+        state={state}
         command={vi.fn()}
         commandBatch={vi.fn()}
         reducedMotion={false}
         usefulTarget={null}
         onUsefulTargetChange={vi.fn()}
+        onboarding={selectFirstSessionPresentation(state)}
       />,
     );
 
@@ -258,6 +261,7 @@ describe("Phase 4 compact money boundaries", () => {
         reducedMotion={false}
         usefulTarget={null}
         onUsefulTargetChange={vi.fn()}
+        onboarding={selectFirstSessionPresentation(state)}
       />,
     );
 

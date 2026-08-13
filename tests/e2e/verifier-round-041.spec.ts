@@ -248,6 +248,10 @@ test("a real first purchase survives benign stale-save recovery after later work
     .getByRole("button", { name: "Place Precision Cleaner in Build" })
     .click();
   await page
+    .getByRole("navigation", { name: "Primary" })
+    .getByRole("button", { name: "Build", exact: true })
+    .click();
+  await page
     .getByTestId("slot-prepare")
     .getByRole("button", { name: "Snap here" })
     .click();

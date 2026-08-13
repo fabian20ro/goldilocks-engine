@@ -303,6 +303,7 @@ test("verifier round 050: audited paid completion survives stale-save recovery w
   await page
     .getByRole("button", { name: "Place Precision Cleaner in Build" })
     .click();
+  await openTab(page, "Build");
   await page
     .getByTestId("slot-prepare")
     .getByRole("button", { name: "Snap here" })

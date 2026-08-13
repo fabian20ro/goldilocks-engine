@@ -548,6 +548,28 @@ h2 {
   background: linear-gradient(135deg, #172614, #101b14);
 }
 
+.onboarding-guide-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+
+.onboarding-required-tab,
+.onboarding-recommendation-label {
+  width: fit-content;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid var(--cyan);
+  border-radius: 0.3rem;
+  color: var(--cyan);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.55rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
 .first-session-guide h2 {
   margin: 0;
   color: var(--acid);
@@ -560,6 +582,13 @@ h2 {
   color: #d1ddd0;
   font-size: 0.7rem;
   line-height: 1.45;
+}
+
+.first-session-guide .onboarding-handoff {
+  padding-top: 0.35rem;
+  border-top: 1px solid #ffffff17;
+  color: var(--acid);
+  font-weight: 700;
 }
 
 .placement-tray {
@@ -630,6 +659,20 @@ h2 {
 
 .mission-card .bottleneck {
   color: var(--amber);
+}
+
+.onboarding-mission {
+  border-color: #6f9a48;
+  background: linear-gradient(135deg, #172614, #0f1813);
+}
+
+.objective-handoff {
+  display: block;
+  margin-top: 0.38rem;
+  color: var(--cyan);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.6rem;
+  line-height: 1.35;
 }
 
 .presentation-toggle {
@@ -1724,6 +1767,43 @@ h2 {
 .upgrade-card.locked .equipment-state {
   border-color: #745f3b;
   color: #e7c784;
+}
+
+.onboarding-recommendation {
+  border-color: #6f9a48;
+  background: linear-gradient(135deg, #142019, #111a16);
+}
+
+.onboarding-recommendation .section-note {
+  color: #c7d8cd;
+}
+
+.recommended-upgrade {
+  border-color: var(--acid-dim);
+  background: linear-gradient(135deg, #152218, #0d1511);
+}
+
+.recommended-upgrade .onboarding-recommendation-label {
+  border-color: var(--acid-dim);
+  color: var(--acid);
+}
+
+.recommended-upgrade .purchase-action,
+.recommended-upgrade .equip-action {
+  min-height: 3.25rem;
+  border-color: var(--acid);
+  background: #2b411f;
+}
+
+.placement-handoff {
+  padding: 0.6rem;
+  border: 1px solid var(--cyan);
+  border-radius: 0.44rem;
+  background: #102126;
+  color: var(--cyan);
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1.45;
 }
 
 .upgrade-card-heading {

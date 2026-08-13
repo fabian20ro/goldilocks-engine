@@ -200,6 +200,7 @@ for (const viewport of [
       await page
         .getByRole("button", { name: "Place Precision Cleaner in Build" })
         .click();
+      await openTab(page, "Build");
       await expect(page.locator(".placement-tray")).toContainText(
         "Place Precision Cleaner",
       );

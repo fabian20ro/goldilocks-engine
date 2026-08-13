@@ -42,6 +42,13 @@ async function openUpgrades(page: Page) {
     .click();
 }
 
+async function openBuild(page: Page) {
+  await page
+    .getByRole("navigation", { name: "Primary" })
+    .getByRole("button", { name: "Build", exact: true })
+    .click();
+}
+
 test.describe("round 012 persistent upgrade economy and UX", () => {
   test("earns a first module, buys once, adds it, observes deltas, and keeps it offline", async ({
     page,
@@ -114,6 +121,7 @@ test.describe("round 012 persistent upgrade economy and UX", () => {
     await page
       .getByRole("button", { name: "Place Precision Cleaner in Build" })
       .click();
+    await openBuild(page);
     await expect(page.locator(".placement-tray")).toContainText(
       "Place Precision Cleaner",
     );
