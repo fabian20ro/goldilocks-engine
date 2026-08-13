@@ -1,4 +1,4 @@
-# Candidate handoff — round 073 first-session primary-action presentation
+# Candidate handoff — round 074 V-076 explanatory-rail repair
 
 ## Implemented behavior summary
 
@@ -13,10 +13,11 @@
   4. Buy that recommended module in Upgrades once affordable.
   5. Start placement there, then manually select Build and choose a compatible
      position.
-- The contextual guide exposes the required tab and one state-specific
-  handoff. It never changes tabs. Starting the recommended placement retains
-  Upgrades and its scroll position; the bottom Build tab carries the real
-  pending placement to the existing tray.
+- The contextual guide renders the selector's concise, state-specific
+  explanation alongside the required tab and one handoff. It never changes
+  tabs. Starting the recommended placement retains Upgrades and its scroll
+  position; the bottom Build tab carries the real pending placement to the
+  existing tray.
 - Build replaces the premature $45 Workstation Expansion objective with the
   current first-session action until the guide completes. Jobs demotes Queue
   10, hides the optional target picker, and demotes Queue 1 whenever the
@@ -44,9 +45,11 @@
 
 ## Verifier findings addressed
 
-- The round-072 baseline had no unresolved verifier finding IDs. This bounded
-  Phase 1 work changes only first-session presentation and associated
-  regression expectations for the explicitly required manual Build handoff.
+- **V-076 resolved:** `FirstSessionGuide` now renders the existing pure
+  selector's `presentation.body` in one concise wrapping paragraph. This makes
+  the queue reason, observe-settlement accounting location, earn-remainder
+  price/reason, and failed-starter recovery explanation visible without adding
+  state, navigation, commands, or duplicate copy.
 - Retained placement regressions now explicitly use the Build tab after the
   first-session handoff. They still verify the same placement tray, Snap,
   persistence, and completion behavior without asserting the now-prohibited
@@ -83,15 +86,16 @@ deterministic loopback servers, waits for readiness, and lets Playwright clean
 up every web-server process:
 
 ```sh
-E2E_PORT=4193 ./scripts/verify
+E2E_PORT=4195 ./scripts/verify
 ```
 
 Focused first-session evidence:
 
 ```sh
+npm run format:check
 npm run typecheck
 npx vitest run src/ui/firstSessionPresentation.test.ts src/ui/careerView.test.tsx --coverage.enabled=false
-E2E_PORT=4178 npm run test:e2e -- tests/e2e/first-session.spec.ts tests/e2e/command-deck.spec.ts tests/e2e/jobs-portrait-margin.spec.ts tests/e2e/round-012-upgrades.spec.ts tests/e2e/round-015-expansion.spec.ts tests/e2e/phase-3-density.spec.ts tests/e2e/verifier-round-036.spec.ts tests/e2e/verifier-round-041.spec.ts tests/e2e/verifier-round-049.spec.ts tests/e2e/verifier-round-050.spec.ts
+E2E_PORT=4184 npm run test:e2e -- tests/e2e/first-session.spec.ts tests/e2e/command-deck.spec.ts tests/e2e/verifier-round-041.spec.ts tests/e2e/verifier-round-042.spec.ts tests/e2e/verifier-round-049.spec.ts tests/e2e/jobs-portrait-margin.spec.ts
 ```
 
 `@playwright/test` is pinned in `package.json`; both `test:e2e` commands set
@@ -105,6 +109,9 @@ sandbox because its local Mach-port rendezvous cannot be created inside it.
   finite onboarding handoff. Existing engine progress remains authoritative;
   tab navigation, placement transaction state, and all Worker commands stay in
   their established owners.
+- The guide reuses that presenter's existing `body` rather than duplicating
+  state-specific copy in the view. The added selector hook exists only for
+  focused browser regression evidence.
 - The recommendation is presentation priority, not a new purchase rule.
   Precision Cleaner is the default live next paid module, while an existing
   valid alternate purchase is respected for the final explicit placement.
@@ -123,29 +130,50 @@ sandbox because its local Mach-port rendezvous cannot be created inside it.
   PWA paths.
 - Remote push, deployment, GitHub-hosted verification, and Pages smoke remain
   external release steps and were not performed.
+- Lockfile installation reports npm's existing full-dependency advisory of four
+  vulnerabilities (one moderate, three high); the canonical production-only
+  audit reports zero. No dependency change was in this bounded UI repair.
 
 ## Checks executed before handoff
 
-- `npm run typecheck` — passed.
-- `npx vitest run src/ui/firstSessionPresentation.test.ts src/ui/careerView.test.tsx --coverage.enabled=false` — 2 files / 13 tests passed.
-- Initial canonical `E2E_PORT=4190 ./scripts/verify` exposed one retained
-  browser regression: `verifier-round-036` found two open Upgrades Details
-  surfaces (the new recommended module plus the normal rig default). Static,
-  unit/property, balance, 210/211 root browser, and 2/2 Pages lanes otherwise
-  passed. The repair gives onboarding its one recommended Details surface while
-  retaining the normal rig default after completion.
-- Exact repair evidence:
-  `E2E_PORT=4178 npm run test:e2e -- tests/e2e/verifier-round-036.spec.ts tests/e2e/first-session.spec.ts` — 12/12 passed.
-- Expanded focused browser matrix shown above — 51/51 passed; its local
-  `test-results/.last-run.json` recorded `status: passed`.
-- Final isolated canonical command:
-  `E2E_PORT=4193 ./scripts/verify`, captured at
-  `/tmp/goldlocks-r073-commit-canonical.log` — terminal marker
-  `R073_COMMIT_CANONICAL_EXIT=0`; format, lint, and TypeScript passed; 45
-  unit/property files / 223 tests passed; first-session 41, upgrades 20,001,
-  progression 41, Career 101, and evaluation 121 balance seeds had zero
-  failures; production audit found `0` vulnerabilities; root Playwright
-  211/211; Pages 2/2.
+- Round-074 focused static/unit checks: `npm run format:check` and
+  `npm run typecheck` passed; `npx vitest run
+src/ui/firstSessionPresentation.test.ts src/ui/careerView.test.tsx
+--coverage.enabled=false` passed 2 files / 13 tests.
+- Round-074 scoped host browser matrix:
+  `E2E_PORT=4184 npm run test:e2e -- tests/e2e/first-session.spec.ts
+tests/e2e/command-deck.spec.ts tests/e2e/verifier-round-041.spec.ts
+tests/e2e/verifier-round-042.spec.ts tests/e2e/verifier-round-049.spec.ts
+tests/e2e/jobs-portrait-margin.spec.ts` passed 33/33. It covers rendered
+  explanations in queue, observe, earn, and failed recovery; raw 320×693,
+  iPhone-SE-like 375×667, and 393×742; 200% text; 44px controls; no horizontal
+  overflow or rail trap; touch, keyboard, reduced motion, recovery, and manual
+  handoff preservation. The same command inside the managed workspace sandbox
+  reached Chromium's documented Mach-port launch denial before tests; no test
+  result was accepted from that attempt.
+- The first canonical attempt, `E2E_PORT=4194 ./scripts/verify`, exposed four
+  320px geometry regressions after the newly visible explanation: one
+  command-deck assertion and retained V-041, V-042, and V-049 assertions.
+  Its static, unit/property, balance, audit/build, and Pages 2/2 lanes passed;
+  the root browser lane was 207/211. The short-portrait CSS repair retained the
+  complete explanation at its existing body font size, compacted card spacing,
+  and removed only Build's duplicate nearby required-tab line. The subsequent
+  33/33 matrix above includes all four regressions.
+- Round-074 retained immutable verifier probe, unchanged:
+  `PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright BASE_URL=http://127.0.0.1:5731
+OUTPUT_DIR=/tmp/goldlocks-r074-final-adversarial node
+.agent/verification/round-073-adversarial.mjs`, against a fresh local
+  `E2E_PORT=5731 ./scripts/run-e2e` preview, returned `findings: []`.
+  It independently covered queue/observe/earn/failed text at 320/393, 200%
+  text, 44px controls, no overflow/rail trap, manual handoff, PWA offline
+  reload, and page/console errors.
+- Final canonical host command: `E2E_PORT=4195 ./scripts/verify`, captured at
+  `/tmp/goldlocks-r074-final-canonical.log`, terminal marker
+  `R074_FINAL_CANONICAL_EXIT=0`. Format, lint, and TypeScript passed; 45
+  unit/property files / 223 tests passed; numeric viability and no-dominant
+  strategy passed; first-session 41, upgrades 20,001, progression 41, Career
+  101, and evaluation 121 balance seeds had zero failures; production audit
+  found `0` vulnerabilities; root Playwright 212/212; Pages 2/2.
 
 ## Checks not run
 

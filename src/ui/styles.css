@@ -584,6 +584,10 @@ h2 {
   line-height: 1.45;
 }
 
+.first-session-guide .onboarding-explanation {
+  overflow-wrap: anywhere;
+}
+
 .first-session-guide .onboarding-handoff {
   padding-top: 0.35rem;
   border-top: 1px solid #ffffff17;
@@ -3703,6 +3707,42 @@ h1 {
 @media (max-width: 350px) and (max-height: 44rem) {
   .main-content.jobs-content {
     gap: 0.125rem;
+  }
+}
+
+/* The finite guide remains complete on a raw 320×693 portrait, while the
+ * nearby Build mission drops only its duplicate tab line. The guide itself
+ * remains the one visible source for the required tab, handoff, and reason. */
+@media (max-width: 350px) and (max-height: 44rem) {
+  .first-session-guide {
+    gap: 0.18rem;
+    padding: 0.48rem;
+  }
+
+  .onboarding-guide-heading {
+    gap: 0.22rem;
+  }
+
+  .onboarding-required-tab {
+    padding: 0.14rem 0.26rem;
+    font-size: 0.52rem;
+  }
+
+  .first-session-guide h2 {
+    font-size: 0.82rem;
+    line-height: 1.2;
+  }
+
+  .first-session-guide p {
+    line-height: 1.32;
+  }
+
+  .first-session-guide .onboarding-handoff {
+    padding-top: 0.22rem;
+  }
+
+  .onboarding-mission .objective-handoff {
+    display: none;
   }
 }
 

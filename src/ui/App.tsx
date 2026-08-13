@@ -554,6 +554,12 @@ function FirstSessionGuide({
         </span>
       </div>
       <h2 id="first-session-guide-title">{presentation.title}</h2>
+      <p
+        className="onboarding-explanation"
+        data-testid="onboarding-explanation"
+      >
+        {presentation.body}
+      </p>
       {inRequiredTab ? null : (
         <p className="onboarding-handoff" data-testid="onboarding-handoff">
           Use the bottom {presentation.requiredTabLabel} tab. This handoff does

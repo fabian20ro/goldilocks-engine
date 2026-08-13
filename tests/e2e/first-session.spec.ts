@@ -64,6 +64,9 @@ test("first-session rail survives reload and placement requires an explicit hand
   await expect(page.getByTestId("onboarding-required-tab")).toHaveText(
     "Required tab · Jobs",
   );
+  await expect(page.getByTestId("onboarding-explanation")).toContainText(
+    "Interactive Chat is the reliable first route",
+  );
   await expect(
     page.getByLabel("Current objective and bottleneck"),
   ).toContainText("Queue one safe Interactive Chat job");
@@ -85,6 +88,9 @@ test("first-session rail survives reload and placement requires an explicit hand
     "data-onboarding-action",
     "observe-settlement",
   );
+  await expect(page.getByTestId("onboarding-explanation")).toContainText(
+    "locked quote, configured cost, and outcome",
+  );
   await expect(page.getByRole("button", { name: "Queue 10" })).toHaveCount(0);
   await page.reload();
   await waitForGuideStep(page, "step 2 of 3");
@@ -99,6 +105,9 @@ test("first-session rail survives reload and placement requires an explicit hand
   );
   await expect(page.getByTestId("onboarding-required-tab")).toHaveText(
     "Required tab · Jobs",
+  );
+  await expect(page.getByTestId("onboarding-explanation")).toContainText(
+    "Precision Cleaner costs $4.00",
   );
   await expect(
     page.getByRole("button", { name: "Queue 1", exact: true }),
@@ -288,6 +297,87 @@ test("first-session handoff preserves a Career draft and scroll until the player
     .toBeGreaterThan(0);
 });
 
+test("short portrait keeps the complete guide reason and first Jobs action clear of navigation", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 693 });
+  await page.goto("/");
+  await waitForSave(page);
+  await expect(page.getByTestId("onboarding-explanation")).toContainText(
+    "Interactive Chat is the reliable first route",
+  );
+
+  const initialGeometry = await page.evaluate(() => {
+    const nav = document
+      .querySelector("nav[aria-label='Primary']")
+      ?.getBoundingClientRect();
+    const guide = document
+      .querySelector("[data-testid='first-session-guide']")
+      ?.getBoundingClientRect();
+    const explanation = document
+      .querySelector("[data-testid='onboarding-explanation']")
+      ?.getBoundingClientRect();
+    const firstPipelineControl = document
+      .querySelector("[data-testid='pipeline'] button")
+      ?.getBoundingClientRect();
+    return {
+      guideContainsExplanation: Boolean(
+        guide &&
+          explanation &&
+          explanation.top >= guide.top &&
+          explanation.bottom <= guide.bottom,
+      ),
+      firstPipelineControlClearsNavigation: Boolean(
+        nav && firstPipelineControl && firstPipelineControl.bottom <= nav.top,
+      ),
+    };
+  });
+  expect(initialGeometry.guideContainsExplanation).toBe(true);
+  expect(initialGeometry.firstPipelineControlClearsNavigation).toBe(true);
+
+  await openTab(page, "Jobs");
+  await page
+    .getByRole("button", { name: "Queue one safe Interactive Chat job" })
+    .click();
+  await page.getByRole("button", { name: "64×", exact: true }).click();
+  await waitForGuideStep(page, "step 3 of 3");
+  await expect(page.getByTestId("onboarding-explanation")).toContainText(
+    "Precision Cleaner costs $4.00",
+  );
+
+  const jobsGeometry = await page.evaluate(() => {
+    const nav = document
+      .querySelector("nav[aria-label='Primary']")
+      ?.getBoundingClientRect();
+    const queueOne = [...document.querySelectorAll("button")]
+      .find((button) => button.textContent?.trim() === "Queue 1")
+      ?.getBoundingClientRect();
+    const undersizedControls = [...document.querySelectorAll("button")]
+      .filter((button) => {
+        const style = getComputedStyle(button);
+        return style.display !== "none" && style.visibility !== "hidden";
+      })
+      .flatMap((button) => {
+        const bounds = button.getBoundingClientRect();
+        return bounds.width < 44 || bounds.height < 44
+          ? [button.getAttribute("aria-label") ?? button.textContent?.trim()]
+          : [];
+      });
+    return {
+      queueOneHasReserve: Boolean(
+        nav && queueOne && queueOne.bottom <= nav.top - 8,
+      ),
+      noHorizontalOverflow:
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+      undersizedControls,
+    };
+  });
+  expect(jobsGeometry.queueOneHasReserve).toBe(true);
+  expect(jobsGeometry.noHorizontalOverflow).toBe(true);
+  expect(jobsGeometry.undersizedControls).toEqual([]);
+});
+
 for (const viewport of [
   { width: 320, height: 693 },
   { width: 375, height: 667 },
@@ -303,6 +393,35 @@ for (const viewport of [
       content: ":root { font-size: 200% !important; }",
     });
     await expect(page.getByTestId("first-session-guide")).toBeVisible();
+    await expect(page.getByTestId("onboarding-explanation")).toContainText(
+      "Interactive Chat is the reliable first route",
+    );
+    const initialGeometry = await page.evaluate(() => {
+      const pipeline = document.querySelector("[data-testid='pipeline']");
+      const undersizedControls = [...document.querySelectorAll("button")]
+        .filter((button) => {
+          const style = getComputedStyle(button);
+          return style.display !== "none" && style.visibility !== "hidden";
+        })
+        .flatMap((button) => {
+          const bounds = button.getBoundingClientRect();
+          return bounds.width < 44 || bounds.height < 44
+            ? [button.getAttribute("aria-label") ?? button.textContent?.trim()]
+            : [];
+        });
+      return {
+        noHorizontalOverflow:
+          document.documentElement.scrollWidth <=
+          document.documentElement.clientWidth,
+        noNestedRailScroll: pipeline
+          ? pipeline.scrollHeight <= pipeline.clientHeight
+          : true,
+        undersizedControls,
+      };
+    });
+    expect(initialGeometry.noHorizontalOverflow).toBe(true);
+    expect(initialGeometry.noNestedRailScroll).toBe(true);
+    expect(initialGeometry.undersizedControls).toEqual([]);
     await openTab(page, "Jobs");
     await expect(
       page.getByRole("button", { name: "Queue one safe Interactive Chat job" }),
@@ -360,6 +479,9 @@ test("a failed starter keeps its visible reason and surviving work through manua
   );
   await expect(page.getByTestId("first-session-guide")).toContainText(
     "Review failed settlement",
+  );
+  await expect(page.getByTestId("onboarding-explanation")).toContainText(
+    "latest starter delivery failed",
   );
   await expect(page.locator(".settlement-recovery")).toContainText(
     "Failure record",
