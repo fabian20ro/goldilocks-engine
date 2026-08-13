@@ -3757,6 +3757,30 @@ h1 {
   }
 }
 
+@media (max-width: 31rem) {
+  /* Keep the selected workload's name and price distinct when scaled portrait
+   * text cannot share the original three-column header row. */
+  .selected-dispatch > div {
+    grid-template-areas:
+      "glyph summary"
+      ". price";
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .selected-dispatch > div > .semantic-glyph {
+    grid-area: glyph;
+  }
+
+  .selected-dispatch > div > span {
+    grid-area: summary;
+  }
+
+  .selected-dispatch > div > b {
+    grid-area: price;
+    justify-self: start;
+  }
+}
+
 /* The portrait shell is at most 31rem wide. Stack the active Build
  * transaction here so 200%-text Cancel never competes with explanatory copy
  * for one narrow flex row. This keeps the complete sticky tray in view. */

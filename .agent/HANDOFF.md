@@ -1,7 +1,12 @@
-# Candidate handoff — round 075 hosted CI portrait-geometry repair
+# Candidate handoff — round 076 selected-workload scaled-text repair
 
 ## Implemented behavior summary
 
+- At portrait widths, the selected Jobs workload now uses a two-column grid
+  with the quote reflowing below its title/summary. This prevents an enlarged
+  title from colliding with the independently readable price at 200% text,
+  without clipping either value or changing Jobs state, routing, queueing,
+  persistence, or Worker behavior.
 - The active-pipeline drag acceptance fixture now scrolls both its source and
   Runtime destination into the app scroll region before calculating real
   pointer/touch coordinates. The hosted trace showed the old Runtime center
@@ -55,6 +60,14 @@
 
 ## Verifier findings addressed
 
+- **V-077 resolved:** the selected workload previously retained the generic
+  glyph / minmax summary / auto-price grid at all widths. At 200% portrait
+  text, the long workload name exceeded the constrained middle track and
+  painted beneath the price. The selected workload alone now intrinsically
+  reflows the price onto its own summary-column row at `max-width: 31rem`.
+  Exact retained probe evidence confirms no title/price overlap or horizontal
+  overflow at 320×693 and 393×742, while raw Queue 1 keeps its 30.734375px and
+  49.0625px navigation reserves respectively.
 - **Hosted Verify 31679283386 / root browser-PWA job 94380784738 resolved:**
   the two `game.spec.ts` direct-drag failures were fixture geometry failures,
   not a module-move regression. The CI trace put the Runtime slot center at
@@ -132,9 +145,14 @@ sandbox because its local Mach-port rendezvous cannot be created inside it.
 
 ## Important architectural decisions
 
-- No `.agent/DECISIONS.md` entry changed: D-018 already requires a raw-320
-  Jobs navigation reserve. `workload-panel` is only a local CSS ownership hook;
-  it introduces no state, navigation, persistence, or simulation behavior.
+- No `.agent/DECISIONS.md` entry changed: D-018 already owns raw Jobs
+  portrait safety and retains 200%-text evidence. The existing
+  `workload-panel` hook and selected-workload grid are local presentational
+  reflows; they create no state and alter neither the onboarding rationale,
+  manual handoff, controls, nor input state.
+- The immutable round-075 adversarial probe remains unchanged and is the
+  candidate regression for V-077. Its range-rectangle assertion now covers
+  both 320×693 and 393×742 under reduced motion and 200% root text.
 - The direct-drag tests retain their original visible, coordinate-based input
   contract. Scrolling the target first fixes the test fixture's impossible
   behind-navigation endpoint rather than relaxing its post-move assertion.
@@ -174,6 +192,41 @@ sandbox because its local Mach-port rendezvous cannot be created inside it.
 
 ## Checks executed before handoff
 
+- Round-076 final canonical Node 22 command:
+  `E2E_PORT=42079 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright
+npm_config_cache="$PWD/.cache/npm" npm exec --yes --package=node@22 -- sh
+./scripts/verify` completed with terminal marker
+  `R076_CANONICAL_EXIT=0` in `/tmp/goldlocks-r076-canonical.log`. Format,
+  lint, TypeScript, 45 unit/property files / 223 tests, numeric viability,
+  first-session 41, upgrades 20,001, progression 41, Career 101, and
+  evaluation 121 balance seeds all passed with zero failures; build and
+  production audit were clean; root Playwright passed 212/212 and Pages passed
+  2/2.
+- An earlier same-command attempt was stopped after `format:check` found the
+  newly added handoff text unformatted. Prettier corrected only that
+  documentation before the final clean canonical run above; no result from the
+  stopped attempt is used as evidence.
+- Round-076 focused Node 22 portrait matrix used 100% and 200% root text with
+  reduced motion at 320×693 and 393×742 after queueing the safe starter. All
+  four cases had zero title/price range intersections, no horizontal overflow,
+  and no visible control below 44px; raw initial Queue 1 reserve remained
+  30.734375px / 49.0625px with initial scroll zero.
+- Round-076 exact retained verifier probe, unchanged:
+  `PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright BASE_URL=http://127.0.0.1:42076
+OUTPUT_DIR=/tmp/goldlocks-r076-full-probe npm_config_cache="$PWD/.cache/npm"
+npm exec --yes --package=node@22 -- node
+.agent/verification/round-075-adversarial.mjs` returned `findings: []`.
+  It includes both raw Jobs reserve/target/overflow and 200%-text title-price
+  geometry at required widths, ten pointer and ten CDP-touch real drags,
+  Career draft/reload, controlled offline PWA reload, malformed-save recovery,
+  and page/console-error checks.
+- Round-076 retained project drag tests:
+  `E2E_PORT=42077 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright
+npm_config_cache="$PWD/.cache/npm" npm exec --yes --package=node@22 -- node
+node_modules/@playwright/test/cli.js test tests/e2e/game.spec.ts --grep
+'supports pointer drag and compatible active-module reordering|supports touch
+drag between compatible active slots' --repeat-each=10 --reporter=line`
+  passed 20/20.
 - Round-075 final canonical Node 22 command:
   `E2E_PORT=4199 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright
 npm_config_cache="$PWD/.cache/npm" npm exec --yes --package=node@22 -- sh
