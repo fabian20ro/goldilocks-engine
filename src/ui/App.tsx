@@ -39,7 +39,6 @@ import {
   workloadUnlockProgress,
 } from "../simulation/engine";
 import {
-  currencyDisplayPrecision,
   formatCompactCurrency,
   formatExactCurrency,
 } from "../simulation/currency";
@@ -69,6 +68,7 @@ import {
   selectFirstSessionPresentation,
   type FirstSessionPresentation,
 } from "./firstSessionPresentation";
+import { selectSettlementPresentation } from "./settlementPresentation";
 import {
   latestCareerScheduleWorkerRejection,
   type CareerScheduleDraft,
@@ -1437,39 +1437,10 @@ function MoneyLoop({
   });
   const offer = estimateWorkloadOffer(offerMetrics, quote);
   const settlement = state.lastSettlement;
-  const settlementNet = settlement
-    ? settlement.grossPayout - settlement.operatingCost
-    : 0;
-  const settlementPaidCost = settlement
-    ? Math.max(
-        0,
-        Math.min(
-          settlement.operatingCost,
-          settlement.grossPayout - settlement.netChange,
-        ),
-      )
-    : 0;
-  const settlementUnpaidCost = settlement
-    ? Math.max(0, settlement.operatingCost - settlementPaidCost)
-    : 0;
   // A quote card is a compact summary, so each figure earns mill precision
-  // only when that figure needs it. Settlement rows below remain one related
-  // accounting equation and therefore share their precision.
+  // only when that figure needs it. Exact settlement accounting remains in
+  // the local presentation selector's native Details disclosure below.
   const quoteMoney = (amount: number) => formatCompactCurrency(amount);
-  const settlementAmounts = settlement
-    ? [
-        settlement.lockedGrossQuote,
-        settlement.grossPayout,
-        settlement.operatingCost,
-        settlementNet,
-        settlementPaidCost,
-        settlementUnpaidCost,
-      ]
-    : [];
-  const settlementCurrencyPrecision =
-    currencyDisplayPrecision(settlementAmounts);
-  const settlementMoney = (amount: number) =>
-    formatCompactCurrency(amount, settlementAmounts);
   const targetOptions = modules
     .filter(
       (item) =>
@@ -1477,14 +1448,6 @@ function MoneyLoop({
     )
     .sort((left, right) => left.purchaseCost - right.purchaseCost);
   const target = targetOptions.find((item) => item.id === targetId) ?? null;
-  const celebration =
-    settlement?.completed === 1 && [1, 5, 12].includes(state.jobs.completed)
-      ? state.jobs.completed === 1
-        ? "First successful delivery recorded — no bonus applied."
-        : state.jobs.completed === 5
-          ? "Five successful deliveries recorded — no bonus applied."
-          : "Twelve successful deliveries recorded — no bonus applied."
-      : null;
   const failureEvent =
     settlement?.failed === 1
       ? [...state.ledger].reverse().find((event) => event.kind === "failure")
@@ -1492,6 +1455,16 @@ function MoneyLoop({
   const recoveryQuote = settlement
     ? getWorkloadQuote(state, settlement.workloadId)
     : null;
+  const settlementPresentation = selectSettlementPresentation({
+    settlement,
+    workloadName: settlement ? getWorkload(settlement.workloadId).name : null,
+    completedJobs: state.jobs.completed,
+    failureCause: failureEvent?.directCause,
+    recoveryQuote,
+    // The finite guide already owns the exact current first-session action;
+    // repeating it in the settlement would create duplicate onboarding copy.
+    showNextCue: !onboardingActive,
+  });
   return (
     <section className="money-loop" aria-labelledby="money-loop-title">
       <div className="money-loop-route" aria-label="Money loop">
@@ -1526,54 +1499,68 @@ function MoneyLoop({
           </small>
         </div>
         <div
-          className={`settlement ${settlement?.failed ? "failure" : ""} ${celebration ? "settlement-pulse" : ""}`}
+          className={`settlement ${settlement?.failed ? "failure" : ""} ${settlementPresentation.recognition ? "settlement-pulse" : ""}`}
           aria-live="polite"
         >
           <span className="eyebrow">Latest settlement</span>
-          {settlement ? (
+          {settlementPresentation.settlement &&
+          settlementPresentation.accounting ? (
             <>
-              <strong className={settlementNet < 0 ? "bad" : "good"}>
-                {settlementNet >= 0 ? "+" : ""}
-                {settlementMoney(settlementNet)} net
+              <strong
+                className={
+                  settlementPresentation.settlement.netChange < 0
+                    ? "bad"
+                    : "good"
+                }
+              >
+                {settlementPresentation.netChange}
               </strong>
-              <small>
-                {getWorkload(settlement.workloadId).name} · task{" "}
-                {settlement.taskId} ·{" "}
-                {settlementMoney(settlement.lockedGrossQuote)} locked gross ·{" "}
-                {settlement.completed} paid · {settlement.failed} failed ·{" "}
-                {settlementMoney(settlement.grossPayout)} settled gross −{" "}
-                {settlementMoney(settlement.operatingCost)} configured actual
-                costs
-                {settlementUnpaidCost > 0
-                  ? ` · ${settlementMoney(settlementPaidCost)} paid · ${settlementMoney(settlementUnpaidCost)} unpaid because cash cannot go below ${settlementMoney(0)}`
-                  : " · paid in full"}
-                {settlementCurrencyPrecision === 3
-                  ? " · Three decimals shown to preserve sub-cent accounting."
-                  : ""}
-              </small>
-              {celebration ? (
+              <p
+                className="settlement-overview"
+                data-testid="settlement-overview"
+              >
+                <strong>{settlementPresentation.outcome}</strong>{" "}
+                {settlementPresentation.overview}
+              </p>
+              {settlementPresentation.recognition ? (
                 <p className="settlement-recognition">
-                  {celebration}
+                  {settlementPresentation.recognition}
                   {reducedMotion
                     ? " Recorded immediately (reduced motion)."
                     : ""}
                 </p>
               ) : null}
-              {settlement.failed ? (
+              {settlementPresentation.failureCause ? (
                 <p className="settlement-recovery">
                   <strong>Failure record:</strong>{" "}
-                  {failureEvent?.directCause ??
-                    "Delivery did not clear the modeled reliability check."}{" "}
-                  Gross {formatCompactCurrency(0)}; configured cost remains
-                  visible above. Recovery forecast:{" "}
-                  {recoveryQuote?.trend ?? "steady"} quote{" "}
-                  {formatCompactCurrency(recoveryQuote?.grossQuote ?? 0)}
-                  after time recovery. No recovery action was applied.
+                  {settlementPresentation.failureCause}{" "}
+                  {settlementPresentation.recovery}
                 </p>
               ) : null}
+              {settlementPresentation.nextCue ? (
+                <p className="settlement-next-cue">
+                  {settlementPresentation.nextCue}
+                </p>
+              ) : null}
+              <details
+                className="settlement-accounting"
+                data-testid="settlement-accounting"
+              >
+                <summary>Settlement accounting and provenance</summary>
+                <div className="settlement-accounting-body">
+                  <p>{settlementPresentation.accounting.task}</p>
+                  <p>{settlementPresentation.accounting.outcomeCounts}</p>
+                  <p>{settlementPresentation.accounting.equation}</p>
+                  <p>{settlementPresentation.accounting.payment}</p>
+                  <p>{settlementPresentation.accounting.cashChange}</p>
+                  <p>{settlementPresentation.accounting.precision}</p>
+                </div>
+              </details>
             </>
           ) : (
-            <strong>No payout yet — queue a job.</strong>
+            <strong data-testid="settlement-overview">
+              {settlementPresentation.overview}
+            </strong>
           )}
         </div>
       </div>

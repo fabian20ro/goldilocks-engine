@@ -670,3 +670,49 @@
   accessible progressive disclosure that preserves exact simulation controls,
   full warning consequences, visible focus return, raw Jobs reserve, and the
   same portrait/text-scale evidence.
+
+## D-033 — Portrait latest-settlement one-scan accounting boundary
+
+- **Decision:** Owner-authorized post-§20.7 Jobs presentation work makes the
+  latest settlement's first level a decision record: delivery outcome, actual
+  cash change, workload identity, concise recognition or direct
+  cause/recovery, and one next valid cue outside finite onboarding. The finite
+  first-session guide continues to own its current action, so that cue is not
+  duplicated in the settlement card.
+- **Disclosure boundary:** Exactly one native `details` control, labeled
+  `Settlement accounting and provenance`, contains the durable task ID,
+  locked quote, completed/failed result, full gross-cost-economic-net
+  equation, paid/unpaid/cash-floor outcome, actual cash change, and the
+  three-decimal rationale. It is regular document flow with native keyboard,
+  touch, focus, and screen-reader semantics; no modal, drawer, accounting
+  framework, truncation, or hidden required accounting record is introduced.
+- **Calculation boundary:** A small pure UI selector assembles the compact
+  presentation from the engine-owned `JobSettlement` and existing ledger
+  cause/quote. It does not dispatch, mutate, persist, round engine state, or
+  change Worker/simulation/economy/schema/ledger behavior. Its displayed cash
+  change is `settlement.netChange`; the disclosure separately names the
+  economic gross-minus-cost equation, which intentionally differs under the
+  cash floor. Its mill rounding is presentation-only and prevents a binary
+  residue from incorrectly describing a fully paid cost as `$0.000 unpaid`.
+- **Responsive boundary:** At portrait widths through 393px the quote and
+  latest-settlement card use one readable column. The later settlement record
+  remains below the selected Queue action, preserving raw 320×693 D-018
+  Queue/navigation reserve. The summary and existing selected-quote Details
+  have 44px minimum targets; no horizontal or nested scroll is introduced.
+- **Reason:** Baseline 393px settlement cards had only 143.4px of inline
+  width and grew to 254.6px for success, 269.4px for zero-payout failure, and
+  343.6px for partial-cash failure while exposing provenance before the
+  recovery decision. One full-width outcome record plus on-demand exact
+  accounting gives each state a usable first scan without losing its evidence.
+- **Evidence policy:** Unit coverage locks success, zero-payout/full-payment,
+  partial-cash/payment-floor, no-settlement, and onboarding-cue states.
+  Candidate Playwright coverage locks successful, zero-payout, and partial
+  failure records at raw 320×693/393×742; native keyboard/touch disclosure,
+  reload persistence, 100%/200%-text reduced motion, 44px targets, no
+  overflow/nested scroll, global Simulation disclosure coexistence, and raw
+  Jobs reserve. Retained drag, Career draft, malformed/reload, PWA/offline,
+  and tab restoration lanes remain canonical requirements.
+- **Reversal condition:** Replace this progressive disclosure only with a
+  similarly native, one-control accessible treatment that retains every exact
+  accounting field, actual-versus-economic-net distinction, first-session
+  ownership, raw Jobs reserve, and equivalent portrait/text-scale evidence.

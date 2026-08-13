@@ -78,11 +78,18 @@ test.describe("verifier round 017 settlement feedback", () => {
     const latestSettlement = page
       .getByText("Latest settlement", { exact: true })
       .locator("..");
-    await expect(latestSettlement).toContainText(
-      "$0.01 configured actual costs · $0.00 paid · $0.01 unpaid",
-      { timeout: 10_000 },
+    await expect(latestSettlement).toContainText("+$0.00 cash change", {
+      timeout: 10_000,
+    });
+    await expect(latestSettlement).toContainText("Failed delivery");
+    const accounting = latestSettlement.getByTestId("settlement-accounting");
+    await accounting.locator(":scope > summary").click();
+    await expect(accounting).toContainText(
+      "$0.010 configured actual costs · $0.000 paid · $0.010 unpaid",
     );
-    await expect(latestSettlement).toContainText(/[−-]\$0\.01 net/);
+    await expect(accounting).toContainText(
+      "$0.000 gross payout − $0.010 configured actual cost = −$0.010 economic net.",
+    );
     await expect(page.getByText(/Run totals:/)).toContainText(
       "$0.00 operating costs paid",
     );
@@ -107,11 +114,16 @@ test.describe("verifier round 017 settlement feedback", () => {
     const latestSettlement = page
       .getByText("Latest settlement", { exact: true })
       .locator("..");
-    await expect(latestSettlement).toContainText("configured actual costs", {
+    await expect(latestSettlement).toContainText("−$0.005 cash change", {
       timeout: 10_000,
     });
-    await expect(latestSettlement).not.toContainText(
-      "$0.01 configured actual costs · $0.01 paid · $0.01 unpaid",
+    const accounting = latestSettlement.getByTestId("settlement-accounting");
+    await accounting.locator(":scope > summary").click();
+    await expect(accounting).toContainText(
+      "$0.010 configured actual costs · $0.005 paid · $0.005 unpaid",
+    );
+    await expect(accounting).not.toContainText(
+      "$0.010 configured actual costs · $0.010 paid · $0.010 unpaid",
     );
   });
 });

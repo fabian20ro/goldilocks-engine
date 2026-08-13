@@ -1354,6 +1354,21 @@ h2 {
   background: #251412;
 }
 
+.settlement-overview,
+.settlement-next-cue {
+  margin: 0;
+  color: #d7e1da;
+}
+
+.settlement-overview > strong {
+  color: var(--cyan);
+}
+
+.settlement-next-cue {
+  color: var(--acid);
+  font-weight: 700;
+}
+
 .settlement-recognition,
 .settlement-recovery {
   margin: 0.38rem 0 0;
@@ -1367,6 +1382,44 @@ h2 {
 
 .settlement-recovery {
   color: #ffd3a2;
+}
+
+.settlement-accounting {
+  margin-top: 0.28rem;
+  border: 1px solid #ffffff1f;
+  border-radius: 0.42rem;
+  background: #0b120e;
+}
+
+.settlement-accounting > summary {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  padding: 0.35rem 0.45rem;
+  color: var(--cyan);
+  cursor: pointer;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.59rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.settlement-accounting[open] > summary {
+  border-bottom: 1px solid #ffffff1f;
+}
+
+.settlement-accounting-body {
+  display: grid;
+  gap: 0.32rem;
+  padding: 0.42rem 0.45rem 0.5rem;
+}
+
+.settlement-accounting-body p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.62rem;
+  line-height: 1.42;
+  overflow-wrap: anywhere;
 }
 
 .settlement-pulse {
@@ -3471,6 +3524,13 @@ h1 {
   line-height: 1.35;
 }
 
+.dispatch-card details > summary {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  cursor: pointer;
+}
+
 .dispatch-card em {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3755,6 +3815,22 @@ h1 {
 
   .onboarding-mission .objective-handoff {
     display: none;
+  }
+}
+
+/* Latest-settlement provenance needs the same readable column as its outcome
+ * on every authorized portrait width. The selected Queue action remains above
+ * this later record, so D-018's raw entry reserve is unchanged. */
+@media (max-width: 25rem) {
+  .money-loop-copy {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settlement {
+    padding-top: 0.6rem;
+    padding-left: 0;
+    border-top: 1px solid var(--line);
+    border-left: 0;
   }
 }
 

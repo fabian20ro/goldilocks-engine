@@ -91,9 +91,14 @@ test.describe("round 009 first-session comprehension", () => {
     await chooseSimulationSpeed(page, "16×");
     await page.getByRole("button", { name: STARTER_QUEUE_NAME }).click();
 
-    await expect(page.getByText(/1 paid · 0 failed/)).toBeVisible({
-      timeout: 10_000,
-    });
+    const settlement = page.locator(".settlement");
+    await expect(settlement.getByTestId("settlement-overview")).toContainText(
+      "Successful delivery",
+      { timeout: 10_000 },
+    );
+    const accounting = settlement.getByTestId("settlement-accounting");
+    await accounting.locator(":scope > summary").click();
+    await expect(accounting).toContainText("1 completed · 0 failed.");
     await expect(
       page.getByText(/Run totals: \$1\.40 gross earned/),
     ).toBeVisible();
@@ -249,9 +254,14 @@ test.describe("round 009 first-session comprehension", () => {
     await chooseSimulationSpeed(page, "16×");
     await page.getByRole("button", { name: "Jobs" }).click();
     await page.getByRole("button", { name: STARTER_QUEUE_NAME }).click();
-    await expect(page.getByText(/1 paid · 0 failed/)).toBeVisible({
-      timeout: 10_000,
-    });
+    const settlement = page.locator(".settlement");
+    await expect(settlement.getByTestId("settlement-overview")).toContainText(
+      "Successful delivery",
+      { timeout: 10_000 },
+    );
+    const accounting = settlement.getByTestId("settlement-accounting");
+    await accounting.locator(":scope > summary").click();
+    await expect(accounting).toContainText("1 completed · 0 failed.");
     await openSimulationContext(page);
     await expect(page.getByRole("button", { name: "16×" })).toHaveAttribute(
       "aria-pressed",
