@@ -1,4 +1,138 @@
-# Candidate handoff — Milestone 4 Research (round 087 repair)
+# Candidate handoff — Milestone 5 Hype/Fear (round 089)
+
+## Implemented behavior summary
+
+- Added four original creator archetypes with audience incentives,
+  preferences, access, usefulness, trust, and reach.
+- Added audience-specific reputation, bounded attention/fear, expectation debt,
+  durable stakeholder-selection effects, finite tool-switching panic, and a
+  persistent World destination.
+- Added four deterministic narrative objects with copied claim/source/audience,
+  deadline, evidence strength, emotional intensity, reach, beneficiaries,
+  counterevidence, active effects, resolution rules, explicit predictions,
+  deadline resolution ranges, and response-gated progression.
+- Added separate hype responses and fear responses, response-required doom-feed
+  entries, and tool-switching consequences. Returning players see the pending
+  response above the feed rather than a feed-only loop.
+- Added schema-safe Hype/Fear restore/migration (`hype-fear-1`, prior
+  `research-1`/`evaluation-replay-1` accepted) with original-integrity-gated
+  retention and bounded shape/timestamp validation. Existing Research,
+  Career, Worker, persistence, causal, accounting, PWA, and offline contracts
+  remain in place.
+- Added deterministic Hype/Fear balance scenarios, unit/UI Rule-of-Three
+  tests, and Playwright portrait/lifecycle coverage.
+
+## Plan requirements covered
+
+- `plan.md` §§1–6 universal grammar and deterministic Observe/Modify/Run/
+  Interpret/Automate/Escalate seam.
+- §§7.3, 11, 13–14: recognition, creator archetypes, narrative fields,
+  distinct hype/fear mechanics, expectation debt, audience reputation, and
+  stakeholder selection.
+- §§17 and 19: bounded causal wording and normal Worker-only countdowns; safe
+  offline policy never resolves a narrative, publishes a prediction, switches
+  tools, or changes stakeholder selection.
+- §§20, 23–27: World navigation, progressive disclosure, portrait/accessibility
+  styles, deterministic balance, migration, unit/UI/browser tooling.
+- §§29, 33, 34: bounded attention, durable consequences, response-gated
+  attention-only strategy, visible uncertainty, and no Milestone 6 systems.
+
+## Verifier findings resolved
+
+- No unresolved verifier findings were present at the supplied round-088
+  baseline. This candidate introduces no report edits and no acceptance claim.
+
+## Setup, startup, and verification commands
+
+Dependencies and browsers use ignored repository-local caches:
+
+```sh
+./scripts/setup
+./scripts/run
+# deterministic loopback: http://127.0.0.1:4173/
+```
+
+```text
+npm cache:          .cache/npm
+Playwright browser: .cache/ms-playwright
+browser artifacts:  test-results/, playwright-report/, playwright-pages-report/
+coverage:           coverage/
+```
+
+```sh
+npm run typecheck
+npm run lint
+npm test
+npm run balance:hype-fear
+npm run test:e2e -- tests/e2e/hype-fear.spec.ts
+./scripts/verify
+```
+
+`@playwright/test` remains pinned; `test:e2e` uses
+`PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright`. `./scripts/verify` owns
+deterministic server cleanup and root/Pages browser lanes.
+
+## Important architectural decisions
+
+- D-039 records the bounded Milestone 5 route. State remains schema 7 while
+  content advances to `hype-fear-1`; old Research and Evaluation Replay saves
+  restore through explicit migration steps.
+- Narrative templates and creator catalog are separate from engine transitions;
+  copied narrative fields make deadlines/resolutions durable and inspectable.
+- Attention coverage is bounded and response-gated. Hype/fear updates are
+  explicit commands; deadline resolution is deterministic from seed, tick,
+  metrics, Research usefulness, and private coverage.
+- Hype/Fear progression is retained only from a valid original integrity seal;
+  stale/forged additions recover to the safe default. Normal offline policy
+  remains freelance-only and does not advance deadlines.
+- The seventh World tab keeps a pending response before the doom feed, exposes
+  supported uncertainty, and keeps touch/keyboard controls at the existing
+  accessible minimum.
+
+## Known limitations and risks
+
+- Four finite narratives are intentionally the complete Milestone 5 slice;
+  later archetypes and endgame systems are out of scope.
+- Native mobile/device inspection was not run; committed Playwright checks are
+  the reproducible browser evidence surface.
+- Candidate is not independently accepted; Verifier must assess this exact
+  commit with the canonical gate.
+
+## Checks run
+
+- Passed `./scripts/agent-status` before implementation; supplied clean
+  baseline was `12116bad3f8d3163d8e78992d80d173722704541` on `agent/implementation`.
+- Passed focused TypeScript check: `npm run typecheck`.
+- Passed focused lint: `npm run lint`.
+- Passed focused Hype/Fear balance: `npm run balance:hype-fear` (121 seeds,
+  zero failures).
+- Passed focused unit/UI lane:
+  `npx vitest run src/simulation/hypeFear.test.ts src/ui/worldView.test.tsx
+src/ui/commandDeck.test.tsx --coverage=false` (3 files, 10 tests).
+- Passed full unit lane: `npx vitest run --coverage=false` (62 files, 284
+  tests).
+- Passed focused Hype/Fear browser lane outside the restricted sandbox:
+  `E2E_PORT=42290 npm_config_cache="$PWD/.cache/npm"
+PLAYWRIGHT_BROWSERS_PATH="$PWD/.cache/ms-playwright" npm run test:e2e --
+tests/e2e/hype-fear.spec.ts` (2 tests, 10.0s).
+- Ran the single final canonical gate:
+  `E2E_PORT=42289 VERIFY_EVIDENCE_DIR="$PWD/.cache/verification/round-089-impl"
+npm_config_cache="$PWD/.cache/npm"
+PLAYWRIGHT_BROWSERS_PATH="$PWD/.cache/ms-playwright" ./scripts/verify`.
+  Setup, format, lint, typecheck, unit, balance, build, and production audit
+  passed. The root browser lane stopped on the environment's Chromium launch
+  failure (`bootstrap_check_in ... Permission denied (1100)`); evidence is in
+  `.cache/verification/round-089-impl/`.
+
+## Checks not run
+
+- The canonical Pages/offline browser lane did not run because the preceding
+  root browser lane stopped on Chromium infrastructure failure. Native mobile/
+  device inspection was not run. The committed `tests/e2e/hype-fear.spec.ts`
+  covers 320/393px, reduced motion, 200% text, keyboard focus, reload, offline,
+  countdown, and response recovery.
+
+## Historical previous handoff
 
 ## Current round implementation
 

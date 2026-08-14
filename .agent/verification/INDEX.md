@@ -57,3 +57,12 @@ Take the full plan/decisions/archive route if status fails; any cited source is
 missing, conflicting, or insufficient; the change touches another product seam;
 the role is release verification; or the user explicitly requests it. The index
 never authorizes a product change by itself.
+
+## Round-089 authorized source route
+
+The frozen provenance map and the Round-085 Research route remain historical.
+The owner-authorized Milestone 5 route is `plan.md` §§1–6, 7.3, 11, 13–14,
+17, 19–20, 23–27, 29, 33–34 plus D-039 in `.agent/DECISIONS.md`. Candidate
+evidence belongs in the Hype/Fear engine, deterministic balance, UI, migration,
+and `tests/e2e/hype-fear.spec.ts` lanes; the canonical gate remains
+`./scripts/verify`. This routing note is not a verdict or acceptance record.

@@ -869,3 +869,44 @@
   verifiable progression authentication and bounded signature economy that
   preserves safe recovery, persistence, explicit goals, and the existing
   threat/offline/accessibility contracts.
+
+## D-039 — Milestone 5 bounded Hype/Fear narrative economy
+
+- **Decision:** Implement the owner-authorized Milestone 5 slice as a small,
+  deterministic data-driven public-pressure loop: four original creator
+  archetypes, audience-specific reputation, separate hype and fear signals,
+  bounded attention, expectation debt, finite countdown narratives, explicit
+  predictions, deadline resolutions with supported confidence ranges, durable
+  stakeholder selection, fear responses, a doom feed, and tool-switching
+  panic. A narrative response is required before the next narrative becomes
+  available, so attention cannot be farmed indefinitely without carrying its
+  consequences.
+- **Content boundary:** Creator preferences, access, usefulness, trust, reach,
+  narrative claims, counterevidence, effects, and resolution rules are original
+  fictional content. The first release uses four finite narrative templates;
+  later creator archetypes, workforce, startup, government, laboratory, and
+  endgame systems remain out of scope.
+- **Persistence/compatibility:** Keep schema version 7. Advance content to
+  `hype-fear-1`, accept `research-1` and the older `evaluation-replay-1` during
+  safe restore, and default missing, malformed, future-dated, or stale Hype/Fear
+  additions unless the original complete save integrity seal is valid. Valid
+  sealed Research and all prior deterministic Worker/accounting/causal state
+  remain preserved.
+- **Offline boundary:** Hype/Fear countdowns advance only through the normal
+  Worker tick path. The safe offline freelance policy does not resolve a
+  deadline, switch tools, publish a prediction, or select stakeholders.
+- **UX/accessibility:** Add a seventh World destination because the milestone
+  has a distinct pending response. Keep response-required content above the
+  doom feed, expose claim/source/audiences/deadline/evidence/counterevidence/
+  effects/resolution rules, show uncertainty ranges, preserve 44px controls,
+  keyboard/screen-reader/reduced-motion behavior, and cover 320/393/200%.
+- **Evidence policy:** Rule of Three covers normal narrative/deadline and
+  stakeholder recovery, malformed or unsafe command rejection, and reload,
+  offline, Research/Career neighbor behavior. Deterministic balance scenarios
+  prove bounded attention, durable consequences, fear-feed recovery, and no
+  indefinitely dominant attention-only path; no acceptance claim is made by
+  this decision.
+- **Reversal condition:** Replace this loop only with an equally bounded,
+  deterministic content model that preserves explicit uncertainty,
+  response-gated attention, safe stale-save recovery, and the frozen
+  Milestone 5 out-of-scope boundary.

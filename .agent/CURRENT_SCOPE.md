@@ -74,6 +74,21 @@ immutable verification reports.
 | Live Git/report status               | `./scripts/agent-status` only                                                                  |
 | Candidate handoff/evidence           | `.agent/HANDOFF.md` (untrusted guide only)                                                     |
 
+## Round-089 authorization note
+
+The frozen provenance and Research notes above remain historical routing
+records. The owner explicitly authorized Milestone 5 Hype and Fear for the
+current Implementer turn. The authorized route is `plan.md` §§1–6, 7.3, 11,
+13–14, 17, 19–20, 23–27, 29, 33–34 plus D-039: original creator archetypes,
+audience reputation, expectation debt, finite deterministic narratives and
+prediction deadlines, separate fear responses, doom feed, tool-switching
+panic, bounded attention, durable stakeholder consequences, and the existing
+Worker/persistence/causal/accounting/accessibility/PWA/offline contracts.
+Milestone 6 lab/endgame, startup/workforce/government, real personalities,
+remote/generative content, and speculative simulation abstractions remain out
+of scope. This note routes source material; it does not replace plan.md,
+decisions, or immutable verification reports.
+
 ## Rule-of-Three repair map
 
 Before a repair handoff, map and test these three same-seam cases:

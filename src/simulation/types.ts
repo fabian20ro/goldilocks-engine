@@ -1,6 +1,6 @@
 export const SCHEMA_VERSION = 7;
-export const CONTENT_VERSION = "research-1";
-export const PREVIOUS_CONTENT_VERSION = "evaluation-replay-1";
+export const CONTENT_VERSION = "hype-fear-1";
+export const PREVIOUS_CONTENT_VERSION = "research-1";
 export const SAVE_INTEGRITY_ALGORITHM = "fnv1a-32-json-v1";
 
 export type SlotType = "source" | "process" | "sink";
@@ -89,6 +89,147 @@ export type ResearchDiscipline =
   | "data"
   | "theory"
   | "education";
+
+/** Audience-specific public standing for the bounded Hype/Fear slice. */
+export type AudienceId =
+  | "developers"
+  | "researchers"
+  | "enthusiasts"
+  | "entrepreneurs"
+  | "customers"
+  | "skeptics";
+
+export type CreatorArchetypeId =
+  | "developer-tastemaker"
+  | "ai-news-amplifier"
+  | "builder-opportunity"
+  | "skeptic";
+
+export type NarrativeKind = "hype" | "fear";
+
+export type NarrativeStatus =
+  | "available"
+  | "awaiting-prediction"
+  | "countdown"
+  | "awaiting-response"
+  | "resolved";
+
+export type NarrativePrediction = "lands" | "partial" | "delayed";
+
+export type NarrativeResolutionKind =
+  | "correct"
+  | "partly-correct"
+  | "wrong"
+  | "delayed"
+  | "unpredicted";
+
+export type NarrativeResponseId =
+  | "publish-evidence"
+  | "acknowledge-uncertainty"
+  | "double-down"
+  | "go-quiet"
+  | "pending";
+
+export type FearResponseId =
+  | "stabilize"
+  | "publish-boundaries"
+  | "pause-and-measure"
+  | "switch-tool";
+
+export type ToolId =
+  | "stable-local-stack"
+  | "fast-new-runtime"
+  | "evidence-first-stack";
+
+export interface AudienceReputation {
+  developers: number;
+  researchers: number;
+  enthusiasts: number;
+  entrepreneurs: number;
+  customers: number;
+  skeptics: number;
+}
+
+export interface StakeholderSelection {
+  escalationSeekers: number;
+  patientPartners: number;
+  supportHeavyUsers: number;
+  cautiousReviewers: number;
+}
+
+export interface NarrativePredictionRecord {
+  prediction: NarrativePrediction;
+  confidence: number;
+  submittedAtTick: number;
+}
+
+export interface NarrativeResolution {
+  kind: NarrativeResolutionKind;
+  headline: string;
+  supportedEvidence: string;
+  confidenceRange: ResearchRange;
+  resolvedAtTick: number;
+}
+
+/** Durable instance: the template fields are copied so deadlines remain inspectable after content updates. */
+export interface NarrativeInstance {
+  id: string;
+  templateId: string;
+  kind: NarrativeKind;
+  claim: string;
+  sourceArchetypeId: CreatorArchetypeId;
+  targetAudiences: readonly AudienceId[];
+  deadlineTick: number;
+  startedAtTick: number;
+  evidenceStrength: number;
+  emotionalIntensity: number;
+  reach: number;
+  beneficiaries: readonly string[];
+  counterevidence: readonly string[];
+  activeEffects: readonly string[];
+  resolutionRules: readonly string[];
+  status: NarrativeStatus;
+  coveredByCreatorIds: readonly CreatorArchetypeId[];
+  prediction: NarrativePredictionRecord | null;
+  resolution: NarrativeResolution | null;
+}
+
+export interface DoomFeedEntry {
+  id: string;
+  narrativeId: string;
+  sourceArchetypeId: CreatorArchetypeId;
+  headline: string;
+  uncertainty: string;
+  createdAtTick: number;
+  responseRequired: boolean;
+}
+
+export interface NarrativeResponseRecord {
+  narrativeId: string;
+  response: NarrativeResponseId | FearResponseId;
+  resolvedAtTick: number;
+  expectationDebtAfter: number;
+  stakeholderNote: string;
+}
+
+export interface HypeFearState {
+  unlocked: boolean;
+  attention: number;
+  fear: number;
+  expectationDebt: number;
+  audienceReputation: AudienceReputation;
+  stakeholderSelection: StakeholderSelection;
+  currentToolId: ToolId;
+  toolSwitchingPanic: number;
+  toolSwitches: number;
+  narratives: readonly NarrativeInstance[];
+  activeNarrativeId: string | null;
+  nextNarrativeIndex: number;
+  pendingResponse: NarrativeResponseRecord | null;
+  doomFeed: readonly DoomFeedEntry[];
+  lastResponse: NarrativeResponseRecord | null;
+  attentionOnlyActions: number;
+}
 
 export type ResearchPrerequisiteKind =
   | "recognition"
@@ -606,6 +747,7 @@ export interface SimulationState {
   resources: Resources;
   career: CareerState;
   research: ResearchState;
+  hypeFear: HypeFearState;
   meta: MetaProgression;
   firstSession: FirstSessionProgress;
   jobs: JobState;
@@ -662,6 +804,16 @@ export type SimulationCommand =
   | { type: "SET_RESEARCH_TEAM"; researcherIds: readonly string[] }
   | { type: "START_RESEARCH"; projectId: string }
   | { type: "FIRST_PRINCIPLES_RECONSTRUCTION" }
+  | { type: "COVER_NARRATIVE"; narrativeId: string; creatorId: string }
+  | {
+      type: "PUBLISH_PREDICTION";
+      narrativeId: string;
+      prediction: NarrativePrediction;
+      confidence: number;
+    }
+  | { type: "RESPOND_TO_NARRATIVE"; response: NarrativeResponseId }
+  | { type: "RESPOND_TO_FEAR"; response: FearResponseId }
+  | { type: "SWITCH_TOOL"; toolId: ToolId }
   | {
       type: "SET_OFFLINE_POLICY";
       enabled: boolean;

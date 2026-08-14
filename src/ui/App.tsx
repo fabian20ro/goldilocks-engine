@@ -97,8 +97,16 @@ import {
   workloadGlyph,
 } from "./glyphs";
 import { ResearchView } from "./ResearchView";
+import { WorldView } from "./WorldView";
 
-type TabId = "build" | "jobs" | "career" | "upgrades" | "inspect" | "research";
+type TabId =
+  | "build"
+  | "jobs"
+  | "career"
+  | "upgrades"
+  | "inspect"
+  | "research"
+  | "world";
 
 /** Model-tier requirement copy is a compact card disclosure, not accounting. */
 function formatModelTierRequirement(requirement: string): string {
@@ -4294,6 +4302,7 @@ export function App() {
     upgrades: 0,
     inspect: 0,
     research: 0,
+    world: 0,
   });
 
   const clearCareerCompletionFeedbackForRequest = useCallback(
@@ -4927,6 +4936,8 @@ export function App() {
             />
           ) : tab === "research" ? (
             <ResearchView state={state} command={command} />
+          ) : tab === "world" ? (
+            <WorldView state={state} command={command} />
           ) : (
             <InspectView
               state={state}

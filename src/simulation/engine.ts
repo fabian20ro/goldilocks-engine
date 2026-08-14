@@ -22,6 +22,20 @@ import {
 } from "./catalog";
 import { nextRandom, normalizeSeed } from "./rng";
 import { findResearcher, findResearchProject } from "./researchCatalog";
+import { findCreator, findTool, narrativeTemplates } from "./hypeFearCatalog";
+import {
+  appendDoomFeed,
+  createInitialHypeFearState,
+  createNarrativeInstance,
+  hypeFearRecognition,
+  isHypeFearStateShapeValid,
+  resolveNarrative,
+  MAX_ATTENTION,
+  MAX_EXPECTATION_DEBT,
+  MAX_FEAR,
+  MAX_TOOL_SWITCHING_PANIC,
+  type HypeFearContext,
+} from "./hypeFear";
 import {
   createInitialResearchState,
   isResearchStateShapeValid,
@@ -67,6 +81,13 @@ import {
   type UpgradeNotice,
   type WorkloadDemandState,
   type WorkloadQuote,
+  type AudienceId,
+  type FearResponseId,
+  type HypeFearState,
+  type NarrativeInstance,
+  type NarrativePrediction,
+  type NarrativeResponseId,
+  type ToolId,
 } from "./types";
 import { formatCurrency, formatExactCurrency } from "./currency";
 import {
@@ -95,6 +116,7 @@ const MAX_PRIVATE_EVALUATION_COVERAGE_GAIN = 0.5;
 const MAX_EVALUATION_SPEND = 10_000;
 const MAX_EVALUATION_COUNTER = 10_000;
 const MAX_META_REPLAYS = 1_000_000;
+const LEGACY_CONTENT_VERSION = "evaluation-replay-1";
 const PRIVATE_ASSESSMENTS: readonly PrivateAssessment[] = [
   "not-run",
   "inconclusive",
@@ -417,6 +439,12 @@ export function isRuntimeSimulationCommand(command: unknown): boolean {
     projectId?: unknown;
     researcherId?: unknown;
     researcherIds?: unknown;
+    narrativeId?: unknown;
+    creatorId?: unknown;
+    prediction?: unknown;
+    confidence?: unknown;
+    response?: unknown;
+    toolId?: unknown;
   };
 
   switch (input.type) {
@@ -470,6 +498,37 @@ export function isRuntimeSimulationCommand(command: unknown): boolean {
       );
     case "FIRST_PRINCIPLES_RECONSTRUCTION":
       return true;
+    case "COVER_NARRATIVE":
+      return (
+        typeof input.narrativeId === "string" &&
+        typeof input.creatorId === "string"
+      );
+    case "PUBLISH_PREDICTION":
+      return (
+        typeof input.narrativeId === "string" &&
+        ["lands", "partial", "delayed"].includes(input.prediction as string) &&
+        isFiniteNumber(input.confidence)
+      );
+    case "RESPOND_TO_NARRATIVE":
+      return [
+        "publish-evidence",
+        "acknowledge-uncertainty",
+        "double-down",
+        "go-quiet",
+      ].includes(input.response as string);
+    case "RESPOND_TO_FEAR":
+      return [
+        "stabilize",
+        "publish-boundaries",
+        "pause-and-measure",
+        "switch-tool",
+      ].includes(input.response as string);
+    case "SWITCH_TOOL":
+      return [
+        "stable-local-stack",
+        "fast-new-runtime",
+        "evidence-first-stack",
+      ].includes(input.toolId as string);
     case "SET_EXPANSION_ACTIVE":
       return typeof input.active === "boolean";
     case "PLACE_MODULE":
@@ -2255,6 +2314,7 @@ export function createInitialState(seed = 20260715): SimulationState {
     resources: { money: 0, timeHours: 4, electricityKwh: 0, reputation: 0 },
     career: createInitialCareerState(),
     research: createInitialResearchState(),
+    hypeFear: createInitialHypeFearState(),
     meta: createInitialMetaProgression(),
     firstSession: createInitialFirstSessionProgress(),
     jobs: {
@@ -2500,6 +2560,623 @@ function advanceResearch(
             ? "warning"
             : "info",
       message: `Research completed: ${outcome.title}. ${outcome.summary} Usefulness ${(outcome.usefulness * 100).toFixed(0)}%; retained knowledge and the failed path remain available for the next decision.`,
+    },
+  );
+}
+
+function hypeFearContext(state: SimulationState): HypeFearContext {
+  const lastUsefulness = state.research.lastOutcome?.usefulness ?? 0;
+  return {
+    seed: state.seed,
+    tick: state.tick,
+    jobsCompleted: state.jobs.completed,
+    reputation: state.resources.reputation,
+    observedQuality: state.metrics.observedQuality,
+    reliability: state.metrics.reliability,
+    observability: state.metrics.observability,
+    privateCoverage: state.career.evaluation.coverage,
+    researchKnowledge: clamp(
+      (state.research.institutionalKnowledge +
+        state.research.retainedKnowledge) /
+        2,
+      0,
+      1,
+    ),
+    latestResearchUsefulness: lastUsefulness,
+    productReleased: state.career.product.released,
+  };
+}
+
+function adjustAudienceReputation(
+  state: HypeFearState,
+  audiences: readonly AudienceId[],
+  amount: number,
+): HypeFearState["audienceReputation"] {
+  const next = { ...state.audienceReputation };
+  for (const audience of audiences)
+    next[audience] = round(clamp(next[audience] + amount, 0, 1), 3);
+  return next;
+}
+
+function adjustStakeholderSelection(
+  state: HypeFearState,
+  changes: Partial<HypeFearState["stakeholderSelection"]>,
+): HypeFearState["stakeholderSelection"] {
+  const next = { ...state.stakeholderSelection };
+  for (const key of Object.keys(changes) as Array<
+    keyof HypeFearState["stakeholderSelection"]
+  >) {
+    const amount = changes[key];
+    if (amount === undefined) continue;
+    next[key] = round(clamp(next[key] + amount, 0, 1), 3);
+  }
+  return next;
+}
+
+function activeNarrative(state: SimulationState): NarrativeInstance | null {
+  const id = state.hypeFear.activeNarrativeId;
+  if (!id) return null;
+  return (
+    state.hypeFear.narratives.find((narrative) => narrative.id === id) ?? null
+  );
+}
+
+function ensureHypeFearNarrative(state: SimulationState): SimulationState {
+  const context = hypeFearContext(state);
+  const current = state.hypeFear;
+  if (!current.unlocked && !hypeFearRecognition(context)) return state;
+  let next = state;
+  if (!current.unlocked) {
+    // Recognition is a durable state transition, not a settlement event. Do
+    // not append here: a job's accounting disclosure must remain the latest
+    // ledger entry after a tick for existing settlement surfaces.
+    next = {
+      ...next,
+      hypeFear: { ...next.hypeFear, unlocked: true },
+    };
+  }
+  if (
+    next.hypeFear.activeNarrativeId !== null ||
+    next.hypeFear.nextNarrativeIndex >= narrativeTemplates.length
+  )
+    return next;
+  const narrative = createNarrativeInstance(
+    next.hypeFear.nextNarrativeIndex,
+    hypeFearContext(next),
+  );
+  if (!narrative) return next;
+  const nextHypeFear: HypeFearState = {
+    ...next.hypeFear,
+    narratives: [...next.hypeFear.narratives, narrative],
+    activeNarrativeId: narrative.id,
+    nextNarrativeIndex: next.hypeFear.nextNarrativeIndex + 1,
+  };
+  return { ...next, hypeFear: nextHypeFear };
+}
+
+function resolveDueHypeFearNarrative(state: SimulationState): SimulationState {
+  const current = activeNarrative(state);
+  if (
+    !current ||
+    (current.status !== "awaiting-prediction" &&
+      current.status !== "countdown") ||
+    state.tick < current.deadlineTick
+  )
+    return state;
+  const resolution = resolveNarrative(
+    current,
+    hypeFearContext(state),
+    state.hypeFear,
+  );
+  const resolvedNarrative: NarrativeInstance = {
+    ...current,
+    status: "awaiting-response",
+    resolution,
+  };
+  let hypeFear: HypeFearState = {
+    ...state.hypeFear,
+    narratives: state.hypeFear.narratives.map((narrative) =>
+      narrative.id === current.id ? resolvedNarrative : narrative,
+    ),
+    pendingResponse: {
+      narrativeId: current.id,
+      response: "pending",
+      resolvedAtTick: state.tick,
+      expectationDebtAfter: state.hypeFear.expectationDebt,
+      stakeholderNote:
+        current.kind === "hype"
+          ? "Escalation-seeking stakeholders now remember the promise; patient partners are watching whether evidence or bravado follows."
+          : "Cautious reviewers and support-heavy users now expect a bounded response to the fear signal.",
+    },
+  };
+  if (current.kind === "fear") {
+    hypeFear = appendDoomFeed(hypeFear, {
+      id: `${current.id}-resolution`,
+      narrativeId: current.id,
+      sourceArchetypeId: current.sourceArchetypeId,
+      headline: resolution.headline,
+      uncertainty:
+        current.counterevidence[0] ??
+        "The warning remains bounded by the measured workload.",
+      createdAtTick: state.tick,
+      responseRequired: true,
+    });
+  }
+  return appendEvent(
+    { ...state, hypeFear },
+    {
+      kind: resolution.kind === "wrong" ? "failure" : "warning",
+      message: `${current.kind === "hype" ? "Hype" : "Fear"} deadline resolved: ${resolution.headline} Confidence range ${Math.round(resolution.confidenceRange.min * 100)}–${Math.round(resolution.confidenceRange.max * 100)}%; choose a response before the next narrative.`,
+      directCause: `The ${current.kind} narrative reached its deterministic deadline with the recorded prediction and evidence boundary.`,
+      contributingCondition: resolution.supportedEvidence,
+    },
+  );
+}
+
+function advanceHypeFear(state: SimulationState): SimulationState {
+  const unlocked = ensureHypeFearNarrative(state);
+  return resolveDueHypeFearNarrative(unlocked);
+}
+
+function applyCoverNarrative(
+  state: SimulationState,
+  narrativeId: string,
+  creatorId: string,
+): SimulationState {
+  if (!state.hypeFear.unlocked)
+    return appendEvent(state, {
+      kind: "warning",
+      message:
+        "Narrative coverage rejected: recognition has not arrived yet. Complete one accepted delivery or build reputation first.",
+    });
+  if (state.hypeFear.pendingResponse)
+    return appendEvent(state, {
+      kind: "warning",
+      message:
+        "Narrative coverage rejected: resolve the pending response before adding another attention signal.",
+    });
+  const narrative = activeNarrative(state);
+  const creator = findCreator(creatorId);
+  if (!creator || !narrative || narrative.id !== narrativeId)
+    return appendEvent(state, {
+      kind: "warning",
+      message:
+        "Narrative coverage rejected: creator or active narrative is unavailable.",
+    });
+  if (narrative.status !== "available")
+    return appendEvent(state, {
+      kind: "warning",
+      message:
+        "Narrative coverage rejected: this narrative is already covered or awaiting its deadline.",
+    });
+  if (
+    !creator.audienceIncentives.some((audience) =>
+      narrative.targetAudiences.includes(audience),
+    )
+  )
+    return appendEvent(state, {
+      kind: "warning",
+      message: `${creator.name} cannot credibly reach the target audiences for this narrative; choose a creator with a matching incentive.`,
+    });
+  if (
+    state.hypeFear.expectationDebt >= 0.9 &&
+    narrative.kind === "hype" &&
+    creator.id !== "skeptic"
+  )
+    return appendEvent(state, {
+      kind: "warning",
+      message:
+        "Attention-only coverage rejected: expectation debt is already high. Publish evidence or choose a skeptical boundary before amplifying again.",
+    });
+  const overlap = creator.audienceIncentives.filter((audience) =>
+    narrative.targetAudiences.includes(audience),
+  );
+  const attentionGain =
+    (narrative.kind === "hype" ? 22 : 9) *
+    creator.reach *
+    narrative.reach *
+    (1 - state.hypeFear.expectationDebt * 0.28);
+  const debtGain =
+    narrative.emotionalIntensity *
+    narrative.reach *
+    (narrative.kind === "hype" ? 0.24 : 0.14);
+  const nextHypeFear: HypeFearState = {
+    ...state.hypeFear,
+    attention: round(
+      clamp(state.hypeFear.attention + attentionGain, 0, MAX_ATTENTION),
+      3,
+    ),
+    fear: round(
+      clamp(
+        state.hypeFear.fear +
+          (narrative.kind === "fear"
+            ? narrative.emotionalIntensity * 0.2
+            : 0.015),
+        0,
+        MAX_FEAR,
+      ),
+      3,
+    ),
+    expectationDebt: round(
+      clamp(state.hypeFear.expectationDebt + debtGain, 0, MAX_EXPECTATION_DEBT),
+      3,
+    ),
+    audienceReputation: adjustAudienceReputation(
+      state.hypeFear,
+      overlap,
+      creator.trust * 0.035,
+    ),
+    stakeholderSelection: adjustStakeholderSelection(
+      state.hypeFear,
+      narrative.kind === "hype"
+        ? {
+            escalationSeekers: narrative.emotionalIntensity * 0.1,
+            supportHeavyUsers: 0.025,
+          }
+        : {
+            cautiousReviewers: narrative.emotionalIntensity * 0.1,
+            supportHeavyUsers: 0.04,
+          },
+    ),
+    attentionOnlyActions: state.hypeFear.attentionOnlyActions + 1,
+    narratives: state.hypeFear.narratives.map((item) =>
+      item.id === narrative.id
+        ? {
+            ...item,
+            status: "awaiting-prediction",
+            coveredByCreatorIds: [creator.id],
+          }
+        : item,
+    ),
+  };
+  return appendEvent(
+    { ...state, hypeFear: nextHypeFear },
+    {
+      kind: narrative.kind === "hype" ? "info" : "warning",
+      message: `${creator.name} covered the ${narrative.kind} narrative. Attention +${attentionGain.toFixed(1)}; expectation debt is now ${Math.round(nextHypeFear.expectationDebt * 100)}%. Deadline and counterevidence remain visible.`,
+      contributingCondition: creator.usefulness,
+    },
+  );
+}
+
+function applyPrediction(
+  state: SimulationState,
+  narrativeId: string,
+  prediction: NarrativePrediction,
+  confidence: number,
+): SimulationState {
+  const narrative = activeNarrative(state);
+  if (
+    !narrative ||
+    narrative.id !== narrativeId ||
+    narrative.status !== "awaiting-prediction"
+  )
+    return appendEvent(state, {
+      kind: "warning",
+      message:
+        "Prediction rejected: the active narrative is not awaiting a prediction.",
+    });
+  if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1)
+    return appendEvent(state, {
+      kind: "warning",
+      message:
+        "Prediction rejected: confidence must stay between 0% and 100%; no narrative state changed.",
+    });
+  const nextHypeFear: HypeFearState = {
+    ...state.hypeFear,
+    narratives: state.hypeFear.narratives.map((item) =>
+      item.id === narrative.id
+        ? {
+            ...item,
+            status: "countdown",
+            prediction: {
+              prediction,
+              confidence: round(confidence, 3),
+              submittedAtTick: state.tick,
+            },
+          }
+        : item,
+    ),
+  };
+  return appendEvent(
+    { ...state, hypeFear: nextHypeFear },
+    {
+      kind: "info",
+      message: `Prediction recorded: ${prediction} with ${Math.round(confidence * 100)}% confidence. The deadline will resolve against measured capability, not confidence alone.`,
+    },
+  );
+}
+
+function completeNarrativeResponse(
+  state: SimulationState,
+  narrative: NarrativeInstance,
+  response: NarrativeResponseId | FearResponseId,
+  stakeholderNote: string,
+  hypeFear: HypeFearState,
+): SimulationState {
+  const expectationDebtAfter = round(hypeFear.expectationDebt, 3);
+  const record = {
+    narrativeId: narrative.id,
+    response,
+    resolvedAtTick: state.tick,
+    expectationDebtAfter,
+    stakeholderNote,
+  } as const;
+  const nextHypeFear: HypeFearState = {
+    ...hypeFear,
+    narratives: hypeFear.narratives.map((item) =>
+      item.id === narrative.id ? { ...item, status: "resolved" } : item,
+    ),
+    activeNarrativeId: null,
+    pendingResponse: null,
+    lastResponse: record,
+  };
+  return appendEvent(
+    { ...state, hypeFear: nextHypeFear },
+    {
+      kind: response === "double-down" ? "warning" : "success",
+      message: `Response recorded: ${response.replaceAll("-", " ")}. Expectation debt is now ${Math.round(expectationDebtAfter * 100)}%; ${stakeholderNote}`,
+    },
+  );
+}
+
+function applyNarrativeResponse(
+  state: SimulationState,
+  response: NarrativeResponseId,
+): SimulationState {
+  const pending = state.hypeFear.pendingResponse;
+  const narrative = pending
+    ? state.hypeFear.narratives.find((item) => item.id === pending.narrativeId)
+    : null;
+  if (!pending || !narrative || narrative.kind !== "hype")
+    return appendEvent(state, {
+      kind: "warning",
+      message:
+        "Hype response rejected: no resolved hype narrative is waiting for a response.",
+    });
+  let hypeFear = state.hypeFear;
+  let note =
+    "Patient partners now have a durable record of the chosen response.";
+  switch (response) {
+    case "publish-evidence":
+      hypeFear = {
+        ...hypeFear,
+        expectationDebt: round(clamp(hypeFear.expectationDebt - 0.2, 0, 1), 3),
+        audienceReputation: adjustAudienceReputation(
+          hypeFear,
+          ["developers", "researchers", "skeptics"],
+          0.045,
+        ),
+        stakeholderSelection: adjustStakeholderSelection(hypeFear, {
+          patientPartners: 0.14,
+          escalationSeekers: -0.06,
+        }),
+      };
+      note =
+        "Evidence-first response grows patient partners and lowers escalation demand.";
+      break;
+    case "acknowledge-uncertainty":
+      hypeFear = {
+        ...hypeFear,
+        expectationDebt: round(clamp(hypeFear.expectationDebt - 0.12, 0, 1), 3),
+        fear: round(clamp(hypeFear.fear - 0.05, 0, 1), 3),
+        audienceReputation: adjustAudienceReputation(
+          hypeFear,
+          ["researchers", "skeptics"],
+          0.05,
+        ),
+        stakeholderSelection: adjustStakeholderSelection(hypeFear, {
+          patientPartners: 0.08,
+          cautiousReviewers: 0.07,
+        }),
+      };
+      note =
+        "Uncertainty is explicit; cautious reviewers can distinguish a bounded claim from a promise.";
+      break;
+    case "double-down":
+      hypeFear = {
+        ...hypeFear,
+        attention: round(clamp(hypeFear.attention + 4, 0, MAX_ATTENTION), 3),
+        expectationDebt: round(clamp(hypeFear.expectationDebt + 0.16, 0, 1), 3),
+        stakeholderSelection: adjustStakeholderSelection(hypeFear, {
+          escalationSeekers: 0.16,
+          supportHeavyUsers: 0.08,
+        }),
+      };
+      note =
+        "Doubling down retains attention but selects escalation-seeking stakeholders and adds expectation debt.";
+      break;
+    case "go-quiet":
+      hypeFear = {
+        ...hypeFear,
+        attention: round(clamp(hypeFear.attention - 2, 0, MAX_ATTENTION), 3),
+        expectationDebt: round(clamp(hypeFear.expectationDebt - 0.08, 0, 1), 3),
+        audienceReputation: adjustAudienceReputation(
+          hypeFear,
+          ["developers", "enthusiasts"],
+          -0.025,
+        ),
+      };
+      note =
+        "Quiet reduces pressure and reach, but momentum-seeking audiences remember the pause.";
+      break;
+  }
+  return completeNarrativeResponse(state, narrative, response, note, hypeFear);
+}
+
+function applyFearResponse(
+  state: SimulationState,
+  response: FearResponseId,
+): SimulationState {
+  const pending = state.hypeFear.pendingResponse;
+  const narrative = pending
+    ? state.hypeFear.narratives.find((item) => item.id === pending.narrativeId)
+    : null;
+  if (!pending || !narrative || narrative.kind !== "fear")
+    return appendEvent(state, {
+      kind: "warning",
+      message:
+        "Fear response rejected: no resolved fear narrative is waiting for a response.",
+    });
+  let hypeFear = state.hypeFear;
+  let note = "The fear response remains bounded by the measured workload.";
+  switch (response) {
+    case "stabilize":
+      hypeFear = {
+        ...hypeFear,
+        fear: round(clamp(hypeFear.fear - 0.25, 0, 1), 3),
+        toolSwitchingPanic: round(
+          clamp(hypeFear.toolSwitchingPanic - 0.12, 0, 1),
+          3,
+        ),
+        expectationDebt: round(clamp(hypeFear.expectationDebt - 0.08, 0, 1), 3),
+        stakeholderSelection: adjustStakeholderSelection(hypeFear, {
+          patientPartners: 0.1,
+          cautiousReviewers: 0.08,
+        }),
+      };
+      note =
+        "Stabilization lowers panic and selects patient partners who value continuity.";
+      break;
+    case "publish-boundaries":
+      hypeFear = {
+        ...hypeFear,
+        fear: round(clamp(hypeFear.fear - 0.18, 0, 1), 3),
+        expectationDebt: round(clamp(hypeFear.expectationDebt - 0.1, 0, 1), 3),
+        audienceReputation: adjustAudienceReputation(
+          hypeFear,
+          ["researchers", "skeptics"],
+          0.07,
+        ),
+        stakeholderSelection: adjustStakeholderSelection(hypeFear, {
+          patientPartners: 0.12,
+          cautiousReviewers: 0.1,
+        }),
+      };
+      note =
+        "Published boundaries improve standing with researchers and skeptics without promising universal safety.";
+      break;
+    case "pause-and-measure":
+      hypeFear = {
+        ...hypeFear,
+        fear: round(clamp(hypeFear.fear - 0.14, 0, 1), 3),
+        toolSwitchingPanic: round(
+          clamp(hypeFear.toolSwitchingPanic - 0.12, 0, 1),
+          3,
+        ),
+        audienceReputation: adjustAudienceReputation(
+          hypeFear,
+          ["researchers", "customers"],
+          0.04,
+        ),
+        stakeholderSelection: adjustStakeholderSelection(hypeFear, {
+          cautiousReviewers: 0.13,
+          patientPartners: 0.08,
+        }),
+      };
+      note =
+        "A pause keeps the uncertainty visible while measurement catches up.";
+      break;
+    case "switch-tool":
+      hypeFear = {
+        ...hypeFear,
+        currentToolId: "fast-new-runtime",
+        fear: round(clamp(hypeFear.fear + 0.04, 0, 1), 3),
+        toolSwitchingPanic: round(
+          clamp(hypeFear.toolSwitchingPanic + 0.16, 0, 1),
+          3,
+        ),
+        expectationDebt: round(clamp(hypeFear.expectationDebt + 0.06, 0, 1), 3),
+        toolSwitches: hypeFear.toolSwitches + 1,
+        stakeholderSelection: adjustStakeholderSelection(hypeFear, {
+          escalationSeekers: 0.1,
+          supportHeavyUsers: 0.08,
+        }),
+      };
+      note =
+        "Switching tools relieves the immediate fear signal but creates durable panic and continuity cost.";
+      break;
+  }
+  return completeNarrativeResponse(state, narrative, response, note, hypeFear);
+}
+
+function applyToolSwitch(
+  state: SimulationState,
+  toolId: ToolId,
+): SimulationState {
+  const tool = findTool(toolId);
+  if (!tool)
+    return appendEvent(state, {
+      kind: "warning",
+      message:
+        "Tool switch rejected: unknown tool; no fear or attention state changed.",
+    });
+  if (state.hypeFear.pendingResponse)
+    return appendEvent(state, {
+      kind: "warning",
+      message:
+        "Tool switch rejected: respond to the pending fear or hype consequence before changing the stack.",
+    });
+  if (state.hypeFear.currentToolId === tool.id)
+    return appendEvent(state, {
+      kind: "info",
+      message: `${tool.name} is already active. No panic or evidence continuity cost was added.`,
+    });
+  const panicGain = tool.id === "fast-new-runtime" ? 0.18 : 0.06;
+  let hypeFear: HypeFearState = {
+    ...state.hypeFear,
+    currentToolId: tool.id,
+    toolSwitches: state.hypeFear.toolSwitches + 1,
+    toolSwitchingPanic: round(
+      clamp(
+        state.hypeFear.toolSwitchingPanic + panicGain,
+        0,
+        MAX_TOOL_SWITCHING_PANIC,
+      ),
+      3,
+    ),
+    fear: round(
+      clamp(
+        state.hypeFear.fear + (tool.id === "fast-new-runtime" ? 0.05 : -0.03),
+        0,
+        MAX_FEAR,
+      ),
+      3,
+    ),
+    expectationDebt: round(
+      clamp(
+        state.hypeFear.expectationDebt +
+          (tool.id === "fast-new-runtime" ? 0.08 : -0.02),
+        0,
+        MAX_EXPECTATION_DEBT,
+      ),
+      3,
+    ),
+  };
+  if (tool.id === "evidence-first-stack")
+    hypeFear = {
+      ...hypeFear,
+      audienceReputation: adjustAudienceReputation(
+        hypeFear,
+        ["researchers", "skeptics"],
+        0.025,
+      ),
+    };
+  if (hypeFear.narratives.length > 0)
+    hypeFear = appendDoomFeed(hypeFear, {
+      id: `tool-switch-${hypeFear.toolSwitches}`,
+      narrativeId: hypeFear.narratives[0]!.id,
+      sourceArchetypeId: "ai-news-amplifier",
+      headline: `Tool switch to ${tool.name} triggered panic about evidence continuity.`,
+      uncertainty: tool.tradeoff,
+      createdAtTick: state.tick,
+      responseRequired: false,
+    });
+  return appendEvent(
+    { ...state, hypeFear },
+    {
+      kind: "warning",
+      message: `Tool switched to ${tool.name}. Panic is ${Math.round(hypeFear.toolSwitchingPanic * 100)}%; ${tool.tradeoff}`,
     },
   );
 }
@@ -3700,6 +4377,21 @@ function applyValidCommand(
         },
       );
     }
+    case "COVER_NARRATIVE":
+      return applyCoverNarrative(state, command.narrativeId, command.creatorId);
+    case "PUBLISH_PREDICTION":
+      return applyPrediction(
+        state,
+        command.narrativeId,
+        command.prediction,
+        command.confidence,
+      );
+    case "RESPOND_TO_NARRATIVE":
+      return applyNarrativeResponse(state, command.response);
+    case "RESPOND_TO_FEAR":
+      return applyFearResponse(state, command.response);
+    case "SWITCH_TOOL":
+      return applyToolSwitch(state, command.toolId);
     case "SET_OFFLINE_POLICY": {
       const maxHours = round(
         Math.floor(
@@ -3866,7 +4558,7 @@ export function applyCommand(
 ): SimulationState {
   if (!isRuntimeSimulationCommand(command)) return state;
   if (state.career.runEnding && command.type !== "RESET") return state;
-  const applied = applyValidCommand(state, command);
+  const applied = advanceHypeFear(applyValidCommand(state, command));
   if (applied === state) return state;
   const next = sealSimulationState(
     resolveRunEnding(
@@ -4135,6 +4827,7 @@ export function tick(state: SimulationState, seconds: number): SimulationState {
     next = advanceTickQuantum(next, quantum);
     remaining = round(remaining - quantum, 6);
   }
+  next = advanceHypeFear(next);
   next = sealSimulationState(next);
   // See applyCommand: the freshly sealed digest is known-good at this point.
   return isStateStructurallyValid(next) ? next : state;
@@ -4739,6 +5432,7 @@ function isStateStructurallyValid(value: unknown): value is SimulationState {
       isCareerStateValid(state.career) &&
       isMetaProgressionValid(state.meta) &&
       isResearchStateShapeValid(state.research, state.tick) &&
+      isHypeFearStateShapeValid(state.hypeFear, state.tick) &&
       nonnegativeIntegers.every(
         (value) => Number.isSafeInteger(value) && value >= 0,
       ) &&
@@ -4950,7 +5644,8 @@ export function restoreSimulationState(
   if (record.schemaVersion === SCHEMA_VERSION) {
     if (
       record.contentVersion !== CONTENT_VERSION &&
-      record.contentVersion !== PREVIOUS_CONTENT_VERSION
+      record.contentVersion !== PREVIOUS_CONTENT_VERSION &&
+      record.contentVersion !== LEGACY_CONTENT_VERSION
     )
       return fallback;
     const storedFirstSession = record.firstSession;
@@ -4974,6 +5669,7 @@ export function restoreSimulationState(
           steps: ["schema-v7-metadata-added"],
         };
     const storedResearch = record.research;
+    const storedHypeFear = record.hypeFear;
     const restoreTick =
       typeof record.tick === "number" ? record.tick : Number.NaN;
     const researchShapeValid = isResearchStateShapeValid(
@@ -4987,11 +5683,23 @@ export function restoreSimulationState(
     const research = researchIsValid
       ? storedResearch
       : createInitialResearchState();
+    const hypeFearShapeValid = isHypeFearStateShapeValid(
+      storedHypeFear,
+      restoreTick,
+    );
+    // Hype/Fear is a durable semantic layer. Like Research, a shape-valid
+    // object is retained only when the complete pre-restore record was sealed;
+    // stale or forged additions recover to the safe default.
+    const hypeFearIsValid = originalIntegrityValid && hypeFearShapeValid;
+    const hypeFear = hypeFearIsValid
+      ? storedHypeFear
+      : createInitialHypeFearState();
     let candidate = {
       ...record,
       contentVersion: CONTENT_VERSION,
       firstSession: storedFirstSession ?? legacyFirstSessionProgress(),
       research,
+      hypeFear,
       migration,
       integrity: isIntegrityShapeValid(record.integrity)
         ? record.integrity
@@ -5004,6 +5712,7 @@ export function restoreSimulationState(
       );
     if (
       record.contentVersion === PREVIOUS_CONTENT_VERSION ||
+      record.contentVersion === LEGACY_CONTENT_VERSION ||
       storedResearch === undefined ||
       !researchShapeValid
     )
@@ -5011,6 +5720,12 @@ export function restoreSimulationState(
         migration,
         "content-evaluation-to-research",
       );
+    if (
+      record.contentVersion !== CONTENT_VERSION ||
+      storedHypeFear === undefined ||
+      !hypeFearShapeValid
+    )
+      migration = withMigrationStep(migration, "content-research-to-hype-fear");
     if (!originalIntegrityValid)
       candidate = normalizeUntrustedLedgerState(candidate);
     const structurallyValid = isStateStructurallyValid(candidate);
@@ -5152,6 +5867,7 @@ export function restoreSimulationState(
       integrity: EMPTY_INTEGRITY,
       firstSession: legacyFirstSessionProgress(),
       research: createInitialResearchState(),
+      hypeFear: createInitialHypeFearState(),
       career: {
         ...legacyCareer,
         evaluation: createInitialEvaluationState(),
@@ -5184,6 +5900,7 @@ export function restoreSimulationState(
       integrity: EMPTY_INTEGRITY,
       firstSession: legacyFirstSessionProgress(),
       research: createInitialResearchState(),
+      hypeFear: createInitialHypeFearState(),
       career: createInitialCareerState(),
       meta: createInitialMetaProgression(),
     } as unknown as SimulationState;

@@ -2818,10 +2818,10 @@ h2 {
   position: relative;
   z-index: 20;
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  padding: 0.4rem max(0.4rem, env(safe-area-inset-right))
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  padding: 0.4rem max(0rem, env(safe-area-inset-right))
     max(0.4rem, env(safe-area-inset-bottom))
-    max(0.4rem, env(safe-area-inset-left));
+    max(0rem, env(safe-area-inset-left));
   border-top: 1px solid var(--line-bright);
   background: #0c1410f2;
   box-shadow: 0 -0.7rem 2rem #0008;
@@ -3153,7 +3153,7 @@ h2 {
   }
 
   .bottom-nav {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(7, minmax(0, 1fr));
   }
 
   .stat-grid {
@@ -4322,5 +4322,213 @@ h1 {
 
   .research-goal-actions > * {
     width: 100%;
+  }
+}
+
+/* Hype/Fear console: the feed is a durable consequence ledger, while the
+ * response card stays above it so a returning player cannot grind headlines
+ * without answering the current narrative. */
+.world-hero {
+  background: linear-gradient(135deg, #241b25, #17121b 62%, #242013);
+}
+
+.world-hero h2,
+.world-narrative h2,
+.world-response h2,
+.world-audiences h2,
+.world-tools h2,
+.world-feed h2 {
+  overflow-wrap: anywhere;
+}
+
+.world-locked,
+.world-uncertainty {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.6rem 0 0;
+  padding: 0.55rem 0.65rem;
+  border-left: 2px solid var(--amber);
+  background: #221c12;
+  color: #f0d39c;
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+
+.world-meter-grid,
+.world-audience-grid,
+.world-tool-grid,
+.world-response-actions,
+.world-actions {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.world-meter-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.world-narrative {
+  border-left: 3px solid var(--acid);
+}
+
+.world-narrative.fear {
+  border-left-color: var(--amber);
+}
+
+.world-response {
+  border: 1px solid var(--amber);
+  background: linear-gradient(135deg, #231d13, #171711);
+}
+
+.world-response-actions button,
+.world-actions button,
+.world-tool-grid button {
+  display: grid;
+  min-height: 2.75rem;
+  gap: 0.18rem;
+  justify-items: start;
+  text-align: left;
+}
+
+.world-response-actions small,
+.world-tool-grid small {
+  color: var(--muted);
+  font-size: 0.6rem;
+  line-height: 1.4;
+}
+
+.world-narrative-claim {
+  margin: 0.45rem 0;
+  color: var(--acid);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.world-narrative-source {
+  margin: 0.35rem 0;
+  color: #d5e3d5;
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.world-fact-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem;
+  margin: 0.65rem 0;
+}
+
+.world-fact-grid div {
+  min-width: 0;
+  padding: 0.42rem;
+  border: 1px solid #3b303d;
+  background: #18151c;
+}
+
+.world-fact-grid dt {
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.53rem;
+  text-transform: uppercase;
+}
+
+.world-fact-grid dd {
+  margin: 0.2rem 0 0;
+  overflow-wrap: anywhere;
+  color: #e0e9de;
+  font-size: 0.64rem;
+  line-height: 1.4;
+}
+
+.world-actions {
+  margin-top: 0.65rem;
+}
+
+.world-actions > strong {
+  color: var(--cyan);
+  font-size: 0.67rem;
+  line-height: 1.45;
+}
+
+.world-countdown {
+  margin: 0.65rem 0 0;
+  padding: 0.55rem 0.65rem;
+  border: 1px dashed var(--cyan);
+  color: #bde6e8;
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+
+.world-audience-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.world-audience {
+  display: flex;
+  min-width: 0;
+  justify-content: space-between;
+  gap: 0.3rem;
+  padding: 0.42rem;
+  border: 1px solid var(--line);
+  background: #0d1711;
+  color: #c4d4c7;
+  font-size: 0.62rem;
+}
+
+.world-audience span {
+  overflow-wrap: anywhere;
+}
+
+.world-audience strong {
+  color: var(--acid);
+}
+
+.world-audiences > p,
+.world-tools > p,
+.world-feed > p {
+  color: #c4d4c7;
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+
+.world-tool-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.world-tool-grid button {
+  width: 100%;
+}
+
+.world-feed-list {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding-left: 1.15rem;
+}
+
+.world-feed-list li {
+  display: grid;
+  gap: 0.18rem;
+  padding: 0.45rem;
+  border-left: 2px solid var(--amber);
+  background: #171711;
+  color: #dce8de;
+  font-size: 0.65rem;
+  line-height: 1.45;
+}
+
+.world-feed-list span,
+.world-feed-list small {
+  color: var(--muted);
+  font-size: 0.6rem;
+}
+
+@media (max-width: 350px) {
+  .world-meter-grid,
+  .world-fact-grid,
+  .world-audience-grid,
+  .world-tool-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
