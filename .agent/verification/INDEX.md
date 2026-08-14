@@ -42,6 +42,15 @@ evidence, not authority. The canonical command retains every lane.
   evidence. Expand to them for release, broad changes, or when their source
   mapping is implicated; do not use the index to discard them.
 
+## Round-085 authorized source route
+
+The frozen provenance map above remains historical. The owner-authorized
+Milestone 4 Research route is `plan.md` §§3–7.4, 12, 17, 19, 20/20.4, 23–27,
+29, 33–34 plus D-037 in `.agent/DECISIONS.md`. Candidate evidence is expected
+in the Research domain tests, balance scenario, and `tests/e2e/research.spec.ts`;
+the canonical lane remains `./scripts/verify`. This routing note is not a
+verdict or acceptance record.
+
 ## Full-read triggers
 
 Take the full plan/decisions/archive route if status fails; any cited source is

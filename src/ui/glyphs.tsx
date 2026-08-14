@@ -42,6 +42,7 @@ export const glyphs = {
     career: "🌙",
     upgrades: "⬆️",
     inspect: "🔬",
+    research: "🧭",
   },
   career: {
     freelance: "💼",
@@ -84,6 +85,7 @@ export const navigationItems = [
   ["career", glyphs.navigation.career, "Career"],
   ["upgrades", glyphs.navigation.upgrades, "Upgrades"],
   ["inspect", glyphs.navigation.inspect, "Inspect"],
+  ["research", glyphs.navigation.research, "Research"],
 ] as const;
 
 export function pipelineGlyph(role: string, slotType: string): Glyph {

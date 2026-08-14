@@ -2818,7 +2818,7 @@ h2 {
   position: relative;
   z-index: 20;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   padding: 0.4rem max(0.4rem, env(safe-area-inset-right))
     max(0.4rem, env(safe-area-inset-bottom))
     max(0.4rem, env(safe-area-inset-left));
@@ -3153,7 +3153,7 @@ h2 {
   }
 
   .bottom-nav {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 
   .stat-grid {
@@ -4086,5 +4086,241 @@ h1 {
     line-height: 1.8;
     white-space: pre;
     content: "LOCAL NODE\A PORTRAIT MODE\A SEED 20260715\A ────────────\A BUILD\A ROUTE\A OBSERVE";
+  }
+}
+
+/* Research console: bounded cards keep the frontier legible at 320px and at
+ * enlarged text sizes. Evidence and team actions stay explicit; no hidden
+ * control depends on hover. */
+.research-hero {
+  background: linear-gradient(135deg, #14231a, #101914 62%, #18221c);
+}
+
+.research-hero h2,
+.research-project-card h3,
+.researcher-card h3,
+.research-active h2,
+.research-outcome h2 {
+  overflow-wrap: anywhere;
+}
+
+.research-locked,
+.pending-decision,
+.research-frontier-note,
+.research-knowledge {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.55rem 0 0;
+  padding: 0.55rem 0.65rem;
+  border-left: 2px solid var(--amber);
+  background: #221c12;
+  color: #f0d39c;
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.research-goal-form,
+.research-project-list,
+.researcher-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.research-goal-form label {
+  color: var(--cyan);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.64rem;
+  font-weight: 700;
+}
+
+.research-goal-form textarea {
+  width: 100%;
+  min-height: 4.4rem;
+  resize: vertical;
+  padding: 0.65rem;
+  border: 1px solid var(--line-bright);
+  border-radius: 0.4rem;
+  background: #0a120d;
+  color: var(--text, #e8f0ea);
+  line-height: 1.45;
+}
+
+.research-goal-actions,
+.research-card-heading,
+.research-card-actions,
+.researcher-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.research-goal-actions small,
+.researcher-card small {
+  color: var(--muted);
+  font-size: 0.6rem;
+  line-height: 1.4;
+}
+
+.research-project-card,
+.researcher-card {
+  min-width: 0;
+  padding: 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  background: #0d1711;
+}
+
+.research-project-card p,
+.researcher-card p {
+  margin: 0.35rem 0;
+  color: #c4d4c7;
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+
+.research-question {
+  color: var(--acid) !important;
+  font-weight: 700;
+}
+
+.research-evidence {
+  color: #bde6e8 !important;
+}
+
+.research-fit,
+.choice-stat {
+  flex: 0 0 auto;
+  color: var(--cyan);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.58rem;
+  text-transform: uppercase;
+}
+
+.research-range-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
+  margin: 0.65rem 0;
+}
+
+.research-range-grid div {
+  min-width: 0;
+  padding: 0.38rem;
+  border: 1px solid #293a30;
+  background: #101c15;
+}
+
+.research-range-grid dt {
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.53rem;
+  text-transform: uppercase;
+}
+
+.research-range-grid dd {
+  margin: 0.18rem 0 0;
+  overflow-wrap: anywhere;
+  color: #dbe9dc;
+  font-size: 0.65rem;
+  line-height: 1.35;
+}
+
+.research-strategy {
+  color: var(--muted) !important;
+}
+
+.research-requirements {
+  display: grid;
+  gap: 0.18rem;
+  margin: 0.45rem 0;
+  padding-left: 1rem;
+  color: var(--muted);
+  font-size: 0.6rem;
+  line-height: 1.4;
+}
+
+.research-card-actions button,
+.researcher-actions button {
+  min-height: 2.75rem;
+}
+
+.research-active progress {
+  width: 100%;
+  height: 0.65rem;
+  accent-color: var(--acid);
+}
+
+.research-compute-control {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.55rem 0;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--line);
+  background: #101c15;
+  color: var(--cyan);
+  font-size: 0.66rem;
+}
+
+.research-compute-control span {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.research-compute-control small {
+  color: var(--muted);
+  font-size: 0.58rem;
+  line-height: 1.4;
+}
+
+.research-compute-control input {
+  width: 100%;
+  min-height: 2.75rem;
+  accent-color: var(--acid);
+}
+
+.research-active p,
+.research-outcome p,
+.research-team-summary {
+  color: #c4d4c7;
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+
+.research-knowledge {
+  border-left-color: var(--cyan);
+  background: #101e20;
+  color: #bde6e8;
+}
+
+.researcher-card.on-team {
+  border-color: #59783e;
+  box-shadow: inset 2px 0 var(--acid);
+}
+
+.researcher-card .primary-action {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+@media (min-width: 25rem) {
+  .research-project-list,
+  .researcher-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 350px) {
+  .research-range-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .research-goal-actions {
+    align-items: stretch;
+  }
+
+  .research-goal-actions > * {
+    width: 100%;
   }
 }

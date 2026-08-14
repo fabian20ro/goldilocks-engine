@@ -804,3 +804,41 @@
 - **Reversal condition:** Permit unsealed precise settlement causes only with
   a durable, independently verifiable authentication mechanism for immutable
   event semantics that preserves legacy fallback and no-free-text selection.
+
+## D-037 — Milestone 4 deterministic Research pipeline
+
+- **Decision:** Round-085 implements the explicitly owner-authorized Milestone
+  4 Research slice as a small data-driven frontier: bounded hypothesis,
+  evidence inspection, goal, team, compute allocation, measurement,
+  replication-oriented outcomes, and publication/tool/strategy signals. The
+  frontier is partly hidden; project ranges, prerequisites, strategic fit, and
+  uncertainty are shown before commitment. Breakthrough, partial, subset,
+  failure, useful-failure, and replication-failure outcomes all retain
+  knowledge or a reusable next option.
+- **Content:** Researcher names and archetypes are original fictional content.
+  The roster includes complementary traits, preferences, mentorship, and
+  integrity. Orin Kade is the original legendary educator-engineer; his
+  `First-Principles Reconstruction` action exposes assumptions and increases
+  institutional/tacit retention. Team chemistry and departure retention are
+  explicit state, not hidden multipliers.
+- **Persistence/compatibility:** Keep schema version 7 to preserve accepted
+  migration contracts. Advance content to `research-1`, accept the previous
+  `evaluation-replay-1` content during a safe restore, and add a bounded
+  default Research state when old valid saves lack the new field. Malformed
+  Research state falls back to the safe Research default while retaining only
+  structurally recoverable gameplay.
+- **Offline boundary:** Research is high-risk and is never auto-run by the
+  existing safe freelance offline policy. A pending/active project resumes
+  through the deterministic Worker tick path only; offline policy remains
+  bounded freelance behavior.
+- **UX/accessibility:** Research is a sixth primary destination because it has
+  a distinct pending decision. One goal, one visible next action, progressive
+  disclosures, explicit disabled prerequisites, 44px controls, keyboard and
+  screen-reader labels, reduced-motion-safe progress, and 320/393/200% layouts
+  are required. Existing Bedroom navigation, drag, persistence, causal,
+  PWA, and offline contracts remain unchanged.
+- **Evidence policy:** The same seam must cover normal completion, malformed or
+  prerequisite rejection, and lifecycle/reload/departure/offline behavior.
+  Deterministic scenario/property/balance tests and committed Playwright
+  checks are the independent evidence surface; no acceptance claim is made by
+  this decision.

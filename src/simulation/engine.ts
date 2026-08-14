@@ -21,8 +21,21 @@ import {
   workloads,
 } from "./catalog";
 import { nextRandom, normalizeSeed } from "./rng";
+import { findResearcher, findResearchProject } from "./researchCatalog";
+import {
+  createInitialResearchState,
+  isResearchStateShapeValid,
+  researchEstimate,
+  researchInspectReveals,
+  researchProjectRequirements,
+  researchRecognition,
+  researchTeamChemistry,
+  resolveResearchOutcome,
+  type ResearchContext,
+} from "./research";
 import {
   CONTENT_VERSION,
+  PREVIOUS_CONTENT_VERSION,
   SAVE_INTEGRITY_ALGORITHM,
   SCHEMA_VERSION,
   type CausalEvidence,
@@ -46,6 +59,7 @@ import {
   type QuantizationProfile,
   type RunEnding,
   type RunEndingId,
+  type ResearchState,
   type SaveIntegrity,
   type SimulationCommand,
   type SimulationState,
@@ -107,6 +121,17 @@ export function getSimulationAgeHours(
   state: Pick<SimulationState, "tick">,
 ): number {
   return (state.tick * SIMULATION_TIME_SCALE) / 3_600_000;
+}
+
+function researchContext(state: SimulationState): ResearchContext {
+  return {
+    seed: state.seed,
+    jobsCompleted: state.jobs.completed,
+    reputation: state.resources.reputation,
+    privateCoverage: state.career.evaluation.coverage,
+    competitionSubmissions: state.career.competition.submissions,
+    productReleased: state.career.product.released,
+  };
 }
 const ROLE_ORDER = ["preparation", "model", "evaluation"] as const;
 const EVENT_KINDS = ["info", "success", "warning", "failure"] as const;
@@ -387,6 +412,10 @@ export function isRuntimeSimulationCommand(command: unknown): boolean {
     maxOperatingCost?: unknown;
     minReliability?: unknown;
     requestedHours?: unknown;
+    text?: unknown;
+    projectId?: unknown;
+    researcherId?: unknown;
+    researcherIds?: unknown;
   };
 
   switch (input.type) {
@@ -423,6 +452,23 @@ export function isRuntimeSimulationCommand(command: unknown): boolean {
       );
     case "APPLY_OFFLINE_POLICY":
       return isFiniteNumber(input.requestedHours);
+    case "SET_RESEARCH_GOAL":
+      return typeof input.text === "string";
+    case "SET_RESEARCH_COMPUTE_ALLOCATION":
+      return isFiniteNumber(input.percent);
+    case "INSPECT_RESEARCH_PROJECT":
+    case "START_RESEARCH":
+      return typeof input.projectId === "string";
+    case "RECRUIT_RESEARCHER":
+    case "RELEASE_RESEARCHER":
+      return typeof input.researcherId === "string";
+    case "SET_RESEARCH_TEAM":
+      return (
+        Array.isArray(input.researcherIds) &&
+        input.researcherIds.every((id) => typeof id === "string")
+      );
+    case "FIRST_PRINCIPLES_RECONSTRUCTION":
+      return true;
     case "SET_EXPANSION_ACTIVE":
       return typeof input.active === "boolean";
     case "PLACE_MODULE":
@@ -2207,6 +2253,7 @@ export function createInitialState(seed = 20260715): SimulationState {
     memoryReserve: 10,
     resources: { money: 0, timeHours: 4, electricityKwh: 0, reputation: 0 },
     career: createInitialCareerState(),
+    research: createInitialResearchState(),
     meta: createInitialMetaProgression(),
     firstSession: createInitialFirstSessionProgress(),
     jobs: {
@@ -2309,6 +2356,150 @@ function updateSlots(
 
   return state.slots.map((item) =>
     item.slotId === slotId ? { ...item, moduleId } : item,
+  );
+}
+
+function researchWarning(
+  state: SimulationState,
+  message: string,
+): SimulationState {
+  return appendEvent(state, { kind: "warning", message });
+}
+
+function addResearchReveals(
+  state: ResearchState,
+  ids: readonly string[],
+): ResearchState {
+  const discoveredProjectIds = [...state.frontier.discoveredProjectIds];
+  const availableResearcherIds = [...state.availableResearcherIds];
+  const strategicOptionIds = [...state.strategicOptionIds];
+  for (const id of ids) {
+    if (findResearchProject(id)) {
+      if (!discoveredProjectIds.includes(id)) discoveredProjectIds.push(id);
+    } else if (findResearcher(id)) {
+      if (
+        !availableResearcherIds.includes(id) &&
+        !state.recruitedResearcherIds.includes(id)
+      )
+        availableResearcherIds.push(id);
+    } else if (!strategicOptionIds.includes(id)) {
+      strategicOptionIds.push(id);
+    }
+  }
+  return {
+    ...state,
+    frontier: { ...state.frontier, discoveredProjectIds },
+    availableResearcherIds,
+    strategicOptionIds,
+  };
+}
+
+function researchTeamKnowledge(
+  state: ResearchState,
+  amount: number,
+): Readonly<Record<string, number>> {
+  const next = { ...state.tacitKnowledge };
+  for (const id of state.teamMemberIds)
+    next[id] = round((next[id] ?? 0) + amount * 0.35, 3);
+  return next;
+}
+
+function advanceResearch(
+  state: SimulationState,
+  elapsedSeconds: number,
+): SimulationState {
+  const active = state.research.activeProject;
+  if (!active || state.research.teamMemberIds.length === 0) return state;
+  const project = findResearchProject(active.projectId);
+  if (!project) return state;
+  const chemistry = researchTeamChemistry(state.research.teamMemberIds);
+  const team = state.research.teamMemberIds.flatMap((id) => {
+    const researcher = findResearcher(id);
+    return researcher ? [researcher] : [];
+  });
+  const execution =
+    team.length === 0
+      ? 0
+      : team.reduce((sum, researcher) => sum + researcher.traits.execution, 0) /
+        team.length;
+  const simulatedHours = (elapsedSeconds * SIMULATION_TIME_SCALE) / 3600;
+  const progressHours =
+    simulatedHours *
+    clamp(
+      (0.7 + execution * 0.35 + chemistry * 0.2) *
+        (0.65 + (state.research.computeAllocation / 100) * 0.35),
+      0.55,
+      1.4,
+    );
+  const nextElapsed = round(
+    Math.min(active.expectedDurationHours, active.elapsedHours + progressHours),
+    3,
+  );
+  if (nextElapsed < active.expectedDurationHours)
+    return {
+      ...state,
+      research: {
+        ...state.research,
+        activeProject: { ...active, elapsedHours: nextElapsed },
+      },
+    };
+
+  const outcome = resolveResearchOutcome(
+    project,
+    state.research,
+    researchContext(state),
+  );
+  let research: ResearchState = {
+    ...state.research,
+    activeProject: null,
+    lastOutcome: outcome,
+    frontier: {
+      ...state.research.frontier,
+      completedProjectIds: state.research.frontier.completedProjectIds.includes(
+        project.id,
+      )
+        ? state.research.frontier.completedProjectIds
+        : [...state.research.frontier.completedProjectIds, project.id],
+    },
+    institutionalKnowledge: round(
+      state.research.institutionalKnowledge +
+        outcome.institutionalKnowledgeGained,
+      3,
+    ),
+    tacitKnowledge: researchTeamKnowledge(
+      state.research,
+      outcome.knowledgeGained,
+    ),
+    pendingDecision: `Outcome: ${outcome.title}. Inspect the evidence and choose the next strategic question.`,
+  };
+  research = addResearchReveals(research, [
+    ...outcome.revealedProjectIds,
+    ...outcome.strategicOptionIds,
+  ]);
+  const reputationGain =
+    outcome.kind === "breakthrough"
+      ? 0.16
+      : outcome.kind === "failure" || outcome.kind === "replication-failure"
+        ? 0.025
+        : 0.08;
+  return appendEvent(
+    {
+      ...state,
+      research,
+      resources: {
+        ...state.resources,
+        reputation: round(state.resources.reputation + reputationGain, 3),
+      },
+    },
+    {
+      kind:
+        outcome.kind === "breakthrough"
+          ? "success"
+          : outcome.kind === "failure" || outcome.kind === "replication-failure"
+            ? "warning"
+            : "info",
+      message: `Research completed: ${outcome.title}. ${outcome.summary} Usefulness ${(outcome.usefulness * 100).toFixed(0)}%; retained knowledge and the failed path remain available for the next decision.`,
+    },
   );
 }
 
@@ -3120,6 +3311,384 @@ function applyValidCommand(
         });
       return finalizeRunEnding(state, "honest-independent-builder");
     }
+    case "SET_RESEARCH_GOAL": {
+      const text = command.text.trim();
+      if (!researchRecognition(researchContext(state)))
+        return researchWarning(
+          state,
+          "Research is not recognized yet. Complete one accepted delivery before writing a research goal.",
+        );
+      if (text.length < 8 || text.length > 120)
+        return researchWarning(
+          state,
+          "Research goal must be 8–120 characters so the pending decision stays legible.",
+        );
+      return appendEvent(
+        {
+          ...state,
+          research: {
+            ...state.research,
+            goal: { text, createdAtTick: state.tick, status: "pending" },
+            pendingDecision:
+              "Inspect the frontier, then commit scarce cash and team time to one question.",
+          },
+        },
+        { kind: "info", message: `Research goal saved: “${text}”` },
+      );
+    }
+    case "SET_RESEARCH_COMPUTE_ALLOCATION": {
+      if (
+        !Number.isInteger(command.percent) ||
+        command.percent < 25 ||
+        command.percent > 100
+      )
+        return researchWarning(
+          state,
+          "Research compute allocation must stay between 25% and 100%.",
+        );
+      return appendEvent(
+        {
+          ...state,
+          research: {
+            ...state.research,
+            computeAllocation: command.percent,
+            pendingDecision: state.research.activeProject
+              ? `Compute allocation set to ${command.percent}%. The active measurement remains bounded and deterministic.`
+              : `Compute allocation set to ${command.percent}%. Review the opportunity cost before starting a project.`,
+          },
+        },
+        {
+          kind: "info",
+          message: `Research compute allocation set to ${command.percent}%.`,
+        },
+      );
+    }
+    case "INSPECT_RESEARCH_PROJECT": {
+      const project = findResearchProject(command.projectId);
+      if (!project)
+        return researchWarning(
+          state,
+          "Research evidence inspection rejected: unknown project.",
+        );
+      if (!researchRecognition(researchContext(state)))
+        return researchWarning(
+          state,
+          "Research frontier is still hidden. Complete one accepted delivery first.",
+        );
+      if (!state.research.frontier.discoveredProjectIds.includes(project.id))
+        return researchWarning(
+          state,
+          "That research question is still hidden. Follow the visible evidence first.",
+        );
+      if (state.research.frontier.inspectedProjectIds.includes(project.id))
+        return state;
+      const requirements = researchProjectRequirements(
+        project,
+        state.research,
+        researchContext(state),
+      );
+      if (!requirements.unlocked)
+        return researchWarning(
+          state,
+          `Inspect blocked: ${requirements.requirements.filter((item) => item.startsWith("Need")).join(" ")}`,
+        );
+      const inspected = {
+        ...state.research,
+        frontier: {
+          ...state.research.frontier,
+          inspectedProjectIds: [
+            ...state.research.frontier.inspectedProjectIds,
+            project.id,
+          ],
+        },
+      };
+      const revealed = addResearchReveals(
+        inspected,
+        researchInspectReveals(project),
+      );
+      return appendEvent(
+        {
+          ...state,
+          research: {
+            ...revealed,
+            pendingDecision: `Evidence inspected for ${project.name}. Choose whether its uncertainty is worth the opportunity cost.`,
+          },
+        },
+        {
+          kind: "info",
+          message: `Evidence inspected: ${project.name}. New researchers and questions may now be visible.`,
+        },
+      );
+    }
+    case "RECRUIT_RESEARCHER": {
+      const researcher = findResearcher(command.researcherId);
+      if (!researcher)
+        return researchWarning(
+          state,
+          "Researcher recruitment rejected: unknown researcher.",
+        );
+      if (!researchRecognition(researchContext(state)))
+        return researchWarning(
+          state,
+          "Recruitment is unavailable before Research recognition.",
+        );
+      if (!state.research.availableResearcherIds.includes(researcher.id))
+        return researchWarning(
+          state,
+          `${researcher.name} is not currently available to recruit.`,
+        );
+      if (state.resources.reputation < researcher.minimumReputation)
+        return researchWarning(
+          state,
+          `${researcher.name} needs ${researcher.minimumReputation.toFixed(2)} reputation; no cash was spent.`,
+        );
+      if (state.resources.money < researcher.recruitCost)
+        return researchWarning(
+          state,
+          `${researcher.name} needs $${researcher.recruitCost.toFixed(3)}; no cash was spent.`,
+        );
+      return appendEvent(
+        {
+          ...state,
+          resources: {
+            ...state.resources,
+            money: round(state.resources.money - researcher.recruitCost, 3),
+          },
+          research: {
+            ...state.research,
+            availableResearcherIds:
+              state.research.availableResearcherIds.filter(
+                (id) => id !== researcher.id,
+              ),
+            recruitedResearcherIds: [
+              ...state.research.recruitedResearcherIds,
+              researcher.id,
+            ],
+            tacitKnowledge: {
+              ...state.research.tacitKnowledge,
+              [researcher.id]: 0,
+            },
+            pendingDecision: `${researcher.name} joined. Add a complementary team before committing an experiment.`,
+          },
+        },
+        {
+          kind: "success",
+          message: `${researcher.name} recruited as ${researcher.archetype}.`,
+        },
+      );
+    }
+    case "RELEASE_RESEARCHER": {
+      const researcher = findResearcher(command.researcherId);
+      if (
+        !researcher ||
+        !state.research.recruitedResearcherIds.includes(command.researcherId)
+      )
+        return researchWarning(
+          state,
+          "Researcher release rejected: researcher is not on the roster.",
+        );
+      if (
+        state.research.activeProject &&
+        state.research.teamMemberIds.length <= 1 &&
+        state.research.teamMemberIds.includes(researcher.id)
+      )
+        return researchWarning(
+          state,
+          "The active experiment needs one researcher. Finish or add a teammate before releasing this person.",
+        );
+      const tacit = state.research.tacitKnowledge[researcher.id] ?? 0;
+      const retained = round(
+        tacit * (0.35 + researcher.traits.mentorship * 0.35),
+        3,
+      );
+      const nextTeam = state.research.teamMemberIds.filter(
+        (id) => id !== researcher.id,
+      );
+      return appendEvent(
+        {
+          ...state,
+          research: {
+            ...state.research,
+            recruitedResearcherIds:
+              state.research.recruitedResearcherIds.filter(
+                (id) => id !== researcher.id,
+              ),
+            teamMemberIds: nextTeam,
+            availableResearcherIds: [
+              ...state.research.availableResearcherIds,
+              researcher.id,
+            ],
+            chemistry: researchTeamChemistry(nextTeam),
+            retainedKnowledge: round(
+              state.research.retainedKnowledge + retained,
+              3,
+            ),
+            pendingDecision: `${researcher.name} left. ${retained.toFixed(2)} tacit knowledge was retained through notes and mentorship.`,
+          },
+        },
+        {
+          kind: "info",
+          message: `${researcher.name} released; retained knowledge preserved ${retained.toFixed(2)}.`,
+        },
+      );
+    }
+    case "SET_RESEARCH_TEAM": {
+      if (
+        new Set(command.researcherIds).size !== command.researcherIds.length ||
+        command.researcherIds.length > 3
+      )
+        return researchWarning(
+          state,
+          "Research team needs 0–3 distinct researchers.",
+        );
+      if (
+        !command.researcherIds.every((id) =>
+          state.research.recruitedResearcherIds.includes(id),
+        )
+      )
+        return researchWarning(
+          state,
+          "Research team can only include recruited researchers.",
+        );
+      if (state.research.activeProject && command.researcherIds.length === 0)
+        return researchWarning(
+          state,
+          "An active experiment needs at least one researcher.",
+        );
+      return appendEvent(
+        {
+          ...state,
+          research: {
+            ...state.research,
+            teamMemberIds: [...command.researcherIds],
+            chemistry: researchTeamChemistry(command.researcherIds),
+            pendingDecision:
+              command.researcherIds.length === 0
+                ? "Recruit a researcher, then assemble a team with complementary strengths."
+                : `Team ready. Chemistry ${researchTeamChemistry(command.researcherIds).toFixed(2)}; choose a question to run.`,
+          },
+        },
+        {
+          kind: "info",
+          message:
+            command.researcherIds.length === 0
+              ? "Research team cleared."
+              : "Research team updated; chemistry and execution are now visible.",
+        },
+      );
+    }
+    case "START_RESEARCH": {
+      const project = findResearchProject(command.projectId);
+      if (!project)
+        return researchWarning(
+          state,
+          "Research start rejected: unknown project.",
+        );
+      if (!researchRecognition(researchContext(state)))
+        return researchWarning(state, "Research is not recognized yet.");
+      if (state.research.activeProject)
+        return researchWarning(
+          state,
+          "Another experiment is active. Interpret its result before starting a second project.",
+        );
+      if (!state.research.goal)
+        return researchWarning(
+          state,
+          "Write a short research goal first; it keeps the pending decision explicit.",
+        );
+      if (!state.research.frontier.inspectedProjectIds.includes(project.id))
+        return researchWarning(
+          state,
+          "Inspect the evidence card before committing to this question.",
+        );
+      const requirements = researchProjectRequirements(
+        project,
+        state.research,
+        researchContext(state),
+      );
+      if (!requirements.unlocked)
+        return researchWarning(
+          state,
+          `Research start blocked: ${requirements.requirements.filter((item) => item.startsWith("Need")).join(" ")}`,
+        );
+      if (state.research.teamMemberIds.length === 0)
+        return researchWarning(
+          state,
+          "Add at least one researcher to the team before starting.",
+        );
+      const estimate = researchEstimate(project, state.research);
+      if (state.resources.money < estimate.cost)
+        return researchWarning(
+          state,
+          `This experiment needs $${estimate.cost.toFixed(3)}; no cash was spent.`,
+        );
+      return appendEvent(
+        {
+          ...state,
+          resources: {
+            ...state.resources,
+            money: round(state.resources.money - estimate.cost, 3),
+          },
+          research: {
+            ...state.research,
+            activeProject: {
+              projectId: project.id,
+              startedAtTick: state.tick,
+              elapsedHours: 0,
+              expectedDurationHours: estimate.durationHours,
+              committedCost: estimate.cost,
+            },
+            pendingDecision: `Experiment running: ${project.name}. Interpret the result when measurement completes.`,
+          },
+        },
+        {
+          kind: "info",
+          message: `${project.name} started for $${estimate.cost.toFixed(3)}; expected duration ${estimate.durationHours.toFixed(2)}h. Failure remains informative.`,
+        },
+      );
+    }
+    case "FIRST_PRINCIPLES_RECONSTRUCTION": {
+      if (!researchRecognition(researchContext(state)))
+        return researchWarning(
+          state,
+          "First-Principles Reconstruction requires Research recognition.",
+        );
+      if (
+        !state.research.recruitedResearcherIds.includes("orin-kade") ||
+        !state.research.teamMemberIds.includes("orin-kade")
+      )
+        return researchWarning(
+          state,
+          "Recruit and add Orin Kade to the research team before using First-Principles Reconstruction.",
+        );
+      const nextTacit = researchTeamKnowledge(state.research, 0.24);
+      return appendEvent(
+        {
+          ...state,
+          research: {
+            ...state.research,
+            institutionalKnowledge: round(
+              state.research.institutionalKnowledge + 0.3,
+              3,
+            ),
+            tacitKnowledge: nextTacit,
+            strategicOptionIds: state.research.strategicOptionIds.includes(
+              "reconstruction-plan",
+            )
+              ? state.research.strategicOptionIds
+              : [...state.research.strategicOptionIds, "reconstruction-plan"],
+            firstPrinciplesUses: state.research.firstPrinciplesUses + 1,
+            pendingDecision:
+              "First principles exposed the assumptions. Choose whether to run the reconstructed plan or teach it through replication.",
+          },
+        },
+        {
+          kind: "success",
+          message:
+            "First-Principles Reconstruction completed: assumptions, constraints, and a teachable plan are now retained.",
+        },
+      );
+    }
     case "SET_OFFLINE_POLICY": {
       const maxHours = round(
         Math.floor(
@@ -3379,6 +3948,7 @@ function advanceTickQuantum(
           3_600_000,
     },
   };
+  next = advanceResearch(next, elapsed);
   if (next.jobs.paused) return recalculate(next);
   next = startNextTask(next);
   if (!next.jobs.activeTask) {
@@ -4157,6 +4727,7 @@ function isStateStructurallyValid(value: unknown): value is SimulationState {
       ) &&
       isCareerStateValid(state.career) &&
       isMetaProgressionValid(state.meta) &&
+      isResearchStateShapeValid(state.research) &&
       nonnegativeIntegers.every(
         (value) => Number.isSafeInteger(value) && value >= 0,
       ) &&
@@ -4366,6 +4937,11 @@ export function restoreSimulationState(
   if (typeof value !== "object" || value === null) return fallback;
   const record = value as Record<string, unknown>;
   if (record.schemaVersion === SCHEMA_VERSION) {
+    if (
+      record.contentVersion !== CONTENT_VERSION &&
+      record.contentVersion !== PREVIOUS_CONTENT_VERSION
+    )
+      return fallback;
     const storedFirstSession = record.firstSession;
     if (
       storedFirstSession !== undefined &&
@@ -4386,9 +4962,15 @@ export function restoreSimulationState(
           sourceSchemaVersion: SCHEMA_VERSION,
           steps: ["schema-v7-metadata-added"],
         };
+    const storedResearch = record.research;
+    const research = isResearchStateShapeValid(storedResearch)
+      ? storedResearch
+      : createInitialResearchState();
     let candidate = {
       ...record,
+      contentVersion: CONTENT_VERSION,
       firstSession: storedFirstSession ?? legacyFirstSessionProgress(),
+      research,
       migration,
       integrity: isIntegrityShapeValid(record.integrity)
         ? record.integrity
@@ -4398,6 +4980,15 @@ export function restoreSimulationState(
       migration = withMigrationStep(
         migration,
         "schema-v7-first-session-guide-added",
+      );
+    if (
+      record.contentVersion === PREVIOUS_CONTENT_VERSION ||
+      storedResearch === undefined ||
+      !isResearchStateShapeValid(storedResearch)
+    )
+      migration = withMigrationStep(
+        migration,
+        "content-evaluation-to-research",
       );
     if (!originalIntegrityValid)
       candidate = normalizeUntrustedLedgerState(candidate);
@@ -4539,6 +5130,7 @@ export function restoreSimulationState(
       migration,
       integrity: EMPTY_INTEGRITY,
       firstSession: legacyFirstSessionProgress(),
+      research: createInitialResearchState(),
       career: {
         ...legacyCareer,
         evaluation: createInitialEvaluationState(),
@@ -4570,6 +5162,7 @@ export function restoreSimulationState(
       migration,
       integrity: EMPTY_INTEGRITY,
       firstSession: legacyFirstSessionProgress(),
+      research: createInitialResearchState(),
       career: createInitialCareerState(),
       meta: createInitialMetaProgression(),
     } as unknown as SimulationState;

@@ -47,6 +47,7 @@ describe("emoji command-deck primitives", () => {
       glyphs.navigation.career,
       glyphs.navigation.upgrades,
       glyphs.navigation.inspect,
+      glyphs.navigation.research,
     ]);
     expect(pipelineGlyph("model", "process")).toBe(glyphs.pipeline.model);
     expect(pipelineGlyph("model", "process")).toBe(

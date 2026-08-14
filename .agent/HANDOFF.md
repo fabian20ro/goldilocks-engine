@@ -1,4 +1,118 @@
-# Candidate handoff — provenance repair and workflow routing
+# Candidate handoff — Milestone 4 Research (round 085)
+
+## Current round implementation
+
+- Added a deterministic, data-driven Research frontier in the existing Worker
+  simulation. Research opens after one accepted delivery; later projects and
+  researchers appear only through inspected evidence, prerequisites, or useful
+  outcomes.
+- Added player-authored 8–120 character goals, explicit pending decisions,
+  project duration/cost/usefulness ranges, strategic fit, uncertainty,
+  prerequisite explanations, and deterministic breakthrough, partial, subset,
+  failure, useful-failure, and replication-failure outcomes.
+- Added four original fictional researchers with traits/preferences, roster
+  recruitment, team chemistry, tacit knowledge, institutional/retained
+  knowledge, departure retention, and Orin Kade's legendary
+  `First-Principles Reconstruction` action.
+- Added an accessible sixth Research destination with goal, evidence, team,
+  progress, outcome, and retained-knowledge UI. Existing Build/Jobs/Career/
+  Upgrades/Inspect, drag, persistence, causal, PWA, and offline contracts stay
+  intact.
+
+## Plan requirements covered
+
+- `plan.md` §§3–6: Research pipeline, universal grammar, and deterministic
+  Observe/Modify/Run/Interpret/Automate/Escalate loop.
+- `plan.md` §§7.3–7.4 and §12: recognition, Local Lab, hidden frontier,
+  uncertain projects, useful failures, original researchers,
+  collaboration/chemistry/retained knowledge, and first legendary archetype.
+- `plan.md` §§17 and 19: bounded causal evidence; safe offline policy never
+  auto-runs high-risk Research.
+- `plan.md` §§20/20.4, 23–27: portrait/text scaling, reduced motion,
+  keyboard/screen-reader labels, Worker separation, schema-7 migration,
+  deterministic balance, unit/property, UI, and browser checks.
+- `plan.md` §§29, 33, 34: question-dependent completion evidence, visible
+  strategic fit/reuse/opportunity cost/team competence, and a new decision
+  rather than undifferentiated point accumulation.
+
+## Verifier findings resolved
+
+- No unresolved verifier findings existed at supplied round-084 PASS.
+- This candidate adds the explicitly authorized Milestone 4 Research seam;
+  independent verification must assess the exact candidate SHA.
+
+## Setup, startup, and verification commands
+
+Dependencies and browsers use ignored repository-local caches:
+
+```sh
+./scripts/setup
+./scripts/run
+# deterministic loopback: http://127.0.0.1:4173/
+```
+
+```text
+npm cache:          .cache/npm
+Playwright browser: .cache/ms-playwright
+browser artifacts:  test-results/, playwright-report/, playwright-pages-report/
+coverage:           coverage/
+```
+
+```sh
+npm run typecheck
+npm run lint
+npm test
+npm run balance:research
+npm run test:e2e -- tests/e2e/research.spec.ts
+./scripts/verify
+```
+
+`@playwright/test` is pinned; `test:e2e` sets
+`PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright`. `./scripts/verify` owns the
+deterministic server lifecycle and invokes root plus Pages browser lanes.
+`PLAYWRIGHT_INSTALL_DEPS=1 ./scripts/setup` is the Linux browser-dependency
+path when required.
+
+## Important architectural decisions
+
+- D-037 records the owner-authorized Research boundary. Schema remains 7 to
+  preserve accepted migration fixtures; content advances to `research-1` and
+  safely accepts `evaluation-replay-1` during restore.
+- Research content, pure requirement/team/outcome logic, and engine command/tick
+  boundaries are separated across `researchCatalog.ts`, `research.ts`, and
+  `engine.ts`; every transition uses the existing sealed Worker rail.
+- Existing safe offline policy remains freelance-only. Research progress is
+  driven only by explicit deterministic simulation ticks.
+- The sixth navigation destination is the smallest coherent UI change needed
+  for a distinct Research pending decision. Controls expose prerequisites and
+  preserve input/state through reload.
+
+## Known limitations and risks
+
+- The catalog is intentionally compact for Milestone 4; later milestones may
+  add projects only through the same data-driven schema.
+- Research does not auto-advance under offline policy by design; returned
+  players see the active/pending decision and resume normal simulation.
+- Candidate is not independently accepted; Verifier must assess this SHA with
+  the canonical gate and archived probes.
+
+## Checks run
+
+- Passed `./scripts/agent-status` before implementation: accepted round-084
+  PASS, no unresolved finding.
+- Passed `npm run typecheck` and `npm run lint`.
+- Passed `npm test`: 56 files, 266 tests; 86.19% statements, 83.07% branches,
+  94.42% functions, 89.17% lines.
+- Passed `npm run balance:research`: 121 seeds, zero failures, four outcome
+  kinds, catalog valid.
+- Passed `npm run test:e2e -- tests/e2e/research.spec.ts`: 2 tests covering
+  393px normal/adversarial and 320px reload/reduced-motion/200%-text/offline.
+- Passed final canonical gate:
+  `E2E_PORT=42185 VERIFY_EVIDENCE_DIR="$PWD/.cache/verification/round-085" PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright npm_config_cache="$PWD/.cache/npm" ./scripts/verify` — setup, format, lint, typecheck, 56 unit files/266 tests, all balances including 121-seed Research, build, audit, 231 root browser tests, and 2 Pages/offline tests. Evidence: `.cache/verification/round-085`.
+- Device-native iOS/Android inspection: not run; Playwright is committed
+  browser evidence.
+
+## Historical previous handoff
 
 ## Workflow-optimization delta (2026-08-14)
 

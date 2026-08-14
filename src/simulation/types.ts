@@ -1,5 +1,6 @@
 export const SCHEMA_VERSION = 7;
-export const CONTENT_VERSION = "evaluation-replay-1";
+export const CONTENT_VERSION = "research-1";
+export const PREVIOUS_CONTENT_VERSION = "evaluation-replay-1";
 export const SAVE_INTEGRITY_ALGORITHM = "fnv1a-32-json-v1";
 
 export type SlotType = "source" | "process" | "sink";
@@ -80,6 +81,150 @@ export interface PipelineExpansionSpec {
   purchaseCost: number;
   processSlots: number;
   tradeoff: string;
+}
+
+export type ResearchDiscipline =
+  | "systems"
+  | "evaluation"
+  | "data"
+  | "theory"
+  | "education";
+
+export type ResearchPrerequisiteKind =
+  | "recognition"
+  | "inspect"
+  | "coverage"
+  | "completed-project"
+  | "knowledge"
+  | "researcher";
+
+export interface ResearchPrerequisite {
+  kind: ResearchPrerequisiteKind;
+  value: string | number;
+  label: string;
+}
+
+export type ResearchOutcomeKind =
+  | "breakthrough"
+  | "partial"
+  | "failure"
+  | "useful-failure"
+  | "subset"
+  | "replication-failure";
+
+export interface ResearchOutcomeDefinition {
+  kind: ResearchOutcomeKind;
+  weight: number;
+  title: string;
+  summary: string;
+  usefulness: ResearchRange;
+  knowledgeGained: number;
+  institutionalKnowledgeGained: number;
+  toolId?: string;
+  reveals: readonly string[];
+  strategicOptions: readonly string[];
+}
+
+export interface ResearchProjectSpec {
+  id: string;
+  name: string;
+  question: string;
+  hypothesis: string;
+  currentEvidence: string;
+  requiredExpertise: readonly string[];
+  failedWorkValue: string;
+  disciplines: readonly ResearchDiscipline[];
+  prerequisites: readonly ResearchPrerequisite[];
+  durationRange: ResearchRange;
+  costRange: ResearchRange;
+  usefulnessRange: ResearchRange;
+  strategicFit: readonly string[];
+  uncertainty: string;
+  hidden: boolean;
+  revealsOnInspect: readonly string[];
+  outcomes: readonly ResearchOutcomeDefinition[];
+}
+
+export interface ResearchRange {
+  min: number;
+  max: number;
+}
+
+export interface ResearcherTraits {
+  depth: number;
+  taste: number;
+  execution: number;
+  mentorship: number;
+  integrity: number;
+  influence: number;
+}
+
+export interface ResearcherSpec {
+  id: string;
+  name: string;
+  archetype: string;
+  disciplines: readonly ResearchDiscipline[];
+  traits: ResearcherTraits;
+  preferences: readonly string[];
+  description: string;
+  signatureAction?: string;
+  legendary: boolean;
+  recruitCost: number;
+  minimumReputation: number;
+}
+
+export interface ResearchGoal {
+  text: string;
+  createdAtTick: number;
+  status: "pending";
+}
+
+export interface ActiveResearchProject {
+  projectId: string;
+  startedAtTick: number;
+  elapsedHours: number;
+  expectedDurationHours: number;
+  committedCost: number;
+}
+
+export interface ResearchOutcome {
+  projectId: string;
+  kind: ResearchOutcomeKind;
+  title: string;
+  summary: string;
+  usefulness: number;
+  durationHours: number;
+  cost: number;
+  knowledgeGained: number;
+  institutionalKnowledgeGained: number;
+  toolId: string | null;
+  revealedProjectIds: readonly string[];
+  strategicOptionIds: readonly string[];
+}
+
+export interface ResearchFrontierState {
+  discoveredProjectIds: readonly string[];
+  inspectedProjectIds: readonly string[];
+  completedProjectIds: readonly string[];
+}
+
+export interface ResearchState {
+  frontier: ResearchFrontierState;
+  goal: ResearchGoal | null;
+  pendingDecision: string;
+  computeAllocation: number;
+  activeProject: ActiveResearchProject | null;
+  availableResearcherIds: readonly string[];
+  recruitedResearcherIds: readonly string[];
+  teamMemberIds: readonly string[];
+  chemistry: number;
+  institutionalKnowledge: number;
+  retainedKnowledge: number;
+  tacitKnowledge: Readonly<Record<string, number>>;
+  toolIds: readonly string[];
+  strategicOptionIds: readonly string[];
+  firstPrinciplesUses: number;
+  lastOutcome: ResearchOutcome | null;
 }
 
 /** The deliberately finite after-hours choices in the Bedroom Developer loop. */
@@ -460,6 +605,7 @@ export interface SimulationState {
   memoryReserve: number;
   resources: Resources;
   career: CareerState;
+  research: ResearchState;
   meta: MetaProgression;
   firstSession: FirstSessionProgress;
   jobs: JobState;
@@ -508,6 +654,14 @@ export type SimulationCommand =
   | { type: "RUN_PUBLIC_EVALUATION" }
   | { type: "RUN_PRIVATE_EVALUATION" }
   | { type: "CONCLUDE_INDEPENDENT_RUN" }
+  | { type: "SET_RESEARCH_GOAL"; text: string }
+  | { type: "SET_RESEARCH_COMPUTE_ALLOCATION"; percent: number }
+  | { type: "INSPECT_RESEARCH_PROJECT"; projectId: string }
+  | { type: "RECRUIT_RESEARCHER"; researcherId: string }
+  | { type: "RELEASE_RESEARCHER"; researcherId: string }
+  | { type: "SET_RESEARCH_TEAM"; researcherIds: readonly string[] }
+  | { type: "START_RESEARCH"; projectId: string }
+  | { type: "FIRST_PRINCIPLES_RECONSTRUCTION" }
   | {
       type: "SET_OFFLINE_POLICY";
       enabled: boolean;
