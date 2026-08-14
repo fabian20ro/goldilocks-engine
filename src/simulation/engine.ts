@@ -22,7 +22,13 @@ import {
 } from "./catalog";
 import { nextRandom, normalizeSeed } from "./rng";
 import { findResearcher, findResearchProject } from "./researchCatalog";
-import { findCreator, findTool, narrativeTemplates } from "./hypeFearCatalog";
+import {
+  creatorCoverageFit,
+  findCreator,
+  findNarrativeTemplate,
+  findTool,
+  narrativeTemplates,
+} from "./hypeFearCatalog";
 import {
   appendDoomFeed,
   createInitialHypeFearState,
@@ -2758,6 +2764,15 @@ function applyCoverNarrative(
       kind: "warning",
       message: `${creator.name} cannot credibly reach the target audiences for this narrative; choose a creator with a matching incentive.`,
     });
+  const template = findNarrativeTemplate(narrative.templateId);
+  const coverageFit = template
+    ? creatorCoverageFit(creator, template)
+    : { preferenceMatches: [], accessMatches: [], score: 0, eligible: false };
+  if (!coverageFit.eligible)
+    return appendEvent(state, {
+      kind: "warning",
+      message: `${creator.name} cannot cover this narrative: its stated preferences and access do not match the evidence context. No attention or expectation debt changed.`,
+    });
   if (
     state.hypeFear.expectationDebt >= 0.9 &&
     narrative.kind === "hype" &&
@@ -2771,15 +2786,18 @@ function applyCoverNarrative(
   const overlap = creator.audienceIncentives.filter((audience) =>
     narrative.targetAudiences.includes(audience),
   );
+  const fitMultiplier = 0.7 + coverageFit.score * 0.3;
   const attentionGain =
     (narrative.kind === "hype" ? 22 : 9) *
     creator.reach *
     narrative.reach *
+    fitMultiplier *
     (1 - state.hypeFear.expectationDebt * 0.28);
   const debtGain =
     narrative.emotionalIntensity *
     narrative.reach *
-    (narrative.kind === "hype" ? 0.24 : 0.14);
+    (narrative.kind === "hype" ? 0.24 : 0.14) *
+    (0.85 + coverageFit.score * 0.15);
   const nextHypeFear: HypeFearState = {
     ...state.hypeFear,
     attention: round(
@@ -2833,8 +2851,8 @@ function applyCoverNarrative(
     { ...state, hypeFear: nextHypeFear },
     {
       kind: narrative.kind === "hype" ? "info" : "warning",
-      message: `${creator.name} covered the ${narrative.kind} narrative. Attention +${attentionGain.toFixed(1)}; expectation debt is now ${Math.round(nextHypeFear.expectationDebt * 100)}%. Deadline and counterevidence remain visible.`,
-      contributingCondition: creator.usefulness,
+      message: `${creator.name} covered the ${narrative.kind} narrative with ${Math.round(coverageFit.score * 100)}% preference/access fit. Attention +${attentionGain.toFixed(1)}; expectation debt is now ${Math.round(nextHypeFear.expectationDebt * 100)}%. Deadline and counterevidence remain visible.`,
+      contributingCondition: `${creator.usefulness} Access: ${creator.access} Preferences matched: ${coverageFit.preferenceMatches.join(", ")}.`,
     },
   );
 }
@@ -3110,6 +3128,12 @@ function applyToolSwitch(
       kind: "warning",
       message:
         "Tool switch rejected: unknown tool; no fear or attention state changed.",
+    });
+  if (!state.hypeFear.unlocked)
+    return appendEvent(state, {
+      kind: "warning",
+      message:
+        "Tool switch rejected: public-pressure recognition has not arrived; the locked World state remains unchanged.",
     });
   if (state.hypeFear.pendingResponse)
     return appendEvent(state, {

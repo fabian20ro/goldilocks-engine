@@ -8,6 +8,11 @@ import {
   sealSimulationState,
   tick,
 } from "./engine";
+import {
+  creatorCoverageFit,
+  findCreator,
+  findNarrativeTemplate,
+} from "./hypeFearCatalog";
 import type { SimulationState } from "./types";
 
 function recognizedState(seed = 7701): SimulationState {
@@ -125,6 +130,46 @@ describe("Hype/Fear narrative loop", () => {
       ...covered.hypeFear.narratives[0],
     });
     expect(before?.status).toBe("available");
+  });
+
+  it("keeps locked tool switching inert and makes creator fit data-driven", () => {
+    const initial = createInitialState(7710);
+    const lockedSwitch = applyCommand(initial, {
+      type: "SWITCH_TOOL",
+      toolId: "fast-new-runtime",
+    });
+    expect(lockedSwitch.hypeFear).toEqual(initial.hypeFear);
+
+    const recognized = recognizedState(7711);
+    const narrative = recognized.hypeFear.narratives[0]!;
+    const creator = findCreator(narrative.sourceArchetypeId)!;
+    const template = findNarrativeTemplate(narrative.templateId)!;
+    const originalPreferences = creator.preferences;
+    const originalAccess = creator.access;
+    try {
+      const fit = creatorCoverageFit(creator, template);
+      expect(fit.eligible).toBe(true);
+      const covered = applyCommand(recognized, {
+        type: "COVER_NARRATIVE",
+        narrativeId: narrative.id,
+        creatorId: creator.id,
+      });
+      expect(covered.hypeFear.narratives[0]?.status).toBe(
+        "awaiting-prediction",
+      );
+
+      creator.preferences = [];
+      creator.access = "no access";
+      const rejected = applyCommand(recognized, {
+        type: "COVER_NARRATIVE",
+        narrativeId: narrative.id,
+        creatorId: creator.id,
+      });
+      expect(rejected.hypeFear).toEqual(recognized.hypeFear);
+    } finally {
+      creator.preferences = originalPreferences;
+      creator.access = originalAccess;
+    }
   });
 
   it("preserves deadline state across offline and research neighbors, while stale additions recover safely", () => {

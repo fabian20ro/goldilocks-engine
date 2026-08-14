@@ -27,6 +27,7 @@ describe("WorldView", () => {
     render(<WorldView state={recognizedState()} command={vi.fn()} />);
     expect(screen.getByTestId("world-view")).toBeVisible();
     expect(screen.getByTestId("narrative-card")).toBeVisible();
+    expect(screen.getByTestId("narrative-card")).toHaveTextContent("2.5H");
     expect(screen.getByText(/bounded estimate/i)).toBeVisible();
     expect(screen.getByTestId("audience-reputation")).toBeVisible();
     expect(screen.getByTestId("doom-feed")).toHaveTextContent(
@@ -108,5 +109,12 @@ describe("WorldView", () => {
       screen.getByRole("heading", { name: /deadline has an audience/i }),
     ).toBeVisible();
     expect(screen.getByTestId("doom-feed")).toBeVisible();
+  });
+
+  it("locks tool switching until recognition", () => {
+    render(<WorldView state={createInitialState(8802)} command={vi.fn()} />);
+    expect(
+      screen.getByRole("button", { name: "Fast new runtime" }),
+    ).toBeDisabled();
   });
 });

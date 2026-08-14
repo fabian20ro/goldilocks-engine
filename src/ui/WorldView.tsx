@@ -1,6 +1,8 @@
 import {
   audienceLabels,
+  creatorCoverageFit,
   findCreator,
+  findNarrativeTemplate,
   toolOptions,
 } from "../simulation/hypeFearCatalog";
 import type {
@@ -92,6 +94,8 @@ function formatPercent(value: number): string {
 
 function NarrativeDetails({ narrative }: { narrative: NarrativeInstance }) {
   const source = findCreator(narrative.sourceArchetypeId);
+  const template = findNarrativeTemplate(narrative.templateId);
+  const deadlineHours = template?.deadlineHours.toFixed(1) ?? "bounded";
   return (
     <>
       <p className="world-narrative-claim">{narrative.claim}</p>
@@ -113,6 +117,10 @@ function NarrativeDetails({ narrative }: { narrative: NarrativeInstance }) {
           <dd>
             {formatPercent(narrative.evidenceStrength)} · bounded estimate
           </dd>
+        </div>
+        <div>
+          <dt>Deadline</dt>
+          <dd>{deadlineHours}H from coverage · prediction required</dd>
         </div>
         <div>
           <dt>Beneficiaries</dt>
@@ -213,6 +221,15 @@ function NarrativeCard({
           narrative.targetAudiences.includes(audience),
         ),
     );
+  const template = findNarrativeTemplate(narrative.templateId);
+  const creatorChoices = template
+    ? eligibleCreators
+        .map((creator) => ({
+          creator,
+          fit: creatorCoverageFit(creator, template),
+        }))
+        .filter(({ fit }) => fit.eligible)
+    : [];
   const hours = simulatedHoursUntil(state, narrative.deadlineTick);
   return (
     <article
@@ -244,12 +261,16 @@ function NarrativeCard({
       <NarrativeDetails narrative={narrative} />
       {narrative.status === "available" ? (
         <div className="world-actions" aria-label="Choose creator coverage">
-          <strong>Choose a creator with a matching audience incentive.</strong>
-          {eligibleCreators.map((creator) => (
+          <strong>
+            Choose a creator whose audience, preferences, and access fit this
+            claim.
+          </strong>
+          {creatorChoices.map(({ creator, fit }) => (
             <button
               type="button"
               className="primary-action"
               key={creator.id}
+              aria-label={`Cover with ${creator.name}`}
               onClick={() =>
                 command({
                   type: "COVER_NARRATIVE",
@@ -259,8 +280,18 @@ function NarrativeCard({
               }
             >
               Cover with {creator.name}
+              <small>
+                {Math.round(fit.score * 100)}% fit ·{" "}
+                {creator.preferences.join(" · ")} · {creator.access}
+              </small>
             </button>
           ))}
+          {creatorChoices.length === 0 ? (
+            <p role="status">
+              No creator currently has the required preference and access for
+              this claim.
+            </p>
+          ) : null}
         </div>
       ) : null}
       {narrative.status === "awaiting-prediction" ? (
@@ -443,7 +474,9 @@ export function WorldView({ state, command }: WorldViewProps) {
               type="button"
               className="text-action"
               key={tool.id}
+              aria-label={tool.name}
               disabled={
+                !hypeFear.unlocked ||
                 tool.id === hypeFear.currentToolId ||
                 Boolean(hypeFear.pendingResponse)
               }

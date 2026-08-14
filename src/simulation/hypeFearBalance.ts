@@ -5,7 +5,11 @@ import {
   sealSimulationState,
   tick,
 } from "./engine";
-import { narrativeTemplates } from "./hypeFearCatalog";
+import {
+  creatorCoverageFit,
+  creators,
+  narrativeTemplates,
+} from "./hypeFearCatalog";
 import type { SimulationState } from "./types";
 
 export interface HypeFearBalanceResult {
@@ -15,6 +19,7 @@ export interface HypeFearBalanceResult {
   durableStakeholders: boolean;
   responseRecovery: boolean;
   fearFeed: boolean;
+  creatorSelection: boolean;
   deterministic: boolean;
   lifecycleValid: boolean;
   valid: boolean;
@@ -67,6 +72,25 @@ function firstLoop(seed: number): SimulationState {
     confidence: 0.5,
   });
   return advanceToDeadline(state);
+}
+
+function creatorSelectionIsBounded(): boolean {
+  const sourceFits = narrativeTemplates.every((template) => {
+    const source = creators.find(
+      (creator) => creator.id === template.sourceArchetypeId,
+    );
+    return source ? creatorCoverageFit(source, template).eligible : false;
+  });
+  const coverageCounts = creators.map(
+    (creator) =>
+      narrativeTemplates.filter(
+        (template) => creatorCoverageFit(creator, template).eligible,
+      ).length,
+  );
+  return (
+    sourceFits &&
+    coverageCounts.every((count) => count < narrativeTemplates.length)
+  );
 }
 
 export function runHypeFearScenario(seed: number): HypeFearBalanceResult {
@@ -140,6 +164,7 @@ export function runHypeFearScenario(seed: number): HypeFearBalanceResult {
       fearPending !== null &&
       fearState.hypeFear.doomFeed.some((entry) => entry.responseRequired) &&
       fearRecovered.hypeFear.fear < fearState.hypeFear.fear,
+    creatorSelection: creatorSelectionIsBounded(),
     deterministic,
     lifecycleValid:
       isStateValid(restored) &&
@@ -157,6 +182,7 @@ export function validateHypeFearBalance(seed: number): boolean {
     result.durableStakeholders &&
     result.responseRecovery &&
     result.fearFeed &&
+    result.creatorSelection &&
     result.deterministic &&
     result.lifecycleValid &&
     result.valid

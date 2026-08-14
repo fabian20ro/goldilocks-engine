@@ -23,6 +23,8 @@ export interface NarrativeTemplate {
   claim: string;
   sourceArchetypeId: CreatorArchetypeId;
   targetAudiences: readonly AudienceId[];
+  creatorPreferenceSignals: readonly string[];
+  creatorAccessSignals: readonly string[];
   deadlineHours: number;
   evidenceStrength: number;
   emotionalIntensity: number;
@@ -97,6 +99,12 @@ export const narrativeTemplates: readonly NarrativeTemplate[] = [
       "A small local tool can make solo builders meaningfully faster this week.",
     sourceArchetypeId: "builder-opportunity",
     targetAudiences: ["developers", "entrepreneurs", "customers"],
+    creatorPreferenceSignals: [
+      "products",
+      "tutorials",
+      "small-business adoption",
+    ],
+    creatorAccessSignals: ["practical adopters", "useful path"],
     deadlineHours: 2.5,
     evidenceStrength: 0.46,
     emotionalIntensity: 0.62,
@@ -124,6 +132,12 @@ export const narrativeTemplates: readonly NarrativeTemplate[] = [
       "Adopt the newest automation tool now or lose the next wave of work.",
     sourceArchetypeId: "ai-news-amplifier",
     targetAudiences: ["customers", "entrepreneurs", "enthusiasts"],
+    creatorPreferenceSignals: [
+      "broad implications",
+      "labor stories",
+      "momentum",
+    ],
+    creatorAccessSignals: ["fast reach", "fear missing", "capability jump"],
     deadlineHours: 2,
     evidenceStrength: 0.31,
     emotionalIntensity: 0.9,
@@ -151,6 +165,8 @@ export const narrativeTemplates: readonly NarrativeTemplate[] = [
       "A reproducible local evaluation will land before the next demo day.",
     sourceArchetypeId: "developer-tastemaker",
     targetAudiences: ["developers", "researchers", "skeptics"],
+    creatorPreferenceSignals: ["usability", "latency", "reliability"],
+    creatorAccessSignals: ["hands-on builders", "afternoon"],
     deadlineHours: 3.5,
     evidenceStrength: 0.64,
     emotionalIntensity: 0.48,
@@ -177,6 +193,12 @@ export const narrativeTemplates: readonly NarrativeTemplate[] = [
     claim: "The public benchmark hides a reliability cliff for real users.",
     sourceArchetypeId: "skeptic",
     targetAudiences: ["skeptics", "researchers", "customers"],
+    creatorPreferenceSignals: [
+      "benchmarks",
+      "failed demos",
+      "independent scrutiny",
+    ],
+    creatorAccessSignals: ["lower the temperature", "evidence travels"],
     deadlineHours: 2.75,
     evidenceStrength: 0.57,
     emotionalIntensity: 0.74,
@@ -234,6 +256,63 @@ export const audienceLabels: Readonly<Record<AudienceId, string>> = {
 
 export const findCreator = (id: unknown): CreatorArchetypeSpec | undefined =>
   creators.find((creator) => creator.id === id);
+
+export interface CreatorCoverageFit {
+  preferenceMatches: readonly string[];
+  accessMatches: readonly string[];
+  score: number;
+  eligible: boolean;
+}
+
+function normalized(value: unknown): string {
+  return typeof value === "string"
+    ? value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim()
+    : "";
+}
+
+function phraseMatches(source: unknown, signal: string): boolean {
+  const sourceText = normalized(source);
+  const signalText = normalized(signal);
+  return (
+    signalText.length > 0 &&
+    (sourceText.includes(signalText) || signalText.includes(sourceText))
+  );
+}
+
+/**
+ * Coverage is a forecastable informed choice, not an ad-slot lookup. The
+ * finite narrative template names the signals it needs; a creator supplies
+ * them through the existing preference and access fields.
+ */
+export function creatorCoverageFit(
+  creator: CreatorArchetypeSpec,
+  template: NarrativeTemplate,
+): CreatorCoverageFit {
+  const preferences = Array.isArray(creator.preferences)
+    ? creator.preferences
+    : [];
+  const preferenceMatches = template.creatorPreferenceSignals.filter((signal) =>
+    preferences.some((preference) => phraseMatches(preference, signal)),
+  );
+  const accessMatches = template.creatorAccessSignals.filter((signal) =>
+    phraseMatches(creator.access, signal),
+  );
+  const preferenceScore =
+    preferenceMatches.length /
+    Math.max(1, template.creatorPreferenceSignals.length);
+  const accessScore =
+    accessMatches.length / Math.max(1, template.creatorAccessSignals.length);
+  const score = Number((preferenceScore * 0.6 + accessScore * 0.4).toFixed(3));
+  return {
+    preferenceMatches,
+    accessMatches,
+    score,
+    eligible: preferenceMatches.length > 0 && accessMatches.length > 0,
+  };
+}
 
 export const findNarrativeTemplate = (
   id: unknown,

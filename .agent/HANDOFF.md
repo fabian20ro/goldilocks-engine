@@ -21,6 +21,10 @@
   remain in place.
 - Added deterministic Hype/Fear balance scenarios, unit/UI Rule-of-Three
   tests, and Playwright portrait/lifecycle coverage.
+- Repair round: locked pre-recognition tool switches are disabled and exact
+  engine no-ops; available narratives disclose their finite deadline before
+  coverage; and creator preference/access signals now determine eligibility
+  and scale deterministic coverage effects.
 
 ## Plan requirements covered
 
@@ -39,8 +43,13 @@
 
 ## Verifier findings resolved
 
-- No unresolved verifier findings were present at the supplied round-088
-  baseline. This candidate introduces no report edits and no acceptance claim.
+- V-089-001: `SWITCH_TOOL` now rejects before recognition without changing
+  Hype/Fear state; World controls mirror the locked boundary.
+- V-089-002: available narrative details show the finite deadline window before
+  the creator decision.
+- V-089-003: finite catalog preference/access signals drive creator fit,
+  eligibility, and effect magnitude; creator fit is deterministic and no one
+  creator covers every narrative.
 
 ## Setup, startup, and verification commands
 
@@ -79,6 +88,9 @@ deterministic server cleanup and root/Pages browser lanes.
   restore through explicit migration steps.
 - Narrative templates and creator catalog are separate from engine transitions;
   copied narrative fields make deadlines/resolutions durable and inspectable.
+- Creator coverage uses finite template preference/access signals matched
+  against each original creator's existing fields. The UI exposes the fit and
+  the engine rejects a missing fit before any durable state change.
 - Attention coverage is bounded and response-gated. Hype/fear updates are
   explicit commands; deadline resolution is deterministic from seed, tick,
   metrics, Research usefulness, and private coverage.
@@ -108,29 +120,43 @@ deterministic server cleanup and root/Pages browser lanes.
   zero failures).
 - Passed focused unit/UI lane:
   `npx vitest run src/simulation/hypeFear.test.ts src/ui/worldView.test.tsx
-src/ui/commandDeck.test.tsx --coverage=false` (3 files, 10 tests).
-- Passed full unit lane: `npx vitest run --coverage=false` (62 files, 284
-  tests).
+src/simulation/verifierRound089.test.ts src/ui/verifierRound089.test.tsx
+--coverage=false` (4 files, 12 tests).
+- Passed full unit lane: `npm test` (64 files, 290 tests; coverage enabled).
+- Passed complete deterministic balance lane: `npm run balance` (numeric
+  `noDominantStrategy: true`; all first-session, upgrades, progression,
+  Career, Evaluation, Research, and Hype/Fear lanes passed).
+- Passed production build: `npm run build`.
+- Passed production audit: `npm audit --omit=dev --audit-level=high` (zero
+  vulnerabilities).
 - Passed focused Hype/Fear browser lane outside the restricted sandbox:
-  `E2E_PORT=42290 npm_config_cache="$PWD/.cache/npm"
-PLAYWRIGHT_BROWSERS_PATH="$PWD/.cache/ms-playwright" npm run test:e2e --
-tests/e2e/hype-fear.spec.ts` (2 tests, 10.0s).
-- Ran the single final canonical gate:
-  `E2E_PORT=42289 VERIFY_EVIDENCE_DIR="$PWD/.cache/verification/round-089-impl"
+  `E2E_PORT=42396 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright npm run
+test:e2e -- tests/e2e/hype-fear.spec.ts` (3 tests, 11.0s).
+- Attempted the single final canonical gate:
+  `INSTALL_PLAYWRIGHT=0 E2E_PORT=42397
+VERIFY_EVIDENCE_DIR=.cache/verification/round-089-repair-final
 npm_config_cache="$PWD/.cache/npm"
 PLAYWRIGHT_BROWSERS_PATH="$PWD/.cache/ms-playwright" ./scripts/verify`.
-  Setup, format, lint, typecheck, unit, balance, build, and production audit
-  passed. The root browser lane stopped on the environment's Chromium launch
-  failure (`bootstrap_check_in ... Permission denied (1100)`); evidence is in
-  `.cache/verification/round-089-impl/`.
+  Setup passed, then format stopped on the handoff's pre-format edit; evidence
+  is in `.cache/verification/round-089-repair-final/summary.txt`.
+- Repaired the documentation-only formatting issue with
+  `npx prettier --write .agent/HANDOFF.md`; the follow-up `npm run
+format:check` passed. Remaining canonical lanes were not rerun because this
+  role turn permits one final `./scripts/verify`; the same remaining lanes were
+  then run individually below.
+- Passed full pinned root browser lane:
+  `E2E_PORT=42398 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright npm run
+test:e2e` (234 tests).
+- Passed full pinned Pages/offline lane:
+  `E2E_PORT=42399 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright npm run
+test:e2e:pages` (2 tests).
 
 ## Checks not run
 
-- The canonical Pages/offline browser lane did not run because the preceding
-  root browser lane stopped on Chromium infrastructure failure. Native mobile/
-  device inspection was not run. The committed `tests/e2e/hype-fear.spec.ts`
-  covers 320/393px, reduced motion, 200% text, keyboard focus, reload, offline,
-  countdown, and response recovery.
+- Native mobile/device inspection was not run. The committed
+  `tests/e2e/hype-fear.spec.ts` covers locked recognition, 320/393px, reduced
+  motion, 200% text, keyboard focus, reload, offline, countdown, and response
+  recovery.
 
 ## Historical previous handoff
 

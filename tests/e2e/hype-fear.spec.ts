@@ -36,6 +36,7 @@ test.describe("Hype and Fear narratives", () => {
     await expect(page.getByTestId("narrative-card")).toContainText(
       "A small local tool",
     );
+    await expect(page.getByTestId("narrative-card")).toContainText("2.5H");
     await page.getByRole("button", { name: "Cover with Rhea Sol" }).click();
     await expect(page.getByText(/Make one explicit prediction/)).toBeVisible();
     await page
@@ -84,5 +85,25 @@ test.describe("Hype and Fear narratives", () => {
       page.getByRole("heading", { name: "Hype & Fear" }),
     ).toBeVisible();
     await page.context().setOffline(false);
+  });
+
+  test("locked recognition keeps tool switching disabled and state unchanged", async ({
+    page,
+  }) => {
+    await page.evaluate((key) => localStorage.removeItem(key), SAVE_KEY);
+    await page.reload();
+    await openWorld(page);
+    const tool = page.getByRole("button", { name: "Fast new runtime" });
+    await expect(tool).toBeDisabled();
+    const before = await page.evaluate(
+      (key) => JSON.parse(localStorage.getItem(key) ?? "null").hypeFear,
+      SAVE_KEY,
+    );
+    await expect(tool).toHaveAttribute("disabled", "");
+    const after = await page.evaluate(
+      (key) => JSON.parse(localStorage.getItem(key) ?? "null").hypeFear,
+      SAVE_KEY,
+    );
+    expect(after).toEqual(before);
   });
 });
