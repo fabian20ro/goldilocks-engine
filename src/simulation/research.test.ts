@@ -44,6 +44,22 @@ function prepareContext(state = recognizedState()): SimulationState {
   return next;
 }
 
+function prepareOrinContext(): SimulationState {
+  const base = recognizedState();
+  let next = sealSimulationState({
+    ...base,
+    resources: { ...base.resources, money: 10, reputation: 0.6 },
+  });
+  for (const command of [
+    { type: "SET_RESEARCH_GOAL", text: "Find durable evidence" },
+    { type: "INSPECT_RESEARCH_PROJECT", projectId: "context-reconstruction" },
+    { type: "RECRUIT_RESEARCHER", researcherId: "orin-kade" },
+    { type: "SET_RESEARCH_TEAM", researcherIds: ["orin-kade"] },
+  ] as const)
+    next = applyCommand(next, command);
+  return next;
+}
+
 describe("Research pipeline", () => {
   it("normal: inspects, commits, measures, and leaves a useful pending decision", () => {
     let state = prepareContext();
@@ -82,6 +98,12 @@ describe("Research pipeline", () => {
     expect(state.research.institutionalKnowledge).toBeGreaterThan(0);
     expect(state.resources.money).toBe(cashAfterCommit);
     expect(isStateValid(state)).toBe(true);
+    const restoredCompleted = restoreSimulationState(
+      JSON.parse(JSON.stringify(state)),
+      state.seed,
+    );
+    expect(restoredCompleted.research).toEqual(state.research);
+    expect(isStateValid(restoredCompleted)).toBe(true);
   });
 
   it("adversarial: hidden, malformed, and unaffordable paths preserve state", () => {
@@ -138,6 +160,52 @@ describe("Research pipeline", () => {
     expect(recovered.research.teamMemberIds).toEqual([]);
     expect(recovered.resources.money).toBe(state.resources.money);
     expect(isStateValid(recovered)).toBe(true);
+  });
+
+  it("adversarial: forged frontier and knowledge clear, then offline recovery remains usable", () => {
+    const state = recognizedState();
+    const malformed = JSON.parse(JSON.stringify(state)) as SimulationState;
+    malformed.research.frontier = {
+      discoveredProjectIds: ["context-reconstruction", "negative-space"],
+      inspectedProjectIds: ["context-reconstruction", "negative-space"],
+      completedProjectIds: ["context-reconstruction"],
+    };
+    malformed.research.goal = {
+      text: "Forged progression",
+      createdAtTick: malformed.tick,
+      status: "pending",
+    };
+    malformed.research.availableResearcherIds = [];
+    malformed.research.recruitedResearcherIds = ["mira-voss"];
+    malformed.research.teamMemberIds = ["mira-voss"];
+    malformed.research.institutionalKnowledge = 1;
+
+    const recovered = restoreSimulationState(malformed, state.seed);
+    expect(recovered.research.frontier).toEqual({
+      discoveredProjectIds: ["context-reconstruction"],
+      inspectedProjectIds: [],
+      completedProjectIds: [],
+    });
+    expect(recovered.research.goal).toBeNull();
+    expect(recovered.research.availableResearcherIds).toEqual(["mira-voss"]);
+    expect(recovered.research.recruitedResearcherIds).toEqual([]);
+    expect(recovered.research.teamMemberIds).toEqual([]);
+    expect(recovered.research.institutionalKnowledge).toBe(0);
+
+    const offlineConfigured = applyCommand(recovered, {
+      type: "SET_OFFLINE_POLICY",
+      enabled: true,
+      maxHours: 4,
+      maxElectricityCost: 5,
+      maxOperatingCost: 5,
+      minReliability: 0.7,
+    });
+    const resumed = applyCommand(offlineConfigured, {
+      type: "APPLY_OFFLINE_POLICY",
+      requestedHours: 4,
+    });
+    expect(resumed.research.frontier).toEqual(recovered.research.frontier);
+    expect(isStateValid(resumed)).toBe(true);
   });
 
   it("adversarial: future-dated goals and projects clear on restore", () => {
@@ -211,6 +279,60 @@ describe("Research pipeline", () => {
       state.research.retainedKnowledge,
     );
     expect(isStateValid(restored)).toBe(true);
+  });
+
+  it("normal: First-Principles Reconstruction is available once to its authorized team", () => {
+    const state = prepareOrinContext();
+    const once = applyCommand(state, {
+      type: "FIRST_PRINCIPLES_RECONSTRUCTION",
+    });
+
+    expect(once.research.firstPrinciplesUses).toBe(1);
+    expect(once.research.institutionalKnowledge).toBe(0.3);
+    expect(once.research.tacitKnowledge["orin-kade"]).toBeGreaterThan(0);
+    expect(once.research.strategicOptionIds).toContain("reconstruction-plan");
+    expect(isStateValid(once)).toBe(true);
+  });
+
+  it("adversarial: replay and missing authority cannot accumulate signature knowledge", () => {
+    const authorized = prepareOrinContext();
+    const once = applyCommand(authorized, {
+      type: "FIRST_PRINCIPLES_RECONSTRUCTION",
+    });
+    const replayed = applyCommand(once, {
+      type: "FIRST_PRINCIPLES_RECONSTRUCTION",
+    });
+    expect(replayed.research).toEqual(once.research);
+
+    const unauthorized = prepareContext();
+    const rejected = applyCommand(unauthorized, {
+      type: "FIRST_PRINCIPLES_RECONSTRUCTION",
+    });
+    expect(rejected.research).toEqual(unauthorized.research);
+    expect(isStateValid(replayed)).toBe(true);
+    expect(isStateValid(rejected)).toBe(true);
+  });
+
+  it("lifecycle: the signature bound survives reload and researcher departure", () => {
+    const once = applyCommand(prepareOrinContext(), {
+      type: "FIRST_PRINCIPLES_RECONSTRUCTION",
+    });
+    const restored = restoreSimulationState(
+      JSON.parse(JSON.stringify(once)),
+      once.seed,
+    );
+    expect(restored.research).toEqual(once.research);
+
+    const released = applyCommand(restored, {
+      type: "RELEASE_RESEARCHER",
+      researcherId: "orin-kade",
+    });
+    expect(released.research.retainedKnowledge).toBeGreaterThan(0);
+    const replayedAfterDeparture = applyCommand(released, {
+      type: "FIRST_PRINCIPLES_RECONSTRUCTION",
+    });
+    expect(replayedAfterDeparture.research).toEqual(released.research);
+    expect(isStateValid(replayedAfterDeparture)).toBe(true);
   });
 
   it("determinism/property: fixed seeds keep outcome and every generated state valid", () => {

@@ -54,7 +54,7 @@ and accessibility remain regression boundaries.
 The preceding boundary is frozen round-083 history. The owner explicitly
 authorized Milestone 4 Research for the current Implementer turn. The
 authorized Research route is bounded by `plan.md` §§3–7.4, 12, 17, 19,
-20/20.4, 23–27, 29, 33, and 34 plus D-037: deterministic content/state,
+20/20.4, 23–27, 29, 33, and 34 plus D-037–D-038: deterministic content/state,
 original fictional researchers, hidden/evidence-gated questions, useful
 partial/failure outcomes, team/retained knowledge, player goals, Inspect
 strategy changes, and the existing threat/accessibility/offline contracts.
@@ -65,7 +65,7 @@ immutable verification reports.
 
 | Need                                 | Exact authority                                                                                |
 | ------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| Product gate / Research requirements | `plan.md` §§3–7.4, 12, 17, 19, 20/20.4, 23–27, 29, 33–34; D-037                                |
+| Product gate / Research requirements | `plan.md` §§3–7.4, 12, 17, 19, 20/20.4, 23–27, 29, 33–34; D-037–D-038                          |
 | Settlement/accounting UI             | D-030, D-033 in `.agent/DECISIONS.md`                                                          |
 | Provenance/recovery/identity         | D-034, D-035, D-036 in `.agent/DECISIONS.md`                                                   |
 | Pre-repair presentation baseline     | `.agent/verification/round-078.md`, verifier commit `437b56245b8488cce0ea1193be4200985cace2c7` |

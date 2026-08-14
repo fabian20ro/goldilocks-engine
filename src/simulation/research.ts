@@ -20,6 +20,9 @@ const RESEARCH_OUTCOME_KINDS = [
   "replication-failure",
 ] as const;
 
+/** First-Principles Reconstruction is a signature intervention, not a loop. */
+export const MAX_FIRST_PRINCIPLES_USES = 1;
+
 export interface ResearchContext {
   seed: number;
   jobsCompleted: number;
@@ -431,7 +434,7 @@ export function isResearchStateShapeValid(
     !uniqueStrings(state.toolIds) ||
     !uniqueStrings(state.strategicOptionIds) ||
     !positiveInteger(state.firstPrinciplesUses) ||
-    state.firstPrinciplesUses > 1000
+    state.firstPrinciplesUses > MAX_FIRST_PRINCIPLES_USES
   )
     return false;
   if (state.activeProject !== null) {

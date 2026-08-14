@@ -25,6 +25,7 @@ import { findResearcher, findResearchProject } from "./researchCatalog";
 import {
   createInitialResearchState,
   isResearchStateShapeValid,
+  MAX_FIRST_PRINCIPLES_USES,
   researchEstimate,
   researchInspectReveals,
   researchProjectRequirements,
@@ -3661,6 +3662,16 @@ function applyValidCommand(
           state,
           "Recruit and add Orin Kade to the research team before using First-Principles Reconstruction.",
         );
+      if (state.research.goal === null)
+        return researchWarning(
+          state,
+          "Write a research goal before using First-Principles Reconstruction.",
+        );
+      if (state.research.firstPrinciplesUses >= MAX_FIRST_PRINCIPLES_USES)
+        return researchWarning(
+          state,
+          "First-Principles Reconstruction is already retained for this run; interpret its assumptions before using another signature action.",
+        );
       const nextTacit = researchTeamKnowledge(state.research, 0.24);
       return appendEvent(
         {
@@ -4965,10 +4976,14 @@ export function restoreSimulationState(
     const storedResearch = record.research;
     const restoreTick =
       typeof record.tick === "number" ? record.tick : Number.NaN;
-    const researchIsValid = isResearchStateShapeValid(
+    const researchShapeValid = isResearchStateShapeValid(
       storedResearch,
       restoreTick,
     );
+    // A shape-valid Research object is not historical proof. Preserve frontier,
+    // team, goal, and knowledge only when the complete save was sealed before
+    // the object was supplied to restore; otherwise recover the safe default.
+    const researchIsValid = originalIntegrityValid && researchShapeValid;
     const research = researchIsValid
       ? storedResearch
       : createInitialResearchState();
@@ -4990,7 +5005,7 @@ export function restoreSimulationState(
     if (
       record.contentVersion === PREVIOUS_CONTENT_VERSION ||
       storedResearch === undefined ||
-      !researchIsValid
+      !researchShapeValid
     )
       migration = withMigrationStep(
         migration,

@@ -842,3 +842,30 @@
   Deterministic scenario/property/balance tests and committed Playwright
   checks are the independent evidence surface; no acceptance claim is made by
   this decision.
+
+## D-038 — Research progression trust and signature bound
+
+- **Decision:** A current-schema Research object retains frontier, goal, roster,
+  team, and knowledge progression during restore only when the original save
+  integrity seal is valid and the Research shape/timestamp checks pass. A
+  shape-valid object from a stale, invalid, or absent seal falls back to the
+  safe Research default; valid sealed progression is preserved.
+- **Signature boundary:** First-Principles Reconstruction is an engine-owned
+  one-use-per-run intervention. A valid call requires Research recognition, a
+  player-authored pending goal, and Orin Kade both recruited and on the team.
+  Replay or missing authority emits the existing warning event and leaves
+  Research unchanged. `firstPrinciplesUses` is persisted and bounded by
+  `MAX_FIRST_PRINCIPLES_USES`.
+- **Reason:** V-085 showed that IDs and shape alone can present forged Research
+  progression after restore. V-086 showed repeated signature commands could
+  mint unbounded institutional/tacit knowledge without time or opportunity
+  cost. Original integrity and explicit engine guards are the smallest stable
+  authority boundaries; no new content, schema, or UI redesign is needed.
+- **Evidence policy:** Candidate tests cover valid sealed progression, forged
+  restore recovery plus offline use, authorized signature use, replay and
+  insufficient authority, reload, and researcher departure. Independent
+  verifier tests/probes and the canonical browser lanes remain required.
+- **Reversal condition:** Replace this boundary only with an independently
+  verifiable progression authentication and bounded signature economy that
+  preserves safe recovery, persistence, explicit goals, and the existing
+  threat/offline/accessibility contracts.

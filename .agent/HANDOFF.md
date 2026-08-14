@@ -1,4 +1,4 @@
-# Candidate handoff — Milestone 4 Research (round 086 repair)
+# Candidate handoff — Milestone 4 Research (round 087 repair)
 
 ## Current round implementation
 
@@ -26,6 +26,14 @@
   must not be later than the enclosing simulation tick. Future-dated persisted
   Research now falls back to the safe default instead of presenting a future
   measurement as running.
+- Repaired V-085 progression trust: only an original-integrity-valid current
+  save may retain persisted Research frontier, goal, roster, team, and
+  knowledge. Shape-valid stale or forged progression now restores the safe
+  Research default while valid sealed progression remains intact.
+- Repaired V-086 signature accumulation: First-Principles Reconstruction has
+  one engine-owned use per run, requires its player-authored goal and Orin's
+  active team authority, and rejects replay without changing Research state.
+  The bound persists through reload and researcher departure.
 
 ## Plan requirements covered
 
@@ -51,8 +59,15 @@
 - Resolved V-084 from immutable round-086: future-dated Research goal/project
   timestamps are rejected during restore; the candidate regression covers
   cleared project/team and preserved cash.
-- The Rule-of-Three regression covers valid temporal ordering, malformed
-  future-timestamp recovery, and active reload/offline lifecycle progression.
+- Resolved V-085 from immutable round-087: shape-valid forged Research
+  progression is rejected without a valid original integrity seal; valid sealed
+  progression and offline/lifecycle recovery remain covered.
+- Resolved V-086 from immutable round-087: First-Principles Reconstruction is
+  bounded to one persisted use and guarded at the engine command seam; replay,
+  missing authority, reload, and researcher departure remain covered.
+- Rule-of-Three coverage maps valid sealed progression, malformed/forged
+  recovery, and reload/offline/cross-feature lifecycle. Signature coverage maps
+  authorized use, replay/insufficient authority, and reload/departure.
 
 ## Setup, startup, and verification commands
 
@@ -100,6 +115,14 @@ path when required.
 - Research shape validation receives the enclosing simulation tick for both
   structural checks and restore selection; future goal/project timestamps
   therefore cannot survive persistence recovery or remain state-valid.
+- Research restore uses the original save integrity seal as the authority for
+  retaining progression. Shape-valid but stale/invalid Research is replaced by
+  the safe default; migration metadata does not claim a content migration for
+  this trust recovery.
+- `MAX_FIRST_PRINCIPLES_USES = 1` is an engine-owned persisted bound. The
+  command guard checks recognition, goal, Orin roster/team authority, and the
+  bound; the UI remains a truthful affordance while invalid/replayed commands
+  fail fast without Research mutation.
 - Existing safe offline policy remains freelance-only. Research progress is
   driven only by explicit deterministic simulation ticks.
 - The sixth navigation destination is the smallest coherent UI change needed
@@ -118,22 +141,18 @@ path when required.
 ## Checks run
 
 - Passed `./scripts/agent-status` before implementation: latest immutable round
-  086 was FAIL with only V-084 unresolved; started from verifier commit
-  `8b7ba13691cbe026c661bad55c2b08eef4f360e3`.
+  087 was FAIL with V-085/V-086 unresolved; started from verifier commit
+  `d5edcb983515e8636cdfb70745a05ceaf4aa0a5b`.
 - Passed focused `node_modules/.bin/vitest run --coverage=false
 src/simulation/research.test.ts src/simulation/verifierRound085.test.ts
-src/simulation/verifierRound086.test.ts`: 3 files, 7 tests.
+src/simulation/verifierRound086.test.ts src/simulation/verifierRound087.test.ts`:
+  4 files, 13 tests.
+- Passed focused engine/research regression lane including
+  `src/simulation/engine.test.ts`: 5 files, 67 tests.
 - Passed `npm run typecheck` and `npm run lint`.
-- Passed `node_modules/.bin/vitest run --coverage=false`: 58 files, 269 tests.
-- Passed `node_modules/.bin/tsx
-.agent/verification/round-085-engine-probe.ts`: hidden frontier, migration,
-  outcome, researcher, and offline boundaries held.
-- Passed `npm test` inside the final canonical gate: 58 files, 269 tests;
-  86.17% statements, 83.01% branches, 94.42% functions, 89.13% lines.
-- Passed `npm run balance:research` inside the final canonical gate: 121 seeds,
-  zero failures, four outcome kinds, catalog valid.
+- Passed `node_modules/.bin/vitest run --coverage=false`: 59 files, 275 tests.
 - Passed final canonical gate:
-  `E2E_PORT=42192 VERIFY_EVIDENCE_DIR="$PWD/.cache/verification/round-086-repair" PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright npm_config_cache="$PWD/.cache/npm" ./scripts/verify` — setup, format, lint, typecheck, 58 unit files/269 tests, all balances including 121-seed Research, build, audit, 231 root browser tests (including Research), and 2 Pages/offline tests. Evidence: `.cache/verification/round-086-repair`.
+  `E2E_PORT=42193 VERIFY_EVIDENCE_DIR="$PWD/.cache/verification/round-087-repair" PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright npm_config_cache="$PWD/.cache/npm" ./scripts/verify` — setup, format, lint, typecheck, 59 unit files/275 tests (86.45% statements, 83.34% branches, 94.42% functions, 89.43% lines), all balances including 121-seed Research, build, production audit, 231 root browser/PWA tests (including Research), and 2 Pages/offline tests. Evidence: `.cache/verification/round-087-repair`.
 
 ## Checks not run
 

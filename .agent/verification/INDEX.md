@@ -46,7 +46,7 @@ evidence, not authority. The canonical command retains every lane.
 
 The frozen provenance map above remains historical. The owner-authorized
 Milestone 4 Research route is `plan.md` §§3–7.4, 12, 17, 19, 20/20.4, 23–27,
-29, 33–34 plus D-037 in `.agent/DECISIONS.md`. Candidate evidence is expected
+29, 33–34 plus D-037–D-038 in `.agent/DECISIONS.md`. Candidate evidence is expected
 in the Research domain tests, balance scenario, and `tests/e2e/research.spec.ts`;
 the canonical lane remains `./scripts/verify`. This routing note is not a
 verdict or acceptance record.
