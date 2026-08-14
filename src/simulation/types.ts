@@ -1,6 +1,6 @@
 export const SCHEMA_VERSION = 7;
-export const CONTENT_VERSION = "hype-fear-1";
-export const PREVIOUS_CONTENT_VERSION = "research-1";
+export const CONTENT_VERSION = "local-lab-1";
+export const PREVIOUS_CONTENT_VERSION = "hype-fear-1";
 export const SAVE_INTEGRITY_ALGORITHM = "fnv1a-32-json-v1";
 
 export type SlotType = "source" | "process" | "sink";
@@ -229,6 +229,90 @@ export interface HypeFearState {
   doomFeed: readonly DoomFeedEntry[];
   lastResponse: NarrativeResponseRecord | null;
   attentionOnlyActions: number;
+}
+
+export type LaboratoryMachineId =
+  | "bench-node"
+  | "parallel-rack"
+  | "evidence-rig"
+  | "archive-node";
+
+export type LaboratoryPipelineId = "reproducibility" | "research" | "delivery";
+
+export type LaboratoryCollaboratorId = string;
+
+export type LaboratoryCultureId =
+  | "evidence-first"
+  | "open-methods"
+  | "craft-and-care";
+
+export type LaboratoryScenarioId =
+  | "limited-hardware"
+  | "academic-collaboration"
+  | "creator-attention"
+  | "high-public-fear"
+  | "weak-economy"
+  | "expensive-electricity";
+
+export type LaboratoryFoundingDecision =
+  | "independent-laboratory"
+  | "open-research-collective"
+  | "larger-organization-collaboration";
+
+export interface LaboratoryMachineState {
+  id: LaboratoryMachineId;
+  acquiredAtTick: number;
+}
+
+export interface LaboratoryActiveRun {
+  startedAtTick: number;
+  elapsedHours: number;
+  expectedDurationHours: number;
+  committedCost: number;
+}
+
+export interface LaboratoryPipelineState {
+  id: LaboratoryPipelineId;
+  machineIds: readonly LaboratoryMachineId[];
+  waitingRuns: number;
+  activeRun: LaboratoryActiveRun | null;
+  completedRuns: number;
+  failedRuns: number;
+  lastRunTick: number | null;
+}
+
+export interface LaboratoryReproducibilityState {
+  versionedConfigs: boolean;
+  lockedSeeds: boolean;
+  independentEvaluation: boolean;
+  documentedRuns: number;
+  score: number;
+}
+
+export interface LaboratoryRunRecord {
+  pipelineId: LaboratoryPipelineId;
+  completed: boolean;
+  startedAtTick: number;
+  finishedAtTick: number;
+  reproducibilityScore: number;
+  note: string;
+}
+
+export interface LaboratoryState {
+  unlocked: boolean;
+  unlockedAtTick: number | null;
+  scenarioId: LaboratoryScenarioId;
+  scenarioUnlockIds: readonly LaboratoryScenarioId[];
+  scenarioProgress: Readonly<Record<LaboratoryScenarioId, number>>;
+  machines: readonly LaboratoryMachineState[];
+  pipelines: readonly LaboratoryPipelineState[];
+  collaboratorIds: readonly LaboratoryCollaboratorId[];
+  cultureId: LaboratoryCultureId | null;
+  reproducibility: LaboratoryReproducibilityState;
+  foundingDecision: LaboratoryFoundingDecision | null;
+  pendingDecision: string;
+  lastRun: LaboratoryRunRecord | null;
+  totalOperatingCost: number;
 }
 
 export type ResearchPrerequisiteKind =
@@ -511,7 +595,12 @@ export type RunEndingId =
   | "product-reliability-collapse"
   | "hardware-debt-spiral"
   | "tutorial-loop"
-  | "honest-independent-builder";
+  | "honest-independent-builder"
+  | "viral-support-catastrophe"
+  | "maintainer-exhaustion"
+  | "panic-business"
+  | "invisible-laboratory"
+  | "honest-foundation";
 
 /** A run ending points only at evidence retained in the bounded ledger. */
 export interface RunEnding {
@@ -748,6 +837,7 @@ export interface SimulationState {
   career: CareerState;
   research: ResearchState;
   hypeFear: HypeFearState;
+  laboratory: LaboratoryState;
   meta: MetaProgression;
   firstSession: FirstSessionProgress;
   jobs: JobState;
@@ -814,6 +904,24 @@ export type SimulationCommand =
   | { type: "RESPOND_TO_NARRATIVE"; response: NarrativeResponseId }
   | { type: "RESPOND_TO_FEAR"; response: FearResponseId }
   | { type: "SWITCH_TOOL"; toolId: ToolId }
+  | { type: "BUY_LAB_MACHINE"; machineId: LaboratoryMachineId }
+  | { type: "ADD_LAB_PIPELINE"; pipelineId: LaboratoryPipelineId }
+  | {
+      type: "ASSIGN_LAB_MACHINE";
+      pipelineId: LaboratoryPipelineId;
+      machineId: LaboratoryMachineId;
+    }
+  | { type: "INVITE_LAB_COLLABORATOR"; researcherId: string }
+  | {
+      type: "SET_LAB_REPRODUCIBILITY";
+      field: "versionedConfigs" | "lockedSeeds" | "independentEvaluation";
+      enabled: boolean;
+    }
+  | { type: "DOCUMENT_LAB_RUN" }
+  | { type: "SET_LAB_CULTURE"; cultureId: LaboratoryCultureId }
+  | { type: "SELECT_LAB_SCENARIO"; scenarioId: LaboratoryScenarioId }
+  | { type: "QUEUE_LAB_RUN"; pipelineId: LaboratoryPipelineId; count?: number }
+  | { type: "FOUND_LAB"; decision: LaboratoryFoundingDecision }
   | {
       type: "SET_OFFLINE_POLICY";
       enabled: boolean;

@@ -931,3 +931,137 @@ NotificationShade`); attempted screenshots were lock-screen/black, so no
   requires repository-local caches.
 - No hosted CI/deployment/push. Those require external release authority and
   are outside this candidate handoff.
+
+# Candidate handoff — Milestone 6 Local Laboratory endgame (round 092)
+
+## Implemented behavior summary
+
+- Added schema-7 `local-lab-1` state with safe restore/migration for prior
+  `hype-fear-1`, `research-1`, and `evaluation-replay-1` saves.
+- Added four machine specs, three bounded pipelines, parallel run queues,
+  deterministic run outcomes, costs, failure traces, collaborators drawn from
+  retained Research, reproducibility switches/documentation, cultures, and
+  seed/evidence scenario unlocks.
+- Added explicit independent-lab, open-collective, and larger-organization
+  founding choices with causal postmortems for five remaining first-release
+  lab endings; prior five endings remain available.
+- Added an accessible Lab tab with locked prerequisites, visible accounting,
+  machine/pipeline/collaborator/evidence/scenario/founding surfaces, and
+  persistence-aware browser coverage at 320/393px.
+
+## Plan requirements covered
+
+- `plan.md` §7.4 and Milestone 6: multiple machines, parallel pipelines,
+  collaborators, reproducibility systems, documentation/retained knowledge,
+  laboratory culture, scenario unlocks, founding decision, remaining named
+  endings, coherent Research/Hype/Fear-connected transition.
+- §16 and §17: bounded routine failures, deterministic replay variation, and
+  direct/contributing/correlation/hypothesis/unknown postmortem evidence.
+- §19–§20 and repository contracts: Worker-only progression, persistence,
+  stale-save recovery, PWA/offline compatibility, explicit accounting, and
+  accessible portrait UI.
+
+## Verifier findings resolved
+
+- No unresolved verifier findings were present at supplied round-091 PASS.
+  This candidate adds the owner-authorized Milestone 6 surface and regression
+  tests; independent verification must assess the exact candidate SHA.
+
+## Setup, startup, and verification commands
+
+Dependencies and browsers use ignored repository-local caches:
+
+```sh
+./scripts/setup
+./scripts/run
+# deterministic loopback: http://127.0.0.1:4173/
+```
+
+```text
+npm cache:          .cache/npm
+Playwright browser: .cache/ms-playwright
+browser artifacts:  test-results/, playwright-report/, playwright-pages-report/
+```
+
+Focused commands:
+
+```sh
+npm run typecheck
+npm run lint
+npx vitest run src/simulation/laboratory.test.ts src/simulation/engine.test.ts
+npm run balance:laboratory
+npm run balance:evaluation
+npm run build
+npm run test:e2e -- tests/e2e/laboratory.spec.ts
+```
+
+Canonical gate:
+
+```sh
+INSTALL_PLAYWRIGHT=0 E2E_PORT=42405 \
+VERIFY_EVIDENCE_DIR=.cache/verification/round-092-final \
+npm_config_cache="$PWD/.cache/npm" \
+PLAYWRIGHT_BROWSERS_PATH="$PWD/.cache/ms-playwright" ./scripts/verify
+```
+
+`@playwright/test` remains pinned in `package.json`; `test:e2e` uses the
+ignored repository-local browser cache. `./scripts/verify` owns deterministic
+server startup and cleanup for root/Pages/PWA lanes.
+
+## Important architectural decisions
+
+- D-040 records the bounded endgame. Laboratory state is a separate domain
+  module; engine commands own accounting, lifecycle, and restore boundaries.
+- Lab entry requires Bedroom Developer exit, one completed Research question,
+  Hype/Fear recognition, and one resolved response. A balance fixture exists
+  only for independent deterministic verification and never changes startup.
+- Machine assignment is explicit and parallel capacity is not an automatic
+  multiplier. Queue costs reserve cash before the Worker starts a run; every
+  completed or failed run retains a record and ledger event.
+
+## Known limitations and risks
+
+- The candidate does not add startup/workforce/government/remote/generative
+  systems or later laboratory expansion.
+- Native mobile/device and non-Chromium inspection remain outside the pinned
+  Playwright evidence surface.
+- The final canonical gate must be rerun by the orchestrator/verifier on this
+  exact committed SHA; this handoff is not an acceptance verdict.
+
+## Checks run
+
+- Passed `./scripts/agent-status` at supplied baseline SHA
+  `95fbf045c71fed8d1979eb77b1d8e71421cee0bd` before edits.
+- Passed `npm run typecheck`.
+- Passed `npm run lint -- --no-warn-ignored`.
+- Passed `npx vitest run src/simulation/laboratory.test.ts
+src/simulation/engine.test.ts` (2 files, 62 tests).
+- Passed `npm run balance:laboratory` (24/24 valid, 24 completed, 24 endings,
+  17 passed deterministic experiments).
+- Passed `npm run balance:evaluation` (121 seeds, zero failures).
+- Passed `npm run build`.
+- Passed focused `npm run test:e2e -- tests/e2e/laboratory.spec.ts` once
+  (1/1), including reload, 320/393 portrait, and 200% text-size overflow
+  checks. Later reruns hit a local Chromium Mach-port permission failure;
+  this is recorded as infrastructure-only and requires independent rerun.
+- First canonical gate attempt used the command below and passed setup,
+  format, lint, typecheck, unit (66 files / 303 tests), balance, build, and
+  production audit. Root browser stopped with 23 portrait/a11y failures caused
+  by the newly added eighth tab resolving to 40px buttons at 320px; no product
+  behavior failures were reported. The nav was repaired with a contained
+  44px minimum-width scroll rail, and focused `game.spec.ts` plus
+  `verifier-round-003.spec.ts` now pass (14/14).
+- Passed the final canonical gate after the repair:
+  `INSTALL_PLAYWRIGHT=0 E2E_PORT=42406
+VERIFY_EVIDENCE_DIR=.cache/verification/round-092-final-2
+npm_config_cache="$PWD/.cache/npm"
+PLAYWRIGHT_BROWSERS_PATH="$PWD/.cache/ms-playwright" ./scripts/verify`.
+  Format, lint, typecheck, 66 unit files / 303 tests, all balance lanes,
+  build, production audit (0 production vulnerabilities), root browser/PWA
+  235/235, and Pages/offline 2/2 passed. Evidence:
+  `.cache/verification/round-092-final-2`.
+
+## Checks not run
+
+- No applicable canonical gate remains skipped.
+- Native mobile/device and non-Chromium browser inspection not run.

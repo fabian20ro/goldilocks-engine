@@ -3,7 +3,12 @@ import {
   createInitialState,
   independentRunReadiness,
   isStateValid,
+  sealSimulationState,
 } from "./engine";
+import {
+  prepareLaboratoryBalanceRun,
+  runLaboratoryBalance,
+} from "./laboratoryBalance";
 import type { CareerRoute, RunEndingId, SimulationState } from "./types";
 
 export interface EvaluationScenarioResult {
@@ -136,6 +141,91 @@ function runCautiousPlan(seed: number): SimulationState {
   return state;
 }
 
+function runLaboratoryEnding(
+  seed: number,
+  endingId: Extract<
+    RunEndingId,
+    | "viral-support-catastrophe"
+    | "maintainer-exhaustion"
+    | "panic-business"
+    | "invisible-laboratory"
+    | "honest-foundation"
+  >,
+): SimulationState {
+  if (endingId === "honest-foundation") return runLaboratoryBalance(seed);
+  let state = prepareLaboratoryBalanceRun(seed);
+  if (endingId === "viral-support-catastrophe") {
+    state = sealSimulationState({
+      ...state,
+      hypeFear: {
+        ...state.hypeFear,
+        attention: 60,
+        stakeholderSelection: {
+          ...state.hypeFear.stakeholderSelection,
+          supportHeavyUsers: 0.72,
+        },
+      },
+      laboratory: {
+        ...state.laboratory,
+        pipelines: state.laboratory.pipelines.map((pipeline) => ({
+          ...pipeline,
+          completedRuns: 0,
+          failedRuns: 2,
+        })),
+      },
+    });
+  } else if (endingId === "maintainer-exhaustion") {
+    state = sealSimulationState({
+      ...state,
+      research: {
+        ...state.research,
+        availableResearcherIds: state.research.availableResearcherIds.filter(
+          (id) => id !== "mira-voss",
+        ),
+        recruitedResearcherIds: [
+          ...new Set([...state.research.recruitedResearcherIds, "mira-voss"]),
+        ],
+      },
+      laboratory: {
+        ...state.laboratory,
+        collaboratorIds: [
+          ...new Set([...state.laboratory.collaboratorIds, "mira-voss"]),
+        ],
+      },
+    });
+  } else if (endingId === "panic-business") {
+    state = sealSimulationState({
+      ...state,
+      hypeFear: {
+        ...state.hypeFear,
+        fear: 0.52,
+        toolSwitchingPanic: 0.52,
+      },
+    });
+  } else {
+    state = sealSimulationState({
+      ...state,
+      laboratory: {
+        ...state.laboratory,
+        collaboratorIds: [],
+        reproducibility: {
+          ...state.laboratory.reproducibility,
+          score: 0.2,
+        },
+      },
+    });
+  }
+  return applyCommand(state, {
+    type: "FOUND_LAB",
+    decision:
+      endingId === "maintainer-exhaustion"
+        ? "open-research-collective"
+        : endingId === "panic-business"
+          ? "larger-organization-collaboration"
+          : "independent-laboratory",
+  });
+}
+
 /** Different preventative routes for each ending; all remain operable. */
 function responseStates(seed: number): readonly SimulationState[] {
   let leaderboard = evening(createInitialState(seed), "freelance");
@@ -188,6 +278,16 @@ export function runEndingScenario(
       return runTutorialLoop(seed);
     case "honest-independent-builder":
       return runHonestIndependentBuilder(seed);
+    case "viral-support-catastrophe":
+      return runLaboratoryEnding(seed, "viral-support-catastrophe");
+    case "maintainer-exhaustion":
+      return runLaboratoryEnding(seed, "maintainer-exhaustion");
+    case "panic-business":
+      return runLaboratoryEnding(seed, "panic-business");
+    case "invisible-laboratory":
+      return runLaboratoryEnding(seed, "invisible-laboratory");
+    case "honest-foundation":
+      return runLaboratoryEnding(seed, "honest-foundation");
   }
 }
 

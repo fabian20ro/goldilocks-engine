@@ -55,6 +55,24 @@ import {
   type ResearchContext,
 } from "./research";
 import {
+  createInitialLaboratoryState,
+  isLaboratoryStateShapeValid,
+  laboratoryEntryReadiness,
+  laboratoryReproducibilityScore,
+  laboratoryRunDuration,
+  laboratoryRunOutcome,
+  laboratoryScenarioUnlocks,
+  laboratoryPipelineReadiness,
+  refreshLaboratoryScore,
+  chooseLaboratoryEnding,
+} from "./laboratory";
+import {
+  findLaboratoryCulture,
+  findLaboratoryMachine,
+  findLaboratoryPipeline,
+  findLaboratoryScenario,
+} from "./laboratoryCatalog";
+import {
   CONTENT_VERSION,
   PREVIOUS_CONTENT_VERSION,
   SAVE_INTEGRITY_ALGORITHM,
@@ -123,6 +141,7 @@ const MAX_EVALUATION_SPEND = 10_000;
 const MAX_EVALUATION_COUNTER = 10_000;
 const MAX_META_REPLAYS = 1_000_000;
 const LEGACY_CONTENT_VERSION = "evaluation-replay-1";
+const EARLIER_CONTENT_VERSION = "research-1";
 const PRIVATE_ASSESSMENTS: readonly PrivateAssessment[] = [
   "not-run",
   "inconclusive",
@@ -143,6 +162,11 @@ const RUN_ENDING_IDS: readonly RunEndingId[] = [
   "hardware-debt-spiral",
   "tutorial-loop",
   "honest-independent-builder",
+  "viral-support-catastrophe",
+  "maintainer-exhaustion",
+  "panic-business",
+  "invisible-laboratory",
+  "honest-foundation",
 ];
 export const SIMULATION_TIME_SCALE = 70;
 
@@ -451,6 +475,12 @@ export function isRuntimeSimulationCommand(command: unknown): boolean {
     confidence?: unknown;
     response?: unknown;
     toolId?: unknown;
+    machineId?: unknown;
+    pipelineId?: unknown;
+    field?: unknown;
+    cultureId?: unknown;
+    scenarioId?: unknown;
+    decision?: unknown;
   };
 
   switch (input.type) {
@@ -535,6 +565,49 @@ export function isRuntimeSimulationCommand(command: unknown): boolean {
         "fast-new-runtime",
         "evidence-first-stack",
       ].includes(input.toolId as string);
+    case "BUY_LAB_MACHINE":
+      return typeof input.machineId === "string";
+    case "ADD_LAB_PIPELINE":
+      return typeof input.pipelineId === "string";
+    case "ASSIGN_LAB_MACHINE":
+      return (
+        typeof input.pipelineId === "string" &&
+        typeof input.machineId === "string"
+      );
+    case "INVITE_LAB_COLLABORATOR":
+      return typeof input.researcherId === "string";
+    case "SET_LAB_REPRODUCIBILITY":
+      return (
+        ["versionedConfigs", "lockedSeeds", "independentEvaluation"].includes(
+          input.field as string,
+        ) && typeof input.enabled === "boolean"
+      );
+    case "DOCUMENT_LAB_RUN":
+      return true;
+    case "SET_LAB_CULTURE":
+      return ["evidence-first", "open-methods", "craft-and-care"].includes(
+        input.cultureId as string,
+      );
+    case "SELECT_LAB_SCENARIO":
+      return [
+        "limited-hardware",
+        "academic-collaboration",
+        "creator-attention",
+        "high-public-fear",
+        "weak-economy",
+        "expensive-electricity",
+      ].includes(input.scenarioId as string);
+    case "QUEUE_LAB_RUN":
+      return (
+        typeof input.pipelineId === "string" &&
+        (input.count === undefined || isFiniteNumber(input.count))
+      );
+    case "FOUND_LAB":
+      return [
+        "independent-laboratory",
+        "open-research-collective",
+        "larger-organization-collaboration",
+      ].includes(input.decision as string);
     case "SET_EXPANSION_ACTIVE":
       return typeof input.active === "boolean";
     case "PLACE_MODULE":
@@ -908,6 +981,41 @@ const ENDING_DETAILS: Readonly<
     nextRunResponse:
       "Keep the same discipline: preserve evidence coverage, pay costs before expansion, and treat private uncertainty as an operational constraint.",
   },
+  "viral-support-catastrophe": {
+    title: "Viral Support Catastrophe",
+    outcome: "failure",
+    diagnosticUnlockId: "shift-monitor",
+    nextRunResponse:
+      "Keep a parallel delivery route bounded while public attention grows; do not promise support capacity that the lab cannot evidence.",
+  },
+  "maintainer-exhaustion": {
+    title: "Maintainer Exhaustion",
+    outcome: "failure",
+    diagnosticUnlockId: "decision-history",
+    nextRunResponse:
+      "Document the method before opening the collective, and make collaboration reduce hero dependency rather than multiply coordination debt.",
+  },
+  "panic-business": {
+    title: "Panic Business",
+    outcome: "failure",
+    diagnosticUnlockId: "leakage-warning",
+    nextRunResponse:
+      "Treat fear and tool-switching panic as evidence; negotiate a bounded collaboration instead of trading away the lab's method under pressure.",
+  },
+  "invisible-laboratory": {
+    title: "Invisible Laboratory",
+    outcome: "failure",
+    diagnosticUnlockId: "bottleneck-map",
+    nextRunResponse:
+      "Retain a collaborator, run independent checks, and make the evidence trail visible before choosing a founding path.",
+  },
+  "honest-foundation": {
+    title: "Honest Foundation",
+    outcome: "success",
+    diagnosticUnlockId: "confidence-intervals",
+    nextRunResponse:
+      "Carry the lab's bounded methods forward: preserve seeds, publish uncertainty, and keep a route for useful delivery alongside research.",
+  },
 };
 
 function privateAssessmentFor(
@@ -1229,6 +1337,101 @@ function endingCausalEvidence(
         ],
         unknowns: [
           "Future workload mixes and costs are not known at the point of conclusion.",
+        ],
+      };
+    case "viral-support-catastrophe":
+      return {
+        directCauses: [
+          "The laboratory chose a public route while failed parallel runs outnumbered completed runs under support-heavy demand.",
+        ],
+        contributingFactors: [
+          `Attention reached ${state.hypeFear.attention.toFixed(1)} while support-heavy users represented ${(state.hypeFear.stakeholderSelection.supportHeavyUsers * 100).toFixed(0)}% of the selected audience.`,
+          `The laboratory retained ${state.laboratory.pipelines.reduce((sum, pipeline) => sum + pipeline.failedRuns, 0)} failed run(s) beside ${state.laboratory.pipelines.reduce((sum, pipeline) => sum + pipeline.completedRuns, 0)} completed run(s).`,
+        ],
+        correlations: [
+          `The ${state.laboratory.cultureId ?? "unselected"} culture was active when attention and support pressure converged.`,
+        ],
+        hypotheses: [
+          "Keeping evidence-first delivery bounded may have prevented the public promise from outrunning the lab.",
+        ],
+        unknowns: [
+          "The ledger cannot prove how an unseen audience would have reacted to a slower launch.",
+        ],
+      };
+    case "maintainer-exhaustion":
+      return {
+        directCauses: [
+          "An open collective was founded with multiple collaborators before enough runs were documented for the method to survive its maintainer.",
+        ],
+        contributingFactors: [
+          `${state.laboratory.collaboratorIds.length} collaborators joined while only ${state.laboratory.reproducibility.documentedRuns} run(s) were documented.`,
+          `The reproducibility score was ${state.laboratory.reproducibility.score.toFixed(2)} at the transition.`,
+        ],
+        correlations: [
+          `${state.laboratory.pipelines.length} pipelines shared the same retained method and evidence surface.`,
+        ],
+        hypotheses: [
+          "A smaller team or an earlier documentation pass may have reduced the coordination load.",
+        ],
+        unknowns: [
+          "The simulator does not model individual health or unrecorded social labor.",
+        ],
+      };
+    case "panic-business":
+      return {
+        directCauses: [
+          "The larger-organization route was chosen while recorded public fear or tool-switching panic remained high.",
+        ],
+        contributingFactors: [
+          `Fear was ${(state.hypeFear.fear * 100).toFixed(0)}% and tool-switching panic was ${(state.hypeFear.toolSwitchingPanic * 100).toFixed(0)}%.`,
+          `${state.laboratory.reproducibility.documentedRuns} documented run(s) bounded the claims available for negotiation.`,
+        ],
+        correlations: [
+          `The active tool was ${state.hypeFear.currentToolId}; switching history remains ${state.hypeFear.toolSwitches}.`,
+        ],
+        hypotheses: [
+          "Publishing boundaries and preserving an independent fallback may have changed the collaboration terms.",
+        ],
+        unknowns: [
+          "The ledger cannot identify which future contract language would have protected the method.",
+        ],
+      };
+    case "invisible-laboratory":
+      return {
+        directCauses: [
+          "The laboratory reached a founding decision without a reproducible evidence trail and without a retained collaborator.",
+        ],
+        contributingFactors: [
+          `Reproducibility score was ${state.laboratory.reproducibility.score.toFixed(2)}; collaborator count was ${state.laboratory.collaboratorIds.length}.`,
+          `${state.laboratory.reproducibility.documentedRuns} run(s) were documented before the transition.`,
+        ],
+        correlations: [
+          `The selected scenario was ${state.laboratory.scenarioId}, with ${state.laboratory.machines.length} machine(s) in the local inventory.`,
+        ],
+        hypotheses: [
+          "A second perspective and an independent evaluation could have made the lab legible enough to sustain.",
+        ],
+        unknowns: [
+          "The exact audience or institution that would have noticed the work remains unobserved.",
+        ],
+      };
+    case "honest-foundation":
+      return {
+        directCauses: [
+          "The laboratory completed a bounded run, retained collaborators, and recorded reproducibility evidence before choosing a founding path.",
+        ],
+        contributingFactors: [
+          `The evidence score was ${state.laboratory.reproducibility.score.toFixed(2)} with ${state.laboratory.reproducibility.documentedRuns} documented run(s).`,
+          `${state.laboratory.machines.length} machine(s) supported ${state.laboratory.pipelines.length} pipeline(s) without hiding their tradeoffs.`,
+        ],
+        correlations: [
+          `The ${state.laboratory.cultureId ?? "unselected"} culture was active at the founding transition.`,
+        ],
+        hypotheses: [
+          "Continuing to preserve seeds, methods, and failure traces may keep this foundation credible under another seed.",
+        ],
+        unknowns: [
+          "Future workload mixes, collaborators, and operating costs are not known at the point of conclusion.",
         ],
       };
   }
@@ -2321,6 +2524,7 @@ export function createInitialState(seed = 20260715): SimulationState {
     career: createInitialCareerState(),
     research: createInitialResearchState(),
     hypeFear: createInitialHypeFearState(),
+    laboratory: createInitialLaboratoryState(normalizedSeed),
     meta: createInitialMetaProgression(),
     firstSession: createInitialFirstSessionProgress(),
     jobs: {
@@ -3203,6 +3407,543 @@ function applyToolSwitch(
       message: `Tool switched to ${tool.name}. Panic is ${Math.round(hypeFear.toolSwitchingPanic * 100)}%; ${tool.tradeoff}`,
     },
   );
+}
+
+function laboratoryWarning(
+  state: SimulationState,
+  message: string,
+): SimulationState {
+  return appendEvent(state, { kind: "warning", message });
+}
+
+function refreshLaboratoryAccess(state: SimulationState): SimulationState {
+  const readiness = laboratoryEntryReadiness(state);
+  if (!state.laboratory.unlocked && readiness.ready) {
+    const scenarioUnlockIds = laboratoryScenarioUnlocks(state);
+    const scenarioId = scenarioUnlockIds.includes(state.laboratory.scenarioId)
+      ? state.laboratory.scenarioId
+      : (scenarioUnlockIds[0] ?? "limited-hardware");
+    return appendEvent(
+      {
+        ...state,
+        laboratory: {
+          ...state.laboratory,
+          unlocked: true,
+          unlockedAtTick: state.tick,
+          scenarioId,
+          scenarioUnlockIds,
+          scenarioProgress: {
+            ...state.laboratory.scenarioProgress,
+            ...Object.fromEntries(scenarioUnlockIds.map((id) => [id, 1])),
+          },
+          pendingDecision:
+            "Choose a machine, a second pipeline, and one collaborator before founding the lab.",
+        },
+      },
+      {
+        kind: "success",
+        message:
+          "Local Laboratory unlocked. Machines, parallel pipelines, collaborators, reproducibility, and founding routes are now visible.",
+      },
+    );
+  }
+  if (!state.laboratory.unlocked) return state;
+  const scenarioUnlockIds = laboratoryScenarioUnlocks(state);
+  const mergedScenarioUnlockIds = [
+    ...new Set([...state.laboratory.scenarioUnlockIds, ...scenarioUnlockIds]),
+  ];
+  const scenarioId = mergedScenarioUnlockIds.includes(
+    state.laboratory.scenarioId,
+  )
+    ? state.laboratory.scenarioId
+    : (mergedScenarioUnlockIds[0] ?? "limited-hardware");
+  const updated = refreshLaboratoryScore({
+    ...state.laboratory,
+    scenarioId,
+    scenarioUnlockIds: mergedScenarioUnlockIds,
+    scenarioProgress: {
+      ...state.laboratory.scenarioProgress,
+      ...Object.fromEntries(scenarioUnlockIds.map((id) => [id, 1])),
+    },
+  });
+  return updated === state.laboratory
+    ? state
+    : { ...state, laboratory: updated };
+}
+
+function startLaboratoryRun(
+  laboratory: SimulationState["laboratory"],
+  pipeline: SimulationState["laboratory"]["pipelines"][number],
+  tick: number,
+): SimulationState["laboratory"]["pipelines"][number] {
+  if (pipeline.activeRun || pipeline.waitingRuns <= 0) return pipeline;
+  const duration = laboratoryRunDuration(laboratory, pipeline.id);
+  return {
+    ...pipeline,
+    waitingRuns: pipeline.waitingRuns - 1,
+    activeRun: {
+      startedAtTick: tick,
+      elapsedHours: 0,
+      expectedDurationHours: duration.hours,
+      committedCost: duration.cost,
+    },
+  };
+}
+
+function advanceLaboratory(
+  state: SimulationState,
+  elapsedSeconds: number,
+): SimulationState {
+  if (!state.laboratory.unlocked || elapsedSeconds <= 0) return state;
+  const elapsedHours = (elapsedSeconds * SIMULATION_TIME_SCALE) / 3_600;
+  let next = refreshLaboratoryAccess(state);
+  const completedEvents: {
+    kind: "success" | "failure";
+    message: string;
+  }[] = [];
+  const pipelines = next.laboratory.pipelines.map((pipeline) => {
+    const updated = startLaboratoryRun(next.laboratory, pipeline, next.tick);
+    if (!updated.activeRun) return updated;
+    const active = updated.activeRun;
+    const progress = active.elapsedHours + elapsedHours;
+    if (progress < active.expectedDurationHours) {
+      return {
+        ...updated,
+        activeRun: { ...active, elapsedHours: round(progress, 4) },
+      };
+    }
+    const outcome = laboratoryRunOutcome(
+      next,
+      updated.id,
+      active.startedAtTick,
+    );
+    const finishedAtTick = next.tick;
+    const runRecord = {
+      pipelineId: updated.id,
+      completed: outcome.completed,
+      startedAtTick: active.startedAtTick,
+      finishedAtTick,
+      reproducibilityScore: next.laboratory.reproducibility.score,
+      note: outcome.note,
+    };
+    const scenarioProgress = {
+      ...next.laboratory.scenarioProgress,
+      [next.laboratory.scenarioId]: round(
+        Math.min(
+          1,
+          (next.laboratory.scenarioProgress[next.laboratory.scenarioId] ?? 0) +
+            (outcome.completed ? 0.25 : 0.1),
+        ),
+        3,
+      ),
+    };
+    next = {
+      ...next,
+      laboratory: {
+        ...next.laboratory,
+        lastRun: runRecord,
+        scenarioProgress,
+        pipelines: next.laboratory.pipelines.map((item) =>
+          item.id === updated.id
+            ? {
+                ...item,
+                activeRun: null,
+                completedRuns: item.completedRuns + (outcome.completed ? 1 : 0),
+                failedRuns: item.failedRuns + (outcome.completed ? 0 : 1),
+                lastRunTick: finishedAtTick,
+              }
+            : item,
+        ),
+      },
+    };
+    completedEvents.push({
+      kind: outcome.completed ? "success" : "failure",
+      message: `${updated.id} laboratory run ${outcome.completed ? "completed" : "failed"}. ${outcome.note}`,
+    });
+    const refreshed = next.laboratory.pipelines.find(
+      (item) => item.id === updated.id,
+    );
+    return refreshed
+      ? startLaboratoryRun(next.laboratory, refreshed, next.tick)
+      : updated;
+  });
+  next = {
+    ...next,
+    laboratory: refreshLaboratoryScore({ ...next.laboratory, pipelines }),
+  };
+  return completedEvents.reduce(
+    (current, event) => appendEvent(current, event),
+    next,
+  );
+}
+
+function applyLaboratoryCommand(
+  state: SimulationState,
+  command: Extract<
+    SimulationCommand,
+    {
+      type:
+        | "BUY_LAB_MACHINE"
+        | "ADD_LAB_PIPELINE"
+        | "ASSIGN_LAB_MACHINE"
+        | "INVITE_LAB_COLLABORATOR"
+        | "SET_LAB_REPRODUCIBILITY"
+        | "DOCUMENT_LAB_RUN"
+        | "SET_LAB_CULTURE"
+        | "SELECT_LAB_SCENARIO"
+        | "QUEUE_LAB_RUN"
+        | "FOUND_LAB";
+    }
+  >,
+): SimulationState {
+  const lab = state.laboratory;
+  if (!lab.unlocked)
+    return laboratoryWarning(
+      state,
+      `Local Laboratory is locked. ${laboratoryEntryReadiness(state).reasons.join(" ")}`,
+    );
+  switch (command.type) {
+    case "BUY_LAB_MACHINE": {
+      const machine = findLaboratoryMachine(command.machineId);
+      if (!machine)
+        return laboratoryWarning(state, "Unknown laboratory machine.");
+      if (lab.machines.some((item) => item.id === machine.id))
+        return laboratoryWarning(
+          state,
+          `${machine.name} is already in the lab inventory.`,
+        );
+      if (state.resources.money < machine.purchaseCost)
+        return laboratoryWarning(
+          state,
+          `${machine.name} needs $${machine.purchaseCost.toFixed(3)}; no cash was spent.`,
+        );
+      return appendEvent(
+        {
+          ...state,
+          resources: {
+            ...state.resources,
+            money: round(state.resources.money - machine.purchaseCost, 3),
+          },
+          laboratory: {
+            ...lab,
+            machines: [
+              ...lab.machines,
+              { id: machine.id, acquiredAtTick: state.tick },
+            ],
+            pendingDecision:
+              "Assign the new machine to a second pipeline, then queue a bounded run.",
+            totalOperatingCost: round(
+              lab.totalOperatingCost + machine.purchaseCost,
+              3,
+            ),
+          },
+        },
+        {
+          kind: "success",
+          message: `${machine.name} acquired for $${machine.purchaseCost.toFixed(3)}. Its reliability, memory, and electricity tradeoffs remain visible.`,
+        },
+      );
+    }
+    case "ADD_LAB_PIPELINE": {
+      const pipeline = findLaboratoryPipeline(command.pipelineId);
+      if (!pipeline)
+        return laboratoryWarning(state, "Unknown laboratory pipeline.");
+      if (lab.pipelines.some((item) => item.id === pipeline.id))
+        return laboratoryWarning(state, `${pipeline.name} is already active.`);
+      if (lab.pipelines.length >= 3)
+        return laboratoryWarning(
+          state,
+          "The local lab supports three bounded pipelines in this release.",
+        );
+      const purchaseCost = round(pipeline.baseCost * 10, 3);
+      if (state.resources.money < purchaseCost)
+        return laboratoryWarning(
+          state,
+          `${pipeline.name} needs $${purchaseCost.toFixed(3)}; no cash was spent.`,
+        );
+      return appendEvent(
+        {
+          ...state,
+          resources: {
+            ...state.resources,
+            money: round(state.resources.money - purchaseCost, 3),
+          },
+          laboratory: {
+            ...lab,
+            pipelines: [
+              ...lab.pipelines,
+              {
+                id: pipeline.id,
+                machineIds: ["bench-node"],
+                waitingRuns: 0,
+                activeRun: null,
+                completedRuns: 0,
+                failedRuns: 0,
+                lastRunTick: null,
+              },
+            ],
+            pendingDecision:
+              "Assign machines explicitly: parallel capacity is a choice, not an automatic bonus.",
+            totalOperatingCost: round(lab.totalOperatingCost + purchaseCost, 3),
+          },
+        },
+        {
+          kind: "success",
+          message: `${pipeline.name} added for $${purchaseCost.toFixed(3)}.`,
+        },
+      );
+    }
+    case "ASSIGN_LAB_MACHINE": {
+      const machine = findLaboratoryMachine(command.machineId);
+      const pipeline = lab.pipelines.find(
+        (item) => item.id === command.pipelineId,
+      );
+      if (
+        !machine ||
+        !pipeline ||
+        !lab.machines.some((item) => item.id === machine.id)
+      )
+        return laboratoryWarning(
+          state,
+          "Machine assignment rejected: acquire the machine and pipeline first.",
+        );
+      if (pipeline.machineIds.includes(machine.id)) return state;
+      return appendEvent(
+        {
+          ...state,
+          laboratory: {
+            ...lab,
+            pipelines: lab.pipelines.map((item) =>
+              item.id === pipeline.id
+                ? { ...item, machineIds: [...item.machineIds, machine.id] }
+                : item,
+            ),
+            pendingDecision: `${machine.name} assigned to ${pipeline.id}. Queue only within the visible reserve.`,
+          },
+        },
+        {
+          kind: "info",
+          message: `${machine.name} assigned to ${pipeline.id}.`,
+        },
+      );
+    }
+    case "INVITE_LAB_COLLABORATOR": {
+      const researcher = findResearcher(command.researcherId);
+      if (
+        !researcher ||
+        !state.research.recruitedResearcherIds.includes(command.researcherId)
+      )
+        return laboratoryWarning(
+          state,
+          "Invite rejected: recruit and retain this Researcher first.",
+        );
+      if (lab.collaboratorIds.includes(researcher.id)) return state;
+      if (lab.collaboratorIds.length >= 4)
+        return laboratoryWarning(
+          state,
+          "The local laboratory holds four collaborators in this release.",
+        );
+      return appendEvent(
+        {
+          ...state,
+          laboratory: {
+            ...lab,
+            collaboratorIds: [...lab.collaboratorIds, researcher.id],
+            pendingDecision: `${researcher.name} is retained as a collaborator. Document the method so the lab is not dependent on one hero.`,
+          },
+        },
+        {
+          kind: "success",
+          message: `${researcher.name} joined the laboratory collaboration.`,
+        },
+      );
+    }
+    case "SET_LAB_REPRODUCIBILITY": {
+      const reproducibility = {
+        ...lab.reproducibility,
+        [command.field]: command.enabled,
+      };
+      return appendEvent(
+        {
+          ...state,
+          laboratory: {
+            ...lab,
+            reproducibility: {
+              ...reproducibility,
+              score: laboratoryReproducibilityScore({
+                ...lab,
+                reproducibility,
+              }),
+            },
+            pendingDecision:
+              "A reproducible claim needs a versioned configuration, a locked seed, and an independent evaluation.",
+          },
+        },
+        {
+          kind: "info",
+          message: `${command.field} ${command.enabled ? "recorded" : "cleared"}.`,
+        },
+      );
+    }
+    case "DOCUMENT_LAB_RUN": {
+      const documentedRuns = lab.reproducibility.documentedRuns + 1;
+      if (documentedRuns > 1000)
+        return laboratoryWarning(
+          state,
+          "Documentation limit reached; retain the existing archive.",
+        );
+      const reproducibility = { ...lab.reproducibility, documentedRuns };
+      return appendEvent(
+        {
+          ...state,
+          laboratory: {
+            ...lab,
+            reproducibility: {
+              ...reproducibility,
+              score: laboratoryReproducibilityScore({
+                ...lab,
+                reproducibility,
+              }),
+            },
+            pendingDecision:
+              "The archive now preserves a method, not only a result. Run the next bounded comparison when ready.",
+          },
+        },
+        {
+          kind: "success",
+          message:
+            "Laboratory run documentation retained with its configuration and seed trail.",
+        },
+      );
+    }
+    case "SET_LAB_CULTURE": {
+      const culture = findLaboratoryCulture(command.cultureId);
+      if (!culture)
+        return laboratoryWarning(state, "Unknown laboratory culture.");
+      return appendEvent(
+        {
+          ...state,
+          laboratory: {
+            ...lab,
+            cultureId: culture.id,
+            reproducibility: {
+              ...lab.reproducibility,
+              score: laboratoryReproducibilityScore({
+                ...lab,
+                cultureId: culture.id,
+              }),
+            },
+            pendingDecision: `${culture.name} selected. Its collaboration and evidence tradeoffs are explicit in the laboratory ledger.`,
+          },
+        },
+        { kind: "info", message: `Laboratory culture set to ${culture.name}.` },
+      );
+    }
+    case "SELECT_LAB_SCENARIO": {
+      const scenario = findLaboratoryScenario(command.scenarioId);
+      if (!scenario || !lab.scenarioUnlockIds.includes(command.scenarioId))
+        return laboratoryWarning(
+          state,
+          "Scenario is not unlocked by the retained run evidence.",
+        );
+      return appendEvent(
+        {
+          ...state,
+          laboratory: {
+            ...lab,
+            scenarioId: scenario.id,
+            pendingDecision: scenario.description,
+          },
+        },
+        {
+          kind: "info",
+          message: `Laboratory scenario selected: ${scenario.name}.`,
+        },
+      );
+    }
+    case "QUEUE_LAB_RUN": {
+      const pipeline = lab.pipelines.find(
+        (item) => item.id === command.pipelineId,
+      );
+      if (!pipeline)
+        return laboratoryWarning(
+          state,
+          "Run queue rejected: unknown laboratory pipeline.",
+        );
+      if (pipeline.machineIds.length === 0)
+        return laboratoryWarning(
+          state,
+          "Assign at least one machine before queueing a run.",
+        );
+      const remaining = 8 - pipeline.waitingRuns;
+      const count = clamp(
+        Math.trunc(command.count ?? 1),
+        1,
+        Math.max(0, remaining),
+      );
+      if (count <= 0)
+        return laboratoryWarning(
+          state,
+          "That pipeline's bounded queue is full.",
+        );
+      const duration = laboratoryRunDuration(lab, pipeline.id);
+      const cost = round(duration.cost * count, 3);
+      const pipelineName =
+        findLaboratoryPipeline(pipeline.id)?.name ?? pipeline.id;
+      if (state.resources.money < cost)
+        return laboratoryWarning(
+          state,
+          `The bounded run reserve needs $${cost.toFixed(3)}; no cash was spent.`,
+        );
+      return appendEvent(
+        {
+          ...state,
+          resources: {
+            ...state.resources,
+            money: round(state.resources.money - cost, 3),
+          },
+          laboratory: {
+            ...lab,
+            pipelines: lab.pipelines.map((item) =>
+              item.id === pipeline.id
+                ? { ...item, waitingRuns: item.waitingRuns + count }
+                : item,
+            ),
+            totalOperatingCost: round(lab.totalOperatingCost + cost, 3),
+            pendingDecision: `${count} bounded ${pipelineName} run${count === 1 ? "" : "s"} queued. Results will retain both successes and failures.`,
+          },
+        },
+        {
+          kind: "info",
+          message: `${count} ${pipelineName} run${count === 1 ? "" : "s"} queued for $${cost.toFixed(3)}.`,
+        },
+      );
+    }
+    case "FOUND_LAB": {
+      const readiness = laboratoryPipelineReadiness(lab);
+      if (!readiness.ready)
+        return laboratoryWarning(
+          state,
+          `Founding decision is not ready: ${readiness.reasons.join(" ")}`,
+        );
+      const endingId = chooseLaboratoryEnding(state, command.decision);
+      const decisionState = appendEvent(
+        {
+          ...state,
+          laboratory: {
+            ...lab,
+            foundingDecision: command.decision,
+            pendingDecision: `Founding route selected: ${command.decision}. The evidence trail is retained in the postmortem.`,
+          },
+        },
+        {
+          kind: "success",
+          message: `Founding decision recorded: ${command.decision}.`,
+        },
+      );
+      return finalizeRunEnding(decisionState, endingId);
+    }
+  }
 }
 
 function applyValidCommand(
@@ -4416,6 +5157,17 @@ function applyValidCommand(
       return applyFearResponse(state, command.response);
     case "SWITCH_TOOL":
       return applyToolSwitch(state, command.toolId);
+    case "BUY_LAB_MACHINE":
+    case "ADD_LAB_PIPELINE":
+    case "ASSIGN_LAB_MACHINE":
+    case "INVITE_LAB_COLLABORATOR":
+    case "SET_LAB_REPRODUCIBILITY":
+    case "DOCUMENT_LAB_RUN":
+    case "SET_LAB_CULTURE":
+    case "SELECT_LAB_SCENARIO":
+    case "QUEUE_LAB_RUN":
+    case "FOUND_LAB":
+      return applyLaboratoryCommand(state, command);
     case "SET_OFFLINE_POLICY": {
       const maxHours = round(
         Math.floor(
@@ -4587,7 +5339,9 @@ export function applyCommand(
   const next = sealSimulationState(
     resolveRunEnding(
       refreshEvaluationWarnings(
-        refreshCareerUnlocks(refreshWorkloadUnlocks(applied)),
+        refreshLaboratoryAccess(
+          refreshCareerUnlocks(refreshWorkloadUnlocks(applied)),
+        ),
       ),
     ),
   );
@@ -4676,6 +5430,7 @@ function advanceTickQuantum(
     },
   };
   next = advanceResearch(next, elapsed);
+  next = advanceLaboratory(next, elapsed);
   if (next.jobs.paused) return recalculate(next);
   next = startNextTask(next);
   if (!next.jobs.activeTask) {
@@ -4851,7 +5606,7 @@ export function tick(state: SimulationState, seconds: number): SimulationState {
     next = advanceTickQuantum(next, quantum);
     remaining = round(remaining - quantum, 6);
   }
-  next = advanceHypeFear(next);
+  next = refreshLaboratoryAccess(advanceHypeFear(next));
   next = sealSimulationState(next);
   // See applyCommand: the freshly sealed digest is known-good at this point.
   return isStateStructurallyValid(next) ? next : state;
@@ -5457,6 +6212,7 @@ function isStateStructurallyValid(value: unknown): value is SimulationState {
       isMetaProgressionValid(state.meta) &&
       isResearchStateShapeValid(state.research, state.tick) &&
       isHypeFearStateShapeValid(state.hypeFear, state.tick) &&
+      isLaboratoryStateShapeValid(state.laboratory, state.tick) &&
       nonnegativeIntegers.every(
         (value) => Number.isSafeInteger(value) && value >= 0,
       ) &&
@@ -5669,6 +6425,7 @@ export function restoreSimulationState(
     if (
       record.contentVersion !== CONTENT_VERSION &&
       record.contentVersion !== PREVIOUS_CONTENT_VERSION &&
+      record.contentVersion !== EARLIER_CONTENT_VERSION &&
       record.contentVersion !== LEGACY_CONTENT_VERSION
     )
       return fallback;
@@ -5694,6 +6451,7 @@ export function restoreSimulationState(
         };
     const storedResearch = record.research;
     const storedHypeFear = record.hypeFear;
+    const storedLaboratory = record.laboratory;
     const restoreTick =
       typeof record.tick === "number" ? record.tick : Number.NaN;
     const researchShapeValid = isResearchStateShapeValid(
@@ -5718,12 +6476,25 @@ export function restoreSimulationState(
     const hypeFear = hypeFearIsValid
       ? storedHypeFear
       : createInitialHypeFearState();
+    const laboratoryShapeValid = isLaboratoryStateShapeValid(
+      storedLaboratory,
+      restoreTick,
+    );
+    const laboratoryIsValid = originalIntegrityValid && laboratoryShapeValid;
+    const laboratory = laboratoryIsValid
+      ? storedLaboratory
+      : createInitialLaboratoryState(
+          typeof record.seed === "number" && Number.isFinite(record.seed)
+            ? normalizeSeed(record.seed)
+            : fallback.seed,
+        );
     let candidate = {
       ...record,
       contentVersion: CONTENT_VERSION,
       firstSession: storedFirstSession ?? legacyFirstSessionProgress(),
       research,
       hypeFear,
+      laboratory,
       migration,
       integrity: isIntegrityShapeValid(record.integrity)
         ? record.integrity
@@ -5750,6 +6521,15 @@ export function restoreSimulationState(
       !hypeFearShapeValid
     )
       migration = withMigrationStep(migration, "content-research-to-hype-fear");
+    if (
+      record.contentVersion !== CONTENT_VERSION ||
+      storedLaboratory === undefined ||
+      !laboratoryShapeValid
+    )
+      migration = withMigrationStep(
+        migration,
+        "content-hype-fear-to-local-lab",
+      );
     if (!originalIntegrityValid)
       candidate = normalizeUntrustedLedgerState(candidate);
     const structurallyValid = isStateStructurallyValid(candidate);
@@ -5892,6 +6672,11 @@ export function restoreSimulationState(
       firstSession: legacyFirstSessionProgress(),
       research: createInitialResearchState(),
       hypeFear: createInitialHypeFearState(),
+      laboratory: createInitialLaboratoryState(
+        typeof record.seed === "number" && Number.isFinite(record.seed)
+          ? normalizeSeed(record.seed)
+          : fallback.seed,
+      ),
       career: {
         ...legacyCareer,
         evaluation: createInitialEvaluationState(),
@@ -5925,6 +6710,11 @@ export function restoreSimulationState(
       firstSession: legacyFirstSessionProgress(),
       research: createInitialResearchState(),
       hypeFear: createInitialHypeFearState(),
+      laboratory: createInitialLaboratoryState(
+        typeof record.seed === "number" && Number.isFinite(record.seed)
+          ? normalizeSeed(record.seed)
+          : fallback.seed,
+      ),
       career: createInitialCareerState(),
       meta: createInitialMetaProgression(),
     } as unknown as SimulationState;

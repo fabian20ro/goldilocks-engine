@@ -20,14 +20,15 @@
     "test:watch": "vitest",
     "test:e2e": "PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright playwright test",
     "test:e2e:pages": "PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright playwright test --config=playwright.pages.config.ts",
-    "balance": "tsx src/simulation/runNumericPrototype.ts && npm run balance:first-session && npm run balance:upgrades && npm run balance:progression && npm run balance:career && npm run balance:evaluation && npm run balance:research && npm run balance:hype-fear",
+    "balance": "tsx src/simulation/runNumericPrototype.ts && npm run balance:first-session && npm run balance:upgrades && npm run balance:progression && npm run balance:career && npm run balance:evaluation && npm run balance:research && npm run balance:hype-fear && npm run balance:laboratory",
     "balance:first-session": "tsx src/simulation/runFirstSessionBalance.ts",
     "balance:upgrades": "tsx src/simulation/runUpgradeBalance.ts",
     "balance:progression": "tsx src/simulation/runProgressionBalance.ts",
     "balance:career": "tsx src/simulation/runCareerBalance.ts",
     "balance:evaluation": "tsx src/simulation/runEvaluationBalance.ts",
     "balance:research": "tsx src/simulation/runResearchBalance.ts",
-    "balance:hype-fear": "tsx src/simulation/runHypeFearBalance.ts"
+    "balance:hype-fear": "tsx src/simulation/runHypeFearBalance.ts",
+    "balance:laboratory": "tsx src/simulation/runLaboratoryBalance.ts"
   },
   "dependencies": {
     "react": "19.0.0",

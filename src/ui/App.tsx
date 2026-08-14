@@ -97,6 +97,7 @@ import {
   workloadGlyph,
 } from "./glyphs";
 import { ResearchView } from "./ResearchView";
+import { LaboratoryView } from "./LaboratoryView";
 import { WorldView } from "./WorldView";
 
 type TabId =
@@ -106,6 +107,7 @@ type TabId =
   | "upgrades"
   | "inspect"
   | "research"
+  | "laboratory"
   | "world";
 
 /** Model-tier requirement copy is a compact card disclosure, not accounting. */
@@ -4302,6 +4304,7 @@ export function App() {
     upgrades: 0,
     inspect: 0,
     research: 0,
+    laboratory: 0,
     world: 0,
   });
 
@@ -4936,6 +4939,8 @@ export function App() {
             />
           ) : tab === "research" ? (
             <ResearchView state={state} command={command} />
+          ) : tab === "laboratory" ? (
+            <LaboratoryView state={state} command={command} />
           ) : tab === "world" ? (
             <WorldView state={state} command={command} />
           ) : (

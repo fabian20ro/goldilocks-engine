@@ -910,3 +910,36 @@
   deterministic content model that preserves explicit uncertainty,
   response-gated attention, safe stale-save recovery, and the frozen
   Milestone 5 out-of-scope boundary.
+
+## D-040 — Milestone 6 bounded Local Laboratory endgame
+
+- **Decision:** Add a finite Local Laboratory layer on schema 7 with four
+  machines, three parallel pipelines, Researcher collaborators, explicit
+  versioned-config/locked-seed/independent-evaluation switches, retained run
+  documentation, three laboratory cultures, deterministic scenario unlocks,
+  and three explicit founding choices (independent, open collective, larger
+  organization collaboration). Existing Career, Research, Hype/Fear, Worker,
+  accounting, PWA, and offline rails remain authoritative inputs.
+- **Endings:** Preserve the existing five run endings and add Viral Support
+  Catastrophe, Maintainer Exhaustion, Panic Business, Invisible Laboratory,
+  and Honest Foundation. Each lab transition records a bounded causal
+  postmortem; routine run failures remain recoverable and retain their traces.
+- **Persistence/threat boundary:** Keep schema 7 and advance content to
+  `local-lab-1`; accept `hype-fear-1`, `research-1`, and the older
+  `evaluation-replay-1` during restore. A missing, malformed, stale, or
+  unsealed Laboratory object falls back to the locked bench default, just as
+  stale Research/Hype additions do. No startup, workforce, government,
+  remote/generative content, or later expansion is added.
+- **Offline/lifecycle:** Laboratory runs advance only through deterministic
+  Worker ticks and resume from a valid persisted active run. Safe offline
+  policy does not queue, complete, or found a lab. Queue costs and machine /
+  pipeline purchases deduct once and bounded failures preserve evidence.
+- **UX/accessibility:** Add an eighth primary Lab destination. Keep the lock
+  gate explicit, one dominant next decision per section, progressive details,
+  44px touch/keyboard controls, text-safe portrait cards, reduced-motion-safe
+  progress, and visible scenario/accounting consequences at 320/393/200%.
+- **Evidence policy:** Rule of Three covers a normal multi-machine founding
+  route, malformed/prerequisite rejection with no cash loss, and active-run
+  persistence/reload/resume. Deterministic balance and committed Playwright
+  portrait checks are independent evidence surfaces; no acceptance claim is
+  made by this decision.
