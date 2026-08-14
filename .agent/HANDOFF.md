@@ -18,6 +18,10 @@
   progress, outcome, and retained-knowledge UI. Existing Build/Jobs/Career/
   Upgrades/Inspect, drag, persistence, causal, PWA, and offline contracts stay
   intact.
+- Repaired V-083 restore recovery: an active Research project is structurally
+  valid only with its required player-authored goal. A malformed active save
+  now falls back to the safe Research default, clearing the active project and
+  team while retaining structurally recoverable gameplay state.
 
 ## Plan requirements covered
 
@@ -37,9 +41,11 @@
 
 ## Verifier findings resolved
 
-- No unresolved verifier findings existed at supplied round-084 PASS.
-- This candidate adds the explicitly authorized Milestone 4 Research seam;
-  independent verification must assess the exact candidate SHA.
+- Resolved V-083 from immutable round-085: malformed active Research without a
+  required goal is rejected during restore; the candidate regression covers the
+  cleared project/team and preserved cash.
+- The Rule-of-Three regression covers valid active restore, malformed
+  missing-goal recovery, and active reload/offline lifecycle behavior.
 
 ## Setup, startup, and verification commands
 
@@ -81,6 +87,9 @@ path when required.
 - Research content, pure requirement/team/outcome logic, and engine command/tick
   boundaries are separated across `researchCatalog.ts`, `research.ts`, and
   `engine.ts`; every transition uses the existing sealed Worker rail.
+- Restore shape validation treats a goal as mandatory whenever a Research
+  project is active, keeping the player-authored decision and running
+  measurement inseparable across persistence recovery.
 - Existing safe offline policy remains freelance-only. Research progress is
   driven only by explicit deterministic simulation ticks.
 - The sixth navigation destination is the smallest coherent UI change needed
@@ -98,19 +107,28 @@ path when required.
 
 ## Checks run
 
-- Passed `./scripts/agent-status` before implementation: accepted round-084
-  PASS, no unresolved finding.
+- Passed `./scripts/agent-status` before implementation: latest immutable round
+  085 was FAIL with only V-083 unresolved; started from verifier commit
+  `f36b6cffbbf0bf16d4197e80638d9f096476135b`.
+- Passed focused `node_modules/.bin/vitest run --coverage=false
+src/simulation/research.test.ts src/simulation/verifierRound085.test.ts`:
+  2 files, 5 tests.
 - Passed `npm run typecheck` and `npm run lint`.
-- Passed `npm test`: 56 files, 266 tests; 86.19% statements, 83.07% branches,
-  94.42% functions, 89.17% lines.
-- Passed `npm run balance:research`: 121 seeds, zero failures, four outcome
+- Passed `node_modules/.bin/vitest run --coverage=false`: 57 files, 267 tests.
+- Passed `npm test` inside the final canonical gate: 57 files, 267 tests;
+  86.08% statements, 82.91% branches, 94.42% functions, 89.04% lines.
+- Passed `npm run balance:research` inside the final canonical gate: 121 seeds,
+  zero failures, four outcome
   kinds, catalog valid.
-- Passed `npm run test:e2e -- tests/e2e/research.spec.ts`: 2 tests covering
-  393px normal/adversarial and 320px reload/reduced-motion/200%-text/offline.
 - Passed final canonical gate:
-  `E2E_PORT=42185 VERIFY_EVIDENCE_DIR="$PWD/.cache/verification/round-085" PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright npm_config_cache="$PWD/.cache/npm" ./scripts/verify` — setup, format, lint, typecheck, 56 unit files/266 tests, all balances including 121-seed Research, build, audit, 231 root browser tests, and 2 Pages/offline tests. Evidence: `.cache/verification/round-085`.
-- Device-native iOS/Android inspection: not run; Playwright is committed
-  browser evidence.
+  `E2E_PORT=42186 VERIFY_EVIDENCE_DIR="$PWD/.cache/verification/round-085-repair" PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright npm_config_cache="$PWD/.cache/npm" ./scripts/verify` — setup, format, lint, typecheck, 57 unit files/267 tests, all balances including 121-seed Research, build, audit, 231 root browser tests, and 2 Pages/offline tests. Evidence: `.cache/verification/round-085-repair`.
+
+## Checks not run
+
+- Device-native iOS/Android inspection was not run; the committed Playwright
+  suite is the reproducible browser evidence and covers the required portrait,
+  touch, keyboard, text-scaling, reduced-motion, persistence, offline, and
+  recovery paths.
 
 ## Historical previous handoff
 

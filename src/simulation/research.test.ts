@@ -57,6 +57,15 @@ describe("Research pipeline", () => {
     expect(state.research.activeProject?.projectId).toBe(
       "context-reconstruction",
     );
+    const restoredActive = restoreSimulationState(
+      JSON.parse(JSON.stringify(state)),
+      state.seed,
+    );
+    expect(restoredActive.research.activeProject).toEqual(
+      state.research.activeProject,
+    );
+    expect(restoredActive.research.goal?.text).toBe(state.research.goal?.text);
+    expect(isStateValid(restoredActive)).toBe(true);
     const cashAfterCommit = state.resources.money;
     state = tick(state, 60);
     expect(state.research.activeProject).toBeNull();
@@ -97,6 +106,24 @@ describe("Research pipeline", () => {
     expect(locked.research.frontier.inspectedProjectIds).not.toContain(
       "evidence-weave",
     );
+    let active = prepareContext();
+    active = applyCommand(active, {
+      type: "START_RESEARCH",
+      projectId: "context-reconstruction",
+    });
+    const malformedActive = JSON.parse(
+      JSON.stringify(active),
+    ) as SimulationState;
+    malformedActive.research.goal = null;
+    const recoveredActive = restoreSimulationState(
+      malformedActive,
+      active.seed,
+    );
+    expect(recoveredActive.research.activeProject).toBeNull();
+    expect(recoveredActive.research.goal).toBeNull();
+    expect(recoveredActive.research.teamMemberIds).toEqual([]);
+    expect(recoveredActive.resources.money).toBe(active.resources.money);
+    expect(isStateValid(recoveredActive)).toBe(true);
     const malformed = {
       ...state,
       research: { ...state.research, teamMemberIds: ["unknown"] },
@@ -113,6 +140,15 @@ describe("Research pipeline", () => {
       type: "START_RESEARCH",
       projectId: "context-reconstruction",
     });
+    const restoredWhileActive = restoreSimulationState(
+      JSON.parse(JSON.stringify(state)),
+      state.seed,
+    );
+    expect(restoredWhileActive.research.activeProject).toEqual(
+      state.research.activeProject,
+    );
+    expect(restoredWhileActive.research.goal).not.toBeNull();
+    expect(isStateValid(restoredWhileActive)).toBe(true);
     const activeBeforeOffline = state.research.activeProject;
     state = applyCommand(state, {
       type: "SET_OFFLINE_POLICY",

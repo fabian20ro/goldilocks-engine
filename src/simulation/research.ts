@@ -429,6 +429,7 @@ export function isResearchStateShapeValid(
     const project = findResearchProject(state.activeProject.projectId);
     if (
       !project ||
+      state.goal === null ||
       !positiveInteger(state.activeProject.startedAtTick) ||
       !isFiniteNumber(state.activeProject.elapsedHours) ||
       state.activeProject.elapsedHours < 0 ||
