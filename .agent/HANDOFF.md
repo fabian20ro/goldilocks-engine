@@ -1,3 +1,91 @@
+# Candidate handoff — hosted-CI PWA fixture repair (round 091)
+
+## Implemented behavior summary
+
+- Added a deterministic lifecycle barrier to the round-029 mixed-scope PWA
+  fixture. Before root-B installation starts, the live Pages-A client now
+  proves an activated matching registration, matching controller, and a
+  successful version handshake, then reaches network idle.
+- Kept the production PWA implementation, generated worker behavior, mixed
+  version update, exact Pages-A isolation assertion, reload marker assertion,
+  offline reload assertion, and error assertion unchanged.
+
+## Plan requirements covered
+
+- Preserves the retained PWA/service-worker contract: a root redeploy must
+  repair the stale root worker identity while a live nested Pages shell stays
+  on its own scope and remains usable offline.
+- Preserves the Rule-of-Three evidence seam: normal mixed-scope repair,
+  stale/extra-cache boundary, and offline reload lifecycle neighbor remain
+  exact assertions in the existing test.
+
+## Verifier findings resolved
+
+- Hosted Verify run `31836413683`, job `94883574736`: stabilized the sole
+  intermittent `tests/e2e/verifier-round-029.spec.ts:233` failure without
+  changing product code or weakening any expected identity.
+
+## Setup, startup, and verification commands
+
+Dependencies and browsers use ignored repository-local caches:
+
+```sh
+./scripts/setup
+./scripts/run
+# deterministic loopback: http://127.0.0.1:4173/
+```
+
+```text
+npm cache:          .cache/npm
+Playwright browser: .cache/ms-playwright
+browser artifacts:  test-results/, playwright-report/, playwright-pages-report/
+```
+
+The pinned Node 22 focused command is:
+
+```sh
+E2E_PORT=42403 PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright npm_config_cache="$PWD/.cache/npm" npm exec --yes --package=node@22 -- npx playwright test tests/e2e/verifier-round-029.spec.ts --repeat-each=20
+```
+
+## Important architectural decisions
+
+- This is test-fixture synchronization only. The barrier observes the same
+  registration/controller/version protocol used by the app; it does not add a
+  production message, retry, delay, or alternate acceptance path.
+- The test continues to start the root update through the retained A worker
+  URL while the server serves B bytes, and still requires exact root-B marker
+  `"1"`, Pages-A identity, persistence, offline reload, and no errors.
+
+## Known limitations and risks
+
+- Hosted CI must rerun the independent canonical lane; local stress cannot
+  prove acceptance on its own.
+- Native devices and non-Chromium engines remain outside the repository's
+  pinned browser evidence surface.
+
+## Checks run
+
+- Passed `./scripts/agent-status` at supplied clean baseline
+  `a39f24b87d56a05a8286c0f9d5420daeef1948bf`.
+- Passed `npm run typecheck`.
+- Passed `npx prettier --check tests/e2e/verifier-round-029.spec.ts`.
+- Passed the pre-edit Node 22 focused lane once and 20 repetitions.
+- Passed the post-edit Node 22 focused lane with 20 repetitions on port 42403
+  (20/20, 1.2 minutes).
+- Passed the single final canonical gate:
+  `INSTALL_PLAYWRIGHT=0 E2E_PORT=42404 VERIFY_EVIDENCE_DIR=.cache/verification/round-091-final npm_config_cache="$PWD/.cache/npm" PLAYWRIGHT_BROWSERS_PATH="$PWD/.cache/ms-playwright" ./scripts/verify`.
+  Setup, format, lint, typecheck, 65 unit files/295 tests, all balance lanes,
+  build, production audit, root browser/PWA 234/234, and Pages/offline 2/2
+  passed. Evidence: `.cache/verification/round-091-final`.
+
+## Checks not run
+
+- Native mobile/device inspection and non-Chromium engine inspection were not
+  run; pinned Chromium is the repository's reproducible browser evidence
+  surface.
+
+---
+
 # Candidate handoff — Milestone 5 Hype/Fear (round 089)
 
 ## Implemented behavior summary

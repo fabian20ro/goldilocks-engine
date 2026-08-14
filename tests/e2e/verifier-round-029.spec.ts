@@ -200,6 +200,47 @@ async function waitForIdentity(
     .toEqual(expected);
 }
 
+async function settleControlledWorker(
+  page: Page,
+  scope: ScopeDefinition,
+  expected: BuildInfo,
+): Promise<void> {
+  await page.evaluate(
+    async ({ basePath, expectedBuild }) => {
+      const registration =
+        await navigator.serviceWorker.getRegistration(basePath);
+      const active = registration?.active;
+      if (
+        !active ||
+        active.state !== "activated" ||
+        navigator.serviceWorker.controller !== active
+      )
+        throw new Error("controlled worker is not fully active");
+
+      await new Promise<void>((resolve, reject) => {
+        const channel = new MessageChannel();
+        const timeout = window.setTimeout(() => {
+          channel.port1.close();
+          reject(new Error("controlled worker did not answer"));
+        }, 2_000);
+        channel.port1.onmessage = (event) => {
+          window.clearTimeout(timeout);
+          channel.port1.close();
+          const data = event.data as { buildId?: unknown } | null;
+          if (data?.buildId !== expectedBuild) {
+            reject(new Error("controlled worker identity is not settled"));
+            return;
+          }
+          resolve();
+        };
+        active.postMessage({ type: "GOLDILOCKS_PWA_VERSION" }, [channel.port2]);
+      });
+    },
+    { basePath: scope.basePath, expectedBuild: expected.version },
+  );
+  await page.waitForLoadState("networkidle");
+}
+
 function expectedIdentity(build: BuildInfo, marker: string | null): Identity {
   return {
     appVersion: build.version,
@@ -254,6 +295,11 @@ test.describe("verifier round 029: live nested shell during stale-URL repair", (
     const pagesClient = await context.newPage();
     await pagesClient.goto(urlFor(pages), { waitUntil: "domcontentloaded" });
     await waitForIdentity(pagesClient, pages, expectedIdentity(pagesA, null));
+    // Let the controlled Pages client settle before the root worker's activate
+    // handler snapshots nested clients. This is a fixture lifecycle barrier,
+    // not a product delay: the assertion below still requires Pages A to stay
+    // isolated through the mixed-version update and offline reload.
+    await settleControlledWorker(pagesClient, pages, pagesA);
 
     // The server deliberately ignores the retained A query, like a static host:
     // root's A registration therefore receives B worker bytes while Pages A is
