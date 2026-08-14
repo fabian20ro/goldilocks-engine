@@ -352,9 +352,17 @@ export function researchInspectReveals(
 
 export function isResearchStateShapeValid(
   value: unknown,
+  simulationTick?: number,
 ): value is ResearchState {
   if (typeof value !== "object" || value === null) return false;
   const state = value as ResearchState;
+  const maxTimestamp = simulationTick ?? Number.MAX_SAFE_INTEGER;
+  if (
+    !Number.isSafeInteger(maxTimestamp) ||
+    maxTimestamp < 0 ||
+    (simulationTick !== undefined && !Number.isSafeInteger(simulationTick))
+  )
+    return false;
   const projectIds = new Set(researchProjects.map((item) => item.id));
   const researcherIds = new Set(researchers.map((item) => item.id));
   const frontier = state.frontier;
@@ -380,6 +388,7 @@ export function isResearchStateShapeValid(
       !isFiniteNumber(state.goal.createdAtTick) ||
       !positiveInteger(state.goal.createdAtTick) ||
       state.goal.createdAtTick < 0 ||
+      state.goal.createdAtTick > maxTimestamp ||
       typeof state.goal.text !== "string" ||
       state.goal.text.length < 8 ||
       state.goal.text.length > 120 ||
@@ -431,6 +440,7 @@ export function isResearchStateShapeValid(
       !project ||
       state.goal === null ||
       !positiveInteger(state.activeProject.startedAtTick) ||
+      state.activeProject.startedAtTick > maxTimestamp ||
       !isFiniteNumber(state.activeProject.elapsedHours) ||
       state.activeProject.elapsedHours < 0 ||
       !isFiniteNumber(state.activeProject.expectedDurationHours) ||

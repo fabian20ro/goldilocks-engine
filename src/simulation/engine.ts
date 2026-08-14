@@ -4727,7 +4727,7 @@ function isStateStructurallyValid(value: unknown): value is SimulationState {
       ) &&
       isCareerStateValid(state.career) &&
       isMetaProgressionValid(state.meta) &&
-      isResearchStateShapeValid(state.research) &&
+      isResearchStateShapeValid(state.research, state.tick) &&
       nonnegativeIntegers.every(
         (value) => Number.isSafeInteger(value) && value >= 0,
       ) &&
@@ -4963,7 +4963,13 @@ export function restoreSimulationState(
           steps: ["schema-v7-metadata-added"],
         };
     const storedResearch = record.research;
-    const research = isResearchStateShapeValid(storedResearch)
+    const restoreTick =
+      typeof record.tick === "number" ? record.tick : Number.NaN;
+    const researchIsValid = isResearchStateShapeValid(
+      storedResearch,
+      restoreTick,
+    );
+    const research = researchIsValid
       ? storedResearch
       : createInitialResearchState();
     let candidate = {
@@ -4984,7 +4990,7 @@ export function restoreSimulationState(
     if (
       record.contentVersion === PREVIOUS_CONTENT_VERSION ||
       storedResearch === undefined ||
-      !isResearchStateShapeValid(storedResearch)
+      !researchIsValid
     )
       migration = withMigrationStep(
         migration,

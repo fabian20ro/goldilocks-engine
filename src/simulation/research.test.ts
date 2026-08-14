@@ -65,6 +65,12 @@ describe("Research pipeline", () => {
       state.research.activeProject,
     );
     expect(restoredActive.research.goal?.text).toBe(state.research.goal?.text);
+    expect(restoredActive.research.goal?.createdAtTick).toBeLessThanOrEqual(
+      restoredActive.tick,
+    );
+    expect(
+      restoredActive.research.activeProject?.startedAtTick,
+    ).toBeLessThanOrEqual(restoredActive.tick);
     expect(isStateValid(restoredActive)).toBe(true);
     const cashAfterCommit = state.resources.money;
     state = tick(state, 60);
@@ -134,6 +140,25 @@ describe("Research pipeline", () => {
     expect(isStateValid(recovered)).toBe(true);
   });
 
+  it("adversarial: future-dated goals and projects clear on restore", () => {
+    let active = prepareContext();
+    active = applyCommand(active, {
+      type: "START_RESEARCH",
+      projectId: "context-reconstruction",
+    });
+    const malformed = JSON.parse(JSON.stringify(active)) as SimulationState;
+    malformed.research.goal!.createdAtTick = malformed.tick + 1;
+    malformed.research.activeProject!.startedAtTick = malformed.tick + 1;
+
+    const recovered = restoreSimulationState(malformed, active.seed);
+
+    expect(recovered.research.activeProject).toBeNull();
+    expect(recovered.research.goal).toBeNull();
+    expect(recovered.research.teamMemberIds).toEqual([]);
+    expect(recovered.resources.money).toBe(active.resources.money);
+    expect(isStateValid(recovered)).toBe(true);
+  });
+
   it("lifecycle: retained knowledge and migration survive departure/reload; offline policy does not run research", () => {
     let state = prepareContext();
     state = applyCommand(state, {
@@ -166,6 +191,11 @@ describe("Research pipeline", () => {
       activeBeforeOffline?.elapsedHours,
     );
     state = tick(state, 60);
+    expect(state.research.goal?.createdAtTick).toBeLessThanOrEqual(state.tick);
+    if (state.research.activeProject !== null)
+      expect(state.research.activeProject.startedAtTick).toBeLessThanOrEqual(
+        state.tick,
+      );
     const beforeRelease = state.research.tacitKnowledge["mira-voss"] ?? 0;
     state = applyCommand(state, {
       type: "RELEASE_RESEARCHER",

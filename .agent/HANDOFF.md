@@ -1,4 +1,4 @@
-# Candidate handoff — Milestone 4 Research (round 085)
+# Candidate handoff — Milestone 4 Research (round 086 repair)
 
 ## Current round implementation
 
@@ -22,6 +22,10 @@
   valid only with its required player-authored goal. A malformed active save
   now falls back to the safe Research default, clearing the active project and
   team while retaining structurally recoverable gameplay state.
+- Repaired V-084 temporal recovery: Research goal and active-project timestamps
+  must not be later than the enclosing simulation tick. Future-dated persisted
+  Research now falls back to the safe default instead of presenting a future
+  measurement as running.
 
 ## Plan requirements covered
 
@@ -44,8 +48,11 @@
 - Resolved V-083 from immutable round-085: malformed active Research without a
   required goal is rejected during restore; the candidate regression covers the
   cleared project/team and preserved cash.
-- The Rule-of-Three regression covers valid active restore, malformed
-  missing-goal recovery, and active reload/offline lifecycle behavior.
+- Resolved V-084 from immutable round-086: future-dated Research goal/project
+  timestamps are rejected during restore; the candidate regression covers
+  cleared project/team and preserved cash.
+- The Rule-of-Three regression covers valid temporal ordering, malformed
+  future-timestamp recovery, and active reload/offline lifecycle progression.
 
 ## Setup, startup, and verification commands
 
@@ -90,6 +97,9 @@ path when required.
 - Restore shape validation treats a goal as mandatory whenever a Research
   project is active, keeping the player-authored decision and running
   measurement inseparable across persistence recovery.
+- Research shape validation receives the enclosing simulation tick for both
+  structural checks and restore selection; future goal/project timestamps
+  therefore cannot survive persistence recovery or remain state-valid.
 - Existing safe offline policy remains freelance-only. Research progress is
   driven only by explicit deterministic simulation ticks.
 - The sixth navigation destination is the smallest coherent UI change needed
@@ -108,20 +118,22 @@ path when required.
 ## Checks run
 
 - Passed `./scripts/agent-status` before implementation: latest immutable round
-  085 was FAIL with only V-083 unresolved; started from verifier commit
-  `f36b6cffbbf0bf16d4197e80638d9f096476135b`.
+  086 was FAIL with only V-084 unresolved; started from verifier commit
+  `8b7ba13691cbe026c661bad55c2b08eef4f360e3`.
 - Passed focused `node_modules/.bin/vitest run --coverage=false
-src/simulation/research.test.ts src/simulation/verifierRound085.test.ts`:
-  2 files, 5 tests.
+src/simulation/research.test.ts src/simulation/verifierRound085.test.ts
+src/simulation/verifierRound086.test.ts`: 3 files, 7 tests.
 - Passed `npm run typecheck` and `npm run lint`.
-- Passed `node_modules/.bin/vitest run --coverage=false`: 57 files, 267 tests.
-- Passed `npm test` inside the final canonical gate: 57 files, 267 tests;
-  86.08% statements, 82.91% branches, 94.42% functions, 89.04% lines.
+- Passed `node_modules/.bin/vitest run --coverage=false`: 58 files, 269 tests.
+- Passed `node_modules/.bin/tsx
+.agent/verification/round-085-engine-probe.ts`: hidden frontier, migration,
+  outcome, researcher, and offline boundaries held.
+- Passed `npm test` inside the final canonical gate: 58 files, 269 tests;
+  86.17% statements, 83.01% branches, 94.42% functions, 89.13% lines.
 - Passed `npm run balance:research` inside the final canonical gate: 121 seeds,
-  zero failures, four outcome
-  kinds, catalog valid.
+  zero failures, four outcome kinds, catalog valid.
 - Passed final canonical gate:
-  `E2E_PORT=42186 VERIFY_EVIDENCE_DIR="$PWD/.cache/verification/round-085-repair" PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright npm_config_cache="$PWD/.cache/npm" ./scripts/verify` — setup, format, lint, typecheck, 57 unit files/267 tests, all balances including 121-seed Research, build, audit, 231 root browser tests, and 2 Pages/offline tests. Evidence: `.cache/verification/round-085-repair`.
+  `E2E_PORT=42192 VERIFY_EVIDENCE_DIR="$PWD/.cache/verification/round-086-repair" PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright npm_config_cache="$PWD/.cache/npm" ./scripts/verify` — setup, format, lint, typecheck, 58 unit files/269 tests, all balances including 121-seed Research, build, audit, 231 root browser tests (including Research), and 2 Pages/offline tests. Evidence: `.cache/verification/round-086-repair`.
 
 ## Checks not run
 
