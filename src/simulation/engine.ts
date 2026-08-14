@@ -3476,7 +3476,21 @@ function startLaboratoryRun(
   pipeline: SimulationState["laboratory"]["pipelines"][number],
   tick: number,
 ): SimulationState["laboratory"]["pipelines"][number] {
-  if (pipeline.activeRun || pipeline.waitingRuns <= 0) return pipeline;
+  if (
+    pipeline.activeRun ||
+    pipeline.waitingRuns <= 0 ||
+    pipeline.machineIds.length === 0
+  )
+    return pipeline;
+  const occupiedMachineIds = new Set(
+    laboratory.pipelines
+      .filter((item) => item.id !== pipeline.id && item.activeRun !== null)
+      .flatMap((item) => item.machineIds),
+  );
+  if (
+    pipeline.machineIds.some((machineId) => occupiedMachineIds.has(machineId))
+  )
+    return pipeline;
   const duration = laboratoryRunDuration(laboratory, pipeline.id);
   return {
     ...pipeline,
@@ -3674,7 +3688,7 @@ function applyLaboratoryCommand(
               ...lab.pipelines,
               {
                 id: pipeline.id,
-                machineIds: ["bench-node"],
+                machineIds: [],
                 waitingRuns: 0,
                 activeRun: null,
                 completedRuns: 0,
@@ -3708,6 +3722,15 @@ function applyLaboratoryCommand(
           "Machine assignment rejected: acquire the machine and pipeline first.",
         );
       if (pipeline.machineIds.includes(machine.id)) return state;
+      const assignedPipeline = lab.pipelines.find(
+        (item) =>
+          item.id !== pipeline.id && item.machineIds.includes(machine.id),
+      );
+      if (assignedPipeline)
+        return laboratoryWarning(
+          state,
+          `${machine.name} is already allocated to ${assignedPipeline.id}. Acquire another machine for parallel capacity.`,
+        );
       return appendEvent(
         {
           ...state,

@@ -1,3 +1,117 @@
+# Candidate handoff — Milestone 6 Local Laboratory lifecycle/capacity repair (round 093)
+
+## Implemented behavior summary
+
+- Founding is now a transactional close: FOUND_LAB rejects while any
+  laboratory pipeline has active or waiting work, preserves the run and cash,
+  and only closes after all evidence work settles.
+- Added pipelines start unassigned. Queue/start transitions require an
+  assigned machine; machine assignment is exclusive across pipelines, and the
+  Worker also checks active machine reservations before starting work.
+- Laboratory shape validation permits a valid unassigned waiting pipeline,
+  rejects duplicate machine allocation and active runs without capacity, and
+  preserves deterministic recovery behavior for valid saved active runs.
+- The Lab UI now exposes unassigned capacity and hides already-allocated
+  machines from competing assignment controls.
+
+## Plan requirements covered
+
+- D-040 offline/lifecycle and founding requirements: active and queued runs
+  survive attempted founding, reload, and offline-policy commands; Worker ticks
+  remain the only completion path.
+- D-040 multiple-machine and parallel-pipeline economy: a second pipeline needs
+  an explicit free machine; one-machine or conflicting allocation cannot
+  silently produce parallel work; purchase and allocation remain separate,
+  visible, once-only transitions.
+- plan.md §§16, 19, 20, 24, 27, and 29: complete-run causal postmortems,
+  deterministic Worker ordering, valid save shape, explicit capacity tests,
+  and accessible Lab presentation remain covered.
+
+## Verifier findings resolved
+
+- V-092-001: founding now rejects active or waiting laboratory work, so no
+  completed-route postmortem can freeze an in-flight run.
+- V-092-002: added pipelines are unassigned; queueing without capacity and
+  conflicting assignment are rejected, while two deliberately assigned
+  machines can run concurrently.
+
+## Setup, startup, and verification commands
+
+Dependencies and browsers use ignored repository-local caches:
+
+./scripts/setup
+./scripts/run
+deterministic loopback: http://127.0.0.1:4173/
+
+npm cache: .cache/npm
+Playwright browser: .cache/ms-playwright
+browser artifacts: test-results/, playwright-report/, playwright-pages-report/
+
+Focused browser command:
+
+INSTALL_PLAYWRIGHT=0 E2E_PORT=42407 npm_config_cache="$PWD/.cache/npm" PLAYWRIGHT_BROWSERS_PATH="$PWD/.cache/ms-playwright" npm run test:e2e -- tests/e2e/laboratory.spec.ts
+
+Final canonical command:
+
+INSTALL_PLAYWRIGHT=0 E2E_PORT=42408 VERIFY_EVIDENCE_DIR=.cache/verification/round-093-final npm_config_cache="$PWD/.cache/npm" PLAYWRIGHT_BROWSERS_PATH="$PWD/.cache/ms-playwright" ./scripts/verify
+
+## Important architectural decisions
+
+- No new decision was required: the repair makes D-040's existing
+  “parallel capacity is a choice” and Worker-only lifecycle language executable
+  in the engine.
+- machineIds are explicit pipeline allocations. A pipeline may exist in a
+  valid unassigned state, but it cannot queue or start until it owns a machine.
+  Allocation is exclusive, and the Worker retains a defensive active-reservation
+  check for restored or future states.
+- Founding readiness is shared by UI and engine command handling, while the
+  engine remains authoritative for malformed or direct command input.
+
+## Known limitations and risks
+
+- The retained round-092 UI adversarial probe encodes the pre-repair defect:
+  it seeds duplicate Bench Node allocation and expects founding to succeed
+  while a run is active. Its rerun therefore times out before the action; it
+  was not used as acceptance evidence. The retained engine adversarial probe
+  now exits cleanly with no findings.
+- Native mobile/device inspection and non-Chromium engine inspection remain
+  outside the pinned browser evidence surface.
+- Candidate is not independently accepted; a fresh Verifier must assess this
+  exact commit.
+
+## Checks run
+
+- Passed ./scripts/agent-status at supplied clean verifier baseline
+  06e2cc3bd4fb25eefab812fcf94a36ca9502ec0b; worktree was clean.
+- Passed npm run typecheck.
+- Passed npm run lint -- --no-warn-ignored.
+- Passed focused unit lane:
+  npx vitest run src/simulation/laboratory.test.ts src/simulation/engine.test.ts
+  (64 tests), and final Lab-only lane (10 tests).
+- Passed node .agent/verification/round-092-adversarial.mjs with findings: [].
+- Passed npm run balance:laboratory (24/24 valid, 24 completed, 24 endings,
+  17 deterministic experiments) and npm run balance:evaluation (121 seeds,
+  zero failures).
+- Passed npm run build.
+- Passed pinned focused Lab browser lane on port 42407 (1/1).
+- Attempted
+  PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright node .agent/verification/round-092-ui-adversarial.mjs;
+  it failed at its stale expectation that an active-run founding button remain
+  available after the repaired engine correctly restored the malformed
+  duplicate-allocation fixture.
+- Completed the single final canonical gate after all executable edits:
+  INSTALL_PLAYWRIGHT=0 E2E_PORT=42408
+  VERIFY_EVIDENCE_DIR=.cache/verification/round-093-final
+  npm_config_cache="$PWD/.cache/npm"
+  PLAYWRIGHT_BROWSERS_PATH="$PWD/.cache/ms-playwright" ./scripts/verify.
+  Setup, format, lint, typecheck, 66 unit files/305 tests, all balance lanes,
+  build, production audit (0 vulnerabilities), root browser/PWA 235/235, and
+  Pages/offline 2/2 completed successfully. Evidence:
+  .cache/verification/round-093-final. No canonical lane was intentionally
+  skipped.
+
+---
+
 # Candidate handoff — hosted-CI PWA fixture repair (round 091)
 
 ## Implemented behavior summary

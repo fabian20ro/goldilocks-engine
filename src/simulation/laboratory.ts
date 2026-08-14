@@ -181,8 +181,20 @@ export function laboratoryPipelineReadiness(
     );
   if (state.pipelines.length < 2)
     coreReasons.push("Add a second pipeline beside the reproducibility bench.");
+  if (state.pipelines.some((pipeline) => pipeline.machineIds.length === 0))
+    coreReasons.push(
+      "Assign every pipeline to an available machine before founding the lab.",
+    );
   if (!state.cultureId) coreReasons.push("Choose an early laboratory culture.");
   if (!state.lastRun) coreReasons.push("Complete one bounded laboratory run.");
+  if (
+    state.pipelines.some(
+      (pipeline) => pipeline.activeRun !== null || pipeline.waitingRuns > 0,
+    )
+  )
+    coreReasons.push(
+      "Finish all active and queued laboratory runs before founding the lab.",
+    );
   if (state.collaboratorIds.length < 1)
     credibilityReasons.push(
       "Invite one Research collaborator with retained context.",
@@ -382,7 +394,7 @@ export function isLaboratoryStateShapeValid(
         return (
           LAB_PIPELINE_IDS.includes(pipeline.id) &&
           Array.isArray(pipeline.machineIds) &&
-          pipeline.machineIds.length >= 1 &&
+          pipeline.machineIds.length >= 0 &&
           pipeline.machineIds.every((id: LaboratoryMachineId) =>
             machineIdSet.has(id),
           ) &&
@@ -393,6 +405,7 @@ export function isLaboratoryStateShapeValid(
           pipeline.completedRuns >= 0 &&
           Number.isSafeInteger(pipeline.failedRuns) &&
           pipeline.failedRuns >= 0 &&
+          (active === null || pipeline.machineIds.length > 0) &&
           (pipeline.lastRunTick === null ||
             (Number.isSafeInteger(pipeline.lastRunTick) &&
               pipeline.lastRunTick >= 0 &&
@@ -411,6 +424,8 @@ export function isLaboratoryStateShapeValid(
         );
       }) &&
       new Set(pipelineIds).size === pipelineIds.length &&
+      new Set(lab.pipelines.flatMap((pipeline) => pipeline.machineIds)).size ===
+        lab.pipelines.flatMap((pipeline) => pipeline.machineIds).length &&
       Array.isArray(collaboratorIds) &&
       collaboratorIds.length <= 6 &&
       collaboratorIds.every(

@@ -217,7 +217,7 @@ export function LaboratoryView({ state, command }: LaboratoryViewProps) {
                       Machines:{" "}
                       {pipeline.machineIds
                         .map((id) => findLaboratoryMachine(id)?.name ?? id)
-                        .join(" · ")}{" "}
+                        .join(" · ") || "none assigned"}{" "}
                       · queue {pipeline.waitingRuns} · {pipeline.completedRuns}{" "}
                       passed / {pipeline.failedRuns} failed
                     </small>
@@ -232,7 +232,10 @@ export function LaboratoryView({ state, command }: LaboratoryViewProps) {
                       <button
                         type="button"
                         className="primary-action"
-                        disabled={state.resources.money < (spec?.baseCost ?? 1)}
+                        disabled={
+                          pipeline.machineIds.length === 0 ||
+                          state.resources.money < (spec?.baseCost ?? 1)
+                        }
                         onClick={() =>
                           command({
                             type: "QUEUE_LAB_RUN",
@@ -245,7 +248,12 @@ export function LaboratoryView({ state, command }: LaboratoryViewProps) {
                       {lab.machines
                         .filter(
                           (machine) =>
-                            !pipeline.machineIds.includes(machine.id),
+                            !pipeline.machineIds.includes(machine.id) &&
+                            !lab.pipelines.some(
+                              (other) =>
+                                other.id !== pipeline.id &&
+                                other.machineIds.includes(machine.id),
+                            ),
                         )
                         .map((machine) => (
                           <button
@@ -263,6 +271,20 @@ export function LaboratoryView({ state, command }: LaboratoryViewProps) {
                             Assign {machine.id}
                           </button>
                         ))}
+                      {pipeline.machineIds.length === 0 &&
+                      !lab.machines.some(
+                        (machine) =>
+                          !lab.pipelines.some(
+                            (other) =>
+                              other.id !== pipeline.id &&
+                              other.machineIds.includes(machine.id),
+                          ),
+                      ) ? (
+                        <small>
+                          No free machine. Acquire another machine before
+                          queueing this pipeline.
+                        </small>
+                      ) : null}
                     </div>
                   </article>
                 );

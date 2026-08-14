@@ -92,6 +92,113 @@ describe("Local Laboratory endgame", () => {
     ).toBe(2);
   });
 
+  it("rejects founding until active work settles, including after reload and offline policy", () => {
+    const waiting = preparedRun(29);
+    const blockedWaiting = applyCommand(waiting, {
+      type: "FOUND_LAB",
+      decision: "independent-laboratory",
+    });
+    expect(blockedWaiting.career.runEnding).toBeNull();
+    expect(blockedWaiting.laboratory.foundingDecision).toBeNull();
+    expect(blockedWaiting.ledger.at(-1)?.kind).toBe("warning");
+
+    const active = tick(waiting, 1);
+    expect(
+      active.laboratory.pipelines.some(
+        (pipeline) => pipeline.activeRun !== null,
+      ),
+    ).toBe(true);
+    const blockedActive = applyCommand(active, {
+      type: "FOUND_LAB",
+      decision: "independent-laboratory",
+    });
+    expect(blockedActive.career.runEnding).toBeNull();
+    expect(blockedActive.laboratory.foundingDecision).toBeNull();
+
+    const restored = restoreSimulationState(JSON.parse(JSON.stringify(active)));
+    const offline = applyCommand(restored, {
+      type: "APPLY_OFFLINE_POLICY",
+      requestedHours: 1,
+    });
+    expect(offline.laboratory).toEqual(restored.laboratory);
+    const settled = tick(offline, 60);
+    expect(
+      settled.laboratory.pipelines.some(
+        (pipeline) => pipeline.activeRun !== null || pipeline.waitingRuns > 0,
+      ),
+    ).toBe(false);
+    expect(
+      applyCommand(settled, {
+        type: "FOUND_LAB",
+        decision: "independent-laboratory",
+      }).career.runEnding,
+    ).not.toBeNull();
+  });
+
+  it("requires explicit non-conflicting machine allocation for parallel capacity", () => {
+    let state = createLaboratoryBalanceState(29);
+    state = applyCommand(state, {
+      type: "ADD_LAB_PIPELINE",
+      pipelineId: "research",
+    });
+    expect(isStateValid(state)).toBe(true);
+    const afterPipeline = state.resources.money;
+    const unassigned = applyCommand(state, {
+      type: "QUEUE_LAB_RUN",
+      pipelineId: "research",
+    });
+    expect(unassigned.resources.money).toBe(afterPipeline);
+    expect(
+      unassigned.laboratory.pipelines.find(
+        (pipeline) => pipeline.id === "research",
+      )?.waitingRuns,
+    ).toBe(0);
+
+    const conflicting = applyCommand(state, {
+      type: "ASSIGN_LAB_MACHINE",
+      pipelineId: "research",
+      machineId: "bench-node",
+    });
+    expect(
+      conflicting.laboratory.pipelines.find(
+        (pipeline) => pipeline.id === "research",
+      )?.machineIds,
+    ).toEqual([]);
+
+    const beforePurchase = state.resources.money;
+    state = applyCommand(state, {
+      type: "BUY_LAB_MACHINE",
+      machineId: "parallel-rack",
+    });
+    expect(state.resources.money).toBeLessThan(beforePurchase);
+    const afterPurchase = state.resources.money;
+    state = applyCommand(state, {
+      type: "BUY_LAB_MACHINE",
+      machineId: "parallel-rack",
+    });
+    expect(state.resources.money).toBe(afterPurchase);
+    state = applyCommand(state, {
+      type: "ASSIGN_LAB_MACHINE",
+      pipelineId: "research",
+      machineId: "parallel-rack",
+    });
+    state = applyCommand(state, {
+      type: "QUEUE_LAB_RUN",
+      pipelineId: "reproducibility",
+    });
+    state = applyCommand(state, {
+      type: "QUEUE_LAB_RUN",
+      pipelineId: "research",
+    });
+    const running = tick(state, 1);
+    expect(
+      running.laboratory.pipelines.filter(
+        (pipeline) => pipeline.activeRun !== null,
+      ),
+    ).toHaveLength(2);
+    expect(isStateValid(running)).toBe(true);
+  });
+
   it("keeps a divergent run as a recovery input instead of losing the queue", () => {
     let state = preparedRun(20260718);
     state = tick(state, 60);
