@@ -124,6 +124,7 @@ function validateCatalog(catalog, reports) {
       requireFile(check, requirement.id);
   }
   if (requirementIds.size === 0) fail("activeScope has no requirements");
+  const activeRequirementIds = requirementIds;
 
   const groups = catalog.findingGroups ?? [];
   const coveredBy = new Map();
@@ -138,10 +139,14 @@ function validateCatalog(catalog, reports) {
         fail(`${finding} is routed by both ${previous} and ${group.id}`);
       coveredBy.set(finding, group.id);
     }
-    if (group.status === "active")
-      fail(
-        `${group.id} is an unresolved active finding; use activeScope for new work`,
-      );
+    if (group.status === "active") {
+      if (!activeRequirementIds.has(group.requirementId))
+        fail(
+          `${group.id} is an unresolved active finding without an active requirement`,
+        );
+      if (group.resolutionReport)
+        fail(`${group.id} active status must not have a resolutionReport`);
+    }
     if (group.status === "resolved" && !group.resolutionReport)
       fail(`${group.id} resolved status has no resolutionReport`);
     if (group.status === "superseded" && !group.supersededByDecision)

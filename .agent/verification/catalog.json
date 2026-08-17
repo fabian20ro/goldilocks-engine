@@ -130,6 +130,18 @@
       "resolutionReport": ".agent/verification/round-093.md",
       "regressionEvidence": ["scripts/verify", ".agent/RELEASE_ACCEPTANCE.md"],
       "note": "Historical deployment/infrastructure blockers; exact-SHA hosted verification remains a release-matrix gate, not an unresolved implementation finding."
+    },
+    {
+      "id": "V-094-001",
+      "match": { "exact": ["V-094-001"] },
+      "status": "active",
+      "requirementId": "M7A-NAV-002",
+      "regressionEvidence": [
+        ".agent/verification/round-094-adversarial.mjs",
+        "src/ui/App.tsx",
+        "src/ui/styles.css"
+      ],
+      "note": "Fresh round-094 independent evidence: active World remains clipped after a 393-to-320 resize until another tab activation or manual strip scroll. Implementer must resolve this under the active M7A navigation lifecycle requirement."
     }
   ],
   "supersededProbes": [
