@@ -1,66 +1,63 @@
-# Candidate handoff — Milestone 7B OIV-first routing assertion repair
+# Candidate handoff — Milestone 7B OIV-first evidence tooling
+
+Candidate SHA: see the exact commit returned by the Implementer; the metadata
+was finalized after the initial semantic commit. The implementation started
+from accepted verifier HEAD
+`756bf2631cdec61ac9aaac02d9915cd1de61e148`.
 
 ## Implemented behavior summary
 
-- Synchronized the two routing regression suites with the authoritative active
-  M7B heading and plural historical-provenance heading.
-- Retained the catalog, historical IDs, and no-live-claim assertions; no
-  product code, `plan.md`, M7B scope, release receipt, or immutable report was
-  changed.
-- Rule-of-Three seam review covers normal active-M7B headings, historical
-  provenance headings/IDs, and the boundary invariant excluding live/current
-  candidate claims.
-- Preserved the existing M7B OIV-first matrix, budgets, Rule of Three,
-  repository-local cache/startup contract, artifact manifest, cleanup, and
-  explicitly deferred later M7 work.
+- Added repository-pinned Playwright WebKit lane
+  (`playwright.webkit.config.ts`, `tests/e2e/m7b-webkit.spec.ts`) with managed
+  loopback startup, 393×742 and 320×693 portrait contexts, reduced motion,
+  200% text, zero document overflow, 44px targets, stable eight-destination
+  order, keyboard Enter, touch activation, persistence/reload, malformed-save
+  recovery, offline cache proof, and explicit WebKit offline-error annotation.
+- Added `scripts/native-accessibility.mjs`: xcrun simctl and adb/adb reverse
+  setup, device identity, accessibility settings capture/optional enable and
+  restore, screenshots/logs/UI hierarchy, speech placeholders, checklist rows,
+  actual-viewport/manual evidence fields, artifact SHA-256 records, cleanup,
+  and honest BLOCKED exit behavior.
+- Added `scripts/collect-mobile-performance.mjs`: five cold runs per pinned
+  browser/portrait cell, PerformanceObserver LCP/INP/CLS, startup/transfer/
+  memory/offline samples, 1×/64× Worker-cost proxy plus memory, p95/median,
+  frozen-build baseline ratio checks, physical adb battery/thermal/memory,
+  and optional five-run Android Chrome CDP lane using adb reverse/forward.
+- Integrated setup, package-manager commands, and all three M7B lanes into
+  `./scripts/verify`; bulky evidence remains ignored under `.cache/`.
+- Added focused contract tests and M7B setup/evidence documentation. No
+  product behavior, telemetry, native wrapper, dependency, plan, decision,
+  scope, catalog, or immutable report was changed.
 
 ## Plan requirements covered
 
-- `plan.md` §§2.4, 20.4, 23, 27, 29, and 34 remain the product/release
-  boundaries; no plan section was edited.
-- D-040 and D-041 remain frozen M6/M7A regression boundaries.
-- D-043 records the frozen M7A receipt and bounds M7B to WebKit/native
-  accessibility plus measured mobile performance first.
-- Remaining later M7 work is explicitly prioritized, not pulled into M7B:
-  writing/density, supported-save fixtures/version policy, localization,
-  audio, and packaging/distribution decision.
+- D-043 and `.agent/RELEASE_ACCEPTANCE.md` M7B WebKit, native accessibility,
+  measured performance, Rule-of-Three, local-cache, deterministic loopback,
+  and BLOCKED-infrastructure requirements.
+- WebKit and performance commands are package-manager scripts and are invoked
+  by the canonical verifier after the existing static/build lanes.
+- Native artifacts record build SHA, device/OS/browser identity, settings,
+  expected and manually recorded CSS viewport, text scale, reduced motion,
+  every eight-tab checklist row, screenshots/logs/speech evidence fields, and
+  SHA-256 paths; absent speech/viewport/device access remains BLOCKED.
+- Performance summary records absolute LCP ≤2500ms, INP ≤200ms, CLS ≤0.10,
+  five-run count, startup/offline/Worker/memory/transfer values, p95/median,
+  same-device baseline ratio ≤1.20, and physical battery/thermal gate.
 
 ## Verifier findings resolved
 
-- V-100-001 is addressed in `src/test/agentWorkflowRouting.test.ts` and
-  `src/test/verifierRound083Workflow.test.ts`; the exact reproduction now
-  passes while historical provenance and non-volatile routing checks remain.
-- V-098-001 remains resolved by immutable round 099 at accepted candidate
-  `d25e80e6781de89e80fc3b3c240a922ada53d978`; the round-099 verifier commit is
-  `efaa1890751588abfc6728fab779a44e2650a2db`.
-- `.agent/verification/round-100.md` and the catalog remain immutable; fresh
-  independent verification of this candidate remains required. This handoff
-  does not issue a verdict.
-
-## Frozen M7A external release receipt
-
-- Accepted candidate: `d25e80e6781de89e80fc3b3c240a922ada53d978`.
-- Verifier: round 099 report `.agent/verification/round-099.md`, commit
-  `efaa1890751588abfc6728fab779a44e2650a2db`.
-- Hosted Verify:
-  <https://github.com/fabian20ro/goldilocks-engine/actions/runs/32071396270>
-  attempt 2 succeeded with all five lanes and aggregate. First attempt
-  portrait setup was cancelled after a runner infrastructure stall; only
-  cancelled/dependent jobs were rerun.
-- `main` was fast-forwarded to the exact candidate. Tag deploy
-  <https://github.com/fabian20ro/goldilocks-engine/actions/runs/32072911527>
-  built successfully but environment policy disallowed the tag. Successful
-  exact-SHA main deploy:
-  <https://github.com/fabian20ro/goldilocks-engine/actions/runs/32073014870>.
-- Live: <https://fabian20ro.github.io/goldilocks-engine/>.
-- Live/local `build-info.json`: version `dc97ee41f6dbbc0e29d2`, scope
-  `/goldilocks-engine/`, matching service-worker ID. Live 320×693 smoke clean;
-  zero console errors.
+- Prior routing findings V-100-001 and V-098-001 remain resolved by the
+  immutable accepted history; no immutable report was edited.
+- This candidate resolves the previously open M7B implementation/tooling
+  scope by adding executable WebKit/native/performance lanes. Native speech,
+  actual CSS viewport, frozen baseline, and unlocked physical Android are
+  evidence gates, not claims made by this handoff.
+- No new stable verifier finding was created by focused checks. Independent
+  verification remains required and this handoff issues no verdict.
 
 ## Setup, startup, and verification commands
 
-Use ignored repository-local caches; no user-home/global cache or browser is
-required:
+All browser/npm caches are repository-local and ignored:
 
 ```sh
 export npm_config_cache="$PWD/.cache/npm"
@@ -69,84 +66,89 @@ export PLAYWRIGHT_BROWSERS_PATH="$PWD/.cache/ms-playwright"
 ./scripts/run
 ```
 
-Focused routing/catalog/static checks for this candidate:
+Focused checks run during implementation:
 
 ```sh
 ./scripts/agent-status
-npx vitest run --coverage=false src/test/agentWorkflowRouting.test.ts src/test/verifierRound083Workflow.test.ts
-npm run validate:verification-catalog
 npm run format:check
 npm run lint -- --quiet
 npm run typecheck
+npx vitest run --coverage=false src/test/m7bEvidenceTooling.test.ts
+node --check scripts/native-accessibility.mjs
+node --check scripts/collect-mobile-performance.mjs
 git diff --check
+E2E_WEBKIT_PORT=43133 npm run test:e2e:webkit
+M7B_NATIVE_ALLOW_BLOCKED=1 M7B_NATIVE_PORT=43132 npm run test:native-a11y
+M7B_PERFORMANCE_ALLOW_BLOCKED=1 M7B_PERFORMANCE_RUNS=5 \
+  M7B_PERFORMANCE_PORT=43134 npm run collect:mobile-performance
 ```
 
-Canonical full gate (run once after the executable routing-test repair):
+The final canonical command is run once after the final candidate commit:
 
 ```sh
-INSTALL_PLAYWRIGHT=0 \
-  npm_config_cache="$PWD/.cache/npm" \
-  PLAYWRIGHT_BROWSERS_PATH="$PWD/.cache/ms-playwright" \
-  ./scripts/verify
+./scripts/verify
 ```
 
-The next candidate must add and document these WebKit commands, then invoke
-the lane from `./scripts/verify`:
+Native operator session, with before snapshots retained and restored:
 
 ```sh
-npx playwright install webkit
-npm run test:e2e:webkit
+M7B_NATIVE_ENABLE_SETTINGS=1 M7B_NATIVE_ALLOW_BLOCKED=1 \
+  npm run test:native-a11y
 ```
 
-Native evidence uses deterministic loopback plus explicit teardown, following
-the existing patterns: `xcrun simctl` for iOS Simulator and `adb`/`adb reverse`
-for an unlocked USB Android. Bulky traces/screenshots/device logs stay in
-ignored `.cache/` or CI artifacts; commit a compact summary with candidate
-SHA, device/browser identity, settings, viewport, samples, thresholds,
-result, and raw-artifact paths/checksums.
+Use `.cache/m7b/native/summary.json` and
+`.cache/m7b/performance/summary.json` plus their listed ignored artifacts.
 
 ## Important architectural decisions
 
-- M7B is evidence-first: normal WebKit/native portrait behavior, 320×693
-  200%-text/reduced-motion boundary behavior, and clean-install/reload/offline
-  plus repeated 1×/64× Worker lifecycle behavior are the Rule of Three.
-- Performance gates are LCP ≤ 2.5s, INP ≤ 200ms, CLS ≤ 0.10, five cold runs
-  per device/browser, and ≤120% of the frozen-build same-device baseline for
-  startup, Worker CPU, memory, and offline startup; physical battery/thermal
-  evidence is required for that sub-gate.
-- Missing iOS Simulator, unlocked USB Android, physical thermal measurement,
-  or browser launch/install is BLOCKED for its affected gate. Chromium, an
-  in-app browser, an AX tree, or simulator-only thermal data cannot silently
-  substitute for native/device evidence.
+- Evidence-only implementation: existing application seams are exercised;
+  no product redesign or speculative abstraction was introduced.
+- WebKit's known offline top-level navigation error is preserved as a
+  concrete `BLOCKED` finding while service-worker/controller/cache proof is
+  retained. Other page/console errors fail the lane.
+- Dedicated Worker CPU attribution is not exposed by browser CDP, so the
+  collector labels `Performance.TaskDuration` as a Worker-cost proxy and
+  records the limitation; the shipped 1×/64× controls are exercised.
+- Android Chrome uses `adb reverse` for deterministic loopback and
+  `adb forward ... localabstract:chrome_devtools_remote` for Playwright CDP;
+  force-stop/reopen separates cold runs and teardown removes both tunnels.
+- Missing native infrastructure, manual speech/viewport evidence, frozen
+  baseline, or physical device never becomes a silent substitute/pass.
 
 ## Known limitations and risks
 
-- This candidate only repairs routing-test expectations; no WebKit lane, native
-  screen-reader session, or mobile-performance collector exists yet. The next
-  Implementer must create those executable artifacts before claiming evidence.
-- Managed macOS browser sandbox policy may require scoped host authority,
-  as recorded by prior verifier rounds.
-- The canonical run reached root-browser-pwa but stopped when Chromium failed
-  to launch under the managed macOS policy. The evidence log records
-  `bootstrap_check_in ... Permission denied (1100)`; pages-offline was not
-  reached. This is an infrastructure limitation to preserve for independent
-  verification, not a source-test result.
-- Writing/density, save fixture/support policy, localization readiness, audio,
-  and packaging/distribution remain later M7 work. Startup/workforce/
-  government/remote content, new destinations, telemetry, native wrappers,
-  and broad architecture rewrites remain out of scope.
+- Focused environment evidence is infrastructure-blocked: CoreSimulatorService
+  is unavailable; the attached Pixel 6a is locked. The collector also has no
+  frozen accepted-build baseline artifact. These are retained in summaries and
+  are not claimed as closed gates.
+- The current WebKit build reports `WebKit encountered an internal error` on
+  offline top-level reload; cached-shell/controller proof succeeds and the
+  exact error is retained as a BLOCKED infrastructure finding.
+- Native VoiceOver/TalkBack speech and actual CSS viewport require an operator
+  session; AX/UIAutomator artifacts are supporting evidence only.
+- The managed macOS browser sandbox may require scoped host authority for
+  pinned browser launch. No chrome-devtools MCP or global cache is used.
+- Deferred M7 work remains out of scope: writing/density, save fixtures and
+  support policy, localization, audio, packaging/distribution, telemetry,
+  startup/workforce/government/remote content, native wrappers, and new game
+  systems.
 
 ## Checks not run / final evidence
 
-- `npx vitest run --coverage=false src/test/agentWorkflowRouting.test.ts
-src/test/verifierRound083Workflow.test.ts` passed: 2 files, 9 tests.
-- `npm run validate:verification-catalog`, `npm run format:check`,
-  `npm run lint -- --quiet`, `npm run typecheck`, and `git diff --check` passed.
-- The single `./scripts/verify` run passed catalog/setup/format/lint/typecheck,
-  unit (66 files, 308 tests), balance, build, and production audit; it stopped
-  at root-browser-pwa on the Chromium launch policy error above. It was not
-  rerun; pages-offline, WebKit, native-device, and performance lanes therefore
-  remain unverified.
-- `./scripts/run`, WebKit installation, native-device checks, and performance
-  collection were not run for the same reason and remain explicit M7B work.
-- A fresh independent Verifier must inspect this exact candidate SHA.
+- Focused format, lint, typecheck, M7B contract tests, syntax, and diff checks
+  passed.
+- WebKit host-authority lane passed 2/2 (393×742 and 320×693). Its normal,
+  boundary, reduced-motion, 200%-text, keyboard/touch, reload/offline/cache,
+  persistence, and recovery assertions executed.
+- Native harness returned BLOCKED with exact xcrun CoreSimulatorService error,
+  locked Android policy evidence, and missing manual speech/viewport evidence;
+  settings/reverse cleanup completed.
+- Performance collector completed Chromium 320/393 five-run cells and
+  Chromium+WebKit 320/393 five-run cells. Chromium p95s observed: LCP 176ms
+  (320) / 88ms (393), INP 56ms / 56ms, CLS 0; Worker TaskDuration proxy p95
+  10.37ms/9.744ms at 1× and 10.061ms/10.467ms at 64×. WebKit offline
+  navigation errors are retained as BLOCKED with cache proof. Android
+  five-run lane and physical battery/thermal closure are BLOCKED by the
+  locked device; frozen-baseline comparison is BLOCKED by missing input.
+- Fresh independent verification must inspect this exact committed SHA and
+  independently rerun applicable canonical and native/operator evidence.

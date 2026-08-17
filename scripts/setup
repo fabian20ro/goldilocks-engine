@@ -15,9 +15,9 @@ case "${INSTALL_PLAYWRIGHT:-1}" in
     ;;
   1)
     if [ "${PLAYWRIGHT_INSTALL_DEPS:-0}" = "1" ]; then
-      npx playwright install --with-deps chromium
+      npx playwright install --with-deps chromium webkit
     else
-      npx playwright install chromium
+      npx playwright install chromium webkit
     fi
     ;;
   *)

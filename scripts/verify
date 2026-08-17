@@ -45,6 +45,9 @@ run_step balance npm run balance
 run_step build npm run build
 run_step production-audit npm audit --omit=dev --audit-level=high
 run_step root-browser-pwa npm run test:e2e
+run_step webkit-browser npm run test:e2e:webkit
+run_step native-accessibility env M7B_NATIVE_ALLOW_BLOCKED=1 npm run test:native-a11y
+run_step mobile-performance env M7B_PERFORMANCE_ALLOW_BLOCKED=1 npm run collect:mobile-performance
 run_step pages-offline npm run test:e2e:pages
 
 printf '%s\n' "Verification passed. Evidence: $EVIDENCE_DIR" | tee -a "$LOG"

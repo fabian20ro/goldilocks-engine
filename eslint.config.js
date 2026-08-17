@@ -58,6 +58,10 @@ export default tseslint.config(
     languageOptions: { globals: globals.node },
   },
   {
+    files: ["scripts/collect-mobile-performance.mjs"],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
+  {
     // Playwright verifier probes run as Node orchestration but exercise browser
     // callbacks. Keep both real execution environments linted without
     // changing older probes that declare their own narrowly scoped globals.
