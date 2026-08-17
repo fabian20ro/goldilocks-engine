@@ -204,7 +204,7 @@ describe("round 083 workflow and provenance routing", () => {
       expect(run.result.status).toBe(0);
       const summary = readFileSync(join(run.evidence, "summary.txt"), "utf8");
       expect(summary).toBe(
-        "verification-catalog=passed\nsetup=passed\nformat=passed\nlint=passed\ntypecheck=passed\nunit=passed\nbalance=passed\nbuild=passed\nproduction-audit=passed\nroot-browser-pwa=passed\npages-offline=passed\n",
+        "verification-catalog=passed\nsetup=passed\nformat=passed\nlint=passed\ntypecheck=passed\nunit=passed\nbalance=passed\nbuild=passed\nproduction-audit=passed\nroot-browser-pwa=passed\nwebkit-browser=passed\nnative-accessibility=passed\nmobile-performance=passed\npages-offline=passed\n",
       );
       expect(readFileSync(join(run.evidence, "checks.log"), "utf8")).toContain(
         "Verification passed. Evidence:",
@@ -220,6 +220,9 @@ describe("round 083 workflow and provenance routing", () => {
         "build",
         "production-audit",
         "root-browser-pwa",
+        "webkit-browser",
+        "native-accessibility",
+        "mobile-performance",
         "pages-offline",
       ])
         expect(existsSync(join(run.evidence, `${name}.log`))).toBe(true);
