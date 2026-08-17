@@ -1,4 +1,4 @@
-# Scope routing map — accepted Milestone 6 history and active Milestone 7A
+# Scope routing map — accepted Milestone 7A release and active Milestone 7B
 
 Navigation only. This map is stable routing metadata, not authority. It never
 states live HEAD, latest verdict, current acceptance, or next gate. Run
@@ -17,7 +17,7 @@ states live HEAD, latest verdict, current acceptance, or next gate. Run
    broad/cross-milestone changes, missing or contradictory catalog coverage,
    or an explicit request.
 
-## Historical accepted boundary
+## Historical accepted boundaries
 
 The immutable round-093 report records the accepted Milestone 6 Local
 Laboratory repair at candidate
@@ -31,42 +31,59 @@ Worker-only lifecycle, offline safety, and eight destinations.
 This is historical provenance. Live status comes only from
 `./scripts/agent-status`.
 
-## Active authorized scope: Milestone 7A
+The exact accepted M7A release receipt is recorded in D-043 and
+`.agent/RELEASE_ACCEPTANCE.md`: candidate
+`d25e80e6781de89e80fc3b3c240a922ada53d978`, independent verifier round 099,
+and the hosted/deployment evidence. This is frozen historical routing, not a
+claim about the live HEAD or a future gate.
 
-D-041 and `.agent/RELEASE_ACCEPTANCE.md` route this bounded slice:
+## Active authorized scope: Milestone 7B OIV-first hardening
 
-- refresh this map and `verification/INDEX.md` without volatile claims;
-- validate the machine-readable active catalog before expensive verification;
-- keep `.agent/HANDOFF.md` current-only and compact;
-- define the remaining commercial-release acceptance matrix;
-- make the eight-tab strip discoverable at 320px while preserving stable
-  order, bottom-tab-only routing, 44px targets, keyboard/touch semantics and
-  393px fit;
-- prove the navigation seam at 320/393, 200% text, keyboard, touch, resize,
-  focus and reload boundaries.
+D-043 and `.agent/RELEASE_ACCEPTANCE.md` route this bounded next slice:
+
+- close the WebKit browser gap at 320×693 and 393×742 with the existing pinned
+  Playwright/cache/startup contract;
+- close native VoiceOver coverage on the available iOS Simulator and native
+  TalkBack coverage on an available unlocked USB Android;
+- collect measured mobile-performance evidence for clean install/startup,
+  LCP/INP/CLS, Worker 1×/64× cost, memory, offline startup, and physical
+  battery/thermal behavior;
+- retain the accepted eight-tab M7A navigation/PWA checks as regression
+  boundaries;
+- keep the device/browser matrix, measurable budgets, Rule of Three, artifact
+  manifest, and infrastructure/blocker policy explicit in the handoff and
+  release matrix.
+
+This routing milestone itself changes only mutable documentation/catalog
+metadata. The next implementation candidate may make the smallest
+accessibility/performance correction demonstrated by the new evidence.
 
 ## Frozen boundaries
 
 No `plan.md` edit, startup/workforce/government expansion, new navigation
 destination, simulation command, persistence schema, speculative telemetry,
 audio/localization implementation, store packaging, or broad architecture
-rewrite is authorized by M7A. Existing deterministic simulation, accounting,
-causal truth, persistence, PWA/update, offline, reduced-motion, accessibility,
-and Lab lifecycle contracts remain regression boundaries.
+rewrite is authorized by M7B. Writing/density, supported-save fixtures and
+version policy, localization readiness, audio, and the PWA-only versus
+store-packaging/distribution decision remain prioritized later M7 work.
+Existing deterministic simulation, accounting, causal truth, persistence,
+PWA/update, offline, reduced-motion, accessibility, and Lab lifecycle
+contracts remain regression boundaries.
 
 ## Exact authority map
 
 | Need                                     | Source                                                                                                                                  |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Product and release boundary             | `plan.md` §§2.4, 20, 24, 27, 29, 34; D-040–D-041                                                                                        |
+| Product and release boundary             | `plan.md` §§2.4, 20, 24, 27, 29, 34; D-040–D-043                                                                                        |
 | Historical accepted Milestone 6 behavior | `.agent/verification/round-093.md`; `.agent/verification/round-093-adversarial.mjs`; `.agent/verification/round-093-ui-adversarial.mjs` |
-| Active M7 release matrix                 | `.agent/RELEASE_ACCEPTANCE.md`                                                                                                          |
+| Frozen M7A receipt and active M7 matrix  | `.agent/RELEASE_ACCEPTANCE.md`; D-043                                                                                                   |
 | Active finding/probe status              | `.agent/verification/catalog.json`; `scripts/validate-verification-catalog.mjs`                                                         |
 | Navigation implementation                | `src/ui/App.tsx`; `src/ui/styles.css`; `src/ui/glyphs.tsx`                                                                              |
 | Navigation acceptance                    | `tests/e2e/navigation-affordance.spec.ts`; `scripts/verify`                                                                             |
+| M7B OIV evidence contract                | `.agent/RELEASE_ACCEPTANCE.md` §Milestone 7B; `.agent/HANDOFF.md`                                                                       |
 | Live Git/report facts                    | `./scripts/agent-status` only                                                                                                           |
 
-## Rule-of-Three navigation map
+## Rule-of-Three retained M7A navigation map
 
 1. Normal: 393px shows all eight stable destinations, each at least 44px, with
    no overflow cue or document-level horizontal overflow.
@@ -74,6 +91,17 @@ and Lab lifecycle contracts remain regression boundaries.
    strip, shows a direction cue, and reveals World after keyboard or touch.
 3. Lifecycle: 200% text, resize to 393px, return to 320px, and reload retain
    stable order, active-tab semantics, focus behavior, and safe overflow state.
+
+## Rule-of-Three M7B OIV map
+
+1. Normal: WebKit/native portrait navigation and first-action reachability at
+   393px, with the same-device performance baseline recorded.
+2. Boundary: 320×693 with 200% text, reduced motion, horizontal reveal,
+   VoiceOver/TalkBack names and active state, touch/keyboard activation, and no
+   document overflow or clipped target.
+3. Lifecycle: clean install, reload/offline resume, repeated 1×/64× Worker
+   runs, and device CPU/memory/battery/thermal observation with explicit
+   recovery or BLOCKED evidence.
 
 The catalog's active requirements and historical finding groups are the
 machine-checked routing contract. If a report introduces a finding ID absent

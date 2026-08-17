@@ -997,3 +997,52 @@
 - **Reversal condition:** Re-enable an automated trigger only through an
   explicit owner decision with an equivalent deduplication, exact-SHA, and
   deployment-approval boundary.
+
+## D-043 — M7A exact release receipt and M7B OIV-first hardening
+
+- **Decision:** Treat the accepted Milestone 7A candidate as a frozen release
+  receipt and begin the next bounded Milestone 7 slice with observability,
+  independent verification, and implementation (OIV) focused first on
+  WebKit/native accessibility and measured mobile performance. The next slice
+  may make the smallest product or test-tooling corrections required by that
+  evidence, but it does not add game systems or broaden the release boundary.
+- **Frozen release receipt:** Accepted candidate
+  `d25e80e6781de89e80fc3b3c240a922ada53d978`; independent Verifier round 099
+  report `.agent/verification/round-099.md`, committed at
+  `efaa1890751588abfc6728fab779a44e2650a2db`. Hosted Verify run
+  [32071396270](https://github.com/fabian20ro/goldilocks-engine/actions/runs/32071396270)
+  attempt 2 succeeded with all five lanes and the aggregate. Its first
+  attempt cancelled portrait setup after a runner-infrastructure stall; only
+  cancelled/dependent jobs were rerun. `main` was fast-forwarded to the exact
+  accepted candidate. Tag deploy run
+  [32072911527](https://github.com/fabian20ro/goldilocks-engine/actions/runs/32072911527)
+  built successfully but environment policy rejected the tag. The successful
+  exact-SHA main deploy is
+  [32073014870](https://github.com/fabian20ro/goldilocks-engine/actions/runs/32073014870).
+  The live site is
+  [fabian20ro.github.io/goldilocks-engine](https://fabian20ro.github.io/goldilocks-engine/).
+  Live and local `build-info.json` report version
+  `dc97ee41f6dbbc0e29d2`, scope `/goldilocks-engine/`, and a matching service
+  worker ID; the live 320×693 smoke was clean with zero console errors.
+- **M7B gates:** The next candidate must provide pinned WebKit evidence at
+  320×693 and 393×742, native VoiceOver evidence on an available iOS
+  Simulator, native TalkBack evidence on an available unlocked USB Android,
+  and repeatable mobile performance evidence with absolute LCP/INP/CLS
+  budgets plus same-device baseline deltas for startup, Worker 1×/64× cost,
+  memory, offline startup, and battery/thermal observations. Missing device or
+  simulator infrastructure is a documented BLOCKED condition for the affected
+  gate, never a silent skip or Chromium-only substitute.
+- **Rule of Three:** M7B evidence must cover (1) normal WebKit/native portrait
+  navigation and first-action reachability, (2) the closest boundary at
+  320×693 with 200% text, reduced motion, horizontal reveal, and accessible
+  names/active state, and (3) lifecycle/performance neighbors across clean
+  install, reload/offline resume, repeated 1×/64× Worker runs, and device
+  resource observation.
+- **Deferred release work:** Writing/density, supported-save fixtures and
+  version policy, localization readiness, audio, and the PWA-only versus
+  store-packaging/distribution decision remain prioritized later Milestone 7
+  work. They are not M7B scope and must not be pulled forward as incidental
+  polish.
+- **Reversal condition:** Change the M7B order, budgets, device evidence
+  requirement, or deferred-work boundary only through an explicit later
+  decision backed by reproducible artifacts and independent verification.

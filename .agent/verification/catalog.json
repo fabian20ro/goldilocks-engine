@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "catalogKind": "active-verification",
-  "description": "Machine-checked routing for immutable verifier evidence and the authorized Milestone 7A release-foundation scope. The status command remains the source of live Git/report state.",
+  "description": "Machine-checked routing for immutable verifier evidence, the retained Milestone 7A release foundation, and the authorized Milestone 7B OIV-first accessibility/performance scope. The status command remains the source of live Git/report state.",
   "historicalAcceptedSnapshot": {
     "report": ".agent/verification/round-093.md",
     "round": 93,
@@ -10,12 +10,13 @@
     "verdict": "PASS"
   },
   "activeScope": {
-    "name": "Milestone 7A — release foundation and mobile navigation",
+    "name": "Milestone 7B — OIV-first accessibility and mobile performance",
     "status": "active",
     "authorities": [
       "plan.md",
       ".agent/DECISIONS.md",
       ".agent/verification/round-093.md",
+      ".agent/verification/round-099.md",
       ".agent/RELEASE_ACCEPTANCE.md"
     ],
     "requirements": [
@@ -61,6 +62,61 @@
         "intent": "Maintain a concrete commercial-release acceptance matrix for the remaining balance, accessibility, performance, writing, audio, save, localization and packaging work.",
         "sources": ["plan.md", ".agent/RELEASE_ACCEPTANCE.md"],
         "checks": [".agent/RELEASE_ACCEPTANCE.md"]
+      },
+      {
+        "id": "M7B-WEBKIT-001",
+        "status": "active",
+        "intent": "Close the WebKit browser gap at 320x693 and 393x742 with pinned, reduced-motion, text-scale, reload/offline, interaction, geometry, and error evidence.",
+        "sources": [
+          ".agent/CURRENT_SCOPE.md",
+          ".agent/RELEASE_ACCEPTANCE.md",
+          ".agent/DECISIONS.md",
+          "plan.md"
+        ],
+        "checks": [
+          ".agent/HANDOFF.md",
+          "scripts/verify",
+          "playwright.config.ts"
+        ]
+      },
+      {
+        "id": "M7B-NATIVE-001",
+        "status": "active",
+        "intent": "Close native VoiceOver and TalkBack evidence on the available iOS Simulator and unlocked USB Android, including names, active state, narrow reveal, first action, and lifecycle results.",
+        "sources": [
+          ".agent/CURRENT_SCOPE.md",
+          ".agent/RELEASE_ACCEPTANCE.md",
+          ".agent/DECISIONS.md",
+          "plan.md"
+        ],
+        "checks": [".agent/HANDOFF.md", ".agent/verification/round-078.md"]
+      },
+      {
+        "id": "M7B-PERF-001",
+        "status": "active",
+        "intent": "Produce five-run clean-install mobile-performance measurements with LCP/INP/CLS budgets, same-device baseline deltas, Worker 1x/64x cost, memory, offline startup, and physical battery/thermal evidence.",
+        "sources": [
+          ".agent/CURRENT_SCOPE.md",
+          ".agent/RELEASE_ACCEPTANCE.md",
+          ".agent/DECISIONS.md",
+          "plan.md"
+        ],
+        "checks": [".agent/HANDOFF.md", "scripts/verify"]
+      },
+      {
+        "id": "M7B-EVIDENCE-001",
+        "status": "active",
+        "intent": "Keep M7B device/browser matrix, Rule of Three, artifact manifest, cleanup, and infrastructure BLOCKED behavior independently verifiable without silently substituting Chromium evidence.",
+        "sources": [
+          ".agent/CURRENT_SCOPE.md",
+          ".agent/RELEASE_ACCEPTANCE.md",
+          ".agent/DECISIONS.md"
+        ],
+        "checks": [
+          ".agent/HANDOFF.md",
+          ".agent/verification/INDEX.md",
+          "scripts/validate-verification-catalog.mjs"
+        ]
       }
     ]
   },

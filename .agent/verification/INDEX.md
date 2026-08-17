@@ -1,4 +1,4 @@
-# Verification index — accepted Milestone 6 history and active Milestone 7A
+# Verification index — accepted Milestone 7A release and active Milestone 7B
 
 Navigation only. Immutable reports, `plan.md`, and `.agent/DECISIONS.md`
 remain authoritative. This index never claims live HEAD, latest verdict,
@@ -24,7 +24,11 @@ audit, root browser/PWA, and Pages/offline checks. `npm run test:e2e` is the
 repository-pinned root browser lane. Browser dependencies and browsers use
 ignored repository-local caches documented in `.agent/HANDOFF.md`.
 
-## Active Milestone 7A route
+The next M7B candidate must add a package-manager WebKit lane and a measured
+mobile-performance command, then invoke both from `./scripts/verify`; those
+commands are not asserted as present by this documentation-only handoff.
+
+## Retained Milestone 7A route
 
 | Requirement | Source | Candidate evidence | Canonical lane |
 | --- | --- | --- | --- |
@@ -33,6 +37,23 @@ ignored repository-local caches documented in `.agent/HANDOFF.md`.
 | Narrow overflow is discoverable without shrinking targets | D-041; `.agent/RELEASE_ACCEPTANCE.md` | `src/ui/styles.css`; `tests/e2e/navigation-affordance.spec.ts` | root browser |
 | Normal/boundary/lifecycle nav behavior | D-041 Rule of Three | 393px fit; 320px cue/reveal; 200% resize/reload/focus/touch | root browser |
 | Commercial-release matrix is explicit | `plan.md` §29; `.agent/RELEASE_ACCEPTANCE.md` | matrix and gate-order documentation | independent Verifier |
+
+M7A's exact accepted release receipt is frozen in D-043 and
+`.agent/RELEASE_ACCEPTANCE.md`; it is historical routing, not a live status
+claim. These navigation/PWA checks remain regression requirements for M7B.
+
+## Active Milestone 7B OIV route
+
+| Requirement | Source | Candidate evidence | Canonical lane |
+| --- | --- | --- | --- |
+| WebKit browser parity at both representative portraits | D-043; `.agent/RELEASE_ACCEPTANCE.md` §Milestone 7B | Next candidate's pinned WebKit E2E matrix, traces/screenshots, and exact handoff commands | `npm run test:e2e:webkit` from `./scripts/verify` |
+| VoiceOver/TalkBack names, active state, reveal, and first action | D-043; `plan.md` §§20.4, 27; `.agent/RELEASE_ACCEPTANCE.md` §Milestone 7B | iOS Simulator + Safari and unlocked USB Android + Chrome/TalkBack artifact with device/browser/build identity | Native device lane; independent Verifier |
+| Measured mobile startup, Web Vitals, Worker, memory, offline, battery/thermal | D-043; `plan.md` §§23, 27; `.agent/RELEASE_ACCEPTANCE.md` §Milestone 7B | Five cold runs/device, raw traces plus median/p95, absolute budgets and frozen-build baseline deltas | Next candidate performance command from `./scripts/verify` |
+| Rule of Three, artifact manifest, and infrastructure/blocker honesty | D-043; `.agent/CURRENT_SCOPE.md`; `.agent/HANDOFF.md` | Candidate SHA, matrix, settings, thresholds, checksums/paths, cleanup, and explicit BLOCKED evidence | Independent Verifier report |
+
+M7B does not pull forward writing/density, supported-save fixtures/version
+policy, localization, audio, or packaging/distribution decisions. Those remain
+prioritized later M7 requirements in `.agent/RELEASE_ACCEPTANCE.md`.
 
 ## Historical accepted Milestone 6 route
 
@@ -50,7 +71,8 @@ round 093 in the machine catalog. Do not rewrite either report.
 
 `catalog.json` is the checked routing index for every immutable finding ID.
 It distinguishes resolved findings, superseded process blockers, archival
-blockers, active M7A requirements, and superseded probes. The validator checks
+blockers, retained M7A requirements, active M7B requirements, and superseded
+probes. The validator checks
 that every finding in every report has exactly one status, every resolution
 report is PASS, every cited decision and evidence path exists, and no active
 finding is hidden in a summary.
