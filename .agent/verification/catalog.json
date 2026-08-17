@@ -138,10 +138,11 @@
       "requirementId": "M7A-NAV-002",
       "regressionEvidence": [
         ".agent/verification/round-094-adversarial.mjs",
+        "tests/e2e/navigation-affordance.spec.ts",
         "src/ui/App.tsx",
         "src/ui/styles.css"
       ],
-      "note": "Fresh round-094 independent evidence: active World remains clipped after a 393-to-320 resize until another tab activation or manual strip scroll. Implementer must resolve this under the active M7A navigation lifecycle requirement."
+      "note": "Fresh round-094 independent evidence found active World clipped after a 393-to-320 resize until another tab activation or manual strip scroll. The candidate adds a resize/text-scale reveal controller and regression coverage; a fresh Verifier must assess the exact candidate before this active finding can be closed."
     }
   ],
   "supersededProbes": [

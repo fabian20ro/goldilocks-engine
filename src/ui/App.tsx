@@ -4332,32 +4332,69 @@ export function App() {
     );
   }, []);
 
+  const revealActiveBottomNav = useCallback(() => {
+    const nav = bottomNavRef.current;
+    const button = bottomNavButtonRefs.current[tab];
+    if (!nav || !button) return;
+    const navBox = nav.getBoundingClientRect();
+    const buttonBox = button.getBoundingClientRect();
+    const maxScrollLeft = Math.max(0, nav.scrollWidth - nav.clientWidth);
+    const endPadding =
+      Number.parseFloat(getComputedStyle(nav).paddingRight) || 0;
+    const maxRevealScrollLeft = Math.max(0, maxScrollLeft - endPadding);
+    nav.scrollLeft = Math.min(nav.scrollLeft, maxRevealScrollLeft);
+    if (buttonBox.left < navBox.left) {
+      nav.scrollLeft += buttonBox.left - navBox.left;
+    } else if (buttonBox.right > navBox.right) {
+      nav.scrollLeft = Math.min(
+        maxRevealScrollLeft,
+        nav.scrollLeft + buttonBox.right - navBox.right,
+      );
+    }
+  }, [tab]);
+
   useEffect(() => {
     const nav = bottomNavRef.current;
     if (!nav) return;
-    updateBottomNavOverflow();
+    let revealFrame: number | undefined;
+    const stabilizeActiveReveal = () => {
+      if (revealFrame !== undefined) window.cancelAnimationFrame(revealFrame);
+      const startedAt = performance.now();
+      const retry = () => {
+        revealActiveBottomNav();
+        updateBottomNavOverflow();
+        if (performance.now() - startedAt < 250) {
+          revealFrame = window.requestAnimationFrame(retry);
+        } else {
+          revealFrame = undefined;
+        }
+      };
+      revealFrame = window.requestAnimationFrame(retry);
+    };
+    const handleResize = () => {
+      updateBottomNavOverflow();
+      stabilizeActiveReveal();
+    };
+    handleResize();
     nav.addEventListener("scroll", updateBottomNavOverflow, { passive: true });
-    window.addEventListener("resize", updateBottomNavOverflow);
+    window.addEventListener("resize", handleResize);
+    const resizeObserver = new ResizeObserver(handleResize);
+    resizeObserver.observe(nav);
+    for (const button of Object.values(bottomNavButtonRefs.current)) {
+      if (button) resizeObserver.observe(button);
+    }
     return () => {
       nav.removeEventListener("scroll", updateBottomNavOverflow);
-      window.removeEventListener("resize", updateBottomNavOverflow);
+      window.removeEventListener("resize", handleResize);
+      if (revealFrame !== undefined) window.cancelAnimationFrame(revealFrame);
+      resizeObserver.disconnect();
     };
-  }, [updateBottomNavOverflow]);
+  }, [revealActiveBottomNav, updateBottomNavOverflow]);
 
   useLayoutEffect(() => {
-    const nav = bottomNavRef.current;
-    const button = bottomNavButtonRefs.current[tab];
-    if (nav && button) {
-      const navBox = nav.getBoundingClientRect();
-      const buttonBox = button.getBoundingClientRect();
-      if (buttonBox.left < navBox.left) {
-        nav.scrollLeft += buttonBox.left - navBox.left;
-      } else if (buttonBox.right > navBox.right) {
-        nav.scrollLeft += buttonBox.right - navBox.right;
-      }
-    }
+    revealActiveBottomNav();
     updateBottomNavOverflow();
-  }, [tab, updateBottomNavOverflow]);
+  }, [revealActiveBottomNav, updateBottomNavOverflow]);
 
   const clearCareerCompletionFeedbackForRequest = useCallback(
     (requestId: number) => {

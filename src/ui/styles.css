@@ -2828,7 +2828,7 @@ h2 {
   backdrop-filter: blur(16px);
   overflow-x: auto;
   scrollbar-width: none;
-  scroll-padding-inline: 1.25rem;
+  scroll-padding-inline: 0;
   scroll-snap-type: x proximity;
   overscroll-behavior-inline: contain;
   touch-action: pan-x;
@@ -2836,6 +2836,17 @@ h2 {
 
 .bottom-nav::-webkit-scrollbar {
   display: none;
+}
+
+@media (max-width: 320px) {
+  .bottom-nav {
+    padding-right: max(0.25rem, env(safe-area-inset-right));
+    scroll-snap-type: none;
+  }
+
+  .bottom-nav button:last-of-type {
+    scroll-snap-align: none;
+  }
 }
 
 .bottom-nav button {
@@ -2853,7 +2864,7 @@ h2 {
   font-size: 0.61rem;
   overflow-wrap: anywhere;
   cursor: pointer;
-  scroll-snap-align: center;
+  scroll-snap-align: start;
 }
 
 .bottom-nav button > span {

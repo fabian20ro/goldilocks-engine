@@ -130,13 +130,29 @@ test("320px overflow is announced and active keyboard/touch tabs are revealed", 
 test("200% text retains navigation targets and survives resize/reload", async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 320, height: 693 });
+  await page.setViewportSize({ width: 393, height: 742 });
   await page.goto("/");
+  const nav = page.getByRole("navigation", { name: "Primary" });
+  await nav.getByRole("button", { name: "World", exact: true }).click();
+  await assertVisibleInsideNavigation(page, "World");
+
+  await page.setViewportSize({ width: 320, height: 693 });
+  await expect(nav).toHaveClass(/has-(left|right)-overflow/);
+  await assertVisibleInsideNavigation(page, "World");
+
+  await nav
+    .getByRole("button", { name: "World", exact: true })
+    .evaluate((element) =>
+      (element as HTMLElement).focus({ preventScroll: true }),
+    );
+  await page.keyboard.press("Enter");
+  await expect(page.locator(":focus")).toHaveAttribute("aria-label", "World");
+
+  await nav.getByRole("button", { name: "Build", exact: true }).click();
   await page.addStyleTag({
     content: ":root { font-size: 200% !important; }",
   });
   await assertTouchTargets(page);
-  const nav = page.getByRole("navigation", { name: "Primary" });
   await expect(nav).toHaveClass(/has-right-overflow/);
 
   await nav
@@ -154,6 +170,10 @@ test("200% text retains navigation targets and survives resize/reload", async ({
     )
     .toBe(true);
   await expect(nav).not.toHaveClass(/has-right-overflow/);
+
+  await page.setViewportSize({ width: 320, height: 693 });
+  await expect(nav).toHaveClass(/has-(left|right)-overflow/);
+  await assertVisibleInsideNavigation(page, "World");
 
   await page.reload();
   await expect(

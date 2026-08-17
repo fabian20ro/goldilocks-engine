@@ -19,6 +19,10 @@
   minimum 44px target contract. At narrow widths the bottom navigation now
   announces horizontal disclosure, shows a visible direction cue, and reveals
   the active destination after keyboard/touch/state changes.
+- Repaired `V-094-001`: active World is re-revealed after 393→320 viewport
+  changes and 200% text geometry changes, including the pending touch/snap
+  lifecycle. The immutable round-094 report remains unchanged; this candidate
+  routes the finding as pending fresh independent verification.
 
 ## Plan requirements covered
 
@@ -32,10 +36,9 @@
 
 ## Verifier findings resolved
 
-- No prior unresolved product finding was in scope. The candidate carries the
-  accepted Milestone 6 verifier baseline and routes all historical findings by
-  stable ID. M7A adds active navigation/release requirements for independent
-  verification.
+- Candidate repair for `V-094-001` is covered by the verifier-owned lifecycle
+  probe and the pinned navigation regression. The catalog intentionally keeps
+  the finding active until a fresh Verifier closes it against this exact SHA.
 
 ## Setup, startup, and verification commands
 
@@ -54,13 +57,15 @@ Focused catalog and browser checks:
 ```sh
 npm run validate:verification-catalog
 E2E_PORT=42496 npm run test:e2e -- tests/e2e/navigation-affordance.spec.ts
+PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright PORT=42494 \
+  node .agent/verification/round-094-adversarial.mjs
 ```
 
 Canonical gate (one final run after all executable edits):
 
 ```sh
 INSTALL_PLAYWRIGHT=0 E2E_PORT=42497 \
-  VERIFY_EVIDENCE_DIR=.cache/verification/round-094-final \
+  VERIFY_EVIDENCE_DIR=.cache/verification/round-095-final \
   npm_config_cache="$PWD/.cache/npm" \
   PLAYWRIGHT_BROWSERS_PATH="$PWD/.cache/ms-playwright" \
   ./scripts/verify
@@ -73,10 +78,14 @@ INSTALL_PLAYWRIGHT=0 E2E_PORT=42497 \
   references, active requirement paths, and superseded-probe replacements.
   Live Git/report state remains owned by `./scripts/agent-status`.
 - Navigation uses a small App-local controller: one ref for the strip, one
-  button-ref map, one overflow state, and active-tab reveal. It does not add a
-  router, state library, reordered tabs, or automatic navigation.
-- CSS scroll snap, `touch-action: pan-x`, edge indicators and an accessible
-  instruction make existing overflow explicit while preserving target size.
+  button-ref map, one overflow state, active-tab reveal, and bounded resize/
+  text-scale stabilization. It does not add a router, state library, reordered
+  tabs, or automatic navigation.
+- CSS scroll snap remains for wider navigation. At the exact 320px boundary,
+  the terminal snap point could move the active last target out of view after
+  resize; the narrow media rule uses a small end reserve and disables snap for
+  that strip only. `touch-action: pan-x`, edge indicators, and the accessible
+  instruction remain active.
 
 ## Known limitations and risks
 
@@ -91,16 +100,17 @@ INSTALL_PLAYWRIGHT=0 E2E_PORT=42497 \
 ## Checks not run / final evidence
 
 - Focused evidence after the executable edits:
-  `npm run validate:verification-catalog` passed (93 immutable reports, 94
+  `npm run validate:verification-catalog` passed (94 immutable reports, 95
   findings, 4 active requirements); `npm run format:check`, `npm run lint`,
-  and `npm run typecheck` passed; the focused UI unit lane passed 2 files / 11
-  tests; the routing/catalog lane passed 2 files / 9 tests; and the pinned
-  navigation browser lane passed 3 tests at 320px, 393px, and 200% text.
-- Final canonical evidence is `.cache/verification/round-094-final`:
+  and `npm run typecheck` passed; the pinned navigation browser lane passed
+  3 tests at 320px, 393px, and 200% text; and the verifier-owned
+  `round-094-adversarial.mjs` probe passed with zero findings.
+- Final canonical evidence is `.cache/verification/round-095-final`:
   `verification-catalog=passed`, `setup=passed`, `format=passed`,
   `lint=passed`, `typecheck=passed`, `unit=passed` (66 files / 305 tests),
   `balance=passed`, `build=passed`, `production-audit=passed`,
   `root-browser-pwa=passed` (238 tests), and `pages-offline=passed` (2
-  tests). The gate exited 0.
+  tests). The gate exited 0. Setup reported four development-dependency
+  advisories; the production audit reported zero vulnerabilities.
 - Native-device, WebKit, and external hosted release checks are not run in this
   role; the reason is scope/independent-verifier ownership, not a silent skip.
