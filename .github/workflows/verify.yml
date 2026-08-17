@@ -221,6 +221,7 @@ jobs:
       - name: Require every verification lane
         shell: bash
         env:
+          CANDIDATE_REF: ${{ inputs.candidate_ref }}
           STATIC_UNIT_BUILD: ${{ needs.static-unit-build.result }}
           BALANCES: ${{ needs.balances.result }}
           PORTRAIT_SMOKE: ${{ needs.portrait-smoke.result }}
@@ -231,7 +232,7 @@ jobs:
           actual="$(git rev-parse HEAD)"
           test "$actual" = "$GITHUB_SHA"
           {
-            printf 'candidate_ref=%s\n' "${{ inputs.candidate_ref }}"
+            printf 'candidate_ref=%s\n' "$CANDIDATE_REF"
             printf 'candidate_sha=%s\n' "$actual"
             printf 'static_unit_build=%s\n' "$STATIC_UNIT_BUILD"
             printf 'balances=%s\n' "$BALANCES"

@@ -1,4 +1,7 @@
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
@@ -6,6 +9,45 @@ const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 
 function readRepositoryFile(path: string): string {
   return readFileSync(`${repositoryRoot}${path}`, "utf8");
+}
+
+function readShellRunBlocks(workflow: string): string[] {
+  const lines = workflow.split(/\r?\n/);
+  const blocks: string[] = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (line === undefined) continue;
+    const match = line.match(/^(\s*)run:\s*(.*)$/);
+    if (!match) continue;
+
+    const indentation = match[1];
+    const bodyText = match[2];
+    if (indentation === undefined || bodyText === undefined) continue;
+    const runIndent = indentation.length;
+    const runBody = bodyText.trim();
+    if (runBody !== "|") {
+      blocks.push(runBody);
+      continue;
+    }
+
+    const body: string[] = [];
+    for (let next = index + 1; next < lines.length; next += 1) {
+      const line = lines[next];
+      if (line === undefined) break;
+      if (line.trim() === "") {
+        body.push("");
+        continue;
+      }
+
+      const contentIndent = line.search(/\S/);
+      if (contentIndent <= runIndent) break;
+      body.push(line.slice(runIndent + 2));
+    }
+    blocks.push(body.join("\n"));
+  }
+
+  return blocks;
 }
 
 describe("Linux verification workflow", () => {
@@ -98,6 +140,79 @@ describe("Linux verification workflow", () => {
     expect(pages).toContain("actions/configure-pages@v6");
     expect(pages).toContain("actions/upload-pages-artifact@v5");
     expect(pages).toContain("actions/deploy-pages@v5");
+  });
+
+  it("keeps dispatch input out of shell interpolation and binds it through env", () => {
+    const verification = readRepositoryFile(".github/workflows/verify.yml");
+    const pages = readRepositoryFile(".github/workflows/deploy-pages.yml");
+    const shellBlocks = [
+      ...readShellRunBlocks(verification),
+      ...readShellRunBlocks(pages),
+    ];
+
+    expect(shellBlocks.length).toBeGreaterThan(0);
+    for (const shellBlock of shellBlocks)
+      expect(shellBlock).not.toMatch(/\$\{\{\s*inputs\./);
+
+    expect(verification).toContain(
+      "CANDIDATE_REF: ${{ inputs.candidate_ref }}",
+    );
+    expect(pages).toContain("CANDIDATE_REF: ${{ inputs.candidate_ref }}");
+    expect(verification).toContain(
+      `printf 'candidate_ref=%s\\n' "$CANDIDATE_REF"`,
+    );
+    expect(pages).toContain(`printf 'candidate_ref=%s\\n' "$CANDIDATE_REF"`);
+    expect(verification).not.toContain(
+      `printf 'candidate_ref=%s\\n' "\${{ inputs.candidate_ref }}"`,
+    );
+  });
+
+  it("records the exact malicious candidate string as data only", () => {
+    const verification = readRepositoryFile(".github/workflows/verify.yml");
+    const aggregateShell = readShellRunBlocks(verification).find((block) =>
+      block.includes("candidate_ref=%s"),
+    );
+    const candidateSummaryLine = aggregateShell
+      ?.split("\n")
+      .find((line) => line.includes("candidate_ref=%s"));
+    const malicious = '"; printf WORKFLOW_INJECTION_MARKER; #';
+    const temporaryDirectory = mkdtempSync(
+      join(tmpdir(), "verify-workflow-injection-"),
+    );
+    const summaryPath = join(temporaryDirectory, "summary");
+
+    try {
+      expect(candidateSummaryLine?.trim()).toBe(
+        `printf 'candidate_ref=%s\\n' "$CANDIDATE_REF"`,
+      );
+
+      const shellPattern = [
+        "set -euo pipefail",
+        'CANDIDATE_REF="$1"',
+        'GITHUB_STEP_SUMMARY="$2"',
+        "{",
+        `  ${candidateSummaryLine?.trim()}`,
+        '} >> "$GITHUB_STEP_SUMMARY"',
+      ].join("\n");
+      const stdout = execFileSync(
+        "/bin/bash",
+        ["-c", shellPattern, "workflow-injection-test", malicious, summaryPath],
+        { encoding: "utf8" },
+      );
+
+      expect(stdout).toBe("");
+      expect(readFileSync(summaryPath, "utf8")).toBe(
+        `candidate_ref=${malicious}\n`,
+      );
+      expect(readFileSync(summaryPath, "utf8")).toContain(
+        "WORKFLOW_INJECTION_MARKER",
+      );
+      expect(
+        existsSync(join(temporaryDirectory, "WORKFLOW_INJECTION_MARKER")),
+      ).toBe(false);
+    } finally {
+      rmSync(temporaryDirectory, { recursive: true, force: true });
+    }
   });
 
   it("keeps browser installation optional and repository-local", () => {
