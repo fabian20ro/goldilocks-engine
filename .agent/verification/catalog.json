@@ -134,15 +134,17 @@
     {
       "id": "V-094-001",
       "match": { "exact": ["V-094-001"] },
-      "status": "active",
+      "status": "resolved",
+      "resolutionReport": ".agent/verification/round-095.md",
       "requirementId": "M7A-NAV-002",
       "regressionEvidence": [
         ".agent/verification/round-094-adversarial.mjs",
+        ".agent/verification/round-095-adversarial.mjs",
         "tests/e2e/navigation-affordance.spec.ts",
         "src/ui/App.tsx",
         "src/ui/styles.css"
       ],
-      "note": "Fresh round-094 independent evidence found active World clipped after a 393-to-320 resize until another tab activation or manual strip scroll. The candidate adds a resize/text-scale reveal controller and regression coverage; a fresh Verifier must assess the exact candidate before this active finding can be closed."
+      "note": "Round-095 independently rechecked the 393-to-320 resize seam at normal and 200% text, including every active destination, and found no reproduction of the round-094 clipping defect."
     }
   ],
   "supersededProbes": [
