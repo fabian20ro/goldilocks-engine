@@ -288,6 +288,12 @@ test.describe("verifier round 029: live nested shell during stale-URL repair", (
 
     await page.goto(urlFor(root), { waitUntil: "domcontentloaded" });
     await waitForIdentity(page, root, expectedIdentity(rootA, null));
+    // Complete the root A registration lifecycle before opening the nested
+    // scope. Without this barrier, a fast initial install and the explicit
+    // stale-URL update can share one update check; Chromium may then retain A
+    // without ever presenting the B worker to the page. This is a fixture
+    // ordering barrier, not a production delay or a relaxed identity check.
+    await settleControlledWorker(page, root, rootA);
     await page.evaluate(() =>
       localStorage.setItem("verifier-round-029", "keep"),
     );
