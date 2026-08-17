@@ -1001,9 +1001,8 @@
 ## D-043 — M7A exact release receipt and M7B OIV-first hardening
 
 - **Decision:** Treat the accepted Milestone 7A candidate as a frozen release
-  receipt and begin the next bounded Milestone 7 slice with observability,
-  independent verification, and implementation (OIV) focused first on
-  WebKit/native accessibility and measured mobile performance. The next slice
+  receipt and begin the next bounded Milestone 7 slice with OIV focused first
+  on WebKit/native accessibility and measured mobile performance. The next slice
   may make the smallest product or test-tooling corrections required by that
   evidence, but it does not add game systems or broaden the release boundary.
 - **Frozen release receipt:** Accepted candidate
