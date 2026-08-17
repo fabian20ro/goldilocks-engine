@@ -216,6 +216,18 @@
         ".github/workflows/deploy-pages.yml"
       ],
       "note": "Round-099 independently rechecked adversarial candidate_ref payloads across every Verify and Pages shell run block, exact-ref/HEAD/GITHUB_SHA gates, and the canonical release lanes; no shell execution or identity mismatch reproduced."
+    },
+    {
+      "id": "V-100-001",
+      "match": { "exact": ["V-100-001"] },
+      "status": "active",
+      "requirementId": "M7A-ROUTING-001",
+      "regressionEvidence": [
+        "src/test/agentWorkflowRouting.test.ts",
+        "src/test/verifierRound083Workflow.test.ts",
+        "scripts/verify"
+      ],
+      "note": "The M7B routing documentation is internally consistent, but two implementation-authored routing assertions still require the replaced M7A headings and stop the canonical unit gate."
     }
   ],
   "supersededProbes": [
