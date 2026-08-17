@@ -1,17 +1,18 @@
-# Candidate handoff — Milestone 7B OIV-first routing
+# Candidate handoff — Milestone 7B OIV-first routing assertion repair
 
 ## Implemented behavior summary
 
-- Updated mutable routing and acceptance docs from the completed M7A
-  navigation/workflow slice to the bounded M7B OIV-first slice.
-- Recorded the supplied exact-SHA hosted/deployment receipt without changing
-  product code, `plan.md`, or an immutable verifier report.
-- Added machine-checked catalog routes for pinned WebKit, native
-  VoiceOver/TalkBack, measured mobile performance, and artifact/blocker
-  honesty while retaining M7A navigation/PWA requirements.
-- Defined the device/browser matrix, measurable budgets, Rule of Three,
+- Synchronized the two routing regression suites with the authoritative active
+  M7B heading and plural historical-provenance heading.
+- Retained the catalog, historical IDs, and no-live-claim assertions; no
+  product code, `plan.md`, M7B scope, release receipt, or immutable report was
+  changed.
+- Rule-of-Three seam review covers normal active-M7B headings, historical
+  provenance headings/IDs, and the boundary invariant excluding live/current
+  candidate claims.
+- Preserved the existing M7B OIV-first matrix, budgets, Rule of Three,
   repository-local cache/startup contract, artifact manifest, cleanup, and
-  explicit deferred M7 work in `.agent/RELEASE_ACCEPTANCE.md`.
+  explicitly deferred later M7 work.
 
 ## Plan requirements covered
 
@@ -26,12 +27,15 @@
 
 ## Verifier findings resolved
 
-- No new finding was introduced by this documentation-only candidate.
+- V-100-001 is addressed in `src/test/agentWorkflowRouting.test.ts` and
+  `src/test/verifierRound083Workflow.test.ts`; the exact reproduction now
+  passes while historical provenance and non-volatile routing checks remain.
 - V-098-001 remains resolved by immutable round 099 at accepted candidate
   `d25e80e6781de89e80fc3b3c240a922ada53d978`; the round-099 verifier commit is
   `efaa1890751588abfc6728fab779a44e2650a2db`.
-- Independent verification of this candidate's routing/docs delta remains
-  required; this handoff does not issue a verdict.
+- `.agent/verification/round-100.md` and the catalog remain immutable; fresh
+  independent verification of this candidate remains required. This handoff
+  does not issue a verdict.
 
 ## Frozen M7A external release receipt
 
@@ -65,10 +69,11 @@ export PLAYWRIGHT_BROWSERS_PATH="$PWD/.cache/ms-playwright"
 ./scripts/run
 ```
 
-Focused docs/catalog checks for this candidate:
+Focused routing/catalog/static checks for this candidate:
 
 ```sh
 ./scripts/agent-status
+npx vitest run --coverage=false src/test/agentWorkflowRouting.test.ts src/test/verifierRound083Workflow.test.ts
 npm run validate:verification-catalog
 npm run format:check
 npm run lint -- --quiet
@@ -76,7 +81,7 @@ npm run typecheck
 git diff --check
 ```
 
-Canonical full gate for the next executable M7B candidate:
+Canonical full gate (run once after the executable routing-test repair):
 
 ```sh
 INSTALL_PLAYWRIGHT=0 \
@@ -116,11 +121,16 @@ result, and raw-artifact paths/checksums.
 
 ## Known limitations and risks
 
-- This candidate is routing/docs-only; no WebKit lane, native screen-reader
-  session, or mobile-performance collector exists yet. The next Implementer
-  must create those executable artifacts before claiming evidence.
+- This candidate only repairs routing-test expectations; no WebKit lane, native
+  screen-reader session, or mobile-performance collector exists yet. The next
+  Implementer must create those executable artifacts before claiming evidence.
 - Managed macOS browser sandbox policy may require scoped host authority,
   as recorded by prior verifier rounds.
+- The canonical run reached root-browser-pwa but stopped when Chromium failed
+  to launch under the managed macOS policy. The evidence log records
+  `bootstrap_check_in ... Permission denied (1100)`; pages-offline was not
+  reached. This is an infrastructure limitation to preserve for independent
+  verification, not a source-test result.
 - Writing/density, save fixture/support policy, localization readiness, audio,
   and packaging/distribution remain later M7 work. Startup/workforce/
   government/remote content, new destinations, telemetry, native wrappers,
@@ -128,10 +138,15 @@ result, and raw-artifact paths/checksums.
 
 ## Checks not run / final evidence
 
-- `./scripts/verify` was not run: this candidate changes only mutable Markdown
-  routing/docs and JSON catalog metadata; no executable product or verification
-  tooling changed, so a canonical product gate would add no scoped evidence.
+- `npx vitest run --coverage=false src/test/agentWorkflowRouting.test.ts
+src/test/verifierRound083Workflow.test.ts` passed: 2 files, 9 tests.
+- `npm run validate:verification-catalog`, `npm run format:check`,
+  `npm run lint -- --quiet`, `npm run typecheck`, and `git diff --check` passed.
+- The single `./scripts/verify` run passed catalog/setup/format/lint/typecheck,
+  unit (66 files, 308 tests), balance, build, and production audit; it stopped
+  at root-browser-pwa on the Chromium launch policy error above. It was not
+  rerun; pages-offline, WebKit, native-device, and performance lanes therefore
+  remain unverified.
 - `./scripts/run`, WebKit installation, native-device checks, and performance
   collection were not run for the same reason and remain explicit M7B work.
-- Run and record the focused catalog/static checks above after all edits; a
-  fresh independent Verifier must inspect this exact candidate SHA.
+- A fresh independent Verifier must inspect this exact candidate SHA.

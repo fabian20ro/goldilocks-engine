@@ -92,12 +92,12 @@ describe("round 083 workflow and provenance routing", () => {
 
     expect(scope).toContain("db43d20b0334f3daba5f2e4f03414fb7da10ded7");
     expect(scope).toContain("0b83e7ee047d7ddcdd54f5b2a57b7974c86433e9");
-    expect(scope).toContain("Historical accepted boundary");
+    expect(scope).toContain("Historical accepted boundaries");
     expect(scope).toContain("./scripts/agent-status");
     expect(scope).not.toContain("Current product candidate:");
     expect(scope).not.toContain("No `round-083.md` exists");
     expect(index).toContain(
-      "accepted Milestone 6 history and active Milestone 7A",
+      "accepted Milestone 7A release and active Milestone 7B",
     );
     expect(index).toContain("./scripts/agent-status");
     expect(index).toContain("catalog.json");

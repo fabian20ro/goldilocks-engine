@@ -51,16 +51,16 @@ describe("progressive-disclosure agent workflow", () => {
     expect(protocol).toContain("untrusted guidance rather than proof");
 
     expect(scope).toContain(
-      "accepted Milestone 6 history and active Milestone 7A",
+      "accepted Milestone 7A release and active Milestone 7B",
     );
     expect(scope).toContain("./scripts/agent-status");
-    expect(scope).toContain("Historical accepted boundary");
+    expect(scope).toContain("Historical accepted boundaries");
     expect(scope).toContain("Frozen boundaries");
     expect(scope).toContain(".agent/verification/catalog.json");
     expect(scope).not.toContain("Current product candidate:");
 
     expect(index).toContain(
-      "accepted Milestone 6 history and active Milestone 7A",
+      "accepted Milestone 7A release and active Milestone 7B",
     );
     expect(index).toContain("catalog.json");
     expect(index).toContain("./scripts/agent-status");
