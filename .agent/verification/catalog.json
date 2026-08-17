@@ -149,15 +149,17 @@
     {
       "id": "V-098-001",
       "match": { "exact": ["V-098-001"] },
-      "status": "active",
+      "status": "resolved",
+      "resolutionReport": ".agent/verification/round-099.md",
       "requirementId": "M7A-RELEASE-001",
       "regressionEvidence": [
         ".agent/verification/round-098.md",
         "src/test/verifyWorkflow.test.ts",
+        "src/test/pagesWorkflow.test.ts",
         ".github/workflows/verify.yml",
         ".github/workflows/deploy-pages.yml"
       ],
-      "note": "Round-098 independently reproduced shell execution from the Verify aggregate's directly interpolated candidate_ref input; Pages uses the safe env-backed pattern."
+      "note": "Round-099 independently rechecked adversarial candidate_ref payloads across every Verify and Pages shell run block, exact-ref/HEAD/GITHUB_SHA gates, and the canonical release lanes; no shell execution or identity mismatch reproduced."
     }
   ],
   "supersededProbes": [
