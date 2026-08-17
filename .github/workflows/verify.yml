@@ -1,10 +1,12 @@
 name: Verify
 
 on:
-  push:
-    branches:
-      - agent/implementation
   workflow_dispatch:
+    inputs:
+      candidate_ref:
+        description: Frozen candidate tag or commit SHA; must resolve to GITHUB_SHA
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -27,6 +29,8 @@ jobs:
     steps:
       - name: Check out frozen candidate
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.candidate_ref }}
 
       - name: Prepare static, unit, and build lane
         uses: ./.github/actions/prepare-verification-lane
@@ -68,6 +72,8 @@ jobs:
     steps:
       - name: Check out frozen candidate
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.candidate_ref }}
 
       - name: Prepare deterministic balances lane
         uses: ./.github/actions/prepare-verification-lane
@@ -97,6 +103,8 @@ jobs:
     steps:
       - name: Check out frozen candidate
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.candidate_ref }}
 
       - name: Prepare 320px portrait smoke lane
         uses: ./.github/actions/prepare-verification-lane
@@ -130,6 +138,8 @@ jobs:
     steps:
       - name: Check out frozen candidate
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.candidate_ref }}
 
       - name: Prepare root browser and PWA lane
         uses: ./.github/actions/prepare-verification-lane
@@ -163,6 +173,8 @@ jobs:
     steps:
       - name: Check out frozen candidate
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.candidate_ref }}
 
       - name: Prepare Pages and offline lane
         uses: ./.github/actions/prepare-verification-lane
@@ -203,6 +215,8 @@ jobs:
     steps:
       - name: Check out frozen candidate
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.candidate_ref }}
 
       - name: Require every verification lane
         shell: bash
@@ -217,6 +231,7 @@ jobs:
           actual="$(git rev-parse HEAD)"
           test "$actual" = "$GITHUB_SHA"
           {
+            printf 'candidate_ref=%s\n' "${{ inputs.candidate_ref }}"
             printf 'candidate_sha=%s\n' "$actual"
             printf 'static_unit_build=%s\n' "$STATIC_UNIT_BUILD"
             printf 'balances=%s\n' "$BALANCES"

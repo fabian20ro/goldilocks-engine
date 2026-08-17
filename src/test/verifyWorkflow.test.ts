@@ -26,6 +26,13 @@ describe("Linux verification workflow", () => {
 
     expect(environmentStart).toBeGreaterThanOrEqual(0);
     expect(jobsStart).toBeGreaterThan(environmentStart);
+    expect(workflow).not.toMatch(/\n {2}push:/);
+    expect(workflow).toContain(
+      "workflow_dispatch:\n    inputs:\n      candidate_ref:",
+    );
+    expect(workflow).toContain(
+      "description: Frozen candidate tag or commit SHA; must resolve to GITHUB_SHA",
+    );
     const environment = workflow.slice(environmentStart, jobsStart);
     expect(environment).toContain(
       "npm_config_cache: ${{ github.workspace }}/.cache/npm",
@@ -45,6 +52,9 @@ describe("Linux verification workflow", () => {
     expect(workflow.match(/actions\/checkout@v6/g)).toHaveLength(
       lanes.length + 1,
     );
+    expect(
+      workflow.match(/ref: \$\{\{ inputs\.candidate_ref \}\}/g),
+    ).toHaveLength(lanes.length + 1);
     expect(workflow.match(/actions\/upload-artifact@v7/g)).toHaveLength(
       lanes.length,
     );
@@ -57,6 +67,9 @@ describe("Linux verification workflow", () => {
     expect(workflow).toContain("npm run test:e2e:pages");
     expect(workflow).toContain("Verification aggregate");
     expect(workflow).toContain("if: always()");
+    expect(workflow).toContain("printf 'candidate_ref=%s\\n'");
+    expect(workflow).toContain('actual="$(git rev-parse HEAD)"');
+    expect(workflow).toContain('test "$actual" = "$GITHUB_SHA"');
     for (const result of [
       "STATIC_UNIT_BUILD",
       "BALANCES",

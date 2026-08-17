@@ -26,21 +26,40 @@ async function assertTouchTargets(page: Page) {
 async function assertVisibleInsideNavigation(page: Page, label: string) {
   const nav = page.getByRole("navigation", { name: "Primary" });
   const button = nav.getByRole("button", { name: label, exact: true });
-  const geometry = await page.evaluate((target) => {
-    const navElement = document.querySelector<HTMLElement>(".bottom-nav");
-    const buttonElement = [
-      ...document.querySelectorAll(".bottom-nav button"),
-    ].find((candidate) => candidate.getAttribute("aria-label") === target);
-    if (!navElement || !buttonElement) return null;
-    const navBox = navElement.getBoundingClientRect();
-    const buttonBox = buttonElement.getBoundingClientRect();
-    return {
-      left: buttonBox.left,
-      right: buttonBox.right,
-      navLeft: navBox.left,
-      navRight: navBox.right,
-    };
-  }, label);
+  const readGeometry = () =>
+    page.evaluate((target) => {
+      const navElement = document.querySelector<HTMLElement>(".bottom-nav");
+      const buttonElement = [
+        ...document.querySelectorAll(".bottom-nav button"),
+      ].find((candidate) => candidate.getAttribute("aria-label") === target);
+      if (!navElement || !buttonElement) return null;
+      const navBox = navElement.getBoundingClientRect();
+      const buttonBox = buttonElement.getBoundingClientRect();
+      return {
+        left: buttonBox.left,
+        right: buttonBox.right,
+        navLeft: navBox.left,
+        navRight: navBox.right,
+      };
+    }, label);
+
+  // ResizeObserver and the rAF controller settle after the viewport resize;
+  // poll the actual geometry instead of asserting during the stale first frame.
+  await expect
+    .poll(
+      async () => {
+        const geometry = await readGeometry();
+        return (
+          geometry !== null &&
+          geometry.left >= geometry.navLeft - 1 &&
+          geometry.right <= geometry.navRight + 1
+        );
+      },
+      { timeout: 5_000 },
+    )
+    .toBe(true);
+
+  const geometry = await readGeometry();
   expect(geometry).not.toBeNull();
   expect(geometry!.left).toBeGreaterThanOrEqual(geometry!.navLeft - 1);
   expect(geometry!.right).toBeLessThanOrEqual(geometry!.navRight + 1);

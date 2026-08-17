@@ -9,6 +9,30 @@ function readRepositoryFile(path: string): string {
 }
 
 describe("GitHub Pages workflow", () => {
+  it("runs only from a manually supplied exact candidate ref", () => {
+    const workflow = readRepositoryFile(".github/workflows/deploy-pages.yml");
+
+    expect(workflow).not.toMatch(/\n {2}push:/);
+    expect(workflow).toContain(
+      "workflow_dispatch:\n    inputs:\n      candidate_ref:",
+    );
+    expect(workflow).toContain("ref: ${{ inputs.candidate_ref }}");
+    expect(workflow).toContain("- name: Require exact frozen candidate");
+    expect(workflow).toContain(
+      'expected="$(git rev-parse --verify --end-of-options "${CANDIDATE_REF}^{commit}")"',
+    );
+    expect(workflow).toContain('test "$actual" = "$expected"');
+    expect(workflow).toContain('test "$actual" = "$GITHUB_SHA"');
+    expect(workflow).toContain("printf 'candidate_ref=%s\\n'");
+    expect(workflow).toContain("printf 'candidate_sha=%s\\n'");
+    const candidateGateStart = workflow.indexOf(
+      "- name: Require exact frozen candidate",
+    );
+    const buildStart = workflow.indexOf("run: npm run build:pages");
+    expect(candidateGateStart).toBeGreaterThanOrEqual(0);
+    expect(buildStart).toBeGreaterThan(candidateGateStart);
+  });
+
   it("applies repository-local npm and browser caches before setup-node and npm ci", () => {
     const workflow = readRepositoryFile(".github/workflows/deploy-pages.yml");
     const buildStart = workflow.indexOf("  build:\n");

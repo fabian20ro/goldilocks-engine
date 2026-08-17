@@ -977,3 +977,23 @@
   release boundary, or active verification policy only through an explicit
   owner decision with updated deterministic, browser, and independent-verifier
   evidence.
+
+## D-042 — Manual exact-candidate release workflows
+
+- **Decision:** Verification and GitHub Pages workflows run only through
+  explicit `workflow_dispatch` with a required frozen candidate tag or commit
+  SHA input. Each workflow checks out that ref and retains the
+  `git rev-parse HEAD == GITHUB_SHA` invariant; Pages records and verifies the
+  resolved candidate before installing, building, or deploying.
+- **Reason:** Push triggers on `agent/implementation` launched duplicate
+  expensive verification and could deploy a verifier head before hosted
+  exact-candidate review. Manual dispatch makes the candidate boundary and
+  release-owner action explicit, reducing quota use and accidental deployment.
+- **Evidence policy:** Workflow unit tests must reject push triggers, require
+  the candidate-ref input, prove checkout uses it, and assert the Pages
+  exact-ref/summary gate precedes build. Hosted exact-SHA verification and
+  deployment receipts remain external release gates; this decision is not an
+  acceptance claim.
+- **Reversal condition:** Re-enable an automated trigger only through an
+  explicit owner decision with an equivalent deduplication, exact-SHA, and
+  deployment-approval boundary.
