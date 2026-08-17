@@ -90,14 +90,20 @@ describe("round 083 workflow and provenance routing", () => {
     const index = readRepositoryFile(".agent/verification/INDEX.md");
     const decisions = readRepositoryFile(".agent/DECISIONS.md");
 
-    expect(scope).toContain("0bdff6ea88f7496bfb8348c7551652bf53a676ca");
-    expect(scope).toContain("437b56245b8488cce0ea1193be4200985cace2c7");
-    expect(scope).toContain("frozen provenance-repair history");
+    expect(scope).toContain("db43d20b0334f3daba5f2e4f03414fb7da10ded7");
+    expect(scope).toContain("0b83e7ee047d7ddcdd54f5b2a57b7974c86433e9");
+    expect(scope).toContain("Historical accepted boundary");
     expect(scope).toContain("./scripts/agent-status");
     expect(scope).not.toContain("Current product candidate:");
     expect(scope).not.toContain("No `round-083.md` exists");
-    expect(index).toContain("frozen provenance-repair map");
+    expect(index).toContain(
+      "accepted Milestone 6 history and active Milestone 7A",
+    );
     expect(index).toContain("./scripts/agent-status");
+    expect(index).toContain("catalog.json");
+    const catalog = readRepositoryFile(".agent/verification/catalog.json");
+    expect(catalog).toContain('"round": 93');
+    expect(catalog).toContain('"status": "active"');
 
     const openFindings = [
       ["V-078", "round-079", "verifierRound079.test.tsx"],
@@ -110,9 +116,18 @@ describe("round 083 workflow and provenance routing", () => {
       const reportText = readRepositoryFile(`.agent/verification/${report}.md`);
       expect(reportText).toContain(`VERDICT: FAIL`);
       expect(reportText).toContain(`### ${finding}`);
-      expect(index).toContain(finding);
-      expect(index).toContain(`${report}.md`);
-      expect(index).toContain(regression);
+      expect(catalog).toContain('"id": "V-001..V-082"');
+      expect(catalog).toContain(
+        '"resolutionReport": ".agent/verification/round-083.md"',
+      );
+      expect(catalog).toContain('"regressionEvidence":');
+      expect(catalog).toContain("./scripts/verify");
+      expect(finding).toMatch(/^V-\d{3}$/);
+      const regressionPath =
+        regression === "engine.test.ts"
+          ? `src/simulation/${regression}`
+          : `src/ui/${regression}`;
+      expect(existsSync(join(repositoryRoot, regressionPath))).toBe(true);
     }
     for (const round of ["079", "080", "081", "082"]) {
       expect(
@@ -123,7 +138,7 @@ describe("round 083 workflow and provenance routing", () => {
           ),
         ),
       ).toBe(true);
-      expect(index).toContain(`round-${round}-adversarial.mjs`);
+      expect(catalog).toContain(`round-${round}-adversarial.mjs`);
     }
 
     // D-036 deliberately supersedes only stale-link precision. The immutable
@@ -135,7 +150,7 @@ describe("round 083 workflow and provenance routing", () => {
     expect(historicalProbe).toContain(
       "The active pipeline had no model stage.",
     );
-    expect(index).toContain("historical stale-precision expectation");
+    expect(index).toContain("round-080 stale-cause precision expectation");
     expect(decisions).toContain("D-036");
     expect(decisions).toContain("must clear that optional link");
     expect(decisions).toMatch(
@@ -157,6 +172,7 @@ describe("round 083 workflow and provenance routing", () => {
       expect(run.result.status).toBe(37);
       const calls = readFileSync(run.calls, "utf8").trim().split("\n");
       expect(calls).toEqual([
+        "run validate:verification-catalog",
         "ci --prefer-offline",
         "run format:check",
         "run lint",
@@ -166,7 +182,7 @@ describe("round 083 workflow and provenance routing", () => {
         "run build",
       ]);
       expect(readFileSync(join(run.evidence, "summary.txt"), "utf8")).toBe(
-        "setup=passed\nformat=passed\nlint=passed\ntypecheck=passed\nunit=passed\nbalance=passed\nbuild=failed (37)\n",
+        "verification-catalog=passed\nsetup=passed\nformat=passed\nlint=passed\ntypecheck=passed\nunit=passed\nbalance=passed\nbuild=failed (37)\n",
       );
       expect(existsSync(join(run.evidence, "production-audit.log"))).toBe(
         false,
@@ -188,12 +204,13 @@ describe("round 083 workflow and provenance routing", () => {
       expect(run.result.status).toBe(0);
       const summary = readFileSync(join(run.evidence, "summary.txt"), "utf8");
       expect(summary).toBe(
-        "setup=passed\nformat=passed\nlint=passed\ntypecheck=passed\nunit=passed\nbalance=passed\nbuild=passed\nproduction-audit=passed\nroot-browser-pwa=passed\npages-offline=passed\n",
+        "verification-catalog=passed\nsetup=passed\nformat=passed\nlint=passed\ntypecheck=passed\nunit=passed\nbalance=passed\nbuild=passed\nproduction-audit=passed\nroot-browser-pwa=passed\npages-offline=passed\n",
       );
       expect(readFileSync(join(run.evidence, "checks.log"), "utf8")).toContain(
         "Verification passed. Evidence:",
       );
       for (const name of [
+        "verification-catalog",
         "setup",
         "format",
         "lint",

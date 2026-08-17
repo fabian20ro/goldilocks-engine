@@ -1,111 +1,80 @@
-# Scope routing map — frozen provenance-repair history
+# Scope routing map — accepted Milestone 6 history and active Milestone 7A
 
-Navigation only. This map is intentionally stable across new commits and
-verification rounds; authority remains with `plan.md`, decisions, and immutable
-reports. It never states live HEAD, latest verdict, acceptance, or next gate.
+Navigation only. This map is stable routing metadata, not authority. It never
+states live HEAD, latest verdict, current acceptance, or next gate. Run
+`./scripts/agent-status` before using it for live Git/report facts.
 
 ## Read route
 
-1. `AGENTS.md`, then the active role at `.codex/agents/`.
-2. Run `./scripts/agent-status` (`--json` for tooling).
-3. This map, then `.agent/verification/INDEX.md`.
-4. Every cited plan section, decision, report, test, and probe.
+1. Read `AGENTS.md`, then `.codex/agents/implementer.toml` or
+   `.codex/agents/verifier.toml` for the active role.
+2. Run `./scripts/agent-status` (`--json` for tooling); fail closed if it
+   cannot parse the immutable reports.
+3. Read this map, `.agent/verification/INDEX.md`, and
+   `.agent/verification/catalog.json`.
+4. Read the exact sources named by the active requirement. Use the full
+   `plan.md`, complete decisions, and archive route for release verification,
+   broad/cross-milestone changes, missing or contradictory catalog coverage,
+   or an explicit request.
 
-Use the full plan, decisions, and report archive for release verification,
-broad architecture/cross-milestone work, missing/conflicting index coverage, or
-an explicit request. If `agent-status` fails, do not reconstruct live state from
-this map: repair the status input or take the full route.
+## Historical accepted boundary
 
-## Freeze label
+The immutable round-093 report records the accepted Milestone 6 Local
+Laboratory repair at candidate
+`db43d20b0334f3daba5f2e4f03414fb7da10ded7`, with verifier commit
+`0b83e7ee047d7ddcdd54f5b2a57b7974c86433e9`. Read
+`.agent/verification/round-093.md` and D-040 for the historical product
+boundary: four machines, three bounded pipelines, collaborators,
+reproducibility switches, cultures, founding choices, schema-7 recovery,
+Worker-only lifecycle, offline safety, and eight destinations.
 
-This records the Jobs settlement-provenance repair seam introduced before the
-round-083 release-verification record. `0bdff6ea88f7496bfb8348c7551652bf53a676ca`
-is the historical repair candidate; round 078 is the pre-repair presentation
-baseline; rounds 079–082 record the adversarial findings; round 083 records the
-release verification of the workflow/provenance chain. These labels are history,
-not a statement about the repository checked out today.
+This is historical provenance. Live status comes only from
+`./scripts/agent-status`.
 
-## Frozen repair boundary
+## Active authorized scope: Milestone 7A
 
-The repair seam is truthful Jobs latest-settlement failure provenance after
-restore:
+D-041 and `.agent/RELEASE_ACCEPTANCE.md` route this bounded slice:
 
-- A valid original integrity seal retains a failed Job settlement's own typed
-  cause after later unrelated Career activity.
-- A stale/invalid restored save retains recoverable gameplay/accounting but
-  reports `Cause unknown`; it never rebuilds a precise cause from mutable IDs,
-  order, task fields, markers, `directCause`, or prose.
-- Future/colliding retained IDs cannot freeze later Worker ticks; post-restore
-  allocation remains deterministic and unique.
+- refresh this map and `verification/INDEX.md` without volatile claims;
+- validate the machine-readable active catalog before expensive verification;
+- keep `.agent/HANDOFF.md` current-only and compact;
+- define the remaining commercial-release acceptance matrix;
+- make the eight-tab strip discoverable at 320px while preserving stable
+  order, bottom-tab-only routing, 44px targets, keyboard/touch semantics and
+  393px fit;
+- prove the navigation seam at 320/393, 200% text, keyboard, touch, resize,
+  focus and reload boundaries.
 
-## Frozen threat model and out-of-scope boundary
+## Frozen boundaries
 
-Persisted state with stale, invalid, or absent integrity is untrusted for
-optional causal provenance. It may be structurally repaired only for
-operability. No new signing/authentication scheme, free-text parser, schema
-redesign, event-history reconstruction, simulation/economy/content change,
-navigation redesign, PWA rewrite, new dependency, or Research work is in scope.
-Existing D-033 settlement hierarchy, D-018 Jobs reserve, pointer/touch drag,
-Career draft, Worker semantics, persistence, root/Pages PWA, offline recovery,
-and accessibility remain regression boundaries.
+No `plan.md` edit, startup/workforce/government expansion, new navigation
+destination, simulation command, persistence schema, speculative telemetry,
+audio/localization implementation, store packaging, or broad architecture
+rewrite is authorized by M7A. Existing deterministic simulation, accounting,
+causal truth, persistence, PWA/update, offline, reduced-motion, accessibility,
+and Lab lifecycle contracts remain regression boundaries.
 
-## Round-085 authorization note
+## Exact authority map
 
-The preceding boundary is frozen round-083 history. The owner explicitly
-authorized Milestone 4 Research for the current Implementer turn. The
-authorized Research route is bounded by `plan.md` §§3–7.4, 12, 17, 19,
-20/20.4, 23–27, 29, 33, and 34 plus D-037–D-038: deterministic content/state,
-original fictional researchers, hidden/evidence-gated questions, useful
-partial/failure outcomes, team/retained knowledge, player goals, Inspect
-strategy changes, and the existing threat/accessibility/offline contracts.
-This note routes that source set; it does not replace plan.md, decisions, or
-immutable verification reports.
+| Need                                     | Source                                                                                                                                  |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Product and release boundary             | `plan.md` §§2.4, 20, 24, 27, 29, 34; D-040–D-041                                                                                        |
+| Historical accepted Milestone 6 behavior | `.agent/verification/round-093.md`; `.agent/verification/round-093-adversarial.mjs`; `.agent/verification/round-093-ui-adversarial.mjs` |
+| Active M7 release matrix                 | `.agent/RELEASE_ACCEPTANCE.md`                                                                                                          |
+| Active finding/probe status              | `.agent/verification/catalog.json`; `scripts/validate-verification-catalog.mjs`                                                         |
+| Navigation implementation                | `src/ui/App.tsx`; `src/ui/styles.css`; `src/ui/glyphs.tsx`                                                                              |
+| Navigation acceptance                    | `tests/e2e/navigation-affordance.spec.ts`; `scripts/verify`                                                                             |
+| Live Git/report facts                    | `./scripts/agent-status` only                                                                                                           |
 
-## Authority map
+## Rule-of-Three navigation map
 
-| Need                                 | Exact authority                                                                                |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| Product gate / Research requirements | `plan.md` §§3–7.4, 12, 17, 19, 20/20.4, 23–27, 29, 33–34; D-037–D-038                          |
-| Settlement/accounting UI             | D-030, D-033 in `.agent/DECISIONS.md`                                                          |
-| Provenance/recovery/identity         | D-034, D-035, D-036 in `.agent/DECISIONS.md`                                                   |
-| Pre-repair presentation baseline     | `.agent/verification/round-078.md`, verifier commit `437b56245b8488cce0ea1193be4200985cace2c7` |
-| Adversarial finding history          | `.agent/verification/round-079.md` through `round-082.md`; index mappings                      |
-| Workflow/provenance release record   | `.agent/verification/round-083.md`                                                             |
-| Live Git/report status               | `./scripts/agent-status` only                                                                  |
-| Candidate handoff/evidence           | `.agent/HANDOFF.md` (untrusted guide only)                                                     |
+1. Normal: 393px shows all eight stable destinations, each at least 44px, with
+   no overflow cue or document-level horizontal overflow.
+2. Boundary: 320px keeps all targets at least 44px, announces the horizontal
+   strip, shows a direction cue, and reveals World after keyboard or touch.
+3. Lifecycle: 200% text, resize to 393px, return to 320px, and reload retain
+   stable order, active-tab semantics, focus behavior, and safe overflow state.
 
-## Round-089 authorization note
-
-The frozen provenance and Research notes above remain historical routing
-records. The owner explicitly authorized Milestone 5 Hype and Fear for the
-current Implementer turn. The authorized route is `plan.md` §§1–6, 7.3, 11,
-13–14, 17, 19–20, 23–27, 29, 33–34 plus D-039: original creator archetypes,
-audience reputation, expectation debt, finite deterministic narratives and
-prediction deadlines, separate fear responses, doom feed, tool-switching
-panic, bounded attention, durable stakeholder consequences, and the existing
-Worker/persistence/causal/accounting/accessibility/PWA/offline contracts.
-Milestone 6 lab/endgame, startup/workforce/government, real personalities,
-remote/generative content, and speculative simulation abstractions remain out
-of scope. This note routes source material; it does not replace plan.md,
-decisions, or immutable verification reports.
-
-## Rule-of-Three repair map
-
-Before a repair handoff, map and test these three same-seam cases:
-
-1. Valid-integrity Job failure + later unrelated Career failure: original cause
-   persists (V-078).
-2. Stale integrity with relink/marker/decoy mutation: provenance is cleared and
-   UI is unknown (V-079, V-080, V-082).
-3. Restored future/colliding ID + repeated Worker tick/reload/offline: progress
-   continues with unique IDs (V-081).
-
-For the explicitly authorized Research seam, the corresponding three cases
-are: (1) a recognized goal, inspected project, staffed team, and deterministic
-useful outcome; (2) malformed goal, hidden question, missing prerequisite, or
-insufficient cash with no partial mutation; (3) active-project tick, reload,
-researcher departure/retained knowledge, and offline-policy non-execution.
-
-Run only the focused map while editing; one final `./scripts/verify` at most per
-role after all intended executable changes. Release verification expands to the
-full authority/archive route and all listed retained probes.
+The catalog's active requirements and historical finding groups are the
+machine-checked routing contract. If a report introduces a finding ID absent
+from the catalog, validation fails and the full-read route is required.

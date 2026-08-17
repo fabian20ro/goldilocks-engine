@@ -943,3 +943,37 @@
   persistence/reload/resume. Deterministic balance and committed Playwright
   portrait checks are independent evidence surfaces; no acceptance claim is
   made by this decision.
+
+## D-041 — Milestone 7 release foundation and narrow-navigation affordance
+
+- **Decision:** Begin the commercial-release work with a bounded release
+  foundation: machine-validated verification routing, a current-only candidate
+  handoff, a concrete acceptance matrix, and a discoverable eight-destination
+  portrait navigation strip. This decision does not authorize startup content,
+  a broad architecture rewrite, telemetry, audio, localization, or store
+  packaging implementation.
+- **Navigation contract:** Preserve the D-040 stable order and bottom-tab-only
+  global routing. Every destination keeps a minimum 44 CSS-pixel target. At
+  320 CSS pixels, horizontal overflow is explicit through a visible direction
+  cue and an accessible instruction; keyboard, touch, and state-driven tab
+  changes reveal the active destination. At 393 CSS pixels, all destinations
+  fit without an overflow cue. Resize, 200% text, reload, focus, and ordinary
+  tab lifecycle must retain the same order and no document-level overflow.
+- **Evidence contract:** The Rule of Three is normal 393px geometry, the
+  320px overflow/keyboard/touch boundary, and the 200%-text resize/reload
+  lifecycle. The pinned `tests/e2e/navigation-affordance.spec.ts` suite and
+  canonical `./scripts/verify` are required; a fresh independent Verifier must
+  assess the exact candidate SHA.
+- **Routing contract:** `.agent/verification/catalog.json` is the machine-
+  checked index of historical finding status and active M7A requirements.
+  Immutable reports stay untouched. `./scripts/agent-status` remains the live
+  Git/report source; routing documents and the handoff never claim live
+  acceptance or a next gate.
+- **Release matrix:** `.agent/RELEASE_ACCEPTANCE.md` records the remaining
+  Milestone 7 evidence for balance, accessibility, mobile performance, writing,
+  audio, save stability, localization readiness, packaging, and exact-SHA
+  deployment. Each item remains open until its applicable evidence exists.
+- **Reversal condition:** Change the navigation order, target-size contract,
+  release boundary, or active verification policy only through an explicit
+  owner decision with updated deterministic, browser, and independent-verifier
+  evidence.

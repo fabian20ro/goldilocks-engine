@@ -1,68 +1,74 @@
-# Verification index — frozen provenance-repair map
+# Verification index — accepted Milestone 6 history and active Milestone 7A
 
-Navigation only. Reports and plan/decisions remain authoritative and immutable.
-This map is frozen history: it must not be used to infer live HEAD, latest
-round, accepted verdict, unresolved state, or next gate. Run
-`./scripts/agent-status` first for those facts.
+Navigation only. Immutable reports, `plan.md`, and `.agent/DECISIONS.md`
+remain authoritative. This index never claims live HEAD, latest verdict,
+acceptance, unresolved state, or next gate. Run `./scripts/agent-status` first.
 
-## Freeze label
+## Canonical read route
 
-This map preserves the provenance-repair source set spanning the round-078
-presentation baseline, rounds 079–082 adversarial findings, and the round-083
-workflow/provenance release-verification record. It intentionally remains useful
-after later reports and commits exist.
+1. `AGENTS.md` and the active role profile.
+2. `./scripts/agent-status`.
+3. `.agent/CURRENT_SCOPE.md`, this index, and
+   `.agent/verification/catalog.json`.
+4. Exact authorities named by the active requirement.
 
-## Canonical baseline
+Use the complete plan, decisions, and archive for release verification,
+broad/cross-milestone work, missing or contradictory catalog coverage, or an
+explicit request. Never use this index or the handoff as proof.
 
-`./scripts/verify` is the complete local gate: locked setup; format; lint;
-typecheck; unit/property; deterministic balances; production build/audit; root
-browser/PWA; Pages/offline. `tests/e2e` and `playwright*.report` are generated
-evidence, not authority. The canonical command retains every lane.
+## Canonical verification lane
 
-## Archived finding map
+`./scripts/verify` runs the catalog validator, locked setup, format, lint,
+typecheck, unit/property tests, deterministic balances, build, production
+audit, root browser/PWA, and Pages/offline checks. `npm run test:e2e` is the
+repository-pinned root browser lane. Browser dependencies and browsers use
+ignored repository-local caches documented in `.agent/HANDOFF.md`.
 
-| Finding | Authoritative report | Candidate regression / normal case | Adversarial / lifecycle evidence | Canonical lane |
-| --- | --- | --- | --- | --- |
-| V-078 later Career failure borrows a Jobs cause | [round-079](round-079.md) | `src/ui/verifierRound079.test.tsx`; `src/ui/settlementProvenance.test.tsx` valid-integrity later-Career restore | `round-079-adversarial.mjs`; reload/offline Jobs provenance E2E | root unit + `npm run test:e2e` |
-| V-079 free-text stale decoy impersonates cause | [round-080](round-080.md) | `src/ui/verifierRound080.test.tsx`; `src/ui/settlementProvenance.test.tsx` decoy/unknown | `round-080-adversarial.mjs`; raw 320 keyboard / 393 touch offline | root unit + `npm run test:e2e` |
-| V-080 stale structural relink claims a precise cause | [round-081](round-081.md) | `src/ui/verifierRound081.test.tsx`; `tests/e2e/jobs-settlement-provenance.spec.ts` raw 320 | `round-081-adversarial.mjs`; restore/reload/offline | root unit + `npm run test:e2e` |
-| V-081 future/colliding ID freezes progress | [round-081](round-081.md) | `src/simulation/engine.test.ts`; `tests/e2e/jobs-settlement-provenance.spec.ts` raw 393 | `round-081-adversarial.mjs`; repeated tick/reload/resume | unit/balance + root browser |
-| V-082 canonical-looking stale marker forges cause | [round-082](round-082.md) | `src/ui/verifierRound082.test.tsx`; `src/ui/settlementProvenance.test.tsx`; browser stale-marker case | `round-082-adversarial.mjs`; raw 320 keyboard / 393 touch, 200%, offline | root unit + `npm run test:e2e` |
+## Active Milestone 7A route
 
-## Archived probe policy
+| Requirement | Source | Candidate evidence | Canonical lane |
+| --- | --- | --- | --- |
+| Routing is compact, current-scope aware, and contradiction-checked | D-041; `.agent/RELEASE_ACCEPTANCE.md` | `catalog.json`; `scripts/validate-verification-catalog.mjs` | `verification-catalog` then `./scripts/verify` |
+| Eight tabs retain stable order and bottom-tab-only routing | `plan.md` §20; D-040–D-041 | `src/ui/App.tsx`; `src/ui/glyphs.tsx` | root browser |
+| Narrow overflow is discoverable without shrinking targets | D-041; `.agent/RELEASE_ACCEPTANCE.md` | `src/ui/styles.css`; `tests/e2e/navigation-affordance.spec.ts` | root browser |
+| Normal/boundary/lifecycle nav behavior | D-041 Rule of Three | 393px fit; 320px cue/reveal; 200% resize/reload/focus/touch | root browser |
+| Commercial-release matrix is explicit | `plan.md` §29; `.agent/RELEASE_ACCEPTANCE.md` | matrix and gate-order documentation | independent Verifier |
 
-- `round-079-adversarial.mjs`, `round-080-adversarial.mjs`,
-  `round-081-adversarial.mjs`, and `round-082-adversarial.mjs` are retained
-  verifier evidence. Do not edit, delete, or silently stop invoking them in
-  release verification.
-- The round-080 probe contains a historical stale-precision expectation
-  superseded only by D-036. Keep it unchanged and label its result accurately;
-  valid-integrity V-078 precision remains required.
-- Earlier `*-adversarial.mjs` and verifier tests remain archival regression
-  evidence. Expand to them for release, broad changes, or when their source
-  mapping is implicated; do not use the index to discard them.
+## Historical accepted Milestone 6 route
 
-## Round-085 authorized source route
+Round 093 is immutable historical evidence for D-040's Lab lifecycle and
+capacity repair. Its normal, malformed/recovery, and reload/offline probes are:
 
-The frozen provenance map above remains historical. The owner-authorized
-Milestone 4 Research route is `plan.md` §§3–7.4, 12, 17, 19, 20/20.4, 23–27,
-29, 33–34 plus D-037–D-038 in `.agent/DECISIONS.md`. Candidate evidence is expected
-in the Research domain tests, balance scenario, and `tests/e2e/research.spec.ts`;
-the canonical lane remains `./scripts/verify`. This routing note is not a
-verdict or acceptance record.
+- `.agent/verification/round-093-adversarial.mjs`;
+- `.agent/verification/round-093-ui-adversarial.mjs`;
+- `src/simulation/laboratory.test.ts` and the Lab E2E suite.
+
+The round-092 FAIL findings V-092-001 and V-092-002 are mapped as resolved by
+round 093 in the machine catalog. Do not rewrite either report.
+
+## Finding and probe catalog
+
+`catalog.json` is the checked routing index for every immutable finding ID.
+It distinguishes resolved findings, superseded process blockers, archival
+blockers, active M7A requirements, and superseded probes. The validator checks
+that every finding in every report has exactly one status, every resolution
+report is PASS, every cited decision and evidence path exists, and no active
+finding is hidden in a summary.
+
+Current superseded-history examples are explicitly retained:
+
+- round-080 stale-cause precision expectation superseded by D-036;
+- round-085 six-destination expectation superseded by D-040;
+- round-087 unsealed Research fixture superseded by D-038;
+- round-092 malformed duplicate-machine fixture superseded by D-040;
+- pre-D-032 global-disclosure selectors retained as archival probes.
+
+Do not delete or rewrite these probes. Do not run a superseded assertion as a
+current acceptance requirement; use the catalog replacement evidence.
 
 ## Full-read triggers
 
-Take the full plan/decisions/archive route if status fails; any cited source is
-missing, conflicting, or insufficient; the change touches another product seam;
-the role is release verification; or the user explicitly requests it. The index
-never authorizes a product change by itself.
-
-## Round-089 authorized source route
-
-The frozen provenance map and the Round-085 Research route remain historical.
-The owner-authorized Milestone 5 route is `plan.md` §§1–6, 7.3, 11, 13–14,
-17, 19–20, 23–27, 29, 33–34 plus D-039 in `.agent/DECISIONS.md`. Candidate
-evidence belongs in the Hype/Fear engine, deterministic balance, UI, migration,
-and `tests/e2e/hype-fear.spec.ts` lanes; the canonical gate remains
-`./scripts/verify`. This routing note is not a verdict or acceptance record.
+Take the full plan/decisions/archive route if status fails, any source or
+catalog mapping is missing or contradictory, the change crosses a product
+milestone, the role is release verification, or the user explicitly requests
+it. A stale routing map is not authority and must not be patched by inference.

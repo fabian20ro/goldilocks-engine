@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "catalogKind": "active-verification",
+  "description": "Machine-checked routing for immutable verifier evidence and the authorized Milestone 7A release-foundation scope. The status command remains the source of live Git/report state.",
+  "historicalAcceptedSnapshot": {
+    "report": ".agent/verification/round-093.md",
+    "round": 93,
+    "candidateSha": "db43d20b0334f3daba5f2e4f03414fb7da10ded7",
+    "verifierCommit": "0b83e7ee047d7ddcdd54f5b2a57b7974c86433e9",
+    "verdict": "PASS"
+  },
+  "activeScope": {
+    "name": "Milestone 7A — release foundation and mobile navigation",
+    "status": "active",
+    "authorities": [
+      "plan.md",
+      ".agent/DECISIONS.md",
+      ".agent/verification/round-093.md",
+      ".agent/RELEASE_ACCEPTANCE.md"
+    ],
+    "requirements": [
+      {
+        "id": "M7A-ROUTING-001",
+        "status": "active",
+        "intent": "Route accepted Milestone 6 history and the active Milestone 7 release matrix without treating summaries as authority.",
+        "sources": [
+          ".agent/CURRENT_SCOPE.md",
+          ".agent/verification/INDEX.md",
+          ".agent/RELEASE_ACCEPTANCE.md"
+        ],
+        "checks": [
+          ".agent/verification/catalog.json",
+          "scripts/validate-verification-catalog.mjs"
+        ]
+      },
+      {
+        "id": "M7A-NAV-001",
+        "status": "active",
+        "intent": "Keep eight destinations in stable order with 44px targets, visible narrow-screen overflow affordance, active-tab reveal, and no duplicate global routing.",
+        "sources": [
+          "plan.md",
+          ".agent/DECISIONS.md",
+          ".agent/RELEASE_ACCEPTANCE.md"
+        ],
+        "checks": [
+          "src/ui/App.tsx",
+          "src/ui/styles.css",
+          "tests/e2e/navigation-affordance.spec.ts"
+        ]
+      },
+      {
+        "id": "M7A-NAV-002",
+        "status": "active",
+        "intent": "Prove normal, 320px boundary, text-scale, keyboard/touch, resize and reload navigation behavior through the pinned browser.",
+        "sources": ["plan.md", ".agent/RELEASE_ACCEPTANCE.md"],
+        "checks": ["tests/e2e/navigation-affordance.spec.ts", "scripts/verify"]
+      },
+      {
+        "id": "M7A-RELEASE-001",
+        "status": "active",
+        "intent": "Maintain a concrete commercial-release acceptance matrix for the remaining balance, accessibility, performance, writing, audio, save, localization and packaging work.",
+        "sources": ["plan.md", ".agent/RELEASE_ACCEPTANCE.md"],
+        "checks": [".agent/RELEASE_ACCEPTANCE.md"]
+      }
+    ]
+  },
+  "findingGroups": [
+    {
+      "id": "V-001..V-082",
+      "match": { "prefix": "V-", "from": 1, "to": 82 },
+      "status": "resolved",
+      "resolutionReport": ".agent/verification/round-083.md",
+      "regressionEvidence": [
+        "./scripts/verify",
+        ".agent/verification/round-079-adversarial.mjs",
+        ".agent/verification/round-080-adversarial.mjs",
+        ".agent/verification/round-081-adversarial.mjs",
+        ".agent/verification/round-082-adversarial.mjs"
+      ],
+      "note": "Earlier product findings are retained in their immutable reports and covered by the accepted canonical regression chain."
+    },
+    {
+      "id": "V-083..V-086",
+      "match": { "prefix": "V-", "from": 83, "to": 86 },
+      "status": "resolved",
+      "resolutionReport": ".agent/verification/round-088.md",
+      "regressionEvidence": [
+        "src/simulation/verifierRound085.test.ts",
+        "src/simulation/verifierRound086.test.ts",
+        "src/simulation/verifierRound088.test.ts"
+      ],
+      "note": "Research restore and signature findings are closed by the independent round-088 PASS."
+    },
+    {
+      "id": "V-089-001..V-089-003",
+      "match": { "exact": ["V-089-001", "V-089-002", "V-089-003"] },
+      "status": "resolved",
+      "resolutionReport": ".agent/verification/round-090.md",
+      "regressionEvidence": [
+        "src/simulation/verifierRound090.test.ts",
+        ".agent/verification/round-090-adversarial.mjs"
+      ],
+      "note": "Hype/Fear recognition, deadline and creator-fit findings are closed by the independent round-090 PASS."
+    },
+    {
+      "id": "V-092-001..V-092-002",
+      "match": { "exact": ["V-092-001", "V-092-002"] },
+      "status": "resolved",
+      "resolutionReport": ".agent/verification/round-093.md",
+      "regressionEvidence": [
+        "src/simulation/laboratory.test.ts",
+        ".agent/verification/round-093-adversarial.mjs",
+        ".agent/verification/round-093-ui-adversarial.mjs"
+      ],
+      "note": "Laboratory founding and exclusive machine-capacity findings are closed by the independent round-093 PASS."
+    },
+    {
+      "id": "B-005",
+      "match": { "exact": ["B-005"] },
+      "status": "superseded",
+      "supersededByDecision": "D-009",
+      "resolutionReport": ".agent/verification/round-083.md",
+      "regressionEvidence": [".agent/DECISIONS.md"],
+      "note": "The former mandatory human-gate blocker is superseded by reproducible automated evidence; the desired quality outcomes remain requirements."
+    },
+    {
+      "id": "B-007..B-008",
+      "match": { "exact": ["B-007", "B-008"] },
+      "status": "archival",
+      "resolutionReport": ".agent/verification/round-093.md",
+      "regressionEvidence": ["scripts/verify", ".agent/RELEASE_ACCEPTANCE.md"],
+      "note": "Historical deployment/infrastructure blockers; exact-SHA hosted verification remains a release-matrix gate, not an unresolved implementation finding."
+    }
+  ],
+  "supersededProbes": [
+    {
+      "id": "R080-stale-precision-expectation",
+      "status": "superseded",
+      "source": ".agent/verification/round-080-adversarial.mjs",
+      "supersededByDecision": "D-036",
+      "replacementEvidence": ".agent/verification/round-082-adversarial.mjs",
+      "note": "The stale-integrity exact-cause expectation is replaced by the honest Cause unknown fallback; the probe remains immutable archival evidence."
+    },
+    {
+      "id": "R085-six-destination-expectation",
+      "status": "superseded",
+      "source": ".agent/verification/round-085-adversarial.mjs",
+      "supersededByDecision": "D-040",
+      "replacementEvidence": ".agent/verification/round-093-ui-adversarial.mjs",
+      "note": "The probe's historical six-destination assertion predates the authorized eighth Laboratory destination; its Research checks remain useful."
+    },
+    {
+      "id": "R087-unsealed-research-fixture",
+      "status": "superseded",
+      "source": ".agent/verification/round-087-adversarial.mjs",
+      "supersededByDecision": "D-038",
+      "replacementEvidence": ".agent/verification/round-088-adversarial.mjs",
+      "note": "The old unsealed fixture is intentionally rejected by the current integrity-gated restore contract."
+    },
+    {
+      "id": "R092-malformed-duplicate-machine-fixture",
+      "status": "superseded",
+      "source": ".agent/verification/round-092-ui-adversarial.mjs",
+      "supersededByDecision": "D-040",
+      "replacementEvidence": ".agent/verification/round-093-ui-adversarial.mjs",
+      "note": "The malformed duplicate-allocation fixture now fail-closes during restore; round-093 probes cover the repaired lifecycle."
+    },
+    {
+      "id": "pre-D032-global-disclosure-probes",
+      "status": "archival",
+      "source": ".agent/verification/round-067-adversarial.mjs",
+      "supersededByDecision": "D-032",
+      "replacementEvidence": ".agent/verification/round-083.md",
+      "note": "The old speed/warning selectors describe pre-disclosure chrome and remain historical only."
+    }
+  ]
+}

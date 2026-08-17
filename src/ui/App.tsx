@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -4289,6 +4290,14 @@ export function App() {
     () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
   const scrollRegionRef = useRef<HTMLDivElement>(null);
+  const bottomNavRef = useRef<HTMLElement>(null);
+  const bottomNavButtonRefs = useRef<
+    Partial<Record<TabId, HTMLButtonElement | null>>
+  >({});
+  const [bottomNavOverflow, setBottomNavOverflow] = useState({
+    left: false,
+    right: false,
+  });
   const headerSettingsRef = useRef<HTMLDetailsElement>(null);
   const helpOriginRef = useRef<HTMLElement | null>(null);
   const dragRef = useRef<DragState | null>(null);
@@ -4307,6 +4316,48 @@ export function App() {
     laboratory: 0,
     world: 0,
   });
+
+  const updateBottomNavOverflow = useCallback(() => {
+    const nav = bottomNavRef.current;
+    if (!nav) return;
+    const maxScrollLeft = Math.max(0, nav.scrollWidth - nav.clientWidth);
+    const next = {
+      left: nav.scrollLeft > 1,
+      right: nav.scrollLeft < maxScrollLeft - 1,
+    };
+    setBottomNavOverflow((current) =>
+      current.left === next.left && current.right === next.right
+        ? current
+        : next,
+    );
+  }, []);
+
+  useEffect(() => {
+    const nav = bottomNavRef.current;
+    if (!nav) return;
+    updateBottomNavOverflow();
+    nav.addEventListener("scroll", updateBottomNavOverflow, { passive: true });
+    window.addEventListener("resize", updateBottomNavOverflow);
+    return () => {
+      nav.removeEventListener("scroll", updateBottomNavOverflow);
+      window.removeEventListener("resize", updateBottomNavOverflow);
+    };
+  }, [updateBottomNavOverflow]);
+
+  useLayoutEffect(() => {
+    const nav = bottomNavRef.current;
+    const button = bottomNavButtonRefs.current[tab];
+    if (nav && button) {
+      const navBox = nav.getBoundingClientRect();
+      const buttonBox = button.getBoundingClientRect();
+      if (buttonBox.left < navBox.left) {
+        nav.scrollLeft += buttonBox.left - navBox.left;
+      } else if (buttonBox.right > navBox.right) {
+        nav.scrollLeft += buttonBox.right - navBox.right;
+      }
+    }
+    updateBottomNavOverflow();
+  }, [tab, updateBottomNavOverflow]);
 
   const clearCareerCompletionFeedbackForRequest = useCallback(
     (requestId: number) => {
@@ -4963,11 +5014,28 @@ export function App() {
         </main>
       </div>
 
-      <nav className="bottom-nav" aria-label="Primary">
+      <span id="primary-nav-overflow-hint" className="visually-hidden">
+        The eight primary destinations stay in a stable order. On narrow
+        screens, swipe the navigation strip horizontally to reveal every tab.
+      </span>
+      <nav
+        ref={bottomNavRef}
+        className={`bottom-nav${bottomNavOverflow.left ? " has-left-overflow" : ""}${bottomNavOverflow.right ? " has-right-overflow" : ""}`}
+        aria-label="Primary"
+        aria-describedby={
+          bottomNavOverflow.left || bottomNavOverflow.right
+            ? "primary-nav-overflow-hint"
+            : undefined
+        }
+        onScroll={updateBottomNavOverflow}
+      >
         {navigationItems.map(([id, icon, label]) => (
           <button
             type="button"
             key={id}
+            ref={(element) => {
+              bottomNavButtonRefs.current[id] = element;
+            }}
             className={tab === id ? "active" : ""}
             aria-current={tab === id ? "page" : undefined}
             aria-label={label}
@@ -4978,6 +5046,18 @@ export function App() {
             {id === "build" && selectedName ? <small>1 pending</small> : null}
           </button>
         ))}
+        <span
+          className="bottom-nav-overflow-indicator bottom-nav-overflow-left"
+          aria-hidden="true"
+        >
+          ‹
+        </span>
+        <span
+          className="bottom-nav-overflow-indicator bottom-nav-overflow-right"
+          aria-hidden="true"
+        >
+          ›
+        </span>
       </nav>
 
       {drag?.active ? (

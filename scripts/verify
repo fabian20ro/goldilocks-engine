@@ -32,6 +32,7 @@ run_step() {
 }
 
 preflight() {
+  run_step verification-catalog npm run validate:verification-catalog
   run_step setup ./scripts/setup
   run_step format npm run format:check
   run_step lint npm run lint

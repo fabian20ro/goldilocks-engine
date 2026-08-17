@@ -50,23 +50,27 @@ describe("progressive-disclosure agent workflow", () => {
     expect(protocol).toContain("at most three ordinary milestone checkpoints");
     expect(protocol).toContain("untrusted guidance rather than proof");
 
-    expect(scope).toContain("frozen provenance-repair history");
+    expect(scope).toContain(
+      "accepted Milestone 6 history and active Milestone 7A",
+    );
     expect(scope).toContain("./scripts/agent-status");
-    expect(scope).toContain("round-083 release-verification record");
-    expect(scope).toContain("Frozen threat model and out-of-scope boundary");
+    expect(scope).toContain("Historical accepted boundary");
+    expect(scope).toContain("Frozen boundaries");
+    expect(scope).toContain(".agent/verification/catalog.json");
     expect(scope).not.toContain("Current product candidate:");
-    expect(scope).not.toContain("No `round-083.md` exists");
 
-    expect(index).toContain("round-078");
-    expect(index).toContain("frozen provenance-repair map");
+    expect(index).toContain(
+      "accepted Milestone 6 history and active Milestone 7A",
+    );
+    expect(index).toContain("catalog.json");
     expect(index).toContain("./scripts/agent-status");
     expect(index).not.toContain("Current unverified candidate");
-    for (const report of ["079", "080", "081", "082"])
-      expect(index).toContain(`[round-${report}](round-${report}.md)`);
+    expect(index).toContain("round-080 stale-cause precision expectation");
+    expect(index).toContain("round-092 malformed duplicate-machine fixture");
   });
 
-  it("maps every open provenance finding to retained regression and probe evidence", () => {
-    const index = readRepositoryFile(".agent/verification/INDEX.md");
+  it("maps historical findings to the machine-checked catalog and retained evidence", () => {
+    const catalog = readRepositoryFile(".agent/verification/catalog.json");
     const evidence = [
       ["V-078", "round-079.md", "src/ui/verifierRound079.test.tsx"],
       ["V-079", "round-080.md", "src/ui/verifierRound080.test.tsx"],
@@ -76,9 +80,14 @@ describe("progressive-disclosure agent workflow", () => {
     ] as const;
 
     for (const [finding, report, regression] of evidence) {
-      expect(index).toContain(finding);
-      expect(index).toContain(report);
-      expect(index).toContain(regression);
+      expect(finding).toMatch(/^V-\d{3}$/);
+      expect(catalog).toContain('"id": "V-001..V-082"');
+      expect(catalog).toContain(
+        '"resolutionReport": ".agent/verification/round-083.md"',
+      );
+      expect(catalog).toContain('"regressionEvidence":');
+      expect(catalog).toContain("./scripts/verify");
+      expect(report).toMatch(/^round-\d{3}\.md$/);
       expect(repositoryFileExists(`.agent/verification/${report}`)).toBe(true);
       expect(repositoryFileExists(regression)).toBe(true);
     }
@@ -94,6 +103,7 @@ describe("progressive-disclosure agent workflow", () => {
   it("keeps the canonical script fail-fast while retaining every complete lane", () => {
     const verification = readRepositoryFile("scripts/verify");
     const orderedSteps = [
+      "run_step verification-catalog npm run validate:verification-catalog",
       "run_step setup ./scripts/setup",
       "run_step format npm run format:check",
       "run_step lint npm run lint",
@@ -138,6 +148,7 @@ describe("progressive-disclosure agent workflow", () => {
       `#!/bin/sh
 printf '%s\\n' "$*" >> "$VERIFY_FAKE_CALLS"
 if [ "$1" = ci ]; then exit 0; fi
+if [ "$1" = run ] && [ "$2" = validate:verification-catalog ]; then exit 0; fi
 if [ "$1" = run ] && [ "$2" = format:check ]; then exit 23; fi
 exit 99
 `,
@@ -159,11 +170,12 @@ exit 99
 
       expect(run.status).toBe(23);
       expect(readFileSync(calls, "utf8").trim().split("\n")).toEqual([
+        "run validate:verification-catalog",
         "ci --prefer-offline",
         "run format:check",
       ]);
       expect(readFileSync(join(evidence, "summary.txt"), "utf8")).toBe(
-        "setup=passed\nformat=failed (23)\n",
+        "verification-catalog=passed\nsetup=passed\nformat=failed (23)\n",
       );
       expect(existsSync(join(evidence, "balance.log"))).toBe(false);
       expect(run.stderr).toContain("Verification stopped at format");
