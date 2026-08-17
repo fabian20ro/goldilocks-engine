@@ -145,6 +145,19 @@
         "src/ui/styles.css"
       ],
       "note": "Round-095 independently rechecked the 393-to-320 resize seam at normal and 200% text, including every active destination, and found no reproduction of the round-094 clipping defect."
+    },
+    {
+      "id": "V-098-001",
+      "match": { "exact": ["V-098-001"] },
+      "status": "active",
+      "requirementId": "M7A-RELEASE-001",
+      "regressionEvidence": [
+        ".agent/verification/round-098.md",
+        "src/test/verifyWorkflow.test.ts",
+        ".github/workflows/verify.yml",
+        ".github/workflows/deploy-pages.yml"
+      ],
+      "note": "Round-098 independently reproduced shell execution from the Verify aggregate's directly interpolated candidate_ref input; Pages uses the safe env-backed pattern."
     }
   ],
   "supersededProbes": [
