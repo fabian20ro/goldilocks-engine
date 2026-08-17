@@ -4372,6 +4372,10 @@ export function App() {
       revealFrame = window.requestAnimationFrame(retry);
     };
     const handleResize = () => {
+      // Reveal synchronously so a destination that fit at the previous width
+      // is never left clipped for one frame; the retry loop below still
+      // handles font-metric and ResizeObserver reflow.
+      revealActiveBottomNav();
       updateBottomNavOverflow();
       stabilizeActiveReveal();
     };

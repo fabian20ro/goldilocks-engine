@@ -232,9 +232,10 @@ test("320px overflow is announced and active keyboard/touch tabs are revealed", 
   }
 });
 
-test("200% text retains navigation targets and survives resize/reload", async ({
+test("200% text retains navigation targets and survives reduced-motion resize/reload", async ({
   page,
 }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 393, height: 742 });
   await page.goto("/");
   const nav = page.getByRole("navigation", { name: "Primary" });
@@ -257,7 +258,11 @@ test("200% text retains navigation targets and survives resize/reload", async ({
 
   await nav.getByRole("button", { name: "Build", exact: true }).click();
   await page.addStyleTag({
-    content: ":root { font-size: 200% !important; }",
+    content: `
+      :root { font-size: 200% !important; }
+      .bottom-nav button,
+      .bottom-nav button > .tab-label { letter-spacing: 0.02em !important; }
+    `,
   });
   await assertTouchTargets(page);
   await expect(nav).toHaveClass(/has-right-overflow/);

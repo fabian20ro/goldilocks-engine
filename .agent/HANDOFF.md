@@ -1,48 +1,39 @@
-# Candidate handoff — Round 096 hosted browser repair
+# Candidate handoff — Round 097 navigation lifecycle repair
 
 ## Implemented behavior summary
 
-- Updated `tests/e2e/navigation-affordance.spec.ts` to assert the actual
-  navigation contract at 393px/320px and injected 200% text: stable eight-tab
-  order, active destination fully inside the strip, >=44px targets, accurate
-  left/right overflow cues, the swipe instruction when the strip overflows, and
-  no document-level horizontal overflow. The test no longer assumes that
-  Linux font metrics make the strip itself fit at 393px/200%.
-- Added a root A-registration lifecycle barrier to
-  `tests/e2e/verifier-round-029.spec.ts` before opening the live Pages A client
-  and requesting the stale-URL A-query/B-body update. The fixture now waits for
-  the initial root worker to be fully activated, controlled, and responsive;
-  it still requires exact root B convergence, Pages A isolation, persistence,
-  and offline reload. No production PWA code or plan/report was changed.
-- The machine-validated verification catalog and routing maps remain valid and
-  unchanged; these hosted failures introduced no new immutable finding ID.
+- Re-reveals the active bottom-navigation destination synchronously on every
+  viewport resize, before the existing bounded animation-frame stabilization.
+  This closes the 393-to-320 gap where Linux font metrics could clip the active
+  World tab for the first frame after a resize; ResizeObserver/font reflow and
+  scroll-snap settling remain covered by the retry pass.
+- Extended the focused 200% text scenario to reduced motion and a small label
+  metric expansion. It retains direct activation, the first 320px boundary,
+  keyboard activation, repeated 393-to-320 resize, and reload checks.
+- Stable eight-tab order, 44px targets, touch/keyboard behavior, overflow
+  instruction/cues, and the Round-029 PWA repair remain unchanged.
 
 ## Plan requirements covered
 
-- M7A-NAV-001/002: stable bottom-tab routing, narrow disclosure, active reveal,
-  normal/boundary/lifecycle behavior, keyboard/touch operation, 200% text,
-  resize, and reload.
-- D-008: static-host stale-worker URL repair, atomic root update, live nested
-  Pages-shell isolation, persistence, and offline recovery remain asserted by
-  the historical Round-029 probe.
-- Rule of Three: direct normal navigation; 320px/200% boundary cues and
-  keyboard/touch reveal; 393-to-320 resize/reload lifecycle.
+- M7A-NAV-001/002: active reveal at normal and narrow widths, 200% text,
+  reduced motion, keyboard/touch input, resize lifecycle, reload, stable order,
+  explicit overflow disclosure, and no document-level overflow.
+- Rule of Three: direct activation; first narrow boundary; repeated wide-to-
+  narrow text-scale resize with reduced motion and reload recovery.
 
 ## Verifier findings resolved
 
-- Hosted run `32013485278` reported two root-browser failures on accepted
-  candidate `bf8bdd7ff669ddfe32eacef118bb8e989c9ec6ef`:
-  - navigation line 169 assumed no strip overflow at Linux 393px/200% text;
-    the product contract is now tested without that invalid premise;
-  - Round-029 remained on root A in one slow initial-install/update ordering;
-    the verifier fixture now settles root A before exercising the mixed-scope
-    transition.
-- No production defect was established in either seam; the accepted PWA
-  implementation and navigation behavior remain under independent verification.
+- Hosted run `32017369881` exposed the remaining navigation defect: after
+  200% text and 393-to-320 resize, active World could remain at `right=348`
+  against a `320px` navigation box. Resize handling now performs the reveal
+  synchronously and keeps the post-layout stabilization for metric churn.
+- No PWA production or fixture code changed. No new immutable finding ID or
+  catalog/routing entry is required; the prior `V-094-001` resolution remains
+  retained.
 
 ## Setup, startup, and verification commands
 
-Dependencies and browser use ignored repository-local caches:
+Dependencies and browsers use ignored repository-local caches:
 
 ```sh
 ./scripts/setup
@@ -52,29 +43,22 @@ export npm_config_cache="$PWD/.cache/npm"
 export PLAYWRIGHT_BROWSERS_PATH="$PWD/.cache/ms-playwright"
 ```
 
-Focused evidence for this candidate:
+Focused evidence:
 
 ```sh
-PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright npx playwright test \
-  tests/e2e/navigation-affordance.spec.ts \
-  tests/e2e/verifier-round-029.spec.ts --workers=1
-PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright npx playwright test \
-  tests/e2e/navigation-affordance.spec.ts --repeat-each=3 --workers=1
-PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright npx playwright test \
-  tests/e2e/verifier-round-029.spec.ts --repeat-each=5 --workers=1
-npm run validate:verification-catalog
 npm run typecheck
-npm run lint
-npx prettier --check tests/e2e/navigation-affordance.spec.ts \
-  tests/e2e/verifier-round-029.spec.ts
+npm run lint -- --quiet
+npm run test:e2e -- tests/e2e/navigation-affordance.spec.ts
+npm run test:e2e -- tests/e2e/navigation-affordance.spec.ts -g '200%'
+npm run test:e2e -- tests/e2e/navigation-affordance.spec.ts -g '200%' --repeat-each=3
 git diff --check
 ```
 
-Canonical final gate:
+Canonical gate attempted once after executable edits:
 
 ```sh
 INSTALL_PLAYWRIGHT=0 E2E_PORT=42497 \
-  VERIFY_EVIDENCE_DIR=.cache/verification/round-096-final \
+  VERIFY_EVIDENCE_DIR=.cache/verification/round-097-final \
   npm_config_cache="$PWD/.cache/npm" \
   PLAYWRIGHT_BROWSERS_PATH="$PWD/.cache/ms-playwright" \
   ./scripts/verify
@@ -82,37 +66,35 @@ INSTALL_PLAYWRIGHT=0 E2E_PORT=42497 \
 
 ## Important architectural decisions
 
-- The navigation assertion is intentionally test-only: platform font metrics
-  may make the scroll strip overflow at 393px/200%, while the user-visible
-  contract remains active-target visibility, explicit instruction/cues, target
-  size, and document fit. No tab order, auto-navigation, or production CSS was
-  broadened.
-- The Round-029 barrier is test-fixture synchronization, not a sleep, retry
-  loophole, or production delay. It verifies the initial root worker identity
-  before the concurrent Pages scope is introduced and retains exact B identity
-  assertions after the update.
+- Resize handling now does one immediate geometry-based reveal, then retains
+  the existing 250ms animation-frame pass. This is the smallest lifecycle
+  repair: no tab reorder, auto-navigation, hidden overflow, speculative state,
+  or scroll behavior change.
+- The acceptance test deliberately keeps the active-target visibility
+  assertion. Its injected 200% root size plus slight label-spacing expansion
+  provides a deterministic stress case for platform-sensitive font metrics;
+  the product contract remains target visibility, cues/instruction, target
+  size, and document fit.
 
 ## Known limitations and risks
 
-- Hosted Linux browser evidence was available only through the failed run log;
-  local pinned Chromium on macOS passes the revised cross-metric contract.
+- The hosted Linux failure was reproduced from run `32017369881`; this
+  candidate still needs a fresh independent hosted Verifier run at its exact
+  commit SHA.
 - Native VoiceOver/TalkBack, WebKit, physical-device timing, low-end mobile
   performance, audio/localization, packaging, and exact-SHA deployment remain
-  outside this Implementer handoff and require independent release evidence.
-- The current candidate has no fresh independent Verifier verdict yet.
+  release-matrix work.
+- No plan or immutable verification report was edited.
 
 ## Checks not run / final evidence
 
-- Focused final checks passed: combined navigation/PWA lane 4/4; navigation
-  repeat 3 runs (9/9); Round-029 repeat 5 runs (5/5); typecheck; lint;
-  Prettier; diff check. Browser commands used the pinned repository-local
-  Chromium outside the managed sandbox because Chromium cannot create its macOS
-  Mach port inside that sandbox.
-- `npm run validate:verification-catalog` passed: 95 immutable reports, 95
-  findings, and 4 active requirements.
-- Final canonical evidence is `.cache/verification/round-096-final`:
-  catalog, setup, format, lint, typecheck, unit (66 files/305 tests), balance,
-  build, production audit (0 vulnerabilities), root-browser-pwa (238 tests),
-  and Pages/offline (2 tests) all passed. `./scripts/verify` exited 0.
-- Canonical setup reported four development-dependency advisories; these are
-  retained in evidence and are not introduced by this candidate.
+- Focused navigation acceptance passed locally; the 200% reduced-motion case
+  passed three consecutive repetitions. Typecheck, lint, and diff checks passed.
+- Canonical pre-browser stages passed: verification catalog, setup, format,
+  lint, typecheck, 66-file/305-test unit suite, balance, build, and production
+  audit. Evidence: `.cache/verification/round-097-final/`.
+- Canonical `root-browser-pwa` did not verify product behavior: all 238 cases
+  failed at browser launch because macOS Chromium could not register its Mach
+  port inside the managed sandbox (`MachPortRendezvousServer ... Permission
+denied`). The gate stopped before Pages/offline. This is an infrastructure
+  limitation, not a product result; do not treat the canonical gate as PASS.
