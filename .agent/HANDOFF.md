@@ -1,7 +1,10 @@
 # Candidate handoff — Milestone 7B simulator evidence/tooling
 
 Implementation base: `1096cfd608fb4f0357c2e0b1d8553326de76a79f`.
-Candidate commit: recorded by the Orchestrator from the final clean Git SHA.
+Implementation candidate: `9890a09aa849d60f32676e8d7a35769618fdba02`
+(`improve simulator-native evidence capture`).
+Final handoff bookkeeping commit: recorded by the Orchestrator from the final
+clean Git SHA.
 No immutable report, `plan.md`, decision, scope map, or verification catalog
 was edited.
 
