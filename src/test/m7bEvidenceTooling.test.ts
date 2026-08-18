@@ -1,10 +1,98 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+// @ts-expect-error The JavaScript verifier module has no declaration file.
+import { classifyWebKitReport } from "../../scripts/webkit-result-classifier.mjs";
 
 const read = (relativePath: string) =>
   readFileSync(new URL(`../../${relativePath}`, import.meta.url), "utf8");
 
 describe("M7B evidence tooling contract", () => {
+  const structuredReport = (test: Record<string, unknown>) => ({
+    stats: { unexpected: 0, flaky: 0 },
+    suites: [{ specs: [{ title: "probe", tests: [test] }] }],
+  });
+
+  it("fails closed on incomplete structured WebKit results", () => {
+    const valid = classifyWebKitReport(
+      structuredReport({
+        status: "expected",
+        results: [{ status: "passed" }],
+      }),
+      0,
+    );
+    expect(valid.result).toBe("PASS");
+
+    for (const test of [
+      { status: "expected" },
+      { status: "expected", results: [] },
+      { status: "expected", results: [{ status: "skipped" }] },
+      { status: "expected", results: [{ status: "unknown" }] },
+    ]) {
+      expect(classifyWebKitReport(structuredReport(test), 0).result).toBe(
+        "FAILED",
+      );
+    }
+
+    const infrastructure = classifyWebKitReport(
+      {
+        stats: { unexpected: 0, flaky: 0 },
+        suites: [
+          {
+            specs: [
+              {
+                title: "host blocker",
+                tests: [
+                  {
+                    status: "expected",
+                    annotations: [
+                      { type: "infrastructure", description: "host offline" },
+                    ],
+                    results: [{ status: "passed" }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      0,
+    );
+    expect(infrastructure.result).toBe("BLOCKED");
+  });
+
+  it("requires both configured portrait matrix tests for the lane", () => {
+    const matrix = {
+      stats: { expected: 2, skipped: 0, unexpected: 0, flaky: 0 },
+      suites: [
+        {
+          specs: [
+            {
+              title: "portrait matrix",
+              tests: [
+                { status: "expected", results: [{ status: "passed" }] },
+                { status: "expected", results: [{ status: "passed" }] },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    expect(
+      classifyWebKitReport(matrix, 0, null, { minimumExpectedTests: 2 }).result,
+    ).toBe("PASS");
+    expect(
+      classifyWebKitReport(
+        structuredReport({
+          status: "expected",
+          results: [{ status: "passed" }],
+        }),
+        0,
+        null,
+        { minimumExpectedTests: 2 },
+      ).result,
+    ).toBe("FAILED");
+  });
+
   it("pins and exposes the WebKit lane without changing the Chromium lane", () => {
     const packageJson = JSON.parse(read("package.json")) as {
       scripts: Record<string, string>;

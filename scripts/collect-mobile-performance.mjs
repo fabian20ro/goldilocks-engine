@@ -216,8 +216,8 @@ function numberOrNull(value) {
   return Number.isFinite(value) ? Number(value) : null;
 }
 
-const KNOWN_WEBKIT_OFFLINE_CONSOLE_MESSAGE =
-  "Failed to load resource: WebKit encountered an internal error";
+const KNOWN_WEBKIT_OFFLINE_MARKER = "WebKit encountered an internal error";
+const KNOWN_WEBKIT_OFFLINE_CONSOLE_MESSAGE = `Failed to load resource: ${KNOWN_WEBKIT_OFFLINE_MARKER}`;
 
 function createErrorRecorder(page) {
   const rawEvents = [];
@@ -302,9 +302,7 @@ function createErrorRecorder(page) {
       offlineNavigationError?.source === "page.reload" &&
       offlineNavigationError.operation === "offline-reload" &&
       offlineNavigationError.targetUrl === operation.targetUrl &&
-      offlineNavigationError.message.includes(
-        KNOWN_WEBKIT_OFFLINE_CONSOLE_MESSAGE,
-      );
+      offlineNavigationError.message.includes(KNOWN_WEBKIT_OFFLINE_MARKER);
     const correlated =
       offlineNavigationError &&
       navigationMatches &&

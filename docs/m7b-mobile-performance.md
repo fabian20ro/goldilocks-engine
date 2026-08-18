@@ -52,16 +52,19 @@ evidence is present. This is local evidence, not product telemetry.
 
 The installed WebKit build may report `WebKit encountered an internal error`
 for a top-level offline reload even when the service-worker controller and
-cached shell are usable. The collector retains every raw pageerror and console
-event with operation, URL, location, and timestamp provenance. It correlates
-the one exact known console event only when it occurs inside that reload's
-operation window, matches the target URL/location, and accompanies the
-structured `{source: "page.reload", operation: "offline-reload"}` error with
-the expected cardinality. That retained pair is an `offline-navigation`
-`BLOCKED` finding alongside the cache proof; it is not silently converted into
-a passing offline navigation. Any event outside the window, additional or
-wrong event, marker collision, or failed assertion remains an uncorrelated
-zero-error failure.
+cached shell are usable. The canonical marker is
+`WebKit encountered an internal error`; the exact resource-error console shape
+is `Failed to load resource: <marker>`, while the structured `page.reload`
+message may wrap only the marker in a Playwright error and call log. The
+collector retains every raw pageerror and console event with operation, URL,
+location, and timestamp provenance. It correlates the one exact resource-error
+event only when it occurs inside that reload's operation window, matches the
+target URL/location, and accompanies the structured
+`{source: "page.reload", operation: "offline-reload"}` error with the expected
+cardinality. That retained pair is an `offline-navigation` `BLOCKED` finding
+alongside the cache proof; it is not silently converted into a passing offline
+navigation. Any event outside the window, additional or wrong event, marker
+collision, or failed assertion remains an uncorrelated zero-error failure.
 
 ## Frozen-build baseline and physical Android evidence
 

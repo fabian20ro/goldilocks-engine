@@ -1,9 +1,7 @@
 # Candidate handoff — Milestone 7B verifier repair
 
-Implementation commit: `70d2315e674bf27eda646a755ef394faab192de6`. The final
-candidate also includes this handoff-only follow-up commit. Implementation
-started from verifier commit
-`ea80ade71a0fc45088218aae31b79a560e5d0fd7`.
+Implementation commit: pending Round 108 commit. Implementation started from
+verifier commit `55bc0d9833db7a8105cc0315b6c5645f8d115258`.
 
 ## Implemented behavior summary
 
@@ -36,16 +34,17 @@ started from verifier commit
   cannot recurse into baseline capture.
 - WebKit and performance retain every raw pageerror and console event with
   operation-window, URL, location, type, message, and timestamp provenance.
-  Only one exact known WebKit console event inside the explicit offline reload
-  window may correlate with the separately caught structured
-  `{source, operation, targetUrl, pageUrl, errorType, message}` navigation
-  error, and only with exact URL/location/type/message and cardinality checks.
-  The raw events and correlated pair are both retained; all uncorrelated or
+  The canonical marker `WebKit encountered an internal error` is shared by
+  the structured navigation error and exact console shape `Failed to load
+  resource: <marker>`. Only one exact in-window event may correlate, with
+  exact URL/location/type/message and cardinality checks; all uncorrelated or
   additional events fail the zero-error gate.
-- Reworked `scripts/webkit-result-classifier.mjs`: any structured unexpected,
-  failed, timed-out, interrupted, or flaky test is FAILED regardless of marker;
-  structured infrastructure BLOCKED is possible only after successful tests;
-  only narrowly recognized pre-report process launch errors may BLOCK.
+- Reworked `scripts/webkit-result-classifier.mjs` and its runner contract:
+  schema-invalid, missing/empty, skipped, unknown, inconsistent, unexpected,
+  failed, timed-out, interrupted, or flaky structured results are FAILED;
+  every configured portrait matrix test must have a final `passed` result.
+  Structured infrastructure BLOCKED is possible only after fully passed
+  structured tests; narrowly recognized pre-report process errors may BLOCK.
 - Native validation now requires exact 320×693 and 393×742 dimensions on each
   device record, each declared checklist row, and each actual CSS viewport.
 - Integrated summary parsing into `./scripts/verify`; PASS, BLOCKED, and
@@ -94,8 +93,9 @@ started from verifier commit
   `M7B_NATIVE_EVIDENCE_DIR=... npm run test:native-a11y:validate` command;
   generated `checklist.json` is explicitly supporting output. Validation
   reruns refuse to overwrite retained output.
-- The exact round-102, round-103, round-104, round-105, and round-106
-  adversarial probes returned no findings.
+- The exact round-102 through round-107 adversarial probes returned no
+  findings after the repair. Focused unit cases cover malformed reports and
+  the two-test portrait matrix contract.
   Independent verification remains required; this handoff issues no verdict.
 
 ## Setup, startup, and verification commands
@@ -129,6 +129,9 @@ node .agent/verification/round-103-adversarial.mjs
 node .agent/verification/round-104-adversarial.mjs
 node .agent/verification/round-105-adversarial.mjs
 node .agent/verification/round-106-adversarial.mjs
+node .agent/verification/round-107-adversarial.mjs
+E2E_WEBKIT_PORT=43812 M7B_WEBKIT_EVIDENCE_DIR=.cache/m7b/webkit/<run-id> \
+  npm run test:e2e:webkit
 git diff --check
 M7B_NATIVE_ALLOW_BLOCKED=1 M7B_NATIVE_EVIDENCE_DIR=.cache/m7b/native/focused \
   npm run test:native-a11y
@@ -165,7 +168,9 @@ artifacts. The native validator writes only
   concrete `BLOCKED` finding only when its exact console/navigation pair is
   authenticated inside the offline operation window. Every other page/console
   error remains uncorrelated and fails the lane, including errors whose text
-  contains an infrastructure marker or occurs outside that window.
+  contains an infrastructure marker or occurs outside that window. The real
+  host run now records both portraits as fully passed structured tests with
+  this exact pair and a BLOCKED lane result.
 - Renderer-wide timing is not treated as Worker attribution. The collector
   instruments the shipped Dedicated Worker only in the test page, records
   request/response evidence at 1×/64×, and returns BLOCKED if that attribution
@@ -187,10 +192,11 @@ artifacts. The native validator writes only
 ## Known limitations and risks
 
 - Focused environment evidence is infrastructure-blocked: CoreSimulatorService
-  is unavailable in this session, the attached Pixel 6a is locked, pinned
-  Chromium/WebKit launches are blocked by the macOS Mach-port sandbox, and no
-  frozen accepted-build baseline artifact is retained. These remain explicit
-  blockers, not claims of closure.
+  is unavailable in this session, the attached Pixel 6a is locked, and no
+  frozen accepted-build baseline artifact is retained. Scoped host authority
+  was required for the pinned WebKit run; its real pair correlation is now
+  recorded as structured BLOCKED evidence. These remain explicit blockers, not
+  claims of closure.
 - The current WebKit build reports `WebKit encountered an internal error` on
   offline top-level reload; cached-shell/controller proof succeeds and the
   exact error is retained as a BLOCKED infrastructure finding.
@@ -209,29 +215,21 @@ artifacts. The native validator writes only
 
 ## Checks / final evidence
 
-- Passed: focused evidence test without coverage, format, lint, typecheck,
+- Passed: focused malformed-report/matrix tests, format, lint, typecheck,
   syntax checks, `git diff --check`, classifier valid/infra/no-test/launch
-  checks, the exact round-102/103/104/105/106 adversarial probes, and a wrong
-  capture-only target probe that returned `BLOCKED` before collecting cells.
-  Native capture/validation proved the exact operator-submission command and
-  refused a validation overwrite on rerun. Focused performance returned
-  `BLOCKED` with Chromium Mach-port, locked-device, and baseline-capture
-  findings; focused WebKit returned `FAILED` from structured browser-launch
-  test failures (not masked as infrastructure).
+  checks, and the exact round-102 through round-107 adversarial probes. Native
+  capture/validation proved the exact operator-submission command and refused
+  a validation overwrite on rerun. Host WebKit executed both portraits and
+  returned structured BLOCKED with exact one-event correlation. Physical
+  Android, native operator, and authenticated baseline evidence remain
+  explicit blockers.
 - Focused evidence remains available in ignored `.cache/m7b/` directories.
-  The final canonical retained evidence is
-  `.cache/verification/round-107-final/`; its root-browser log records the
-  managed Chromium Mach-port launch blocker above, and later M7B lanes were
-  not silently treated as passed.
+  The final canonical retained evidence will be recorded below; no M7B gate is
+  silently treated as passed.
 - Final canonical command:
-  `VERIFY_EVIDENCE_DIR=.cache/verification/round-107-final ./scripts/verify`.
-  Catalog, setup, format, lint, typecheck, 67-file/312-test unit suite, all
-  balance lanes, build, and production audit passed. Root-browser Playwright
-  stopped at 0/238 because the managed browser sandbox denied Chromium's
-  `bootstrap_check_in` Mach-port rendezvous (`Permission denied (1100)`), so
-  Pages/WebKit/native/performance gates did not run. Exit was 1 with
-  `root-browser-pwa=failed`; this is an infrastructure blocker, not a product
-  PASS claim.
+  `VERIFY_EVIDENCE_DIR=.cache/verification/round-108-final ./scripts/verify`.
+  Result and exact blocked/failed gates are recorded after the one final run;
+  this handoff issues no verdict.
 - To close remaining infrastructure gates, run the canonical lane with an
   available pinned browser, iOS VoiceOver operator session, unlocked/authorized
   Pixel TalkBack session, and the accepted build containing its collector on

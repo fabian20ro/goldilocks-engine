@@ -67,6 +67,7 @@ const classification = classifyWebKitReport(
   report,
   run.status ?? 1,
   processError,
+  { minimumExpectedTests: 2 },
 );
 const result = classification.result;
 const summary = {

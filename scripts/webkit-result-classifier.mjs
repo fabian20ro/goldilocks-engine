@@ -13,13 +13,8 @@ const infrastructureErrorMarkers = [
   "browserType.launch: Executable doesn't exist",
 ];
 
-const failureStatuses = new Set([
-  "failed",
-  "timedOut",
-  "interrupted",
-  "unexpected",
-  "flaky",
-]);
+const recognizedTestStatuses = new Set(["expected", "unexpected", "skipped"]);
+const recognizedResultStatuses = new Set(["passed"]);
 
 const launchProcessCodes = new Set(["ENOENT", "EACCES", "EPERM"]);
 
@@ -35,10 +30,26 @@ function isRecognizedInfrastructureError(value) {
   );
 }
 
-function collectReportEvidence(report) {
+function isObject(value) {
+  return value !== null && typeof value === "object";
+}
+
+function isNonNegativeInteger(value) {
+  return Number.isInteger(value) && value >= 0;
+}
+
+function collectReportEvidence(report, { minimumExpectedTests = 1 } = {}) {
   const failures = [];
   const infrastructure = [];
   let testsSeen = 0;
+  const testCounts = {
+    expected: 0,
+    unexpected: 0,
+    skipped: 0,
+  };
+
+  const schemaFailure = (location, error) =>
+    failures.push({ location, status: "invalid", error });
 
   const inspectAnnotations = (annotations, location) => {
     for (const annotation of Array.isArray(annotations) ? annotations : []) {
@@ -55,72 +66,182 @@ function collectReportEvidence(report) {
   };
 
   const inspectSuites = (suites, parentTitle = "") => {
-    for (const suite of Array.isArray(suites) ? suites : []) {
+    if (!Array.isArray(suites)) {
+      schemaFailure(
+        parentTitle || "Playwright suites",
+        "Playwright report suites must be an array",
+      );
+      return;
+    }
+    for (const suite of suites) {
+      if (!isObject(suite)) {
+        schemaFailure(
+          parentTitle || "Playwright suite",
+          "Playwright suite must be an object",
+        );
+        continue;
+      }
       const suiteTitle = [parentTitle, suite?.title]
         .filter((value) => typeof value === "string" && value.length > 0)
         .join("/");
-      for (const spec of Array.isArray(suite?.specs) ? suite.specs : []) {
+      const specs = Array.isArray(suite.specs) ? suite.specs : [];
+      const childSuites = Array.isArray(suite.suites) ? suite.suites : [];
+      if (!Array.isArray(suite.specs) && !Array.isArray(suite.suites))
+        schemaFailure(
+          suiteTitle || "Playwright suite",
+          "Playwright suite must contain specs or nested suites",
+        );
+      for (const spec of specs) {
+        if (!isObject(spec)) {
+          schemaFailure(
+            suiteTitle || "Playwright spec",
+            "Playwright spec must be an object",
+          );
+          continue;
+        }
         const specTitle = [suiteTitle, spec?.title]
           .filter((value) => typeof value === "string" && value.length > 0)
           .join("/");
-        for (const test of Array.isArray(spec?.tests) ? spec.tests : []) {
+        if (!Array.isArray(spec.tests)) {
+          schemaFailure(
+            specTitle || "Playwright spec",
+            "Playwright spec tests must be an array",
+          );
+          continue;
+        }
+        for (const test of spec.tests) {
           testsSeen += 1;
           const location = specTitle || "Playwright test";
+          if (!isObject(test)) {
+            schemaFailure(location, "Playwright test must be an object");
+            continue;
+          }
           inspectAnnotations(test?.annotations, location);
 
-          // Test and result status is authenticated structured evidence. Never
-          // downgrade it because an error message happens to contain a marker.
-          if (
-            failureStatuses.has(test?.status) ||
-            failureStatuses.has(test?.outcome)
-          )
+          const testStatus = test.status;
+          if (!recognizedTestStatuses.has(testStatus)) {
             failures.push({
               location,
-              status: test.status ?? test.outcome,
-              error: "Playwright test outcome was not successful",
+              status: testStatus ?? "missing",
+              error: "Playwright test status is missing or unknown",
             });
-          const results = Array.isArray(test?.results) ? test.results : [];
-          for (const result of results) {
-            inspectAnnotations(result?.annotations, location);
-            if (failureStatuses.has(result?.status))
+          } else {
+            testCounts[testStatus] += 1;
+            // Test status is authenticated structured evidence. Never
+            // downgrade it because an error message happens to contain a
+            // marker.
+            if (testStatus !== "expected")
               failures.push({
                 location,
-                status: result.status,
-                error: descriptionOf(result.error),
+                status: testStatus,
+                error: "Playwright test outcome was not successful",
               });
           }
           if (
-            test?.status === "skipped" &&
-            !results.some((result) => result?.status === "skipped")
+            Object.hasOwn(test, "expectedStatus") &&
+            test.expectedStatus !== "passed"
           )
+            schemaFailure(
+              location,
+              "Playwright expectedStatus must be passed for this matrix",
+            );
+          const results = test.results;
+          if (!Array.isArray(results) || results.length === 0) {
+            schemaFailure(
+              location,
+              "Playwright test must contain a nonempty results array",
+            );
+            continue;
+          }
+          for (const result of results) {
+            if (!isObject(result)) {
+              schemaFailure(
+                location,
+                "Playwright test result must be an object",
+              );
+              continue;
+            }
+            inspectAnnotations(result?.annotations, location);
+            if (!recognizedResultStatuses.has(result.status))
+              failures.push({
+                location,
+                status: result.status,
+                error:
+                  "Playwright result status is missing, skipped, unknown, or unsuccessful",
+              });
+          }
+          const finalResult = results[results.length - 1];
+          if (finalResult?.status !== "passed")
             failures.push({
               location,
-              status: "skipped",
-              error:
-                "Playwright test was skipped without a recognized infrastructure blocker",
+              status: finalResult?.status ?? "missing",
+              error: "Playwright final result status was not passed",
             });
+          if (results.some((result) => isObject(result) && result.error))
+            schemaFailure(
+              location,
+              "A passed Playwright result must not contain an error object",
+            );
         }
       }
-      inspectSuites(suite?.suites, suiteTitle);
+      inspectSuites(childSuites, suiteTitle);
     }
   };
 
-  inspectSuites(report?.suites);
+  if (!isObject(report)) {
+    schemaFailure("Playwright report", "Playwright report must be an object");
+    return { failures, infrastructure, testsSeen };
+  }
+  if (!Array.isArray(report.suites) || report.suites.length === 0)
+    schemaFailure(
+      "Playwright report",
+      "Playwright report must contain at least one suite",
+    );
+  inspectSuites(report.suites);
   const stats = report?.stats;
-  if (Number(stats?.unexpected) > 0)
-    failures.push({
-      location: "Playwright report stats",
-      status: "unexpected",
-      error: "Playwright report contains unexpected tests",
-    });
-  if (Number(stats?.flaky) > 0)
-    failures.push({
-      location: "Playwright report stats",
-      status: "flaky",
-      error: "Playwright report contains flaky tests",
-    });
+  if (!isObject(stats))
+    schemaFailure("Playwright report stats", "Playwright report stats missing");
+  else {
+    for (const field of ["expected", "skipped", "unexpected", "flaky"]) {
+      if (Object.hasOwn(stats, field) && !isNonNegativeInteger(stats[field]))
+        schemaFailure(
+          "Playwright report stats",
+          `Playwright stats.${field} must be a non-negative integer`,
+        );
+    }
+    for (const field of ["expected", "skipped", "unexpected"]) {
+      if (
+        isNonNegativeInteger(stats[field]) &&
+        stats[field] !== testCounts[field]
+      )
+        schemaFailure(
+          "Playwright report stats",
+          `Playwright stats.${field} is inconsistent with observed tests`,
+        );
+    }
+    if (stats.flaky > 0)
+      failures.push({
+        location: "Playwright report stats",
+        status: "flaky",
+        error: "Playwright report contains flaky tests",
+      });
+  }
 
-  for (const error of Array.isArray(report?.errors) ? report.errors : []) {
+  if (
+    testsSeen < minimumExpectedTests ||
+    testCounts.expected < minimumExpectedTests
+  )
+    schemaFailure(
+      "Playwright matrix",
+      `Playwright report must contain at least ${minimumExpectedTests} expected matrix tests`,
+    );
+
+  if (Object.hasOwn(report, "errors") && !Array.isArray(report.errors))
+    schemaFailure(
+      "Playwright report errors",
+      "Playwright report errors must be an array",
+    );
+  for (const error of Array.isArray(report.errors) ? report.errors : []) {
     const message = descriptionOf(error);
     if (isRecognizedInfrastructureError(error))
       infrastructure.push({
@@ -146,7 +267,12 @@ function isLaunchProcessBlocker(processError) {
   );
 }
 
-export function classifyWebKitReport(report, exitCode, processError = null) {
+export function classifyWebKitReport(
+  report,
+  exitCode,
+  processError = null,
+  { minimumExpectedTests = 1 } = {},
+) {
   if (!report || typeof report !== "object") {
     if (isLaunchProcessBlocker(processError))
       return {
@@ -176,7 +302,7 @@ export function classifyWebKitReport(report, exitCode, processError = null) {
     };
   }
 
-  const evidence = collectReportEvidence(report);
+  const evidence = collectReportEvidence(report, { minimumExpectedTests });
   if (evidence.failures.length > 0)
     return {
       ...evidence,
