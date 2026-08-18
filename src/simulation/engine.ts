@@ -7090,16 +7090,16 @@ function recoveryStatusFor(
       reset: ["unsupported schema or content fields"],
       nextAction: "Start a new run on this supported build.",
     };
-  if (isFallbackState(state, fallbackSeed))
-    return {
-      ...base,
-      disposition: "reset",
-      reason: "malformed-or-uncorroborated-save",
-      reset: ["untrusted save fields"],
-      nextAction:
-        "Start a new run; the recovery backup is available for inspection.",
-    };
-  if (schemaVersion < SCHEMA_VERSION)
+  if (schemaVersion < SCHEMA_VERSION) {
+    if (isFallbackState(state, fallbackSeed))
+      return {
+        ...base,
+        disposition: "reset",
+        reason: "malformed-or-uncorroborated-save",
+        reset: ["untrusted save fields"],
+        nextAction:
+          "Start a new run; the recovery backup is available for inspection.",
+      };
     return {
       ...base,
       disposition: "migrated",
@@ -7113,6 +7113,7 @@ function recoveryStatusFor(
       reset: ["features introduced after the source generation"],
       nextAction: "Continue the migrated run and make one normal save.",
     };
+  }
   if (record.contentVersion !== CONTENT_VERSION)
     return {
       ...base,
@@ -7134,6 +7135,15 @@ function recoveryStatusFor(
       preserved: ["the complete sealed run"],
       reset: [],
       nextAction: "Continue playing.",
+    };
+  if (isFallbackState(state, fallbackSeed))
+    return {
+      ...base,
+      disposition: "reset",
+      reason: "malformed-or-uncorroborated-save",
+      reset: ["untrusted save fields"],
+      nextAction:
+        "Start a new run; the recovery backup is available for inspection.",
     };
   return {
     ...base,

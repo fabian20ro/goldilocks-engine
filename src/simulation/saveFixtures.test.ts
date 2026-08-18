@@ -229,6 +229,13 @@ describe("D-046 golden save fixture boundary", () => {
     }
   });
 
+  it("does not call a valid sealed initial save a reset", () => {
+    const source = createInitialState(46_050);
+    const result = restoreSimulationStateWithReport(source, source.seed, true);
+    expect(result.recovery.disposition).toBe("none");
+    expect(result.recovery.reason).toBe("sealed-current-save");
+  });
+
   it.each(boundaryFixtures.map((fixture) => [fixture.id, fixture] as const))(
     "%s has provenance/checksum and resolves its explicit adversarial boundary",
     (_id, fixture) => {

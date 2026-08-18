@@ -96,8 +96,8 @@ VERIFY_EVIDENCE_DIR=.cache/verification/round-112-development \
 That invocation stopped in the unit lane on two compatibility regressions
 (`capitalLedgerCurrency.test.ts` legacy purchase wording and
 `verifierRound035.test.ts` saturated causal-repair metadata). Both were fixed.
-The complete post-fix unit lane is `72 files / 360 tests`; focused fixture and
-adversarial lanes are `53/53`; the focused browser lane is `4/4`; typecheck,
+The complete post-fix unit lane is `72 files / 361 tests`; focused fixture and
+adversarial lanes are `54/54`; the focused browser lane is `4/4`; typecheck,
 lint, format, and catalog validation are clean. The canonical command was not
 looped after those fixes to respect the one-final-gate rule; an independent
 Verifier must rerun it for the committed candidate.
