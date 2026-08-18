@@ -216,6 +216,153 @@ function numberOrNull(value) {
   return Number.isFinite(value) ? Number(value) : null;
 }
 
+const KNOWN_WEBKIT_OFFLINE_CONSOLE_MESSAGE =
+  "Failed to load resource: WebKit encountered an internal error";
+
+function createErrorRecorder(page) {
+  const rawEvents = [];
+  let nextEventId = 1;
+  let nextOperationId = 1;
+  let activeOperation = null;
+
+  function record(event) {
+    const operation = activeOperation;
+    const rawEvent = {
+      id: `event-${nextEventId++}`,
+      kind: event.kind,
+      type: event.type,
+      message: event.message,
+      location: event.location ?? null,
+      pageUrl: page.url(),
+      observedAt: Date.now(),
+      isError: event.isError,
+      operationId: operation?.id ?? null,
+      operation: operation?.name ?? null,
+    };
+    rawEvents.push(rawEvent);
+    if (operation) operation.eventIds.push(rawEvent.id);
+  }
+
+  page.on("pageerror", (error) =>
+    record({
+      kind: "pageerror",
+      type: error?.name ?? "Error",
+      message: error?.message ?? String(error),
+      isError: true,
+    }),
+  );
+  page.on("console", (message) =>
+    record({
+      kind: "console",
+      type: message.type(),
+      message: message.text(),
+      location: message.location(),
+      isError: message.type() === "error",
+    }),
+  );
+
+  function beginOperation(name, targetUrl) {
+    const operation = {
+      id: `operation-${nextOperationId++}`,
+      name,
+      targetUrl,
+      startedAt: Date.now(),
+      endedAt: null,
+      eventIds: [],
+    };
+    activeOperation = operation;
+    return operation;
+  }
+
+  function finishOperation(operation) {
+    if (operation.endedAt === null) {
+      if (activeOperation?.id === operation.id) activeOperation = null;
+      operation.endedAt = Date.now();
+    }
+    return operation;
+  }
+
+  function evidence(operation, offlineNavigationError) {
+    const operationEvents = rawEvents.filter(
+      (event) =>
+        event.operationId === operation.id &&
+        event.observedAt >= operation.startedAt &&
+        event.observedAt <= operation.endedAt,
+    );
+    const operationErrors = operationEvents.filter((event) => event.isError);
+    const candidates = operationErrors.filter(
+      (event) =>
+        event.kind === "console" &&
+        event.type === "error" &&
+        event.message === KNOWN_WEBKIT_OFFLINE_CONSOLE_MESSAGE &&
+        event.pageUrl === operation.targetUrl &&
+        (!event.location?.url || event.location.url === operation.targetUrl),
+    );
+    const navigationMatches =
+      offlineNavigationError?.source === "page.reload" &&
+      offlineNavigationError.operation === "offline-reload" &&
+      offlineNavigationError.targetUrl === operation.targetUrl &&
+      offlineNavigationError.message.includes(
+        KNOWN_WEBKIT_OFFLINE_CONSOLE_MESSAGE,
+      );
+    const correlated =
+      offlineNavigationError &&
+      navigationMatches &&
+      operationErrors.length === 1 &&
+      candidates.length === 1
+        ? {
+            status: "BLOCKED",
+            operation: { ...operation, eventIds: [...operation.eventIds] },
+            navigation: offlineNavigationError,
+            console: candidates[0],
+            cardinality: {
+              operationErrors: operationErrors.length,
+              exactCandidates: candidates.length,
+            },
+          }
+        : null;
+    const correlatedId = correlated?.console.id ?? null;
+    const uncorrelatedErrors = rawEvents.filter(
+      (event) => event.isError && event.id !== correlatedId,
+    );
+    const correlationFailure =
+      offlineNavigationError && !correlated
+        ? {
+            source: "page.reload",
+            operationName: "offline-reload",
+            reason:
+              "offline navigation was not paired with exactly one matching console error in its operation window",
+            operation: { ...operation, eventIds: [...operation.eventIds] },
+            navigation: offlineNavigationError,
+            operationErrorCount: operationErrors.length,
+            exactCandidateCount: candidates.length,
+          }
+        : null;
+    return {
+      rawEvents: rawEvents.map((event) => ({ ...event })),
+      rawErrors: rawEvents
+        .filter((event) => event.isError)
+        .map((event) => ({ ...event })),
+      errors: rawEvents
+        .filter((event) => event.isError)
+        .map(
+          (event) =>
+            `${event.kind === "pageerror" ? "page" : "console"}: ${event.message}`,
+        ),
+      operation: { ...operation, eventIds: [...operation.eventIds] },
+      correlatedOfflineError: correlated,
+      correlationFailure,
+      uncorrelatedErrors,
+    };
+  }
+
+  function snapshot() {
+    return rawEvents.map((event) => ({ ...event }));
+  }
+
+  return { beginOperation, finishOperation, evidence, snapshot };
+}
+
 const observerScript = () => {
   const state = {
     lcp: [],
@@ -432,11 +579,8 @@ async function runBrowserSample(browserName, width, runIndex, browser) {
     serviceWorkers: "allow",
   });
   const page = await context.newPage();
+  const errorRecorder = createErrorRecorder(page);
   const errors = [];
-  page.on("pageerror", (error) => errors.push(`page: ${error.message}`));
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(`console: ${message.text()}`);
-  });
   const tracePath = path.join(
     evidenceDir,
     "traces",
@@ -470,11 +614,28 @@ async function runBrowserSample(browserName, width, runIndex, browser) {
     });
     const worker = await measureDedicatedWorkerCost(page);
     const offlineStart = Date.now();
-    const offlineNavigationError = await expectOfflineReload(
-      page,
-      context,
-      browserName,
+    const offlineOperation = errorRecorder.beginOperation(
+      "offline-reload",
+      page.url(),
     );
+    let offlineNavigationError = null;
+    let errorEvidence;
+    try {
+      offlineNavigationError = await expectOfflineReload(
+        page,
+        context,
+        browserName,
+        offlineOperation,
+        errorRecorder,
+      );
+    } finally {
+      errorRecorder.finishOperation(offlineOperation);
+      errorEvidence = errorRecorder.evidence(
+        offlineOperation,
+        offlineNavigationError,
+      );
+    }
+    errors.push(...errorEvidence.errors);
     const offlineStartupMs = Date.now() - offlineStart;
     sample = {
       browser: browserName,
@@ -499,6 +660,12 @@ async function runBrowserSample(browserName, width, runIndex, browser) {
       actualCssViewport: metrics.viewport,
       supportedEntryTypes: metrics.supportedEntryTypes,
       errors,
+      rawErrors: errorEvidence.rawErrors,
+      rawEvents: errorEvidence.rawEvents,
+      errorOperation: errorEvidence.operation,
+      uncorrelatedErrors: errorEvidence.uncorrelatedErrors,
+      correlatedOfflineError: errorEvidence.correlatedOfflineError,
+      correlationFailure: errorEvidence.correlationFailure,
       offlineNavigationError,
     };
   } finally {
@@ -507,7 +674,12 @@ async function runBrowserSample(browserName, width, runIndex, browser) {
   }
   const sampleArtifact = artifact(
     path.join("samples", `${browserName}-${width}-${runIndex}.json`),
-    sample ?? { browser: browserName, width, run: runIndex, errors },
+    sample ?? {
+      browser: browserName,
+      width,
+      run: runIndex,
+      rawEvents: errorRecorder.snapshot(),
+    },
   );
   return {
     sample,
@@ -516,7 +688,13 @@ async function runBrowserSample(browserName, width, runIndex, browser) {
   };
 }
 
-async function expectOfflineReload(page, context, browserName) {
+async function expectOfflineReload(
+  page,
+  context,
+  browserName,
+  offlineOperation,
+  errorRecorder,
+) {
   await expect
     .poll(
       async () =>
@@ -537,6 +715,9 @@ async function expectOfflineReload(page, context, browserName) {
         source: "page.reload",
         operation: "offline-reload",
         message: String(error),
+        errorType: error?.name ?? "Error",
+        targetUrl: offlineOperation.targetUrl,
+        pageUrl: page.url(),
       };
     }
     await waitForApp(page);
@@ -555,6 +736,7 @@ async function expectOfflineReload(page, context, browserName) {
     if (!cacheProof.controller || !cacheProof.shellCached)
       throw new Error("offline cache proof failed");
   } finally {
+    errorRecorder.finishOperation(offlineOperation);
     await context.setOffline(false);
   }
   return offlineNavigationError;
@@ -669,11 +851,7 @@ async function runAndroidChromeSample(
   const context = browser.contexts()[0];
   if (!context) throw new Error("Android Chrome CDP context was unavailable");
   const page = await waitForAndroidPage(context);
-  const errors = [];
-  page.on("pageerror", (error) => errors.push(`page: ${error.message}`));
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(`console: ${message.text()}`);
-  });
+  const errorRecorder = createErrorRecorder(page);
   await context.tracing.start({
     screenshots: true,
     snapshots: true,
@@ -711,7 +889,12 @@ async function runAndroidChromeSample(
       )
       .toBe(true);
     const offlineStart = Date.now();
+    const offlineOperation = errorRecorder.beginOperation(
+      "offline-reload",
+      page.url(),
+    );
     let offlineNavigationError = null;
+    let errorEvidence;
     await cdp.send("Network.enable");
     await cdp.send("Network.emulateNetworkConditions", {
       offline: true,
@@ -727,6 +910,9 @@ async function runAndroidChromeSample(
           source: "page.reload",
           operation: "offline-reload",
           message: String(error),
+          errorType: error?.name ?? "Error",
+          targetUrl: offlineOperation.targetUrl,
+          pageUrl: page.url(),
         };
       }
       await waitForApp(page);
@@ -745,6 +931,7 @@ async function runAndroidChromeSample(
       if (!cacheProof.controller || !cacheProof.shellCached)
         throw new Error("Android Chrome offline cache proof failed");
     } finally {
+      errorRecorder.finishOperation(offlineOperation);
       await cdp
         .send("Network.emulateNetworkConditions", {
           offline: false,
@@ -754,6 +941,10 @@ async function runAndroidChromeSample(
         })
         .catch(() => undefined);
       await cdp.detach().catch(() => undefined);
+      errorEvidence = errorRecorder.evidence(
+        offlineOperation,
+        offlineNavigationError,
+      );
     }
     sample = {
       browser: "android-chrome",
@@ -776,7 +967,13 @@ async function runAndroidChromeSample(
       offlineStartupMs: Date.now() - offlineStart,
       actualCssViewport: metrics.viewport,
       supportedEntryTypes: metrics.supportedEntryTypes,
-      errors,
+      errors: errorEvidence.errors,
+      rawErrors: errorEvidence.rawErrors,
+      rawEvents: errorEvidence.rawEvents,
+      errorOperation: errorEvidence.operation,
+      uncorrelatedErrors: errorEvidence.uncorrelatedErrors,
+      correlatedOfflineError: errorEvidence.correlatedOfflineError,
+      correlationFailure: errorEvidence.correlationFailure,
       offlineNavigationError,
     };
   } finally {
@@ -958,6 +1155,17 @@ function summarizeCell(samples) {
     worker64xMs: workerMetric("64x"),
     jsCssTransferBytes: metric("jsCssTransferBytes"),
     errors: samples.flatMap((sample) => sample.errors),
+    rawErrors: samples.flatMap((sample) => sample.rawErrors ?? []),
+    rawEvents: samples.flatMap((sample) => sample.rawEvents ?? []),
+    uncorrelatedErrors: samples.flatMap(
+      (sample) => sample.uncorrelatedErrors ?? sample.errors,
+    ),
+    correlatedOfflineErrors: samples
+      .map((sample) => sample.correlatedOfflineError)
+      .filter(Boolean),
+    correlationFailures: samples
+      .map((sample) => sample.correlationFailure)
+      .filter(Boolean),
     viewportSamples: samples.map((sample) => sample.actualCssViewport),
   };
 }
@@ -1022,23 +1230,29 @@ function budgetFindings(cells) {
             "product Dedicated Worker request/response evidence is unavailable",
           result: "BLOCKED",
         });
-    if (cell.summary.errors.length > 0)
+    if (cell.summary.uncorrelatedErrors.length > 0)
       findings.push({
         gate: "page-errors",
         cell: label,
-        errors: cell.summary.errors,
+        errors: cell.summary.uncorrelatedErrors,
         result: "FAILED",
       });
-    const offlineErrors = cell.samples
-      .map((sample) => sample.offlineNavigationError)
-      .filter(Boolean);
-    if (offlineErrors.length > 0)
+    if (cell.summary.correlationFailures.length > 0)
+      findings.push({
+        gate: "offline-navigation-correlation",
+        cell: label,
+        reason:
+          "offline navigation was not paired with exactly one matching console error in its operation window",
+        errors: cell.summary.correlationFailures,
+        result: "FAILED",
+      });
+    if (cell.summary.correlatedOfflineErrors.length > 0)
       findings.push({
         gate: "offline-navigation",
         cell: label,
         reason:
-          "browser reported an offline navigation error; cached-shell proof was retained",
-        errors: offlineErrors,
+          "browser reported a correlated offline navigation error; cached-shell proof was retained",
+        errors: cell.summary.correlatedOfflineErrors,
         result: "BLOCKED",
       });
   }

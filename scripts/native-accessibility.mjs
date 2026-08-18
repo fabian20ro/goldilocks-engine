@@ -115,6 +115,14 @@ function shellQuote(value) {
   return `'${String(value).replaceAll("'", "'\\''")}'`;
 }
 
+function operatorSubmissionPath() {
+  return path.join(evidenceDir, "operator-submission.json");
+}
+
+function operatorValidationCommand() {
+  return `M7B_NATIVE_EVIDENCE_DIR=${shellQuote(evidenceDir)} npm run test:native-a11y:validate`;
+}
+
 function captureSetting(result, key, value) {
   result.settings[key] = value.trim() || "<unavailable>";
 }
@@ -947,8 +955,7 @@ function captureIos(result) {
     gate: "voiceover-speech",
     reason:
       "native VoiceOver speech transcript and actual CSS viewport require an operator session",
-    command:
-      "Edit .cache/m7b/native/ios-voiceover-speech.txt and checklist.json after the Safari session",
+    command: `Complete ${operatorSubmissionPath()} after the Safari session (checklist.json is generated supporting output); then run ${operatorValidationCommand()}`,
     stderr: "AX-tree/browser substitutes are intentionally not accepted",
   });
   return deviceResult;
@@ -1190,8 +1197,7 @@ function captureAndroid(result) {
     gate: "talkback-speech",
     reason:
       "native TalkBack speech transcript and actual CSS viewport require an operator session",
-    command:
-      "Edit .cache/m7b/native/android-talkback-speech.txt and checklist.json after the Chrome session",
+    command: `Complete ${operatorSubmissionPath()} after the Chrome session (checklist.json is generated supporting output); then run ${operatorValidationCommand()}`,
     stderr:
       "UIAutomator output is retained as supporting evidence, not speech evidence",
   });
@@ -1377,15 +1383,17 @@ const checklistPath = writeArtifact(
 );
 result.artifacts.push(checklistPath);
 result.artifacts.push(...result.devices.flatMap((device) => device.artifacts));
-const operatorSubmissionPath = path.join(
+const operatorSubmissionArtifactPath = path.join(
   evidenceDir,
   "operator-submission.json",
 );
 fs.writeFileSync(
-  operatorSubmissionPath,
+  operatorSubmissionArtifactPath,
   JSON.stringify(operatorSubmissionTemplate(result), null, 2) + "\n",
 );
-result.operatorSubmissionTemplate = artifactRecord(operatorSubmissionPath);
+result.operatorSubmissionTemplate = artifactRecord(
+  operatorSubmissionArtifactPath,
+);
 result.artifacts.push(result.operatorSubmissionTemplate);
 result.result = result.blockers.length === 0 ? "PASS" : "BLOCKED";
 fs.mkdirSync(path.dirname(summaryPath), { recursive: true });

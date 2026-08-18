@@ -17,13 +17,198 @@ const navigationLabels = [
   "World",
 ] as const;
 
-function captureErrors(page: Page): string[] {
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(`page: ${error.message}`));
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(`console: ${message.text()}`);
-  });
-  return errors;
+const KNOWN_WEBKIT_OFFLINE_CONSOLE_MESSAGE =
+  "Failed to load resource: WebKit encountered an internal error";
+
+type RawErrorEvent = {
+  id: string;
+  kind: "pageerror" | "console";
+  type: string;
+  message: string;
+  location: { url: string; lineNumber: number; columnNumber: number } | null;
+  pageUrl: string;
+  observedAt: number;
+  isError: boolean;
+  operationId: string | null;
+  operation: string | null;
+};
+
+type OfflineNavigationError = {
+  source: "page.reload";
+  operation: "offline-reload";
+  message: string;
+  errorType: string;
+  targetUrl: string;
+  pageUrl: string;
+};
+
+type OfflineOperation = {
+  id: string;
+  name: "offline-reload";
+  targetUrl: string;
+  startedAt: number;
+  endedAt: number | null;
+  eventIds: string[];
+};
+
+type ErrorEvidence = {
+  rawEvents: RawErrorEvent[];
+  rawErrors: RawErrorEvent[];
+  errors: string[];
+  operation: OfflineOperation;
+  uncorrelatedErrors: RawErrorEvent[];
+  correlatedOfflineError: {
+    status: "BLOCKED";
+    operation: OfflineOperation;
+    navigation: OfflineNavigationError;
+    console: RawErrorEvent;
+    cardinality: { operationErrors: number; exactCandidates: number };
+  } | null;
+  correlationFailure: Record<string, unknown> | null;
+};
+
+function captureErrors(page: Page) {
+  const rawEvents: RawErrorEvent[] = [];
+  let nextEventId = 1;
+  let nextOperationId = 1;
+  let activeOperation: OfflineOperation | null = null;
+
+  function record(
+    event: Omit<
+      RawErrorEvent,
+      "id" | "pageUrl" | "observedAt" | "operationId" | "operation"
+    >,
+  ) {
+    const operation = activeOperation;
+    const rawEvent: RawErrorEvent = {
+      ...event,
+      id: `event-${nextEventId++}`,
+      pageUrl: page.url(),
+      observedAt: Date.now(),
+      operationId: operation?.id ?? null,
+      operation: operation?.name ?? null,
+    };
+    rawEvents.push(rawEvent);
+    if (operation) operation.eventIds.push(rawEvent.id);
+  }
+
+  page.on("pageerror", (error) =>
+    record({
+      kind: "pageerror",
+      type: error.name,
+      message: error.message,
+      location: null,
+      isError: true,
+    }),
+  );
+  page.on("console", (message) =>
+    record({
+      kind: "console",
+      type: message.type(),
+      message: message.text(),
+      location: message.location(),
+      isError: message.type() === "error",
+    }),
+  );
+
+  function beginOperation(targetUrl: string): OfflineOperation {
+    const operation: OfflineOperation = {
+      id: `operation-${nextOperationId++}`,
+      name: "offline-reload",
+      targetUrl,
+      startedAt: Date.now(),
+      endedAt: null,
+      eventIds: [],
+    };
+    activeOperation = operation;
+    return operation;
+  }
+
+  function finishOperation(operation: OfflineOperation) {
+    if (operation.endedAt === null) {
+      if (activeOperation?.id === operation.id) activeOperation = null;
+      operation.endedAt = Date.now();
+    }
+  }
+
+  function evidence(
+    operation: OfflineOperation,
+    offlineNavigationError: OfflineNavigationError | null,
+  ): ErrorEvidence {
+    const operationEvents = rawEvents.filter(
+      (event) =>
+        event.operationId === operation.id &&
+        event.observedAt >= operation.startedAt &&
+        event.observedAt <= (operation.endedAt ?? Date.now()),
+    );
+    const operationErrors = operationEvents.filter((event) => event.isError);
+    const candidates = operationErrors.filter(
+      (event) =>
+        event.kind === "console" &&
+        event.type === "error" &&
+        event.message === KNOWN_WEBKIT_OFFLINE_CONSOLE_MESSAGE &&
+        event.pageUrl === operation.targetUrl &&
+        (!event.location?.url || event.location.url === operation.targetUrl),
+    );
+    const navigationMatches =
+      offlineNavigationError?.source === "page.reload" &&
+      offlineNavigationError.operation === "offline-reload" &&
+      offlineNavigationError.targetUrl === operation.targetUrl &&
+      offlineNavigationError.message.includes(
+        KNOWN_WEBKIT_OFFLINE_CONSOLE_MESSAGE,
+      );
+    const correlated =
+      offlineNavigationError &&
+      navigationMatches &&
+      operationErrors.length === 1 &&
+      candidates.length === 1
+        ? {
+            status: "BLOCKED" as const,
+            operation: { ...operation, eventIds: [...operation.eventIds] },
+            navigation: offlineNavigationError,
+            console: candidates[0],
+            cardinality: {
+              operationErrors: operationErrors.length,
+              exactCandidates: candidates.length,
+            },
+          }
+        : null;
+    const correlatedId = correlated?.console.id ?? null;
+    const uncorrelatedErrors = rawEvents.filter(
+      (event) => event.isError && event.id !== correlatedId,
+    );
+    const correlationFailure =
+      offlineNavigationError && !correlated
+        ? {
+            source: "page.reload",
+            operationName: "offline-reload",
+            reason:
+              "offline navigation was not paired with exactly one matching console error in its operation window",
+            operation: { ...operation, eventIds: [...operation.eventIds] },
+            navigation: offlineNavigationError,
+            operationErrorCount: operationErrors.length,
+            exactCandidateCount: candidates.length,
+          }
+        : null;
+    return {
+      rawEvents: rawEvents.map((event) => ({ ...event })),
+      rawErrors: rawEvents
+        .filter((event) => event.isError)
+        .map((event) => ({ ...event })),
+      errors: rawEvents
+        .filter((event) => event.isError)
+        .map(
+          (event) =>
+            `${event.kind === "pageerror" ? "page" : "console"}: ${event.message}`,
+        ),
+      operation: { ...operation, eventIds: [...operation.eventIds] },
+      uncorrelatedErrors,
+      correlatedOfflineError: correlated,
+      correlationFailure,
+    };
+  }
+
+  return { beginOperation, finishOperation, evidence };
 }
 
 async function assertTargetGeometry(page: Page) {
@@ -99,13 +284,8 @@ async function assertOfflineRecovery(
   page: Page,
   context: BrowserContext,
   testInfo: TestInfo,
-): Promise<{
-  offlineNavigationError: {
-    source: "page.reload";
-    operation: "offline-reload";
-    message: string;
-  } | null;
-}> {
+  errorRecorder: ReturnType<typeof captureErrors>,
+): Promise<ErrorEvidence> {
   await page.evaluate(() => {
     localStorage.setItem("m7b-webkit-recovery", "before-reload");
     localStorage.setItem("goldilocks-simulation-save-v4", "{malformed");
@@ -125,11 +305,8 @@ async function assertOfflineRecovery(
       },
     )
     .toBe(true);
-  let offlineNavigationError: {
-    source: "page.reload";
-    operation: "offline-reload";
-    message: string;
-  } | null = null;
+  const offlineOperation = errorRecorder.beginOperation(page.url());
+  let offlineNavigationError: OfflineNavigationError | null = null;
   await context.setOffline(true);
   try {
     try {
@@ -143,6 +320,9 @@ async function assertOfflineRecovery(
         source: "page.reload",
         operation: "offline-reload",
         message: String(error),
+        errorType: error instanceof Error ? error.name : "Error",
+        targetUrl: offlineOperation.targetUrl,
+        pageUrl: page.url(),
       };
     }
     await expect(
@@ -170,15 +350,24 @@ async function assertOfflineRecovery(
     });
     expect(cacheProof.controller).toBe(true);
     expect(cacheProof.shellCached).toBe(true);
-    if (offlineNavigationError)
-      testInfo.annotations.push({
-        type: "infrastructure",
-        description: JSON.stringify(offlineNavigationError),
-      });
   } finally {
+    errorRecorder.finishOperation(offlineOperation);
     await context.setOffline(false);
   }
-  return { offlineNavigationError };
+  const evidence = errorRecorder.evidence(
+    offlineOperation,
+    offlineNavigationError,
+  );
+  await testInfo.attach("m7b-offline-error-evidence.json", {
+    body: JSON.stringify(evidence, null, 2),
+    contentType: "application/json",
+  });
+  if (evidence.correlatedOfflineError)
+    testInfo.annotations.push({
+      type: "infrastructure",
+      description: JSON.stringify(evidence.correlatedOfflineError),
+    });
+  return evidence;
 }
 
 test.describe("M7B pinned WebKit OIV matrix", () => {
@@ -214,8 +403,14 @@ test.describe("M7B pinned WebKit OIV matrix", () => {
           )
           .toBe(true);
         await assertNavigation(page, viewport.width);
-        await assertOfflineRecovery(page, context, test.info());
-        expect(errors).toEqual([]);
+        const evidence = await assertOfflineRecovery(
+          page,
+          context,
+          test.info(),
+          errors,
+        );
+        expect(evidence.correlationFailure).toBeNull();
+        expect(evidence.uncorrelatedErrors).toEqual([]);
       } finally {
         await context.close();
       }

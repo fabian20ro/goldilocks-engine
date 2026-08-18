@@ -39,12 +39,14 @@ M7B_NATIVE_EVIDENCE_DIR=.cache/m7b/native/<new-capture-id> \
 npm run test:native-a11y
 ```
 
-The capture writes `operator-submission.json`, a machine-readable contract.
-The operator fills its build/device/settings/viewport fields, marks every
+The capture writes `operator-submission.json`, the machine-readable file
+consumed by validation. The generated `checklist.json` is supporting output;
+do not use it as the operator submission input. The operator fills
+`operator-submission.json` device/build/settings/viewport fields, marks every
 normal and boundary checklist row `PASS`, records speech transcripts and
 screenshots as retained paths, records both retained settings-before and
 settings-after paths, updates the corresponding `{path,sha256}` entries in
-`artifactPaths`, and sets `submittedAt`. Validate that retained submission
+`artifactPaths`, and sets `submittedAt`. Validate that exact retained file
 without rewriting it:
 
 ```sh
@@ -76,8 +78,9 @@ simulator screenshot and accessibility log, and restores captured accessibility
 settings during teardown. The generated command list is retained in
 `summary.json`.
 
-On the booted simulator, complete the rows in `checklist.json` with VoiceOver
-enabled. At both 393×742 and 320×693 CSS-pixel orientations, cover:
+On the booted simulator, use the rows copied into
+`operator-submission.json` with VoiceOver enabled. At both 393×742 and
+320×693 CSS-pixel orientations, cover:
 
 - all eight tab names and the selected/page state;
 - the 320px horizontal reveal instruction and active-tab reveal;
@@ -106,10 +109,10 @@ captures secure/global animation and accessibility settings, establishes
 UIAutomator hierarchy, and logcat. It restores every captured setting and
 removes the reverse tunnel in teardown.
 
-Complete the same checklist with TalkBack enabled at both widths and 200%
-text/reduced motion. Record exact speech in `android-talkback-speech.txt`,
-actual CSS viewport, and evidence paths. UIAutomator is supporting semantics,
-not a TalkBack speech substitute.
+Complete the same checklist in `operator-submission.json` with TalkBack
+enabled at both widths and 200% text/reduced motion. Record exact speech in
+`android-talkback-speech.txt`, actual CSS viewport, and evidence paths.
+UIAutomator is supporting semantics, not a TalkBack speech substitute.
 
 With `M7B_NATIVE_ENABLE_SETTINGS=1`, the harness discovers the installed
 TalkBack package, captures the secure/global settings, enables TalkBack and
