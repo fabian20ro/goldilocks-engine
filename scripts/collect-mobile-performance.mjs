@@ -9,7 +9,7 @@
  * a BLOCKED gate, never an implicit pass.
  */
 
-import { execFileSync, spawn } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -47,14 +47,14 @@ const requestedFrozenCandidateSha = process.env.M7B_FROZEN_ACCEPTED_SHA;
 const requestedFrozenBuildId = process.env.M7B_FROZEN_BUILD_ID;
 const performanceDeviceId =
   process.env.M7B_PERFORMANCE_DEVICE_ID ?? "unidentified-device";
-// Candidate runs consume only the capture helper's canonical retained output.
-// Arbitrary --baseline paths and M7B_PERFORMANCE_BASELINE are deliberately not
-// accepted as evidence inputs.
-const baselinePath = path.join(
+// Persisted receipts are output-only migration hazards. Candidate comparison
+// never reads them; the same invocation captures a fresh accepted-build
+// baseline through captureFrozenBaselineThroughChannel below.
+const legacyBaselinePath = path.join(
   root,
   ".cache/m7b/performance/frozen-baseline.json",
 );
-const baselineProvenancePath = `${baselinePath}.provenance.json`;
+const legacyBaselineProvenancePath = `${legacyBaselinePath}.provenance.json`;
 const callerBaselineOverride =
   process.argv.find((value) => value.startsWith("--baseline=")) ??
   process.env.M7B_PERFORMANCE_BASELINE;
@@ -116,6 +116,10 @@ function sha256(filePath) {
     .digest("hex");
 }
 
+function sha256Text(value) {
+  return crypto.createHash("sha256").update(value).digest("hex");
+}
+
 function artifact(relativePath, value) {
   const target = path.join(evidenceDir, relativePath);
   fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -137,6 +141,14 @@ function existingArtifact(filePath) {
 }
 
 function gitSha() {
+  if (
+    captureFrozenBaseline &&
+    process.env.M7B_FROZEN_CAPTURE_AUTH &&
+    process.env.M7B_FROZEN_CAPTURE_AUTH ===
+      process.env.M7B_FROZEN_CAPTURE_NONCE &&
+    process.env.M7B_FROZEN_CAPTURE_SHA === frozenAcceptedCandidateSha
+  )
+    return process.env.M7B_FROZEN_CAPTURE_SHA;
   try {
     return execFileSync("git", ["rev-parse", "HEAD"], {
       cwd: root,
@@ -150,6 +162,15 @@ function gitSha() {
 function gitTreeSha(commitSha) {
   if (typeof commitSha !== "string" || !/^[a-f0-9]{40}$/.test(commitSha))
     return "unknown";
+  if (
+    captureFrozenBaseline &&
+    commitSha === frozenAcceptedCandidateSha &&
+    process.env.M7B_FROZEN_CAPTURE_AUTH &&
+    process.env.M7B_FROZEN_CAPTURE_AUTH ===
+      process.env.M7B_FROZEN_CAPTURE_NONCE &&
+    process.env.M7B_FROZEN_CAPTURE_TREE_SHA
+  )
+    return process.env.M7B_FROZEN_CAPTURE_TREE_SHA;
   try {
     return execFileSync("git", ["rev-parse", `${commitSha}^{tree}`], {
       cwd: root,
@@ -157,14 +178,6 @@ function gitTreeSha(commitSha) {
     }).trim();
   } catch {
     return "unknown";
-  }
-}
-
-function readJson(filePath) {
-  try {
-    return JSON.parse(fs.readFileSync(filePath, "utf8"));
-  } catch {
-    return null;
   }
 }
 
@@ -200,6 +213,7 @@ const observerScript = () => {
     lcp: [],
     cls: 0,
     inp: [],
+    inpEvidenceCount: 0,
     supportedEntryTypes: PerformanceObserver.supportedEntryTypes ?? [],
   };
   window.__m7bPerformance = state;
@@ -227,8 +241,17 @@ const observerScript = () => {
     if (state.supportedEntryTypes.includes("event")) {
       new PerformanceObserver((list) => {
         for (const entry of list.getEntries()) {
-          if (entry.name !== "pointerdown" && entry.name !== "keydown")
+          // `event` entries are PerformanceEventTiming entries. Only retain
+          // actual interaction entries; wall-clock click durations are not
+          // Event Timing evidence and must never become INP.
+          if (
+            entry?.entryType === "event" &&
+            Number.isFinite(entry.duration) &&
+            Number(entry.interactionId) > 0
+          ) {
             state.inp.push(entry.duration);
+            state.inpEvidenceCount += 1;
+          }
         }
       }).observe({ type: "event", buffered: true, durationThreshold: 16 });
     }
@@ -291,6 +314,7 @@ async function readPageMetrics(page) {
       lcpMs: state?.lcp?.length ? Math.max(...state.lcp) : null,
       cls: state?.cls ?? null,
       inpMs: state?.inp?.length ? Math.max(...state.inp) : null,
+      inpEvidenceCount: Number(state?.inpEvidenceCount ?? 0),
       supportedEntryTypes: state?.supportedEntryTypes ?? [],
       domContentLoadedMs: navigation?.domContentLoadedEventEnd ?? null,
       transferBytes: resources.reduce(
@@ -427,12 +451,13 @@ async function runBrowserSample(browserName, width, runIndex, browser) {
     const metrics = await readPageMetrics(page);
     const eventStart = Date.now();
     await page.getByRole("button", { name: "Jobs", exact: true }).click();
-    const interactionMs = Date.now() - eventStart;
+    const interactionWallClockMs = Date.now() - eventStart;
     await page.waitForTimeout(100);
     const interactionMetrics = await page.evaluate(() => {
       const state = window.__m7bPerformance;
       return {
         inpMs: state?.inp?.length ? Math.max(...state.inp) : null,
+        inpEvidenceCount: Number(state?.inpEvidenceCount ?? 0),
       };
     });
     const worker = await measureDedicatedWorkerCost(page);
@@ -450,11 +475,13 @@ async function runBrowserSample(browserName, width, runIndex, browser) {
       run: runIndex,
       startupMs,
       lcpMs: numberOrNull(metrics.lcpMs),
-      inpMs: numberOrNull(
-        interactionMetrics.inpMs ?? metrics.inpMs ?? interactionMs,
+      inpMs: numberOrNull(interactionMetrics.inpMs ?? metrics.inpMs),
+      inpEvidenceCount: Math.max(
+        interactionMetrics.inpEvidenceCount ?? 0,
+        metrics.inpEvidenceCount ?? 0,
       ),
       cls: numberOrNull(metrics.cls),
-      interactionMs,
+      interactionWallClockMs,
       domContentLoadedMs: numberOrNull(metrics.domContentLoadedMs),
       transferBytes: numberOrNull(metrics.transferBytes),
       jsCssTransferBytes: numberOrNull(metrics.jsCssTransferBytes),
@@ -659,12 +686,13 @@ async function runAndroidChromeSample(
     const metrics = await readPageMetrics(page);
     const eventStart = Date.now();
     await page.getByRole("button", { name: "Jobs", exact: true }).click();
-    const interactionMs = Date.now() - eventStart;
+    const interactionWallClockMs = Date.now() - eventStart;
     await page.waitForTimeout(100);
     const interactionMetrics = await page.evaluate(() => {
       const state = window.__m7bPerformance;
       return {
         inpMs: state?.inp?.length ? Math.max(...state.inp) : null,
+        inpEvidenceCount: Number(state?.inpEvidenceCount ?? 0),
       };
     });
     const worker = await measureDedicatedWorkerCost(page);
@@ -722,11 +750,13 @@ async function runAndroidChromeSample(
       run: runIndex,
       startupMs,
       lcpMs: numberOrNull(metrics.lcpMs),
-      inpMs: numberOrNull(
-        interactionMetrics.inpMs ?? metrics.inpMs ?? interactionMs,
+      inpMs: numberOrNull(interactionMetrics.inpMs ?? metrics.inpMs),
+      inpEvidenceCount: Math.max(
+        interactionMetrics.inpEvidenceCount ?? 0,
+        metrics.inpEvidenceCount ?? 0,
       ),
       cls: numberOrNull(metrics.cls),
-      interactionMs,
+      interactionWallClockMs,
       domContentLoadedMs: numberOrNull(metrics.domContentLoadedMs),
       transferBytes: numberOrNull(metrics.transferBytes),
       jsCssTransferBytes: numberOrNull(metrics.jsCssTransferBytes),
@@ -910,7 +940,7 @@ function summarizeCell(samples) {
     lcpMs: metric("lcpMs"),
     inpMs: metric("inpMs"),
     cls: metric("cls"),
-    interactionMs: metric("interactionMs"),
+    interactionWallClockMs: metric("interactionWallClockMs"),
     memoryMb: metric("memoryMb"),
     offlineStartupMs: metric("offlineStartupMs"),
     worker1xMs: workerMetric("1x"),
@@ -949,6 +979,21 @@ function budgetFindings(cells) {
         });
       }
     }
+    const missingEventTiming = cell.samples.filter(
+      (sample) =>
+        !Number.isFinite(sample.inpMs) ||
+        !Number.isInteger(sample.inpEvidenceCount) ||
+        sample.inpEvidenceCount < 1,
+    );
+    if (missingEventTiming.length > 0)
+      findings.push({
+        gate: "inp-event-timing",
+        cell: label,
+        reason:
+          "PerformanceEventTiming/Event Timing evidence was unavailable for one or more samples; wall-clock interaction time is not INP",
+        missingRuns: missingEventTiming.map((sample) => sample.run),
+        result: "BLOCKED",
+      });
     if (cell.summary.sampleCount < 5)
       findings.push({
         gate: "cold-runs",
@@ -1001,177 +1046,6 @@ function baselineArtifactEntries(baseline) {
   ];
 }
 
-function baselineArtifactMap(baseline) {
-  return new Map(
-    baselineArtifactEntries(baseline).map((entry) => [
-      entry?.path,
-      entry?.sha256,
-    ]),
-  );
-}
-
-function trustedBaselineProvenanceFindings(baseline, provenance) {
-  if (!baseline)
-    return [
-      {
-        gate: "same-device-baseline",
-        reason:
-          "trusted frozen accepted-build baseline is unavailable at the canonical capture path",
-        required:
-          "npm run capture:frozen-baseline -- --output=.cache/m7b/performance/frozen-baseline.json",
-        result: "BLOCKED",
-      },
-    ];
-  if (!provenance || typeof provenance !== "object")
-    return [
-      {
-        gate: "same-device-baseline-provenance",
-        reason:
-          "baseline provenance receipt is missing; caller-supplied JSON is not accepted",
-        required: path.relative(root, baselineProvenancePath),
-        result: "BLOCKED",
-      },
-    ];
-
-  const findings = [];
-  if (provenance.schemaVersion !== 1)
-    findings.push({
-      gate: "same-device-baseline-provenance",
-      reason: "baseline provenance schema is unsupported",
-      result: "BLOCKED",
-    });
-  if (provenance.kind !== "m7b-frozen-baseline-provenance")
-    findings.push({
-      gate: "same-device-baseline-provenance",
-      reason: "baseline provenance kind is not the trusted capture receipt",
-      result: "BLOCKED",
-    });
-  if (
-    typeof provenance.captureId !== "string" ||
-    provenance.captureId.trim() === ""
-  )
-    findings.push({
-      gate: "same-device-baseline-provenance",
-      reason: "baseline provenance capture ID is missing",
-      result: "BLOCKED",
-    });
-  if (provenance.generatedBy !== "scripts/capture-frozen-baseline.mjs")
-    findings.push({
-      gate: "same-device-baseline-provenance",
-      reason: "baseline was not produced by the repository capture helper",
-      result: "BLOCKED",
-    });
-  if (provenance.acceptedSha !== frozenAcceptedCandidateSha)
-    findings.push({
-      gate: "same-device-baseline-provenance",
-      reason: "provenance does not identify the trusted accepted Git object",
-      expectedAcceptedSha: frozenAcceptedCandidateSha,
-      actualAcceptedSha: provenance.acceptedSha,
-      result: "BLOCKED",
-    });
-  const expectedTreeSha = gitTreeSha(frozenAcceptedCandidateSha);
-  if (
-    expectedTreeSha === "unknown" ||
-    provenance.gitTreeSha !== expectedTreeSha ||
-    baseline.gitTreeSha !== expectedTreeSha
-  )
-    findings.push({
-      gate: "same-device-baseline-provenance",
-      reason:
-        "baseline Git tree does not match the re-derived tree of the trusted accepted object",
-      expectedTreeSha,
-      provenanceTreeSha: provenance.gitTreeSha,
-      baselineTreeSha: baseline.gitTreeSha,
-      result: "BLOCKED",
-    });
-  if (provenance.buildId !== frozenAcceptedBuildId)
-    findings.push({
-      gate: "same-device-baseline-provenance",
-      reason: "provenance build ID is not the trusted accepted build",
-      expectedBuildId: frozenAcceptedBuildId,
-      actualBuildId: provenance.buildId,
-      result: "BLOCKED",
-    });
-  if (baseline.candidateSha !== frozenAcceptedCandidateSha)
-    findings.push({
-      gate: "same-device-baseline-provenance",
-      reason: "baseline summary candidate SHA differs from the trusted capture",
-      result: "BLOCKED",
-    });
-  if (baseline.buildInfo?.version !== frozenAcceptedBuildId)
-    findings.push({
-      gate: "same-device-baseline-provenance",
-      reason: "baseline summary build ID differs from the trusted capture",
-      result: "BLOCKED",
-    });
-  if (
-    baseline.provenance?.captureId !== provenance.captureId ||
-    baseline.provenance?.path !== path.relative(root, baselineProvenancePath)
-  )
-    findings.push({
-      gate: "same-device-baseline-provenance",
-      reason:
-        "baseline summary is not bound to the retained provenance receipt",
-      result: "BLOCKED",
-    });
-  if (provenance.summaryPath !== path.relative(root, baselinePath))
-    findings.push({
-      gate: "same-device-baseline-provenance",
-      reason: "provenance summary path is not the canonical retained baseline",
-      result: "BLOCKED",
-    });
-  if (
-    !/^[a-f0-9]{64}$/.test(provenance.summarySha256 ?? "") ||
-    !fs.existsSync(baselinePath) ||
-    sha256(baselinePath) !== provenance.summarySha256
-  )
-    findings.push({
-      gate: "same-device-baseline-provenance",
-      reason: "baseline summary digest does not match the retained bytes",
-      result: "BLOCKED",
-    });
-
-  const baselineArtifacts = baselineArtifactMap(baseline);
-  const provenanceArtifacts = new Map(
-    (Array.isArray(provenance.artifacts) ? provenance.artifacts : []).map(
-      (entry) => [entry?.path, entry?.sha256],
-    ),
-  );
-  for (const entry of Array.isArray(provenance.artifacts)
-    ? provenance.artifacts
-    : [])
-    if (
-      !entry ||
-      typeof entry.path !== "string" ||
-      !/^[a-f0-9]{64}$/.test(entry.sha256 ?? "")
-    )
-      findings.push({
-        gate: "same-device-baseline-provenance",
-        path: entry?.path,
-        reason: "provenance artifact entries must be {path,sha256}",
-        result: "BLOCKED",
-      });
-  if (baselineArtifacts.size === 0 || provenanceArtifacts.size === 0)
-    findings.push({
-      gate: "same-device-baseline-provenance",
-      reason: "trusted capture receipt has no retained artifact manifest",
-      result: "BLOCKED",
-    });
-  if (
-    baselineArtifacts.size !== provenanceArtifacts.size ||
-    [...baselineArtifacts].some(
-      ([artifactPath, digest]) =>
-        provenanceArtifacts.get(artifactPath) !== digest,
-    )
-  )
-    findings.push({
-      gate: "same-device-baseline-provenance",
-      reason: "provenance artifact manifest differs from baseline summary",
-      result: "BLOCKED",
-    });
-  return findings;
-}
-
 function baselineArtifactFindings(baseline) {
   const entries = baselineArtifactEntries(baseline);
   const unique = [
@@ -1193,6 +1067,7 @@ function baselineArtifactFindings(baseline) {
   for (const entry of unique) {
     if (
       typeof entry.path !== "string" ||
+      Object.keys(entry).length !== 2 ||
       !/^[a-f0-9]{64}$/.test(entry.sha256 ?? "")
     ) {
       findings.push({
@@ -1227,14 +1102,50 @@ function baselineArtifactFindings(baseline) {
   return findings;
 }
 
-function baselineFindings(cells, baseline, provenance, currentContext) {
-  const provenanceFindings = trustedBaselineProvenanceFindings(
-    baseline,
-    provenance,
-  );
-  if (provenanceFindings.length > 0) return provenanceFindings;
+function baselineFindings(cells, baseline, currentContext) {
+  if (!baseline)
+    return [
+      {
+        gate: "same-device-baseline-capture",
+        reason:
+          "same-invocation frozen accepted-build capture was unavailable; persisted receipts are not accepted",
+        result: "BLOCKED",
+      },
+    ];
   const findings = [];
   findings.push(...baselineArtifactFindings(baseline));
+  if (
+    baseline.mode !== "frozen-baseline" ||
+    baseline.kind !== "m7b-mobile-performance"
+  )
+    findings.push({
+      gate: "same-device-baseline-provenance",
+      reason:
+        "authenticated child capture returned an unexpected baseline shape",
+      result: "BLOCKED",
+    });
+  const expectedTreeSha = gitTreeSha(frozenAcceptedCandidateSha);
+  if (
+    baseline.candidateSha !== frozenAcceptedCandidateSha ||
+    baseline.gitTreeSha !== expectedTreeSha ||
+    baseline.buildInfo?.version !== frozenAcceptedBuildId
+  )
+    findings.push({
+      gate: "same-device-baseline-provenance",
+      reason:
+        "authenticated child capture is not bound to the repository-pinned accepted Git object/tree/build",
+      expected: {
+        candidateSha: frozenAcceptedCandidateSha,
+        gitTreeSha: expectedTreeSha,
+        buildId: frozenAcceptedBuildId,
+      },
+      actual: {
+        candidateSha: baseline.candidateSha,
+        gitTreeSha: baseline.gitTreeSha,
+        buildId: baseline.buildInfo?.version,
+      },
+      result: "BLOCKED",
+    });
   const baselineDeviceId = baseline.environment?.deviceId;
   const currentDeviceId = currentContext.environment?.deviceId;
   const baselineBrowserSet = baseline.environment?.browserSet;
@@ -1381,6 +1292,201 @@ function baselineFindings(cells, baseline, provenance, currentContext) {
   return findings;
 }
 
+function legacyBaselineReceiptFindings() {
+  const findings = [];
+  for (const filePath of [legacyBaselinePath, legacyBaselineProvenancePath])
+    if (fs.existsSync(filePath))
+      findings.push({
+        gate: "same-device-baseline-provenance",
+        path: path.relative(root, filePath),
+        reason:
+          "persisted baseline receipts are output-only and ignored; remove the legacy receipt before verification",
+        result: "BLOCKED",
+      });
+  if (callerBaselineOverride)
+    findings.push({
+      gate: "same-device-baseline-provenance",
+      reason:
+        "caller-supplied baseline paths are rejected; comparison accepts only the authenticated same-invocation capture channel",
+      rejected: callerBaselineOverride,
+      result: "BLOCKED",
+    });
+  return findings;
+}
+
+function authenticatedBaselineEnvelope(stdout) {
+  const marker = "M7B_FROZEN_CAPTURE_RESULT ";
+  const line = String(stdout ?? "")
+    .split(/\r?\n/)
+    .reverse()
+    .find((candidate) => candidate.startsWith(marker));
+  if (!line) return null;
+  try {
+    return JSON.parse(
+      Buffer.from(line.slice(marker.length), "base64url").toString("utf8"),
+    );
+  } catch {
+    return null;
+  }
+}
+
+function validateAuthenticatedBaseline(envelope, nonce, currentContext) {
+  const baseline = envelope?.baseline;
+  const expectedTreeSha = gitTreeSha(frozenAcceptedCandidateSha);
+  const findings = [];
+  if (envelope?.channelVersion !== 1 || envelope?.nonce !== nonce)
+    findings.push({
+      gate: "same-device-baseline-provenance",
+      reason: "frozen baseline process channel nonce or version was invalid",
+      result: "BLOCKED",
+    });
+  if (!baseline || typeof baseline !== "object")
+    findings.push({
+      gate: "same-device-baseline-provenance",
+      reason: "frozen baseline process channel returned no summary",
+      result: "BLOCKED",
+    });
+  if (!baseline) return findings;
+  if (
+    baseline.candidateSha !== frozenAcceptedCandidateSha ||
+    baseline.gitTreeSha !== expectedTreeSha ||
+    baseline.buildInfo?.version !== frozenAcceptedBuildId
+  )
+    findings.push({
+      gate: "same-device-baseline-provenance",
+      reason:
+        "frozen baseline was not captured from the exact repository-pinned accepted Git object/tree/build",
+      expected: {
+        candidateSha: frozenAcceptedCandidateSha,
+        gitTreeSha: expectedTreeSha,
+        buildId: frozenAcceptedBuildId,
+      },
+      actual: {
+        candidateSha: baseline.candidateSha,
+        gitTreeSha: baseline.gitTreeSha,
+        buildId: baseline.buildInfo?.version,
+      },
+      result: "BLOCKED",
+    });
+  if (baseline.environment?.deviceId !== currentContext.environment?.deviceId)
+    findings.push({
+      gate: "same-device-baseline-identity",
+      reason: "frozen baseline device differs from candidate device",
+      result: "BLOCKED",
+    });
+  if (
+    JSON.stringify((baseline.environment?.browserSet ?? []).slice().sort()) !==
+    JSON.stringify(
+      (currentContext.environment?.browserSet ?? []).slice().sort(),
+    )
+  )
+    findings.push({
+      gate: "same-device-baseline-identity",
+      reason: "frozen baseline browser matrix differs from candidate matrix",
+      result: "BLOCKED",
+    });
+  if (
+    baseline.environment?.settingsFingerprint !==
+    currentContext.environment?.settingsFingerprint
+  )
+    findings.push({
+      gate: "same-device-baseline-identity",
+      reason: "frozen baseline settings differ from candidate settings",
+      result: "BLOCKED",
+    });
+  findings.push(...baselineArtifactFindings(baseline));
+  if (baseline.result !== "PASS")
+    findings.push({
+      gate: "same-device-baseline-capture",
+      reason:
+        "authenticated accepted-build capture did not close all of its own required gates",
+      captureResult: baseline.result,
+      result: "BLOCKED",
+    });
+  return findings;
+}
+
+function captureFrozenBaselineThroughChannel(currentContext) {
+  if (performanceDeviceId === "unidentified-device")
+    return {
+      baseline: null,
+      finding: {
+        gate: "same-device-baseline-capture",
+        reason:
+          "an explicit physical device ID is required before starting the authenticated frozen capture",
+        result: "BLOCKED",
+      },
+    };
+  const nonce = crypto.randomBytes(32).toString("hex");
+  const captureEvidenceDir = path.join(
+    root,
+    ".cache/m7b/performance/frozen-baseline-capture",
+    nonce.slice(0, 16),
+  );
+  const child = spawnSync(
+    process.execPath,
+    ["scripts/capture-frozen-baseline.mjs", "--child-capture"],
+    {
+      cwd: root,
+      encoding: "utf8",
+      maxBuffer: 64 * 1024 * 1024,
+      env: {
+        ...process.env,
+        M7B_FROZEN_CAPTURE_NONCE: nonce,
+        M7B_FROZEN_ACCEPTED_SHA: frozenAcceptedCandidateSha,
+        M7B_FROZEN_BUILD_ID: frozenAcceptedBuildId,
+        M7B_PERFORMANCE_DEVICE_ID: performanceDeviceId,
+        M7B_PERFORMANCE_BROWSERS: browsers.join(","),
+        M7B_PERFORMANCE_RUNS: String(runs),
+        M7B_PERFORMANCE_ALLOW_BLOCKED: "1",
+        M7B_PERFORMANCE_EVIDENCE_DIR: captureEvidenceDir,
+        M7B_PERFORMANCE_PORT: String(port + 17),
+        M7B_PERFORMANCE_ANDROID_CDP_PORT: String(androidCdpPort + 17),
+      },
+    },
+  );
+  const envelope = authenticatedBaselineEnvelope(child.stdout);
+  const findings = [];
+  if (child.status !== 0 || child.signal)
+    findings.push({
+      gate: "same-device-baseline-capture",
+      reason: "accepted-build capture process did not complete",
+      status: child.status,
+      signal: child.signal,
+      stderr: String(child.stderr ?? "").slice(-2_000),
+      result: "BLOCKED",
+    });
+  if (!envelope)
+    findings.push({
+      gate: "same-device-baseline-provenance",
+      reason:
+        "accepted-build capture returned no authenticated nonce-bound process envelope",
+      result: "BLOCKED",
+    });
+  findings.push(
+    ...validateAuthenticatedBaseline(envelope, nonce, currentContext),
+  );
+  if (findings.length > 0) return { baseline: null, findings };
+
+  const baselineText = JSON.stringify(envelope.baseline, null, 2) + "\n";
+  const baselineDigest = sha256Text(baselineText);
+  const retained = artifact(
+    path.join("frozen-baselines", `${baselineDigest}.json`),
+    baselineText,
+  );
+  return {
+    baseline: envelope.baseline,
+    evidence: {
+      channel: "authenticated-child-stdout",
+      candidateSha: envelope.baseline.candidateSha,
+      gitTreeSha: envelope.baseline.gitTreeSha,
+      buildId: envelope.baseline.buildInfo?.version,
+      artifact: retained,
+    },
+    findings: [],
+  };
+}
+
 const summary = {
   schemaVersion: 1,
   kind: "m7b-mobile-performance",
@@ -1443,15 +1549,7 @@ if (
     },
     result: "BLOCKED",
   });
-if (callerBaselineOverride)
-  summary.findings.push({
-    gate: "same-device-baseline-provenance",
-    reason:
-      "caller-supplied baseline paths are rejected; use the repository capture helper and canonical retained receipt",
-    rejected: callerBaselineOverride,
-    required: path.relative(root, baselinePath),
-    result: "BLOCKED",
-  });
+summary.findings.push(...legacyBaselineReceiptFindings());
 
 let server;
 try {
@@ -1608,16 +1706,26 @@ try {
     summary.findings.push(summary.androidBrowser);
   }
   summary.findings.push(...budgetFindings(summary.cells));
-  const baseline = readJson(baselinePath);
-  const baselineProvenance = readJson(baselineProvenancePath);
-  if (!captureFrozenBaseline)
+  if (!captureFrozenBaseline) {
+    const baselineCapture = captureFrozenBaselineThroughChannel({
+      candidateSha: summary.candidateSha,
+      buildInfo: summary.buildInfo,
+      environment: summary.environment,
+    });
+    summary.findings.push(...(baselineCapture.findings ?? []));
+    if (baselineCapture.finding) summary.findings.push(baselineCapture.finding);
+    if (baselineCapture.evidence) {
+      summary.frozenBaseline = baselineCapture.evidence;
+      summary.artifacts.push(baselineCapture.evidence.artifact);
+    }
     summary.findings.push(
-      ...baselineFindings(summary.cells, baseline, baselineProvenance, {
+      ...baselineFindings(summary.cells, baselineCapture.baseline, {
         candidateSha: summary.candidateSha,
         buildInfo: summary.buildInfo,
         environment: summary.environment,
       }),
     );
+  }
 } finally {
   if (server?.pid) {
     try {

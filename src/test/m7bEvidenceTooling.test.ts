@@ -52,10 +52,14 @@ describe("M7B evidence tooling contract", () => {
     const performance = read("scripts/collect-mobile-performance.mjs");
     const native = read("scripts/native-accessibility.mjs");
     const webkitClassifier = read("scripts/webkit-result-classifier.mjs");
-    expect(performance).toContain("trustedBaselineProvenanceFindings");
-    expect(performance).toContain("M7B_PERFORMANCE_BASELINE");
+    expect(performance).toContain("authenticated-child-stdout");
+    expect(performance).toContain("M7B_FROZEN_CAPTURE_NONCE");
     expect(performance).toContain(
       "caller-supplied baseline paths are rejected",
+    );
+    expect(performance).not.toContain("readJson(baselinePath)");
+    expect(performance).not.toContain(
+      "interactionMetrics.inpMs ?? metrics.inpMs ?? interactionMs",
     );
     expect(native).toContain(
       "row.actualCssViewport?.height !== expected.height",

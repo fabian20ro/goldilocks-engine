@@ -40,9 +40,12 @@ interaction, transfer, memory, offline startup, Dedicated Worker 1×/64×
 request/response attribution, median/p95 aggregates, thresholds, artifact
 SHA-256 values, page errors, and cleanup commands.
 
-LCP/INP/CLS are measured from `PerformanceObserver`. When a browser does not
-expose an entry type, its metric is `null` and the summary is `BLOCKED`; no
-zero is fabricated. The collector wraps the shipped `Worker` constructor only
+LCP/CLS are measured from `PerformanceObserver`; INP is populated only from
+`PerformanceEventTiming`/Event Timing `event` entries with interaction IDs.
+When a browser does not expose an entry type, its metric is `null` and the
+summary is explicitly `BLOCKED`; no wall-clock click duration is substituted
+(that diagnostic is retained separately as `interactionWallClockMs`). The
+collector wraps the shipped `Worker` constructor only
 inside the test page, records the actual product Worker's `postMessage` to
 `message` round trips for 1× and 64×, and blocks if no attributable Worker
 evidence is present. This is local evidence, not product telemetry.
@@ -55,37 +58,35 @@ silently converted into a passing offline navigation.
 
 ## Frozen-build baseline and physical Android evidence
 
-The accepted-build baseline is captured separately; the current candidate is
-never used as its own baseline. Candidate collection consumes only the
-canonical retained capture at
-`.cache/m7b/performance/frozen-baseline.json` and its adjacent
-`.provenance.json` receipt. `--baseline` and `M7B_PERFORMANCE_BASELINE` are
-rejected as caller-supplied evidence, not treated as an override.
+The accepted-build baseline is captured by every candidate collector
+invocation; the current candidate is never used as its own baseline. The
+collector creates an unpredictable nonce, asks the internal helper to extract
+the exact frozen SHA (`d25e80e6781de89e80fc3b3c240a922ada53d978` /
+`dc97ee41f6dbbc0e29d2`), installs it with the repository-local caches, and
+consumes only the helper's nonce-authenticated stdout envelope. The helper and
+parent validate the Git object/tree/build, explicit device ID, browser matrix,
+settings fingerprint, result, and every retained `{path,sha256}` artifact
+before comparing metrics. A digest-addressed copy is written as output
+evidence after validation; no persisted JSON receipt is read as authority.
 
-The capture helper binds the baseline to the frozen accepted SHA/build
-(`d25e80e6781de89e80fc3b3c240a922ada53d978` /
-`dc97ee41f6dbbc0e29d2`), re-derives the accepted Git tree, records a unique
-capture ID, explicit same-device ID, browser matrix, settings fingerprint,
-and checksummed artifact manifest. The collector revalidates those inputs,
-the summary digest, and every retained `{path,sha256}` entry before comparing
-metrics. Missing, self, forged, unrelated, or mismatched evidence is
-`BLOCKED` before metric comparison.
+`--baseline`, `M7B_PERFORMANCE_BASELINE`, and legacy
+`.cache/m7b/performance/frozen-baseline*.json` receipts are rejected or
+ignored and produce an explicit `same-device-baseline-provenance` `BLOCKED`
+finding. Forged, self, unrelated, missing, or mismatched evidence cannot enter
+the comparison path. The public `capture:frozen-baseline` helper is an
+internal nonce-bound child and is not a standalone receipt-import command.
 
-Capture a baseline reproducibly from a detached worktree of that exact frozen
-SHA. The command requires an explicit physical/same-device identifier and
-uses only ignored repository-local npm/browser caches:
+The candidate command requires an explicit physical/same-device identifier
+for this gate and uses only ignored repository-local npm/browser caches:
 
 ```sh
 M7B_PERFORMANCE_DEVICE_ID=my-device \
-npm run capture:frozen-baseline
+npm run collect:mobile-performance
 ```
 
-The helper runs `npm ci --prefer-offline`, installs the pinned Chromium/WebKit
-builds into `.cache/ms-playwright`, runs the collector with
-`--capture-frozen-baseline`, validates the frozen SHA/build/tree ID, writes the
-summary and provenance receipt, and removes its temporary worktree. The
-canonical default output must remain at the path above; a custom `--output`
-is retained for inspection but is not consumed as candidate evidence.
+When the accepted Git object has no available collector/dependency or the
+device/browser infrastructure is unavailable, the authenticated capture lane
+returns `BLOCKED`; it never falls back to a caller-supplied or prior file.
 
 ```sh
 npm run collect:mobile-performance

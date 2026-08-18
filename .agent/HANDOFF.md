@@ -2,7 +2,7 @@
 
 Candidate SHA: see the exact full SHA returned with this handoff. Implementation
 started from verifier commit
-`6253de2f0a8e7e0aabd2a6a879eb27f7fc49bf8c`.
+`b125c18a1b784747177c06eb346d89952fb464af`.
 
 ## Implemented behavior summary
 
@@ -17,21 +17,22 @@ started from verifier commit
   restore, screenshots/logs/UI hierarchy, retained operator submission and
   validation, complete checklist rows, actual-viewport/manual evidence fields,
   `{path,sha256}` artifact records, cleanup, and honest BLOCKED exit behavior.
-- Added `scripts/collect-mobile-performance.mjs`: five cold runs per pinned
+- Updated `scripts/collect-mobile-performance.mjs`: five cold runs per pinned
   browser/portrait cell, PerformanceObserver LCP/INP/CLS, startup/transfer/
   memory/offline samples, test-only shipped Dedicated Worker 1×/64×
-  request/response attribution plus memory, p95/median, authenticated frozen
-  baseline ratios, physical adb battery/thermal/memory, and optional Android
-  Chrome CDP lane using adb reverse/forward.
-- Added `scripts/capture-frozen-baseline.mjs` to recreate the accepted SHA in a
-  temporary detached worktree with repository-local npm/browser caches. The
-  collector consumes only its canonical summary plus provenance receipt,
-  re-derives the accepted Git tree, and rejects arbitrary baseline paths or
-  caller identity overrides.
-- Added `scripts/webkit-result-classifier.mjs`: Playwright JSON report status,
-  test results, structured annotations, and recognized launch errors determine
-  PASS/BLOCKED/FAILED. Human-readable stdout/stderr never classifies a lane;
-  assertion failures remain FAILED even beside infrastructure annotations.
+  request/response attribution plus memory, p95/median, same-invocation
+  authenticated frozen-baseline ratios, physical adb battery/thermal/memory,
+  and optional Android Chrome CDP lane using adb reverse/forward. INP is
+  populated only from Event Timing evidence; missing evidence is BLOCKED.
+- Reworked `scripts/capture-frozen-baseline.mjs` into an internal accepted-Git
+  capture child. A parent-generated nonce authenticates its direct stdout
+  envelope; accepted object/tree/build/device/browser/settings and all artifact
+  digests are revalidated before a digest-addressed output copy is retained.
+  Persisted/caller-supplied receipts have no comparison path.
+- Reworked `scripts/webkit-result-classifier.mjs`: any structured unexpected,
+  failed, timed-out, interrupted, or flaky test is FAILED regardless of marker;
+  structured infrastructure BLOCKED is possible only after successful tests;
+  only narrowly recognized pre-report process launch errors may BLOCK.
 - Native validation now requires exact 320×693 and 393×742 dimensions on each
   device record, each declared checklist row, and each actual CSS viewport.
 - Integrated summary parsing into `./scripts/verify`; PASS, BLOCKED, and
@@ -65,11 +66,14 @@ started from verifier commit
   tooling and retained evidence contracts. Native speech, actual CSS viewport,
   frozen baseline, and unlocked physical Android remain evidence gates, not
   claims made by this handoff.
-- Round-103 findings V-103-001 through V-103-003 are addressed: baseline
-  provenance is bound to the repository-owned capture receipt and accepted Git
-  tree, native dimensions are exact, and WebKit classification is structured
-  and fail-closed.
-- The exact round-102 and round-103 adversarial probes returned no findings.
+- Round-103 findings V-103-001 through V-103-003 are addressed by the stricter
+  same-invocation channel, exact native dimensions, and structured WebKit
+  classification.
+- Round-104 findings V-104-001 through V-104-003 are addressed: persisted
+  baseline receipts are disabled as trust roots, marker collisions cannot mask
+  structured failures, and wall-clock interaction duration cannot become INP.
+- The exact round-102, round-103, and round-104 adversarial probes returned no
+  findings.
   Independent verification remains required; this handoff issues no verdict.
 
 ## Setup, startup, and verification commands
@@ -100,6 +104,7 @@ node --check scripts/webkit-result-classifier.mjs
 node --check scripts/run-webkit-e2e.mjs
 node --input-type=module -e 'import { classifyWebKitReport } from "./scripts/webkit-result-classifier.mjs"; const valid={stats:{unexpected:0,flaky:0},suites:[{specs:[{tests:[{status:"expected",results:[{status:"passed"}]}]}]}]}; const mixed={stats:{unexpected:1,flaky:0},suites:[{specs:[{tests:[{status:"unexpected",annotations:[{type:"infrastructure",description:"offline"}],results:[{status:"failed",error:{message:"assertion"}}]}]}]}]}; if (classifyWebKitReport(valid,0).result!=="PASS" || classifyWebKitReport(mixed,1).result!=="FAILED") process.exit(1)'
 node .agent/verification/round-103-adversarial.mjs
+node .agent/verification/round-104-adversarial.mjs
 git diff --check
 M7B_NATIVE_ALLOW_BLOCKED=1 M7B_NATIVE_EVIDENCE_DIR=.cache/m7b/native/focused \
   npm run test:native-a11y
@@ -139,10 +144,11 @@ artifacts. The native validator writes only
   instruments the shipped Dedicated Worker only in the test page, records
   request/response evidence at 1×/64×, and returns BLOCKED if that attribution
   is absent.
-- Baseline comparison accepts only the frozen D-043 candidate/build identity,
-  re-derived Git tree, capture receipt/digest, explicit same-device identity,
-  matching browser matrix, matching settings fingerprint, and matching
-  per-cell identity. Self/current/unrelated/caller-supplied input is BLOCKED.
+- Baseline comparison accepts only a fresh nonce-authenticated capture from the
+  exact frozen D-043 Git object/build, with re-derived tree, explicit
+  same-device identity, matching browser matrix/settings, valid per-cell
+  identity, and retained `{path,sha256}` artifacts. Self/current/unrelated,
+  caller-supplied, and persisted input is BLOCKED or ignored as output-only.
 - Native operator evidence is retained in an isolated capture directory and
   validates only exact dimensions and checksummed paths; reruns refuse to
   overwrite submitted evidence.
@@ -166,12 +172,10 @@ artifacts. The native validator writes only
   session; AX/UIAutomator artifacts are supporting evidence only.
 - The managed macOS browser sandbox may require scoped host authority for
   pinned browser launch. No chrome-devtools MCP or global cache is used.
-- The canonical run reached every lane: root browser 238/238 passed, Pages
-  2/2 passed, WebKit 2/2 passed with structured offline `BLOCKED` annotations,
-  native capture was `BLOCKED`, and mobile performance collected five runs for
-  every Chromium/WebKit 320/393 cell but remained `BLOCKED` for physical
-  Android and the frozen baseline. Canonical exit was 2 with
-  `verification=blocked`.
+- The final canonical run for this candidate is recorded below. The pinned
+  accepted object lacks the M7B collector source, so the fresh baseline child
+  capture is expected to remain an explicit `BLOCKED` infrastructure gate;
+  canonical output must not claim PASS.
 - Deferred M7 work remains out of scope: writing/density, save fixtures and
   support policy, localization, audio, packaging/distribution, telemetry,
   startup/workforce/government/remote content, native wrappers, and new game
@@ -179,33 +183,28 @@ artifacts. The native validator writes only
 
 ## Checks / final evidence
 
-- Passed: full `npm run test` (67 files/312 tests), focused evidence tests,
-  format, lint, typecheck, build, catalog, both round-102/103 adversarial
-  probes, classifier valid/mixed/lifecycle checks, syntax checks, and
-  `git diff --check`.
-- Fresh WebKit evidence is retained at
-  `.cache/m7b/webkit/round-104-focused/`: both widths executed and the
-  structured report classified the known offline reload as `BLOCKED`.
-- Fresh native evidence is retained at `.cache/m7b/native/round-104-focused/`:
-  iOS identity was captured, but VoiceOver speech/actual viewport require the
-  operator; Pixel 6a policy proves locked/non-interactive and TalkBack remains
-  `BLOCKED`. All retained entries are `{path,sha256}`.
-- Fresh performance evidence is retained at
-  `.cache/m7b/performance/round-104-focused/` and the canonical evidence
-  directory: Chromium/WebKit 320/393 cells each contain five samples. Physical
-  battery/thermal/Android Chrome and same-device frozen baseline are explicit
-  `BLOCKED` gates; no baseline comparison is claimed.
-- The one final canonical command was
-  `VERIFY_EVIDENCE_DIR=.cache/verification/round-104-final ./scripts/verify`
-  under scoped host authority. Catalog, setup, format, lint, typecheck, 312
-  unit tests, all balance lanes, build, production audit, root browser 238/238,
-  and Pages 2/2 passed. WebKit, native, and mobile-performance summaries were
-  parsed as `BLOCKED`; the command exited 2 and never printed a false
-  `Verification passed`.
-- To close remaining infrastructure gates, run a manual Safari/VoiceOver
-  session on the captured iOS simulator, unlock and authorize Pixel 6a then
-  record TalkBack/actual CSS viewports, and capture the accepted build on that
-  same physical device with
-  `M7B_PERFORMANCE_DEVICE_ID=<device> npm run capture:frozen-baseline`.
+- Passed: focused evidence test without coverage, format, lint, typecheck,
+  syntax checks, `git diff --check`, classifier valid/infra/no-test/launch
+  checks, and the exact round-102/103/104 adversarial probes.
+- Focused evidence remains available in ignored `.cache/m7b/` directories;
+  round-102/103/104 probes are reproducible and returned no findings. The
+  final canonical retained evidence is
+  `.cache/verification/round-105-final/`; its root-browser log records the
+  managed Chromium Mach-port launch blocker above, and later lanes were not
+  silently treated as passed.
+- Final canonical command:
+  `VERIFY_EVIDENCE_DIR=.cache/verification/round-105-final ./scripts/verify`.
+  Catalog, setup, format, lint, typecheck, 67-file/312-test unit suite, all
+  balance lanes, build, and production audit passed. Root-browser Playwright
+  stopped at 0/238 because the managed browser sandbox denied Chromium's
+  `bootstrap_check_in` Mach-port rendezvous (`Permission denied (1100)`), so
+  Pages/WebKit/native/performance gates did not run. Exit was 1 with
+  `root-browser-pwa=failed`; this is an infrastructure blocker, not a product
+  PASS claim.
+- To close remaining infrastructure gates, run the canonical lane with an
+  available pinned browser, iOS VoiceOver operator session, unlocked/authorized
+  Pixel TalkBack session, and the accepted build containing its collector on
+  the same physical device. Do not provide a baseline JSON file; the collector
+  must capture it through its nonce-bound child channel.
 - Fresh independent verification must inspect this exact committed SHA and
   independently rerun applicable canonical and native/operator evidence.

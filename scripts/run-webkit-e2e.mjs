@@ -60,7 +60,14 @@ try {
 } catch (error) {
   reportParseError = String(error);
 }
-const classification = classifyWebKitReport(report, run.status ?? 1);
+const processError = run.error
+  ? { code: run.error.code, message: String(run.error.message ?? run.error) }
+  : null;
+const classification = classifyWebKitReport(
+  report,
+  run.status ?? 1,
+  processError,
+);
 const result = classification.result;
 const summary = {
   schemaVersion: 1,
@@ -69,6 +76,7 @@ const summary = {
   result,
   exitCode: run.status ?? 1,
   signal: run.signal ?? null,
+  processError,
   command: `PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright playwright test ${configArg} --reporter=json`,
   reason: classification.reason,
   playwright: {

@@ -1,6 +1,7 @@
 /*
- * Classify a Playwright JSON report without consulting human-readable runner
- * output. Test/assertion failures always win over infrastructure annotations.
+ * Classify Playwright's structured JSON report. Human-readable output is not
+ * evidence. A structured test failure always wins over any infrastructure
+ * annotation or marker embedded in its error text.
  */
 
 const infrastructureErrorMarkers = [
@@ -19,6 +20,8 @@ const failureStatuses = new Set([
   "unexpected",
   "flaky",
 ]);
+
+const launchProcessCodes = new Set(["ENOENT", "EACCES", "EPERM"]);
 
 function descriptionOf(value) {
   return typeof value === "string" ? value : value?.message;
@@ -64,41 +67,28 @@ function collectReportEvidence(report) {
           testsSeen += 1;
           const location = specTitle || "Playwright test";
           inspectAnnotations(test?.annotations, location);
-          const results = Array.isArray(test?.results) ? test.results : [];
-          for (const result of results) {
-            inspectAnnotations(result?.annotations, location);
-            if (
-              failureStatuses.has(result?.status) &&
-              isRecognizedInfrastructureError(result?.error)
-            )
-              infrastructure.push({
-                location,
-                description: descriptionOf(result.error),
-              });
-            else if (failureStatuses.has(result?.status))
-              failures.push({
-                location,
-                status: result.status,
-                error: descriptionOf(result.error),
-              });
-          }
-          const resultWasRecognizedInfrastructure =
-            results.length > 0 &&
-            results.every(
-              (result) =>
-                failureStatuses.has(result?.status) &&
-                isRecognizedInfrastructureError(result?.error),
-            );
+
+          // Test and result status is authenticated structured evidence. Never
+          // downgrade it because an error message happens to contain a marker.
           if (
-            (failureStatuses.has(test?.status) ||
-              failureStatuses.has(test?.outcome)) &&
-            !resultWasRecognizedInfrastructure
+            failureStatuses.has(test?.status) ||
+            failureStatuses.has(test?.outcome)
           )
             failures.push({
               location,
               status: test.status ?? test.outcome,
               error: "Playwright test outcome was not successful",
             });
+          const results = Array.isArray(test?.results) ? test.results : [];
+          for (const result of results) {
+            inspectAnnotations(result?.annotations, location);
+            if (failureStatuses.has(result?.status))
+              failures.push({
+                location,
+                status: result.status,
+                error: descriptionOf(result.error),
+              });
+          }
           if (
             test?.status === "skipped" &&
             !results.some((result) => result?.status === "skipped")
@@ -117,23 +107,22 @@ function collectReportEvidence(report) {
 
   inspectSuites(report?.suites);
   const stats = report?.stats;
-  if (
-    (Number(stats?.unexpected) > 0 || Number(stats?.flaky) > 0) &&
-    failures.length === 0 &&
-    infrastructure.length === 0
-  )
+  if (Number(stats?.unexpected) > 0)
     failures.push({
       location: "Playwright report stats",
-      status: Number(stats.unexpected) > 0 ? "unexpected" : "flaky",
-      error: "Playwright report contains unexpected or flaky tests",
+      status: "unexpected",
+      error: "Playwright report contains unexpected tests",
+    });
+  if (Number(stats?.flaky) > 0)
+    failures.push({
+      location: "Playwright report stats",
+      status: "flaky",
+      error: "Playwright report contains flaky tests",
     });
 
   for (const error of Array.isArray(report?.errors) ? report.errors : []) {
     const message = descriptionOf(error);
-    if (
-      typeof message === "string" &&
-      infrastructureErrorMarkers.some((marker) => message.includes(marker))
-    )
+    if (isRecognizedInfrastructureError(error))
       infrastructure.push({
         location: "Playwright report error",
         description: message,
@@ -149,8 +138,29 @@ function collectReportEvidence(report) {
   return { failures, infrastructure, testsSeen };
 }
 
-export function classifyWebKitReport(report, exitCode) {
-  if (!report || typeof report !== "object")
+function isLaunchProcessBlocker(processError) {
+  return (
+    processError &&
+    launchProcessCodes.has(processError.code) &&
+    typeof processError.message === "string"
+  );
+}
+
+export function classifyWebKitReport(report, exitCode, processError = null) {
+  if (!report || typeof report !== "object") {
+    if (isLaunchProcessBlocker(processError))
+      return {
+        result: "BLOCKED",
+        reason: `Playwright could not launch: ${processError.message}`,
+        failures: [],
+        infrastructure: [
+          {
+            location: "Playwright process launch",
+            description: processError.message,
+          },
+        ],
+        testsSeen: 0,
+      };
     return {
       result: "FAILED",
       reason: "Playwright did not produce a parseable JSON report",
@@ -164,6 +174,7 @@ export function classifyWebKitReport(report, exitCode) {
       infrastructure: [],
       testsSeen: 0,
     };
+  }
 
   const evidence = collectReportEvidence(report);
   if (evidence.failures.length > 0)
@@ -173,18 +184,18 @@ export function classifyWebKitReport(report, exitCode) {
       reason:
         "Playwright report contains an unexpected, assertion, or unclassified failure",
     };
+  if (evidence.testsSeen === 0)
+    return {
+      ...evidence,
+      result: "FAILED",
+      reason: "Playwright JSON report contains no executable tests",
+    };
   if (evidence.infrastructure.length > 0)
     return {
       ...evidence,
       result: "BLOCKED",
       reason:
         "Playwright tests otherwise succeeded but recorded a structured infrastructure blocker",
-    };
-  if (evidence.testsSeen === 0)
-    return {
-      ...evidence,
-      result: "FAILED",
-      reason: "Playwright JSON report contains no executable tests",
     };
   if (exitCode !== 0)
     return {
