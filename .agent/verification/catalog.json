@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "catalogKind": "active-verification",
-  "description": "Machine-checked routing for immutable verifier evidence, the retained Milestone 7A release foundation, and the authorized Milestone 7B OIV-first accessibility/performance scope. The status command remains the source of live Git/report state.",
+  "description": "Machine-checked routing for immutable verifier evidence, the retained Milestone 7A release foundation, the parked Milestone 7B commercial gate, and the authorized Milestone 7C writing/density scope. The status command remains the source of live Git/report state.",
   "historicalAcceptedSnapshot": {
     "report": ".agent/verification/round-093.md",
     "round": 93,
@@ -10,14 +10,15 @@
     "verdict": "PASS"
   },
   "activeScope": {
-    "name": "Milestone 7B — OIV-first accessibility and mobile performance",
+    "name": "Milestone 7C — Writing and Density Closure (M7B parked commercial gate)",
     "status": "active",
     "authorities": [
       "plan.md",
       ".agent/DECISIONS.md",
       ".agent/verification/round-093.md",
       ".agent/verification/round-099.md",
-      ".agent/RELEASE_ACCEPTANCE.md"
+      ".agent/RELEASE_ACCEPTANCE.md",
+      ".agent/verification/round-109.md"
     ],
     "requirements": [
       {
@@ -116,6 +117,54 @@
           ".agent/HANDOFF.md",
           ".agent/verification/INDEX.md",
           "scripts/validate-verification-catalog.mjs"
+        ]
+      },
+      {
+        "id": "M7C-PROFILES-001",
+        "status": "active",
+        "intent": "Keep development-candidate and full-release profiles explicit: development records parked M7B blockers, while full release invokes and strictly propagates every M7B lane.",
+        "sources": [
+          ".agent/CURRENT_SCOPE.md",
+          ".agent/verification/INDEX.md",
+          ".agent/RELEASE_ACCEPTANCE.md",
+          ".agent/DECISIONS.md"
+        ],
+        "checks": ["scripts/verify", "src/test/verificationProfiles.test.ts"]
+      },
+      {
+        "id": "M7C-EDITORIAL-001",
+        "status": "active",
+        "intent": "Give every existing destination one live editorial summary with current state, consequence, cost/risk, next action, and an exact Details/evidence route.",
+        "sources": [
+          "plan.md",
+          ".agent/CURRENT_SCOPE.md",
+          ".agent/DECISIONS.md",
+          ".agent/RELEASE_ACCEPTANCE.md"
+        ],
+        "checks": [
+          "src/ui/editorial.ts",
+          "src/ui/commandDeck.tsx",
+          "src/ui/App.tsx",
+          "src/ui/ResearchView.tsx",
+          "src/ui/LaboratoryView.tsx",
+          "src/ui/WorldView.tsx",
+          "src/ui/editorial.test.ts"
+        ]
+      },
+      {
+        "id": "M7C-DENSITY-001",
+        "status": "active",
+        "intent": "Prove normal, locked/failure/recovery, starter/expanded, portrait/text-scale, reduced-motion, touch/keyboard, persistence/reload/offline, and screenshot-atlas behavior without nested pipeline scroll or undersized controls.",
+        "sources": [
+          "plan.md",
+          ".agent/CURRENT_SCOPE.md",
+          ".agent/verification/INDEX.md",
+          ".agent/RELEASE_ACCEPTANCE.md"
+        ],
+        "checks": [
+          "tests/e2e/command-deck.spec.ts",
+          "src/ui/styles.css",
+          "scripts/verify"
         ]
       }
     ]

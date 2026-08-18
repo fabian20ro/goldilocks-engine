@@ -1045,3 +1045,68 @@
 - **Reversal condition:** Change the M7B order, budgets, device evidence
   requirement, or deferred-work boundary only through an explicit later
   decision backed by reproducible artifacts and independent verification.
+
+## D-044 — Parked M7B commercial gate and explicit verification profiles
+
+- **Decision:** Unavailable physical/native M7B evidence remains an explicit
+  commercial-release gate. Its tooling, artifacts, and immutable BLOCKED
+  reports are retained as evidence; they are never relabeled as PASS or
+  silently omitted. Development candidates may use the named
+  `./scripts/verify --profile=development` profile, which runs every locally
+  testable candidate lane and records `m7b-commercial-gate=blocked` as a
+  parked gate. Commercial release uses the default or explicit
+  `./scripts/verify --profile=full-release` profile, which invokes WebKit,
+  native accessibility, and measured-device lanes and exits BLOCKED when any
+  required infrastructure evidence is unavailable.
+- **Profile boundary:** The development profile is a candidate-quality result,
+  not a release result. It may close independently verifiable product work
+  only after a fresh independent Verifier assesses the exact candidate. The
+  full-release profile remains the only route that can provide complete
+  commercial-release evidence, and hosted exact-SHA verification/deployment
+  remain separate release-owner gates.
+- **Reason:** Round 109 found no correctable candidate defect but could not
+  obtain VoiceOver/TalkBack speech, unlocked physical Android, battery/thermal,
+  authenticated frozen baseline, or WebKit offline top-level reload evidence.
+  A named profile lets bounded implementation continue without converting an
+  infrastructure blocker into a false acceptance claim.
+- **Evidence policy:** Profile parsing, explicit parked-gate output, retained
+  M7B lane invocation, canonical summaries, and round-109's honest BLOCKED
+  evidence are regression requirements. No profile may downgrade a FAILED
+  candidate lane to BLOCKED.
+- **Reversal condition:** Close or change the commercial gate only through a
+  fresh independent PASS with the required physical/native artifacts and an
+  exact-SHA hosted/deployment receipt.
+
+## D-045 — Presentation-only writing and density contract
+
+- **Decision:** Every primary surface across Build, Jobs, Career, Upgrades,
+  Inspect, Research, Lab, World, and the global/onboarding chrome exposes one
+  compact, live editorial decision summary: current state, consequence,
+  cost/risk, and exactly one next action. The shared presenter reads current
+  engine/catalog values and never dispatches, persists, navigates, changes
+  balance, or invents a control. Existing input, Worker authority, simulation,
+  economy, persistence, PWA, and navigation behavior remain unchanged.
+- **Information boundary:** Summaries are presentation-only. Exact money,
+  quote, requirement, causal, evidence, and configuration values remain in
+  the existing item Details, accounting disclosures, Inspect comparison, or
+  ledger surfaces. Locked states name the requirement, current progress, and
+  the next unlock action. Errors and blocked states name preserved work and a
+  player-directed recovery path. The finite first-session guide remains the
+  only onboarding action source; the shared summaries refer to it rather than
+  duplicating its action/copy.
+- **Density boundary:** Use the existing glyph registry, formatters, cards,
+  rails, and Details primitives. Keep one document scroll owner, no nested
+  expanded-pipeline trap, no document-level horizontal overflow, portrait
+  320×693 and 393×742 reachability, 100%/200% text, reduced-motion equivalence,
+  and 44 CSS-pixel controls. Add no i18n framework, audio, art, telemetry,
+  package, destination, engine command, schema, or broad App architecture.
+- **Evidence policy:** Pure presenter tests cover normal, locked/failure/recovery,
+  and reload/onboarding lifecycle neighbors. The data-driven Playwright
+  screenshot atlas covers all eight destinations in starter and expanded
+  states at both portraits, plus 200% text/reduced motion, keyboard/touch,
+  persistence/reload/offline, and exact Details routes. Independent visual
+  inspection remains required; semantic checks alone do not establish visual
+  coherence.
+- **Reversal condition:** Replace a summary or density rule only with a
+  presentation treatment that preserves the same live data, one next action,
+  exact Details/evidence route, and portrait/accessibility/recovery evidence.

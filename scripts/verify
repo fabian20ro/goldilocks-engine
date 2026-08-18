@@ -11,6 +11,41 @@ LOG="$EVIDENCE_DIR/checks.log"
 : > "$SUMMARY"
 : > "$LOG"
 
+# D-044 keeps the commercial-release gate strict while giving implementation
+# candidates a named, reproducible profile. The development profile runs every
+# locally testable candidate lane and records the parked M7B gate explicitly;
+# it never relabels unavailable WebKit/native/device evidence as a pass.
+PROFILE=${VERIFY_PROFILE:-full-release}
+if [ "$#" -gt 2 ]; then
+  printf '%s\n' "Usage: ./scripts/verify [--profile development|full-release]" >&2
+  exit 64
+fi
+if [ "$#" -eq 1 ]; then
+  case "$1" in
+    --profile=development) PROFILE=development ;;
+    --profile=full-release) PROFILE=full-release ;;
+    --profile) PROFILE=__missing_value__ ;;
+    *)
+      printf '%s\n' "Unknown verify option: $1" >&2
+      exit 64
+      ;;
+  esac
+elif [ "$#" -eq 2 ]; then
+  if [ "$1" != "--profile" ]; then
+    printf '%s\n' "Unknown verify option: $1" >&2
+    exit 64
+  fi
+  PROFILE=$2
+fi
+case "$PROFILE" in
+  development|full-release) ;;
+  *)
+    printf '%s\n' "Unknown verification profile: $PROFILE" >&2
+    exit 64
+    ;;
+esac
+printf 'profile=%s\n' "$PROFILE" | tee -a "$LOG"
+
 run_step() {
   name=$1
   shift
@@ -98,6 +133,19 @@ run_step balance npm run balance
 run_step build npm run build
 run_step production-audit npm audit --omit=dev --audit-level=high
 run_step root-browser-pwa npm run test:e2e
+
+if [ "$PROFILE" = "development" ]; then
+  # This is an explicit commercial-release gate, not a skipped check. The
+  # full-release profile below is the only profile allowed to close it.
+  printf '%s\n' 'profile=development' >> "$SUMMARY"
+  printf '%s\n' 'm7b-commercial-gate=blocked (parked under D-044; run --profile full-release)' | tee -a "$LOG"
+  printf '%s\n' 'm7b-commercial-gate=blocked (parked under D-044; run --profile full-release)' >> "$SUMMARY"
+  run_step pages-offline npm run test:e2e:pages
+  printf '%s\n' 'verification=development-candidate' | tee -a "$LOG"
+  printf '%s\n' 'verification=development-candidate' >> "$SUMMARY"
+  exit 0
+fi
+
 WEBKIT_EVIDENCE_DIR="$EVIDENCE_DIR/m7b-webkit-$$"
 NATIVE_EVIDENCE_DIR="$EVIDENCE_DIR/m7b-native-$$"
 PERFORMANCE_EVIDENCE_DIR="$EVIDENCE_DIR/m7b-performance-$$"

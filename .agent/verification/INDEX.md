@@ -1,5 +1,7 @@
 # Verification index — accepted Milestone 7A release and active Milestone 7B
 
+M7B is parked as a commercial gate; active Milestone 7C follows below.
+
 Navigation only. Immutable reports, `plan.md`, and `.agent/DECISIONS.md`
 remain authoritative. This index never claims live HEAD, latest verdict,
 acceptance, unresolved state, or next gate. Run `./scripts/agent-status` first.
@@ -18,15 +20,15 @@ explicit request. Never use this index or the handoff as proof.
 
 ## Canonical verification lane
 
-`./scripts/verify` runs the catalog validator, locked setup, format, lint,
-typecheck, unit/property tests, deterministic balances, build, production
-audit, root browser/PWA, and Pages/offline checks. `npm run test:e2e` is the
+`./scripts/verify --profile=full-release` runs the catalog validator, locked
+setup, format, lint, typecheck, unit/property tests, deterministic balances,
+build, production audit, root browser/PWA, WebKit, native, performance, and
+Pages/offline checks. It remains strict: unavailable M7B evidence exits
+BLOCKED. `./scripts/verify --profile=development` runs every locally testable
+candidate lane and records `m7b-commercial-gate=blocked (parked under D-044)`;
+it never calls that parked gate PASS. `npm run test:e2e` is the
 repository-pinned root browser lane. Browser dependencies and browsers use
 ignored repository-local caches documented in `.agent/HANDOFF.md`.
-
-The next M7B candidate must add a package-manager WebKit lane and a measured
-mobile-performance command, then invoke both from `./scripts/verify`; those
-commands are not asserted as present by this documentation-only handoff.
 
 ## Retained Milestone 7A route
 
@@ -42,7 +44,7 @@ M7A's exact accepted release receipt is frozen in D-043 and
 `.agent/RELEASE_ACCEPTANCE.md`; it is historical routing, not a live status
 claim. These navigation/PWA checks remain regression requirements for M7B.
 
-## Active Milestone 7B OIV route
+## Parked Milestone 7B OIV route
 
 | Requirement | Source | Candidate evidence | Canonical lane |
 | --- | --- | --- | --- |
@@ -54,6 +56,18 @@ claim. These navigation/PWA checks remain regression requirements for M7B.
 M7B does not pull forward writing/density, supported-save fixtures/version
 policy, localization, audio, or packaging/distribution decisions. Those remain
 prioritized later M7 requirements in `.agent/RELEASE_ACCEPTANCE.md`.
+
+## Active Milestone 7C writing/density route
+
+| Requirement | Source | Candidate evidence | Canonical lane |
+| --- | --- | --- | --- |
+| D-044 development/full-release profiles keep parked M7B evidence explicit | D-044; `.agent/RELEASE_ACCEPTANCE.md` §Milestone 7C | `scripts/verify`; `src/test/verificationProfiles.test.ts`; round-109 BLOCKED report | development profile then full-release profile |
+| D-045 one live editorial summary per destination | D-045; `plan.md` §§20.2–20.7; `.agent/RELEASE_ACCEPTANCE.md` §Milestone 7C | `src/ui/editorial.ts`; `src/ui/commandDeck.tsx`; `src/ui/App.tsx`; Research/Lab/World views | focused unit + pinned browser |
+| Locked/failure/recovery copy preserves requirements, progress, work, and action | D-045; `plan.md` §§9, 16, 17, 20.5 | `LockedState`; editorial presenter Rule-of-Three tests; existing Details/ledger suites | focused unit + root browser |
+| Portrait density and lifecycle contract across all eight destinations | D-045; D-041; `.agent/CURRENT_SCOPE.md` | data-driven `tests/e2e/command-deck.spec.ts` screenshot atlas, 320/393/200%/reduced-motion/keyboard/touch/reload/offline | `npm run test:e2e` |
+
+M7C remains presentation-only. It does not close the parked M7B commercial
+release gate or imply hosted exact-SHA deployment.
 
 ## Historical accepted Milestone 6 route
 

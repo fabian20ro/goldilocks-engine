@@ -666,6 +666,115 @@ h2 {
   color: var(--amber);
 }
 
+/* M7C editorial contract: every destination gets one compact, state-derived
+ * decision record. It is intentionally denser than a panel and never replaces
+ * the item's existing Details/evidence route. */
+.destination-decision {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.35rem;
+  margin: 0.55rem 0.75rem 0.75rem;
+  padding: 0.55rem;
+  border: 1px solid #385645;
+  border-radius: 0.48rem;
+  background: #0d1711;
+}
+
+.destination-decision > div {
+  min-width: 0;
+  padding: 0.35rem;
+  border-left: 2px solid var(--line-bright);
+}
+
+.destination-decision > div:first-child {
+  border-left-color: var(--acid);
+}
+
+.destination-decision > div:nth-child(2) {
+  border-left-color: var(--cyan);
+}
+
+.destination-decision > div:nth-child(3) {
+  border-left-color: var(--amber);
+}
+
+.destination-decision > div:nth-child(4) {
+  border-left-color: var(--acid-dim);
+}
+
+.destination-decision .eyebrow {
+  font-size: 0.5rem;
+  letter-spacing: 0.08em;
+}
+
+.destination-decision strong {
+  display: block;
+  margin-top: 0.2rem;
+  color: #dce9dd;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.destination-details-hint {
+  grid-column: 1 / -1;
+  padding-top: 0.28rem;
+  border-top: 1px solid #ffffff17;
+  color: var(--muted);
+  font-size: 0.6rem;
+  line-height: 1.35;
+}
+
+.locked-state {
+  display: grid;
+  gap: 0.18rem;
+  margin-top: 0.55rem;
+  padding: 0.55rem 0.65rem;
+  border-left: 2px solid var(--amber);
+  background: #221c12;
+  color: #f0d39c;
+  font-size: 0.65rem;
+  line-height: 1.4;
+}
+
+.locked-state strong {
+  color: #ffe1a7;
+  font-size: 0.66rem;
+}
+
+.locked-state small {
+  color: var(--muted);
+}
+
+.locked-state .locked-state-action {
+  color: var(--acid);
+  font-weight: 700;
+}
+
+.research-hero .destination-decision,
+.laboratory-hero .destination-decision,
+.world-hero .destination-decision {
+  margin-inline: 0;
+}
+
+@media (max-width: 430px) {
+  .destination-decision {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container main-content (max-width: 13em) {
+  .destination-decision {
+    gap: 0.22rem;
+    margin-inline: 0.5rem;
+    padding: 0.4rem;
+  }
+
+  .destination-decision strong {
+    font-size: 0.66rem;
+  }
+}
+
 .onboarding-mission {
   border-color: #6f9a48;
   background: linear-gradient(135deg, #172614, #0f1813);
@@ -800,8 +909,10 @@ h2 {
 }
 
 .pipeline {
-  max-height: min(70vh, 42rem);
-  overflow-y: auto;
+  /* The app scroll region is the only vertical scroll owner. Keeping the
+   * ordered rail in normal flow avoids a nested trap at 320px and 200% text. */
+  max-height: none;
+  overflow: visible;
   padding: 0.75rem;
   overscroll-behavior: contain;
   scrollbar-width: thin;

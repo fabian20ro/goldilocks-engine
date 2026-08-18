@@ -13,7 +13,8 @@ import type {
   SimulationCommand,
   SimulationState,
 } from "../simulation/types";
-import { StatusGauge } from "./commandDeck";
+import { DecisionSummary, LockedState, StatusGauge } from "./commandDeck";
+import { presentWorldDecision } from "./editorial";
 
 interface WorldViewProps {
   state: SimulationState;
@@ -356,13 +357,14 @@ export function WorldView({ state, command }: WorldViewProps) {
         </p>
         {!hypeFear.unlocked ? (
           <div className="world-locked" role="status">
-            <strong>Public narratives are not recognized yet.</strong>
-            <span>
-              Complete one accepted delivery or build reputation to meet the
-              first audience.
-            </span>
+            <LockedState
+              requirement="First Recognition: one accepted delivery or 0.15 reputation."
+              progress={`${Math.min(1, state.jobs.completed)}/1 delivery · ${Math.min(0.15, state.resources.reputation).toFixed(2)}/0.15 reputation`}
+              nextAction="Complete one accepted delivery or build reputation; return here to cover the first narrative."
+            />
           </div>
         ) : null}
+        <DecisionSummary decision={presentWorldDecision(state)} />
       </section>
 
       <section

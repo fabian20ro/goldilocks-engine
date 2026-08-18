@@ -1,5 +1,7 @@
 # Scope routing map — accepted Milestone 7A release and active Milestone 7B
 
+Parked commercial gate; active Milestone 7C follows below.
+
 Navigation only. This map is stable routing metadata, not authority. It never
 states live HEAD, latest verdict, current acceptance, or next gate. Run
 `./scripts/agent-status` before using it for live Git/report facts.
@@ -37,7 +39,7 @@ The exact accepted M7A release receipt is recorded in D-043 and
 and the hosted/deployment evidence. This is frozen historical routing, not a
 claim about the live HEAD or a future gate.
 
-## Active authorized scope: Milestone 7B OIV-first hardening
+## Parked commercial-release gate: Milestone 7B OIV evidence
 
 D-043 and `.agent/RELEASE_ACCEPTANCE.md` route this bounded next slice:
 
@@ -54,18 +56,46 @@ D-043 and `.agent/RELEASE_ACCEPTANCE.md` route this bounded next slice:
   manifest, and infrastructure/blocker policy explicit in the handoff and
   release matrix.
 
-This routing milestone itself changes only mutable documentation/catalog
-metadata. The next implementation candidate may make the smallest
-accessibility/performance correction demonstrated by the new evidence.
+Round 109 records honest BLOCKED infrastructure evidence for the unavailable
+physical/native/browser gates. D-044 parks that evidence as a commercial
+release gate: retained tooling and reports remain required and cannot be
+silently relabeled or skipped. `./scripts/verify --profile=full-release`
+continues to invoke the complete M7B lanes and remains strict. The named
+development profile records the parked gate explicitly while exercising all
+locally testable candidate lanes.
+
+## Active authorized scope: Milestone 7C Writing & Density Closure
+
+D-044 and D-045 authorize the smallest presentation-only closure across all
+eight existing destinations and global/onboarding chrome:
+
+- define the development-candidate and full-release verification profiles;
+- add one live editorial decision summary per destination with current state,
+  consequence, cost/risk, and one next action;
+- retain exact accounting, requirements, causal truth, and evidence in the
+  existing Details, Inspect, accounting, and ledger surfaces;
+- make locked states name requirement, current progress, and unlock action;
+- make errors/blocked states name preserved work and player-directed recovery;
+- remove duplicate onboarding prompts without changing the finite first-session
+  command boundary or bottom-tab-only navigation;
+- prove the contract at starter/expanded, normal/locked/failure/recovery,
+  reload/offline, 100%/200% text, reduced motion, keyboard/touch, 320×693, and
+  393×742 through a data-driven screenshot atlas.
+
+This is presentation and verification tooling only. Engine/Worker/schema,
+economy/balance, navigation destinations, PWA, threat model, and out-of-scope
+startup/workforce/government/telemetry/audio/localization/packaging boundaries
+remain frozen.
 
 ## Frozen boundaries
 
 No `plan.md` edit, startup/workforce/government expansion, new navigation
 destination, simulation command, persistence schema, speculative telemetry,
 audio/localization implementation, store packaging, or broad architecture
-rewrite is authorized by M7B. Writing/density, supported-save fixtures and
-version policy, localization readiness, audio, and the PWA-only versus
-store-packaging/distribution decision remain prioritized later M7 work.
+rewrite is authorized by M7C. Supported-save fixtures/version policy,
+localization readiness, audio, and the PWA-only versus store-packaging/
+distribution decision remain later commercial-release work. The unavailable
+M7B physical/native/browser evidence remains a release gate under D-044.
 Existing deterministic simulation, accounting, causal truth, persistence,
 PWA/update, offline, reduced-motion, accessibility, and Lab lifecycle
 contracts remain regression boundaries.
@@ -74,13 +104,16 @@ contracts remain regression boundaries.
 
 | Need                                     | Source                                                                                                                                  |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Product and release boundary             | `plan.md` §§2.4, 20, 24, 27, 29, 34; D-040–D-043                                                                                        |
+| Product and release boundary             | `plan.md` §§2.4, 20, 24, 27, 29, 34; D-040–D-045                                                                                        |
 | Historical accepted Milestone 6 behavior | `.agent/verification/round-093.md`; `.agent/verification/round-093-adversarial.mjs`; `.agent/verification/round-093-ui-adversarial.mjs` |
 | Frozen M7A receipt and active M7 matrix  | `.agent/RELEASE_ACCEPTANCE.md`; D-043                                                                                                   |
 | Active finding/probe status              | `.agent/verification/catalog.json`; `scripts/validate-verification-catalog.mjs`                                                         |
 | Navigation implementation                | `src/ui/App.tsx`; `src/ui/styles.css`; `src/ui/glyphs.tsx`                                                                              |
 | Navigation acceptance                    | `tests/e2e/navigation-affordance.spec.ts`; `scripts/verify`                                                                             |
 | M7B OIV evidence contract                | `.agent/RELEASE_ACCEPTANCE.md` §Milestone 7B; `.agent/HANDOFF.md`                                                                       |
+| M7C profile and editorial contract       | D-044–D-045; `.agent/RELEASE_ACCEPTANCE.md` §Milestone 7C; `scripts/verify`; `src/ui/editorial.ts`; `src/ui/commandDeck.tsx`            |
+| M7C destination implementation           | `src/ui/App.tsx`; `src/ui/ResearchView.tsx`; `src/ui/LaboratoryView.tsx`; `src/ui/WorldView.tsx`; `src/ui/styles.css`                   |
+| M7C executable evidence                  | `src/ui/editorial.test.ts`; `src/test/verificationProfiles.test.ts`; `tests/e2e/command-deck.spec.ts`                                   |
 | Live Git/report facts                    | `./scripts/agent-status` only                                                                                                           |
 
 ## Rule-of-Three retained M7A navigation map
@@ -102,6 +135,19 @@ contracts remain regression boundaries.
 3. Lifecycle: clean install, reload/offline resume, repeated 1×/64× Worker
    runs, and device CPU/memory/battery/thermal observation with explicit
    recovery or BLOCKED evidence.
+
+## Rule-of-Three M7C editorial map
+
+1. Normal: each destination's live summary names current state, consequence,
+   cost/risk, and one next action while the existing primary action remains
+   reachable at 393×742.
+2. Boundary: locked, malformed/failure, and recovery states name the
+   requirement or preserved work, current progress, and a player-directed
+   unlock/recovery action at 320×693 and 200% text with no overflow or target
+   below 44 CSS pixels.
+3. Lifecycle: starter/expanded atlas captures, reload/offline resume,
+   reduced-motion, keyboard/touch, and onboarding transitions retain the same
+   single summary contract without simulation or input mutation.
 
 The catalog's active requirements and historical finding groups are the
 machine-checked routing contract. If a report introduces a finding ID absent

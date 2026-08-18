@@ -9,12 +9,15 @@ import {
   researchProjectRequirements,
   researchRecognition,
   researchTeamProfile,
+  researchUnlockRequirements,
 } from "../simulation/research";
 import type {
   ResearchProjectSpec,
   SimulationCommand,
   SimulationState,
 } from "../simulation/types";
+import { DecisionSummary, LockedState } from "./commandDeck";
+import { presentResearchDecision } from "./editorial";
 
 interface ResearchViewProps {
   state: SimulationState;
@@ -179,12 +182,17 @@ export function ResearchView({ state, command }: ResearchViewProps) {
         </p>
         {!recognized ? (
           <div className="research-locked" role="status">
-            <strong>Research is not recognized yet.</strong>
-            <span>
-              Complete one accepted delivery to open the first question.
-            </span>
+            <LockedState
+              title="Research is not recognized yet."
+              requirement="First Recognition: one accepted delivery or 0.15 reputation."
+              progress={researchUnlockRequirements(
+                contextFor(state),
+              ).requirements.join(" · ")}
+              nextAction="Complete one accepted delivery or build reputation; the bottom Research tab remains the only route."
+            />
           </div>
         ) : null}
+        <DecisionSummary decision={presentResearchDecision(state)} />
       </section>
 
       <section className="panel" aria-labelledby="research-goal-title">

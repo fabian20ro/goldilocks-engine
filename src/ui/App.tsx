@@ -56,10 +56,18 @@ import type {
 import { TIME_SPEEDS, useSimulation, type TimeSpeed } from "./useSimulation";
 import {
   ComparisonDelta,
+  DecisionSummary,
   DetailsSurface,
   ItemDetailsDisclosure,
   StatusGauge,
 } from "./commandDeck";
+import {
+  presentBuildDecision,
+  presentCareerDecision,
+  presentInspectDecision,
+  presentJobsDecision,
+  presentUpgradesDecision,
+} from "./editorial";
 import {
   moduleInventoryDefaultEntries,
   selectModuleInventory,
@@ -457,6 +465,11 @@ function QuickStart({ onDismiss }: { onDismiss: () => void }) {
       className="quick-start"
       aria-labelledby="quick-start-title"
       data-testid="quick-start"
+      data-editorial-surface="quick-start"
+      data-editorial-current-state="The first-session route is always reopenable."
+      data-editorial-consequence="The finite guide keeps the first action legible without changing simulation state."
+      data-editorial-cost-risk="Risk: skipping the guide leaves the same work and controls available; no progress is lost."
+      data-editorial-next-action="Follow one numbered step, then use the named bottom tab."
     >
       <div className="section-heading">
         <div>
@@ -559,6 +572,11 @@ function FirstSessionGuide({
       aria-labelledby="first-session-guide-title"
       data-testid="first-session-guide"
       data-onboarding-action={presentation.action}
+      data-editorial-surface="onboarding"
+      data-editorial-current-state={presentation.title}
+      data-editorial-consequence={presentation.body}
+      data-editorial-cost-risk="Current work is preserved; the handoff does not navigate or change simulation state."
+      data-editorial-next-action={`Use the bottom ${presentation.requiredTabLabel} tab.`}
     >
       <div className="onboarding-guide-heading">
         <span className="eyebrow">First session · step {step} of 3</span>
@@ -1329,6 +1347,15 @@ function BuildView({
       <section
         className={`mission-card ${onboarding.active ? "onboarding-mission" : ""}`}
         aria-label="Current objective and bottleneck"
+        data-editorial-surface="global-objective"
+        data-editorial-current-state={objective}
+        data-editorial-consequence={`The next measured constraint is ${state.metrics.dominantBottleneck}.`}
+        data-editorial-cost-risk="Changing the current pipeline remains an explicit player choice."
+        data-editorial-next-action={
+          onboarding.active
+            ? `Use the bottom ${onboarding.requiredTabLabel} tab.`
+            : objective
+        }
       >
         <div>
           <span className="eyebrow">
@@ -1401,6 +1428,13 @@ function BuildView({
         onDragStart={presentation === "build" ? onDragStart : () => undefined}
         onInstall={presentation === "build" ? onInstall : () => undefined}
         reducedMotion={reducedMotion}
+      />
+      <DecisionSummary
+        decision={presentBuildDecision(state, selectedStageId, {
+          active: onboarding.active,
+          action: onboarding.action,
+          requiredTabLabel: onboarding.requiredTabLabel ?? undefined,
+        })}
       />
       {secondaryControls}
       {presentation === "build" ? (
@@ -2186,6 +2220,14 @@ function UpgradesView({
           before buying: every option trades capability for power, memory,
           latency, reliability, observability, or operating cost.
         </p>
+        <DecisionSummary
+          decision={presentUpgradesDecision(
+            state,
+            recommendedEntry?.module.name ?? null,
+            recommendedEntry?.module.purchaseCost ?? null,
+            pendingPlacementModuleId !== null,
+          )}
+        />
       </section>
       {onboarding.active && recommendedEntry ? (
         <section
@@ -2470,6 +2512,13 @@ export function JobsView({
             </p>
           </details>
         </article>
+        <DecisionSummary
+          decision={presentJobsDecision(state, {
+            active: onboarding.active,
+            action: onboarding.action,
+            requiredTabLabel: onboarding.requiredTabLabel ?? undefined,
+          })}
+        />
         <MoneyLoop
           state={state}
           reducedMotion={reducedMotion}
@@ -3111,6 +3160,14 @@ export function CareerView({
             <dd>{state.metrics.dominantBottleneck}</dd>
           </div>
         </dl>
+        <DecisionSummary
+          decision={presentCareerDecision(
+            state,
+            scheduledDraftHours,
+            eveningProjection,
+            isRunBlocked,
+          )}
+        />
       </section>
 
       <section
@@ -4080,6 +4137,7 @@ function InspectView({
           </button>
         </div>
         <InspectPriority state={state} />
+        <DecisionSummary decision={presentInspectDecision(state)} />
         {supplemental ? (
           <div className="inspect-supplemental">{supplemental}</div>
         ) : null}
@@ -4954,7 +5012,7 @@ export function App() {
 
         <main id="main-content" className={`main-content ${tab}-content`}>
           {tab !== "build" && tab !== "inspect" ? secondaryControls : null}
-          {tab !== "inspect" && tab !== "jobs" ? (
+          {tab !== "inspect" ? (
             <FirstSessionGuide presentation={onboarding} currentTab={tab} />
           ) : null}
           {tab !== "inspect" ? <UpgradeFeedback state={state} /> : null}
@@ -4978,18 +5036,15 @@ export function App() {
               secondaryControls={secondaryControls}
             />
           ) : tab === "jobs" ? (
-            <>
-              <FirstSessionGuide presentation={onboarding} currentTab={tab} />
-              <JobsView
-                state={state}
-                command={command}
-                commandBatch={commandBatch}
-                reducedMotion={reducedMotion}
-                usefulTarget={usefulTarget}
-                onUsefulTargetChange={setUsefulTarget}
-                onboarding={onboarding}
-              />
-            </>
+            <JobsView
+              state={state}
+              command={command}
+              commandBatch={commandBatch}
+              reducedMotion={reducedMotion}
+              usefulTarget={usefulTarget}
+              onUsefulTargetChange={setUsefulTarget}
+              onboarding={onboarding}
+            />
           ) : tab === "career" ? (
             <CareerView
               state={state}

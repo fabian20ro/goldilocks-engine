@@ -13,7 +13,18 @@ product. Startup, workforce, government, remote/generative content, and later
 expansions remain out of scope under D-040 and `plan.md` §29. The release gate
 requires the complete applicable product suite, a fresh independent Verifier
 `PASS`, hosted exact-SHA verification, and deployment of that exact accepted
-SHA. Optional playtesting never becomes an undocumented blocker.
+SHA. Under D-044, unavailable physical/native/WebKit M7B evidence remains an
+explicit commercial-release gate; it is never silently skipped or relabeled by
+a development-candidate check. Optional playtesting never becomes an
+undocumented blocker.
+
+`./scripts/verify --profile=development` is the reproducible local candidate
+profile. It runs the locally testable product and browser lanes, records
+`m7b-commercial-gate=blocked`, and exits successfully only for candidate
+verification. The default `./scripts/verify` and explicit
+`./scripts/verify --profile=full-release` retain the WebKit/native/performance
+lanes and return BLOCKED when the required physical evidence is unavailable.
+The development profile is not commercial-release evidence.
 
 ## Frozen M7A release receipt
 
@@ -38,17 +49,17 @@ save-support, localization, audio, or packaging gates are complete.
 
 ## Milestone 7 matrix
 
-| Area                       | Required acceptance evidence                                                                                                                                                                                                | Current routing state                                                                            |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Balance and strategy       | Deterministic unit/property/scenario checks; balance sweeps for the Bedroom → Lab route; no dominant strategy within declared bounds; viable recoveries and varied endings                                                  | Baseline evidence is retained by round 093; rerun and record the release matrix after M7 changes |
-| Accessibility              | 320/393 portrait; 200% and pseudo-localized text; 44px controls; keyboard; touch; visible focus; screen-reader names/live updates; reduced motion; no color-only meaning; WebKit smoke; native VoiceOver/TalkBack checklist | Chromium/M7A evidence and live smoke are retained; WebKit/native speech is the first M7B gate    |
-| Mobile performance         | Clean install measurements for representative 320/393 portraits; LCP/INP/CLS budgets; low-end Android CPU/memory; Worker 1×/64× cost; battery/thermal observation; offline startup                                          | Baseline payload is recorded in the audit; measured device evidence is the first M7B gate        |
-| Writing and density        | Editorial pass for every primary card and disclosure: consequence, cost/risk, next action; no duplicated onboarding; concise locked states; screenshot review at raw and scaled widths                                      | Open; use the existing progressive-disclosure grammar                                            |
-| Audio                      | Small local cue set for important settlement/warning/completion transitions; persistent mute; visual equivalent for every cue; no remote or generative dependency                                                           | Open; not part of the M7A receipt or M7B OIV implementation                                      |
-| Save stability             | Golden fixtures for supported schema/content history; malformed/stale/unsealed recovery; reload/offline; update across old saves; explicit supported-version policy; no duplicate commands or deductions                    | Runtime recovery evidence is strong; release fixture matrix and support policy remain open       |
-| Localization readiness     | Stable message catalog; locale-aware number/currency/plural formatting; pseudo-localization; expansion-safe cards and disclosures; stable internal IDs                                                                      | Open; translation implementation is not part of M7A/M7B                                          |
-| Packaging and distribution | Root and Pages PWA install/update/offline; deterministic build identity; release notes/version display; supported browser/OS matrix; rollback procedure; explicit PWA-only versus store-package decision                    | PWA mechanics are covered; distribution target and release receipt remain open                   |
-| Deployment and operations  | Fresh Verifier report names exact candidate SHA; hosted aggregate passes; Pages deploys that SHA; live `build-info.json` matches; clean branch and post-deploy smoke                                                        | External release-owner gate; never inferred from local PASS                                      |
+| Area                       | Required acceptance evidence                                                                                                                                                                                                | Current routing state                                                                                                                                  |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Balance and strategy       | Deterministic unit/property/scenario checks; balance sweeps for the Bedroom → Lab route; no dominant strategy within declared bounds; viable recoveries and varied endings                                                  | Baseline evidence is retained by round 093; rerun and record the release matrix after M7 changes                                                       |
+| Accessibility              | 320/393 portrait; 200% and pseudo-localized text; 44px controls; keyboard; touch; visible focus; screen-reader names/live updates; reduced motion; no color-only meaning; WebKit smoke; native VoiceOver/TalkBack checklist | Chromium/M7A evidence and live smoke are retained; WebKit/native speech is the first M7B gate                                                          |
+| Mobile performance         | Clean install measurements for representative 320/393 portraits; LCP/INP/CLS budgets; low-end Android CPU/memory; Worker 1×/64× cost; battery/thermal observation; offline startup                                          | Baseline payload is recorded in the audit; measured device evidence is the first M7B gate                                                              |
+| Writing and density        | Editorial pass for every primary card and disclosure: consequence, cost/risk, next action; no duplicated onboarding; concise locked states; screenshot review at raw and scaled widths                                      | M7C candidate seam: live summaries, Details preservation, lock/recovery copy, and atlas are routed by D-045; independent verification remains required |
+| Audio                      | Small local cue set for important settlement/warning/completion transitions; persistent mute; visual equivalent for every cue; no remote or generative dependency                                                           | Open; not part of the M7A receipt or M7B OIV implementation                                                                                            |
+| Save stability             | Golden fixtures for supported schema/content history; malformed/stale/unsealed recovery; reload/offline; update across old saves; explicit supported-version policy; no duplicate commands or deductions                    | Runtime recovery evidence is strong; release fixture matrix and support policy remain open                                                             |
+| Localization readiness     | Stable message catalog; locale-aware number/currency/plural formatting; pseudo-localization; expansion-safe cards and disclosures; stable internal IDs                                                                      | Open; translation implementation is not part of M7A/M7B                                                                                                |
+| Packaging and distribution | Root and Pages PWA install/update/offline; deterministic build identity; release notes/version display; supported browser/OS matrix; rollback procedure; explicit PWA-only versus store-package decision                    | PWA mechanics are covered; distribution target and release receipt remain open                                                                         |
+| Deployment and operations  | Fresh Verifier report names exact candidate SHA; hosted aggregate passes; Pages deploys that SHA; live `build-info.json` matches; clean branch and post-deploy smoke                                                        | External release-owner gate; never inferred from local PASS                                                                                            |
 
 ## Milestone 7B OIV-first handoff
 
@@ -148,6 +159,25 @@ that order after the OIV gates. It also does not add startup/workforce/
 government/remote content, new destinations, new simulation commands,
 telemetry, a native wrapper, or a broad architecture rewrite.
 
+## Milestone 7C writing/density closure
+
+M7C is presentation-only. Across Build, Jobs, Career, Upgrades, Inspect,
+Research, Lab, World, and global/onboarding chrome, each primary surface must
+state the live current state, consequence, cost or risk, and one next action.
+Exact accounting, requirements, and evidence remain available in the existing
+Details/ledger/record surfaces. Locked states identify the requirement,
+current progress, and unlock action. Failure and recovery copy identifies
+preserved work and the next recovery step. Existing inputs, commands,
+persistence, navigation, engine, Worker, schema, economy, balance, and PWA
+behavior remain unchanged; onboarding is not duplicated by destination copy.
+
+M7C evidence is a pure-presenter Rule-of-Three unit suite plus a data-driven
+Playwright screenshot atlas covering starter/expanded states for all eight
+destinations at 320×693 and 393×742. The atlas also checks 100/200% text,
+reduced motion, touch/drag, reload/resume, offline, failure/recovery, target
+size, and overflow contracts. It is an implementation candidate gate only;
+the parked M7B physical evidence remains required for commercial release.
+
 ## Retained Milestone 7A acceptance slice
 
 This frozen slice prepared the release work without adding startup content or
@@ -177,9 +207,11 @@ rewriting the architecture; its navigation/PWA checks remain M7B regressions.
 
 ## Gate order
 
-1. Run the machine-validated catalog and focused M7B tests (retaining M7A
-   navigation/PWA regressions).
-2. Run one final `./scripts/verify` after executable edits are complete.
+1. Run the machine-validated catalog and focused M7C tests (retaining M7A
+   navigation/PWA regressions and the parked M7B lane contract).
+2. Run one final `./scripts/verify --profile=development` for a local
+   candidate, or the default/full-release profile when release infrastructure
+   is available; the latter must retain and report any M7B blocker.
 3. Freeze the candidate commit and hand only its exact SHA to a fresh Verifier.
 4. After an independent `PASS`, run hosted exact-SHA aggregation and Pages
    deployment. Record the receipt separately; do not turn local evidence into

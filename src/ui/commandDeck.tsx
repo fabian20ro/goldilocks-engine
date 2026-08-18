@@ -167,6 +167,71 @@ export function StatusGauge({
   );
 }
 
+export function DecisionSummary({
+  decision,
+}: {
+  decision: {
+    destination: string;
+    currentState: string;
+    consequence: string;
+    costOrRisk: string;
+    nextAction: string;
+    detailsHint: string;
+  };
+}) {
+  return (
+    <section
+      className="destination-decision"
+      aria-label={`${decision.destination} decision summary`}
+      data-testid="destination-decision"
+      data-editorial-destination={decision.destination}
+      data-editorial-state={decision.currentState}
+      data-editorial-consequence={decision.consequence}
+      data-editorial-cost-risk={decision.costOrRisk}
+      data-editorial-next-action={decision.nextAction}
+    >
+      <div>
+        <span className="eyebrow">Current state</span>
+        <strong>{decision.currentState}</strong>
+      </div>
+      <div>
+        <span className="eyebrow">Consequence</span>
+        <strong>{decision.consequence}</strong>
+      </div>
+      <div>
+        <span className="eyebrow">Cost / risk</span>
+        <strong>{decision.costOrRisk}</strong>
+      </div>
+      <div>
+        <span className="eyebrow">Next action</span>
+        <strong>{decision.nextAction}</strong>
+      </div>
+      <small className="destination-details-hint">{decision.detailsHint}</small>
+    </section>
+  );
+}
+
+export function LockedState({
+  requirement,
+  progress,
+  nextAction,
+  title,
+}: {
+  requirement: string;
+  progress: string;
+  nextAction: string;
+  title?: string;
+}) {
+  return (
+    <div className="locked-state" role="status" data-testid="locked-state">
+      <strong>{title ?? "Locked · requirement"}</strong>
+      <span>{requirement}</span>
+      <small>Progress: {progress}</small>
+      <small className="locked-state-action">Next action: {nextAction}</small>
+    </div>
+  );
+}
+
 /** Compact signed comparison used by the existing inspection and upgrade views. */
 export function ComparisonDelta({
   label,

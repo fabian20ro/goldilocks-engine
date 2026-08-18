@@ -1,60 +1,67 @@
-# Candidate handoff — Milestone 7B simulator evidence/tooling
+# Candidate handoff — Milestone 7C Writing & Density Closure
 
-Implementation base: `1096cfd608fb4f0357c2e0b1d8553326de76a79f`.
-Implementation candidate: `9890a09aa849d60f32676e8d7a35769618fdba02`
-(`improve simulator-native evidence capture`).
-Final handoff bookkeeping commit: recorded by the Orchestrator from the final
-clean Git SHA.
-No immutable report, `plan.md`, decision, scope map, or verification catalog
-was edited.
+Implementation base: `34c76e1a450075d3534efb5fe0dd48f8bd326054`.
+Implementation candidate: `PENDING_FINAL_SHA` (replace before final commit).
+Role: Implementer. This handoff makes no independent-verifier verdict or
+commercial-release acceptance claim.
 
 ## Implemented behavior summary
 
-- Native harness waits a bounded, recorded four seconds after iOS Simulator
-  Safari or unlocked Android Chrome launch before capture. Override with
-  `M7B_NATIVE_BROWSER_SETTLE_MS` (0–30,000 ms).
-- Native capture inventories the installed Android SDK emulator with
-  `emulator -list-avds`; an empty inventory is retained as informational and
-  never substitutes the required unlocked USB Android.
-- Locked Android is now read-only: the harness records policy/settings and an
-  explicit skipped-interaction command, then does not launch Chrome, mutate
-  accessibility settings, create `adb reverse`, or capture misleading browser
-  artifacts.
-- iOS simulators booted by the harness are shut down during cleanup; already
-  booted simulators remain running. Existing settings restoration remains
-  checksummed and recorded.
-- Added focused contract assertions and native-evidence documentation for the
-  readiness, emulator inventory, locked-device, and cleanup seams.
-- No product/game behavior, simulation, persistence, navigation, telemetry,
-  schema, audio, localization, packaging, or threat-model boundary changed.
+- Added a pure `src/ui/editorial.ts` presenter seam for Build, Jobs, Career,
+  Upgrades, Inspect, Research, Lab, and World. Each live summary states current
+  state, consequence, cost/risk, one next action, and the existing Details /
+  evidence boundary.
+- Added compact `DecisionSummary` and `LockedState` presentation primitives.
+  Research, Lab, and World locked surfaces now state requirement, progress, and
+  unlock action. Existing failure copy remains player-directed and preserves
+  work/recovery context.
+- Removed the duplicate Jobs first-session guide mount. Global and onboarding
+  chrome now carries editorial data attributes without adding a second action
+  source or changing navigation, Worker commands, persistence, or input.
+- Kept the expanded pipeline in normal document flow so the app scroll region
+  remains the only vertical owner; retained the 44px and horizontal-overflow
+  contracts.
+- Extended the data-driven command-deck screenshot atlas and browser contract
+  across all eight destinations, starter/expanded states, both portrait
+  widths, and the existing scale/reduced-motion/touch/reload/offline neighbors.
+- Formalized D-044 profiles in `scripts/verify`: development runs the local
+  candidate lanes and records the parked M7B commercial gate explicitly;
+  default/full-release retains WebKit/native/performance invocation and strict
+  BLOCKED propagation.
+- Routed D-044/D-045 through CURRENT_SCOPE, RELEASE_ACCEPTANCE, the
+  verification index/catalog, and this handoff. Immutable reports and
+  `plan.md` were not edited.
 
 ## Plan requirements covered
 
-- D-043 / M7B-NATIVE-001: available iOS Simulator Safari capture, settings
-  preservation, readiness wait, artifact checksums, honest VoiceOver/manual
-  speech and CSS-viewport blockers.
-- D-043 / M7B-EVIDENCE-001: explicit simulator/device matrix, artifact and
-  cleanup records, no physical or speech substitution.
-- M7B Rule of Three: normal iOS Safari shell capture at the representative
-  portrait simulator, 320/393 operator checklist boundary retained, and
-  lifecycle cleanup/recovery behavior recorded. The physical lifecycle gate
-  remains open.
-- Retained M7A navigation/PWA and deterministic/accounting/persistence scope
-  remains regression-only and unchanged.
+- D-044: unavailable physical/native/WebKit M7B evidence remains a named
+  commercial-release gate; no tooling or BLOCKED evidence is relabeled or
+  omitted. Development-candidate evidence is explicitly not release evidence.
+- D-045: presentation-only editorial contract for all eight destinations and
+  global/onboarding chrome; exact accounting/evidence stays in existing
+  Details, Inspect, accounting, and ledger surfaces; no speculative controls,
+  duplicate onboarding, engine/Worker/schema/economy/balance/navigation/PWA
+  changes.
+- M7C Rule of Three: normal presenter output; locked/malformed/failure/recovery
+  boundaries; starter/expanded/reload/offline/reduced-motion/onboarding
+  lifecycle neighbors.
+- Portrait contract: 320×693 and 393×742, raw and scaled browser coverage,
+  44 CSS-pixel controls, no document horizontal overflow, no nested expanded
+  pipeline scroll trap, and reachable primary actions.
 
-## Verifier findings resolved / rechecked
+## Verifier findings resolved / retained
 
-- `node .agent/verification/round-102-adversarial.mjs` through
-  `round-107-adversarial.mjs`: all `findings: []`; active trust-boundary seams
-  did not recur.
-- This candidate does not claim to resolve the infrastructure blockers in
-  immutable round 108. Native speech, actual CSS viewport, unlocked Android,
-  physical performance/battery/thermal, authenticated frozen baseline, and
-  pinned WebKit offline top-level reload remain explicit blockers.
+- No immutable verifier report was edited and no M7B finding is claimed closed.
+  Round 109 remains the honest BLOCKED infrastructure report; active M7B
+  catalog groups and tooling remain parked under D-044.
+- New candidate-owned regression coverage covers M7C profile parsing and the
+  editorial Rule of Three. Existing verifier suites remain in the canonical
+  lane; the eight strict-locator collisions found during independent full
+  browser rerun were repaired by avoiding duplicate exact copy in summaries.
 
 ## Setup, startup, and verification commands
 
-All npm and browser caches are repository-local and ignored:
+All dependency and browser caches are ignored and repository-local:
 
 ```sh
 export npm_config_cache="$PWD/.cache/npm"
@@ -63,111 +70,93 @@ export PLAYWRIGHT_BROWSERS_PATH="$PWD/.cache/ms-playwright"
 ./scripts/run
 ```
 
-Focused implementation checks:
+`./scripts/run` starts Vite at `http://127.0.0.1:4173` with strict port
+ownership; Playwright-managed servers clean up after each run. The pinned
+browser package is a project dependency. Use the package-manager commands:
 
 ```sh
-node --check scripts/native-accessibility.mjs
-npx vitest run --coverage=false src/test/m7bEvidenceTooling.test.ts --pool=forks --maxWorkers=1
-npm run format:check
-npm run lint -- --quiet
-npm run typecheck
-git diff --check
-node .agent/verification/round-102-adversarial.mjs
-node .agent/verification/round-103-adversarial.mjs
-node .agent/verification/round-104-adversarial.mjs
-node .agent/verification/round-105-adversarial.mjs
-node .agent/verification/round-106-adversarial.mjs
-node .agent/verification/round-107-adversarial.mjs
-```
-
-Host-authorized simulator capture used for this candidate:
-
-```sh
-M7B_NATIVE_ALLOW_BLOCKED=1 \
-M7B_NATIVE_EVIDENCE_DIR=.cache/m7b/native/round-109-native-harness-repair-2 \
+npm run test:e2e
+npm run test:e2e:pages
+npm run test:e2e:webkit
 npm run test:native-a11y
+npm run collect:mobile-performance
 ```
 
-Observed summary: `BLOCKED`; iOS 26.5 iPhone 17 Pro booted by harness, Safari
-page-ready screenshot after `sleep 4`, settings restored, simulator shutdown
-status 0; Android SDK emulator binary present with zero configured AVDs;
-attached Pixel 6a keyguard-locked, browser interaction skipped, no reverse
-tunnel left. Summary/artifacts are ignored under the evidence directory.
-
-Supplemental Safari simulator cache/open-url exploration (not acceptance
-evidence): start `E2E_PORT=4175 ./scripts/run-e2e`, open the URL with
-`xcrun simctl openurl <booted-udid> http://127.0.0.1:4175/`, wait four seconds
-and capture `xcrun simctl io <booted-udid> screenshot <path>`, stop the preview,
-then repeat `simctl openurl` and capture. The stopped-server screenshot retained
-the cached shell visually. It is not a proof of reload, speech, actual CSS
-viewport, physical performance, or pinned Playwright WebKit parity.
-
-Canonical full gate, once after all executable edits:
+Candidate profile and evidence directory used for this handoff:
 
 ```sh
-VERIFY_EVIDENCE_DIR=.cache/verification/round-109-final ./scripts/verify
+VERIFY_EVIDENCE_DIR=.cache/verification/round-110-development-final2 \
+  ./scripts/verify --profile=development
+```
+
+## Focused evidence executed
+
+```sh
+npm run format:check
+npm run lint
+npm run typecheck
+npm run validate:verification-catalog
+npx vitest run src/ui/editorial.test.ts src/test/verificationProfiles.test.ts --coverage=false
+npx vitest run src/test/agentWorkflowRouting.test.ts src/test/verifierRound083Workflow.test.ts src/ui/researchView.test.tsx --coverage=false
+npm run test:e2e -- tests/e2e/command-deck.spec.ts
+npm run test:e2e -- tests/e2e/first-session.spec.ts
+npm run test:e2e -- tests/e2e/game.spec.ts tests/e2e/research.spec.ts \
+  tests/e2e/round-009-usability.spec.ts tests/e2e/round-012-upgrades.spec.ts \
+  tests/e2e/round-015-expansion.spec.ts
+```
+
+The final development profile completed catalog, setup, format, lint,
+typecheck, 319 unit tests, all balance lanes, build, production audit, root
+Chromium/PWA `238 passed`, explicit `m7b-commercial-gate=blocked`, and Pages
+`2 passed`; exit `0`. The full browser run needed host-authorized Chromium
+launch because the managed sandbox otherwise returned macOS MachPort launch
+permission errors. The atlas images inspected from the final run included:
+
+```text
+test-results/command-deck/320-starter-build.png
+test-results/command-deck/393-starter-research.png
+test-results/command-deck/320-expanded-world.png
+test-results/command-deck/393-expanded-jobs.png
 ```
 
 ## Important architectural decisions
 
-- Evidence-only repair. Native speech remains operator-submitted; simulator
-  screenshots, logs, UI trees, and Safari visual checks never become speech or
-  physical-device claims.
-- Readiness is a bounded explicit wait, recorded in the machine artifact, not
-  an unbounded sleep or a guessed PASS. Locked-device short-circuit prevents
-  false browser evidence and avoids unnecessary device mutation.
-- Only a simulator booted by this harness is shut down; pre-existing operator
-  simulator state is preserved. Reverse-tunnel cleanup runs only when this
-  harness created the tunnel.
-- Android emulator inventory is diagnostic only. Simulator CPU/memory/thermal
-  observations cannot close the physical battery/thermal requirement.
+- Presenters are pure reads of existing engine/catalog/formatting helpers;
+  they cannot dispatch, persist, navigate, alter balance, or manufacture a
+  control. Summary text avoids duplicating exact source-of-truth values that
+  existing tests and Details surfaces already expose.
+- `LockedState` centralizes requirement/progress/action wording while allowing
+  the existing Research lock sentence to remain stable for screen-reader and
+  regression consumers.
+- The finite first-session guide remains the only onboarding action owner;
+  destination summaries point at it rather than repeating the action.
+- CSS changes remove only the nested vertical pipeline owner. No simulation,
+  Worker, schema, economy, PWA, persistence, navigation, threat-model, or
+  out-of-scope feature boundary changed.
 
 ## Known limitations and risks
 
-- CoreSimulator requires host authority in the managed sandbox. Without it,
-  `xcrun simctl list devices available --json` fails with CoreSimulatorService
-  connection errors and the lane remains `BLOCKED`.
-- The available iOS simulator Safari screenshot is supporting visual evidence;
-  VoiceOver speech and actual CSS viewport still require the operator submission
-  and validation command in `docs/m7b-native-accessibility.md`.
-- No Android AVD is installed. The attached Pixel 6a is locked and the user is
-  not near it; no unlock, TalkBack, physical Chrome, battery, or thermal claim
-  is made.
-- Pinned Playwright WebKit still reports the known correlated offline
-  top-level navigation error while cached-shell/controller proof succeeds. The
-  classifier retains it as `BLOCKED`; Safari simulator visual cache evidence
-  does not replace that pinned lane.
-- Same-device authenticated frozen baseline and physical performance evidence
-  remain unavailable. No caller-supplied or persisted baseline is accepted.
-- Deferred M7 work remains out of scope: writing/density, supported-save
-  fixtures/version policy, localization, audio, packaging/distribution,
-  startup/workforce/government/remote content, wrappers, and telemetry.
+- Commercial release remains BLOCKED until the physical/native/WebKit M7B
+  evidence is available: VoiceOver/TalkBack speech, unlocked physical Android,
+  physical battery/thermal, authenticated frozen baseline, and the known
+  WebKit offline top-level reload evidence. Round 109 and all M7B tooling are
+  retained as the source of that gate.
+- `./scripts/verify --profile=full-release` (also the no-argument default) was
+  not rerun in this candidate because immutable round-109 full-gate evidence
+  already records the same unavailable infrastructure; the script still
+  invokes every M7B lane and strictly propagates BLOCKED/FAILED outcomes.
+- The development profile is candidate evidence only. A fresh independent
+  Verifier must assess this exact committed SHA; no PASS or release claim is
+  issued here.
 
 ## Checks not run / final evidence
 
-- Host-authorized iOS Simulator native capture: run; `BLOCKED` for manual
-  VoiceOver speech and actual CSS viewport, with clean settings/simulator
-  cleanup. Final artifact summary:
-  `.cache/m7b/native/round-109-native-harness-repair-2/summary.json`.
-- Android native capture: physical interaction intentionally not run because
-  the device is locked; the harness records the exact policy output and skip.
-- Safari WebDriver enablement was not performed; persistent system automation
-  enablement was rejected by host policy. No claim depends on it.
-- Physical Android TalkBack, battery/thermal, and authenticated same-device
-  baseline: unavailable infrastructure; remain `BLOCKED`.
-- Final canonical command ran once after executable edits; it exited `2` because
-  M7B evidence lanes are blocked. This handoff issues no verdict or acceptance
-  claim.
-
-Final canonical result:
-
-`VERIFY_EVIDENCE_DIR=.cache/verification/round-109-final ./scripts/verify`
-→ exit `2`, blocked. Catalog/setup/format/lint/typecheck, 314 unit tests,
-balance, build, production audit, root Chromium/PWA `238 passed`, and Pages
-`2 passed`. WebKit ran both portraits with `BLOCKED` only for the exact
-correlated offline top-level navigation pair. Native iOS Safari capture ran
-with page-ready wait and simulator shutdown; VoiceOver speech/CSS viewport and
-locked Android/TalkBack remain blocked. Performance recorded Chromium/WebKit ×
-320/393, five runs per cell; physical battery/thermal and authenticated
-same-device baseline remain blocked. Evidence:
-`.cache/verification/round-109-final`.
+- Full-release/default profile: intentionally not run; reason above. Run it
+  only when the required M7B infrastructure is available.
+- WebKit, native accessibility, and measured-device lanes: not run in the
+  development profile because D-044 parks them as the explicit commercial
+  gate; their commands remain wired in full-release.
+- Native device speech, physical performance/battery/thermal, and hosted
+  exact-SHA deployment: unavailable/out of Implementer scope.
+- Final canonical development evidence:
+  `.cache/verification/round-110-development-final2/summary.txt`.

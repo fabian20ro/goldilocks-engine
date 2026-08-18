@@ -10,6 +10,8 @@ import {
 import { laboratoryPipelineReadiness } from "../simulation/laboratory";
 import { findResearcher } from "../simulation/researchCatalog";
 import type { SimulationCommand, SimulationState } from "../simulation/types";
+import { DecisionSummary, LockedState } from "./commandDeck";
+import { presentLaboratoryDecision } from "./editorial";
 
 interface LaboratoryViewProps {
   state: SimulationState;
@@ -68,21 +70,11 @@ export function LaboratoryView({ state, command }: LaboratoryViewProps) {
         </p>
         {!lab.unlocked ? (
           <div className="laboratory-locked" role="status">
-            <strong>Laboratory plan is still closed.</strong>
-            <ul>
-              {state.career.exitAchieved ? null : (
-                <li>Complete the Bedroom Developer exit.</li>
-              )}
-              {state.research.frontier.completedProjectIds.length > 0 ? null : (
-                <li>Complete one Research question.</li>
-              )}
-              {state.hypeFear.unlocked ? null : (
-                <li>Reach First Recognition.</li>
-              )}
-              {state.hypeFear.lastResponse ? null : (
-                <li>Resolve one Hype or Fear deadline.</li>
-              )}
-            </ul>
+            <LockedState
+              requirement="Bedroom exit + one Research question + First Recognition + one resolved Hype/Fear deadline."
+              progress={`${state.career.exitAchieved ? 1 : 0}/1 exit · ${Math.min(1, state.research.frontier.completedProjectIds.length)}/1 research · ${state.hypeFear.unlocked ? 1 : 0}/1 recognition · ${state.hypeFear.lastResponse ? 1 : 0}/1 deadline`}
+              nextAction="Complete the first unmet requirement listed here; no lab purchase or founding action is available while locked."
+            />
           </div>
         ) : (
           <div className="laboratory-status" role="status">
@@ -91,6 +83,7 @@ export function LaboratoryView({ state, command }: LaboratoryViewProps) {
             <small>{lab.pendingDecision}</small>
           </div>
         )}
+        <DecisionSummary decision={presentLaboratoryDecision(state)} />
       </section>
 
       {lab.unlocked ? (

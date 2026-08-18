@@ -6,7 +6,16 @@ import {
 } from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
-const tabs = ["Build", "Jobs", "Career", "Upgrades", "Inspect"] as const;
+const tabs = [
+  "Build",
+  "Jobs",
+  "Career",
+  "Upgrades",
+  "Inspect",
+  "Research",
+  "Lab",
+  "World",
+] as const;
 
 async function openTab(page: Page, name: (typeof tabs)[number]) {
   await page
@@ -41,6 +50,28 @@ async function assertPortrait(page: Page) {
     }),
   );
   expect(small).toEqual([]);
+}
+
+async function assertEditorialSummary(page: Page, destination: string) {
+  const summary = page.getByTestId("destination-decision");
+  await expect(summary).toHaveCount(1);
+  await expect(summary).toHaveAttribute(
+    "data-editorial-destination",
+    destination,
+  );
+  for (const label of [
+    "Current state",
+    "Consequence",
+    "Cost / risk",
+    "Next action",
+  ])
+    await expect(summary.getByText(label, { exact: true })).toBeVisible();
+  await expect(summary.locator(".destination-details-hint")).toContainText(
+    "Details",
+  );
+  await expect(page.getByTestId("first-session-guide")).toHaveCount(
+    destination === "Inspect" ? 0 : 1,
+  );
 }
 
 async function assertTabScrollContract(
@@ -239,6 +270,7 @@ for (const viewport of [
     for (const tab of tabs) {
       await openTab(page, tab);
       await assertPortrait(page);
+      await assertEditorialSummary(page, tab === "Lab" ? "Lab" : tab);
       if (tab === "Career")
         await assertCareerControlGeometry(page, viewport.width);
       if (tab === "Inspect") await assertInspectPriority(page);
@@ -259,6 +291,7 @@ for (const viewport of [
     for (const tab of tabs) {
       await openTab(page, tab);
       await assertPortrait(page);
+      await assertEditorialSummary(page, tab === "Lab" ? "Lab" : tab);
       if (tab === "Career")
         await assertCareerControlGeometry(page, viewport.width);
       if (tab === "Inspect") await assertInspectPriority(page);
