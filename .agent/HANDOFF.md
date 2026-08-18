@@ -36,7 +36,7 @@ verifier commit `55bc0d9833db7a8105cc0315b6c5645f8d115258`.
   operation-window, URL, location, type, message, and timestamp provenance.
   The canonical marker `WebKit encountered an internal error` is shared by
   the structured navigation error and exact console shape `Failed to load
-  resource: <marker>`. Only one exact in-window event may correlate, with
+resource: <marker>`. Only one exact in-window event may correlate, with
   exact URL/location/type/message and cardinality checks; all uncorrelated or
   additional events fail the zero-error gate.
 - Reworked `scripts/webkit-result-classifier.mjs` and its runner contract:
