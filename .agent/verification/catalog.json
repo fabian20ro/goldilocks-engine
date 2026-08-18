@@ -518,6 +518,39 @@
         "scripts/webkit-result-classifier.mjs"
       ],
       "note": "The structured WebKit classifier accepts expected tests with missing, skipped, or unknown results as PASS instead of rejecting malformed or incomplete evidence."
+    },
+    {
+      "id": "V-111-001",
+      "match": { "exact": ["V-111-001"] },
+      "status": "active",
+      "requirementId": "M7D-SAVE-001",
+      "regressionEvidence": [
+        "src/simulation/verifierRound111.test.ts",
+        ".agent/verification/round-111.md"
+      ],
+      "note": "Schema 3–6 restore accepts unknown content generations instead of enforcing the exact audited schema/content pairs."
+    },
+    {
+      "id": "V-111-002",
+      "match": { "exact": ["V-111-002"] },
+      "status": "active",
+      "requirementId": "M7D-SAVE-002",
+      "regressionEvidence": [
+        "src/simulation/verifierRound111.test.ts",
+        ".agent/verification/round-111.md"
+      ],
+      "note": "Malformed supported legacy payloads fall back but are reported as migrated with preserved-field copy."
+    },
+    {
+      "id": "V-111-003",
+      "match": { "exact": ["V-111-003"] },
+      "status": "active",
+      "requirementId": "M7D-SAVE-002",
+      "regressionEvidence": [
+        "src/simulation/verifierRound111.test.ts",
+        ".agent/verification/round-111.md"
+      ],
+      "note": "Unsealed current saves retain uncorroborated hardware, module, ending, and Career progression fields."
     }
   ],
   "supersededProbes": [
