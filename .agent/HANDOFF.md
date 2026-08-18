@@ -1,7 +1,9 @@
 # Candidate handoff — Milestone 7B verifier repair
 
-Implementation commit: pending Round 108 commit. Implementation started from
-verifier commit `55bc0d9833db7a8105cc0315b6c5645f8d115258`.
+Implementation commit: `0302771` (`repair WebKit evidence trust boundaries`).
+Final handoff bookkeeping is the documentation-only commit after the canonical
+run. Implementation started from verifier commit
+`55bc0d9833db7a8105cc0315b6c5645f8d115258`.
 
 ## Implemented behavior summary
 
@@ -217,19 +219,31 @@ artifacts. The native validator writes only
 
 - Passed: focused malformed-report/matrix tests, format, lint, typecheck,
   syntax checks, `git diff --check`, classifier valid/infra/no-test/launch
-  checks, and the exact round-102 through round-107 adversarial probes. Native
-  capture/validation proved the exact operator-submission command and refused
-  a validation overwrite on rerun. Host WebKit executed both portraits and
-  returned structured BLOCKED with exact one-event correlation. Physical
-  Android, native operator, and authenticated baseline evidence remain
-  explicit blockers.
+  checks, the exact round-102 through round-107 adversarial probes, the full
+  314-test unit suite, balance, build, 238-test Chromium E2E, and 2-test Pages
+  E2E. Native capture/validation proved the exact operator-submission command
+  and refused a validation overwrite on rerun. Host WebKit executed both
+  portraits and returned structured BLOCKED with exact one-event correlation.
+  Physical Android, native operator, and authenticated baseline evidence
+  remain explicit blockers.
 - Focused evidence remains available in ignored `.cache/m7b/` directories.
-  The final canonical retained evidence will be recorded below; no M7B gate is
-  silently treated as passed.
+  The final canonical retained evidence is under
+  `.cache/verification/round-108-final/` (ignored); no M7B gate is silently
+  treated as passed.
 - Final canonical command:
   `VERIFY_EVIDENCE_DIR=.cache/verification/round-108-final ./scripts/verify`.
-  Result and exact blocked/failed gates are recorded after the one final run;
-  this handoff issues no verdict.
+  Result: exit `2`, verification blocked. Static, unit, balance, build,
+  Chromium E2E (`238 passed`), and Pages E2E (`2 passed`) passed. WebKit
+  summary `.cache/verification/round-108-final/m7b-webkit-32649/summary.json`
+  is `BLOCKED` with two structured expected tests, both portrait matrices,
+  exact correlated marker pairs, and no structured failures. Native summary
+  `.cache/verification/round-108-final/m7b-native-32649/summary.json` is
+  `BLOCKED` for VoiceOver/actual CSS operator evidence and locked Android
+  TalkBack. Performance summary
+  `.cache/verification/round-108-final/m7b-performance-32649/summary.json` is
+  `BLOCKED` for physical battery/thermal and same-device authenticated frozen
+  baseline capture; all four browser cells recorded five runs and WebKit
+  offline pairs are retained. This handoff issues no verdict.
 - To close remaining infrastructure gates, run the canonical lane with an
   available pinned browser, iOS VoiceOver operator session, unlocked/authorized
   Pixel TalkBack session, and the accepted build containing its collector on
