@@ -1,7 +1,9 @@
 # Candidate handoff — Milestone 7C Writing & Density Closure
 
 Implementation base: `34c76e1a450075d3534efb5fe0dd48f8bd326054`.
-Implementation candidate: `PENDING_FINAL_SHA` (replace before final commit).
+Implementation candidate: `3076be34c2bae5ee2e56a761e81b5b7a9497a8ce` before
+the final handoff-bookkeeping amend; the final candidate SHA is reported after
+that amend.
 Role: Implementer. This handoff makes no independent-verifier verdict or
 commercial-release acceptance claim.
 
