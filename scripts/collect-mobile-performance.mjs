@@ -38,22 +38,26 @@ const allowBlocked =
 const captureFrozenBaseline = process.argv.includes(
   "--capture-frozen-baseline",
 );
-const frozenAcceptedCandidateSha =
-  process.env.M7B_FROZEN_ACCEPTED_SHA ??
-  "d25e80e6781de89e80fc3b3c240a922ada53d978";
-const frozenAcceptedBuildId =
-  process.env.M7B_FROZEN_BUILD_ID ?? "dc97ee41f6dbbc0e29d2";
+// These values are the release-owner trust root for the frozen M7A receipt.
+// Environment variables may request a capture, but never redefine the object
+// against which candidate evidence is compared.
+const frozenAcceptedCandidateSha = "d25e80e6781de89e80fc3b3c240a922ada53d978";
+const frozenAcceptedBuildId = "dc97ee41f6dbbc0e29d2";
+const requestedFrozenCandidateSha = process.env.M7B_FROZEN_ACCEPTED_SHA;
+const requestedFrozenBuildId = process.env.M7B_FROZEN_BUILD_ID;
 const performanceDeviceId =
   process.env.M7B_PERFORMANCE_DEVICE_ID ?? "unidentified-device";
-const baselineArg = process.argv.find((value) =>
-  value.startsWith("--baseline="),
-);
-const baselinePath = path.resolve(
+// Candidate runs consume only the capture helper's canonical retained output.
+// Arbitrary --baseline paths and M7B_PERFORMANCE_BASELINE are deliberately not
+// accepted as evidence inputs.
+const baselinePath = path.join(
   root,
-  baselineArg?.slice("--baseline=".length) ??
-    process.env.M7B_PERFORMANCE_BASELINE ??
-    ".cache/m7b/performance/frozen-baseline.json",
+  ".cache/m7b/performance/frozen-baseline.json",
 );
+const baselineProvenancePath = `${baselinePath}.provenance.json`;
+const callerBaselineOverride =
+  process.argv.find((value) => value.startsWith("--baseline=")) ??
+  process.env.M7B_PERFORMANCE_BASELINE;
 const summaryArg = process.argv.find((value) => value.startsWith("--output="));
 const summaryPath = path.resolve(
   root,
@@ -140,6 +144,27 @@ function gitSha() {
     }).trim();
   } catch {
     return "unknown";
+  }
+}
+
+function gitTreeSha(commitSha) {
+  if (typeof commitSha !== "string" || !/^[a-f0-9]{40}$/.test(commitSha))
+    return "unknown";
+  try {
+    return execFileSync("git", ["rev-parse", `${commitSha}^{tree}`], {
+      cwd: root,
+      encoding: "utf8",
+    }).trim();
+  } catch {
+    return "unknown";
+  }
+}
+
+function readJson(filePath) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch {
+    return null;
   }
 }
 
@@ -964,16 +989,191 @@ function budgetFindings(cells) {
   return findings;
 }
 
-function baselineArtifactFindings(baseline) {
-  const entries = [
-    ...(Array.isArray(baseline.artifacts) ? baseline.artifacts : []),
-    ...(Array.isArray(baseline.physicalDevice?.artifacts)
+function baselineArtifactEntries(baseline) {
+  return [
+    ...(Array.isArray(baseline?.artifacts) ? baseline.artifacts : []),
+    ...(Array.isArray(baseline?.physicalDevice?.artifacts)
       ? baseline.physicalDevice.artifacts
       : []),
-    ...(Array.isArray(baseline.androidBrowser?.artifacts)
+    ...(Array.isArray(baseline?.androidBrowser?.artifacts)
       ? baseline.androidBrowser.artifacts
       : []),
   ];
+}
+
+function baselineArtifactMap(baseline) {
+  return new Map(
+    baselineArtifactEntries(baseline).map((entry) => [
+      entry?.path,
+      entry?.sha256,
+    ]),
+  );
+}
+
+function trustedBaselineProvenanceFindings(baseline, provenance) {
+  if (!baseline)
+    return [
+      {
+        gate: "same-device-baseline",
+        reason:
+          "trusted frozen accepted-build baseline is unavailable at the canonical capture path",
+        required:
+          "npm run capture:frozen-baseline -- --output=.cache/m7b/performance/frozen-baseline.json",
+        result: "BLOCKED",
+      },
+    ];
+  if (!provenance || typeof provenance !== "object")
+    return [
+      {
+        gate: "same-device-baseline-provenance",
+        reason:
+          "baseline provenance receipt is missing; caller-supplied JSON is not accepted",
+        required: path.relative(root, baselineProvenancePath),
+        result: "BLOCKED",
+      },
+    ];
+
+  const findings = [];
+  if (provenance.schemaVersion !== 1)
+    findings.push({
+      gate: "same-device-baseline-provenance",
+      reason: "baseline provenance schema is unsupported",
+      result: "BLOCKED",
+    });
+  if (provenance.kind !== "m7b-frozen-baseline-provenance")
+    findings.push({
+      gate: "same-device-baseline-provenance",
+      reason: "baseline provenance kind is not the trusted capture receipt",
+      result: "BLOCKED",
+    });
+  if (
+    typeof provenance.captureId !== "string" ||
+    provenance.captureId.trim() === ""
+  )
+    findings.push({
+      gate: "same-device-baseline-provenance",
+      reason: "baseline provenance capture ID is missing",
+      result: "BLOCKED",
+    });
+  if (provenance.generatedBy !== "scripts/capture-frozen-baseline.mjs")
+    findings.push({
+      gate: "same-device-baseline-provenance",
+      reason: "baseline was not produced by the repository capture helper",
+      result: "BLOCKED",
+    });
+  if (provenance.acceptedSha !== frozenAcceptedCandidateSha)
+    findings.push({
+      gate: "same-device-baseline-provenance",
+      reason: "provenance does not identify the trusted accepted Git object",
+      expectedAcceptedSha: frozenAcceptedCandidateSha,
+      actualAcceptedSha: provenance.acceptedSha,
+      result: "BLOCKED",
+    });
+  const expectedTreeSha = gitTreeSha(frozenAcceptedCandidateSha);
+  if (
+    expectedTreeSha === "unknown" ||
+    provenance.gitTreeSha !== expectedTreeSha ||
+    baseline.gitTreeSha !== expectedTreeSha
+  )
+    findings.push({
+      gate: "same-device-baseline-provenance",
+      reason:
+        "baseline Git tree does not match the re-derived tree of the trusted accepted object",
+      expectedTreeSha,
+      provenanceTreeSha: provenance.gitTreeSha,
+      baselineTreeSha: baseline.gitTreeSha,
+      result: "BLOCKED",
+    });
+  if (provenance.buildId !== frozenAcceptedBuildId)
+    findings.push({
+      gate: "same-device-baseline-provenance",
+      reason: "provenance build ID is not the trusted accepted build",
+      expectedBuildId: frozenAcceptedBuildId,
+      actualBuildId: provenance.buildId,
+      result: "BLOCKED",
+    });
+  if (baseline.candidateSha !== frozenAcceptedCandidateSha)
+    findings.push({
+      gate: "same-device-baseline-provenance",
+      reason: "baseline summary candidate SHA differs from the trusted capture",
+      result: "BLOCKED",
+    });
+  if (baseline.buildInfo?.version !== frozenAcceptedBuildId)
+    findings.push({
+      gate: "same-device-baseline-provenance",
+      reason: "baseline summary build ID differs from the trusted capture",
+      result: "BLOCKED",
+    });
+  if (
+    baseline.provenance?.captureId !== provenance.captureId ||
+    baseline.provenance?.path !== path.relative(root, baselineProvenancePath)
+  )
+    findings.push({
+      gate: "same-device-baseline-provenance",
+      reason:
+        "baseline summary is not bound to the retained provenance receipt",
+      result: "BLOCKED",
+    });
+  if (provenance.summaryPath !== path.relative(root, baselinePath))
+    findings.push({
+      gate: "same-device-baseline-provenance",
+      reason: "provenance summary path is not the canonical retained baseline",
+      result: "BLOCKED",
+    });
+  if (
+    !/^[a-f0-9]{64}$/.test(provenance.summarySha256 ?? "") ||
+    !fs.existsSync(baselinePath) ||
+    sha256(baselinePath) !== provenance.summarySha256
+  )
+    findings.push({
+      gate: "same-device-baseline-provenance",
+      reason: "baseline summary digest does not match the retained bytes",
+      result: "BLOCKED",
+    });
+
+  const baselineArtifacts = baselineArtifactMap(baseline);
+  const provenanceArtifacts = new Map(
+    (Array.isArray(provenance.artifacts) ? provenance.artifacts : []).map(
+      (entry) => [entry?.path, entry?.sha256],
+    ),
+  );
+  for (const entry of Array.isArray(provenance.artifacts)
+    ? provenance.artifacts
+    : [])
+    if (
+      !entry ||
+      typeof entry.path !== "string" ||
+      !/^[a-f0-9]{64}$/.test(entry.sha256 ?? "")
+    )
+      findings.push({
+        gate: "same-device-baseline-provenance",
+        path: entry?.path,
+        reason: "provenance artifact entries must be {path,sha256}",
+        result: "BLOCKED",
+      });
+  if (baselineArtifacts.size === 0 || provenanceArtifacts.size === 0)
+    findings.push({
+      gate: "same-device-baseline-provenance",
+      reason: "trusted capture receipt has no retained artifact manifest",
+      result: "BLOCKED",
+    });
+  if (
+    baselineArtifacts.size !== provenanceArtifacts.size ||
+    [...baselineArtifacts].some(
+      ([artifactPath, digest]) =>
+        provenanceArtifacts.get(artifactPath) !== digest,
+    )
+  )
+    findings.push({
+      gate: "same-device-baseline-provenance",
+      reason: "provenance artifact manifest differs from baseline summary",
+      result: "BLOCKED",
+    });
+  return findings;
+}
+
+function baselineArtifactFindings(baseline) {
+  const entries = baselineArtifactEntries(baseline);
   const unique = [
     ...new Map(
       entries
@@ -1027,17 +1227,12 @@ function baselineArtifactFindings(baseline) {
   return findings;
 }
 
-function baselineFindings(cells, baseline, currentContext) {
-  if (!baseline) {
-    return [
-      {
-        gate: "same-device-baseline",
-        reason: "frozen accepted-build baseline artifact is unavailable",
-        required: "--baseline=<accepted-build-summary.json>",
-        result: "BLOCKED",
-      },
-    ];
-  }
+function baselineFindings(cells, baseline, provenance, currentContext) {
+  const provenanceFindings = trustedBaselineProvenanceFindings(
+    baseline,
+    provenance,
+  );
+  if (provenanceFindings.length > 0) return provenanceFindings;
   const findings = [];
   findings.push(...baselineArtifactFindings(baseline));
   const baselineDeviceId = baseline.environment?.deviceId;
@@ -1191,6 +1386,7 @@ const summary = {
   kind: "m7b-mobile-performance",
   mode: captureFrozenBaseline ? "frozen-baseline" : "candidate",
   candidateSha: gitSha(),
+  gitTreeSha: gitTreeSha(gitSha()),
   buildInfo: null,
   environment: {
     deviceId: performanceDeviceId,
@@ -1227,6 +1423,35 @@ const summary = {
   androidBrowser: null,
   artifacts: [],
 };
+
+if (
+  (requestedFrozenCandidateSha &&
+    requestedFrozenCandidateSha !== frozenAcceptedCandidateSha) ||
+  (requestedFrozenBuildId && requestedFrozenBuildId !== frozenAcceptedBuildId)
+)
+  summary.findings.push({
+    gate: "same-device-baseline-provenance",
+    reason:
+      "frozen baseline identity is repository-pinned; caller overrides are rejected",
+    expected: {
+      candidateSha: frozenAcceptedCandidateSha,
+      buildId: frozenAcceptedBuildId,
+    },
+    requested: {
+      candidateSha: requestedFrozenCandidateSha,
+      buildId: requestedFrozenBuildId,
+    },
+    result: "BLOCKED",
+  });
+if (callerBaselineOverride)
+  summary.findings.push({
+    gate: "same-device-baseline-provenance",
+    reason:
+      "caller-supplied baseline paths are rejected; use the repository capture helper and canonical retained receipt",
+    rejected: callerBaselineOverride,
+    required: path.relative(root, baselinePath),
+    result: "BLOCKED",
+  });
 
 let server;
 try {
@@ -1383,15 +1608,11 @@ try {
     summary.findings.push(summary.androidBrowser);
   }
   summary.findings.push(...budgetFindings(summary.cells));
-  let baseline = null;
-  try {
-    baseline = JSON.parse(fs.readFileSync(baselinePath, "utf8"));
-  } catch {
-    baseline = null;
-  }
+  const baseline = readJson(baselinePath);
+  const baselineProvenance = readJson(baselineProvenancePath);
   if (!captureFrozenBaseline)
     summary.findings.push(
-      ...baselineFindings(summary.cells, baseline, {
+      ...baselineFindings(summary.cells, baseline, baselineProvenance, {
         candidateSha: summary.candidateSha,
         buildInfo: summary.buildInfo,
         environment: summary.environment,

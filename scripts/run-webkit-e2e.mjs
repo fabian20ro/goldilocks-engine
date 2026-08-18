@@ -4,6 +4,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { classifyWebKitReport } from "./webkit-result-classifier.mjs";
 
 const root = path.resolve(new URL("..", import.meta.url).pathname);
 const evidenceDir = path.resolve(
@@ -52,24 +53,32 @@ const stderr = String(run.stderr ?? "");
 fs.writeFileSync(reportPath, stdout);
 fs.writeFileSync(stderrPath, stderr);
 
-const infrastructureFailure =
-  /WebKit encountered an internal error|WebKit.*(?:Abort trap|Mach-port)|bootstrap_check_in|process launch failed|browserType\.launch|WebKit offline reload reported:/i.test(
-    `${stdout}\n${stderr}`,
-  );
-const blocked = infrastructureFailure;
-const result = blocked ? "BLOCKED" : run.status === 0 ? "PASS" : "FAILED";
+let report = null;
+let reportParseError = null;
+try {
+  report = JSON.parse(stdout);
+} catch (error) {
+  reportParseError = String(error);
+}
+const classification = classifyWebKitReport(report, run.status ?? 1);
+const result = classification.result;
 const summary = {
   schemaVersion: 1,
   kind: "m7b-webkit-e2e",
   candidateSha: candidateSha(),
   result,
   exitCode: run.status ?? 1,
+  signal: run.signal ?? null,
   command: `PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright playwright test ${configArg} --reporter=json`,
-  reason: blocked
-    ? "WebKit reported a known navigation or browser-launch infrastructure failure; inspect retained report and stderr"
-    : result === "FAILED"
-      ? "Pinned WebKit test failed"
-      : "Pinned WebKit test completed without blocked annotations",
+  reason: classification.reason,
+  playwright: {
+    reportParsed: report !== null,
+    reportParseError,
+    testsSeen: classification.testsSeen,
+    failures: classification.failures,
+    infrastructure: classification.infrastructure,
+    stats: report?.stats ?? null,
+  },
   artifacts: [artifact(reportPath), artifact(stderrPath)],
 };
 fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2) + "\n");

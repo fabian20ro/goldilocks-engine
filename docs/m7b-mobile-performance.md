@@ -55,13 +55,21 @@ silently converted into a passing offline navigation.
 
 ## Frozen-build baseline and physical Android evidence
 
-The accepted-build baseline must be collected separately and passed explicitly;
-the current candidate is never used as its own baseline. Baseline metadata must
-authenticate the frozen accepted SHA/build (`d25e80e6781de89e80fc3b3c240a922ada53d978` /
-`dc97ee41f6dbbc0e29d2`), an explicit same-device ID, the same browser matrix,
-and the same settings fingerprint. Missing, self, unrelated, or mismatched
-metadata is `BLOCKED` before metric comparison. Every baseline artifact is
-also required to be a retained `{path,sha256}` entry whose bytes still match.
+The accepted-build baseline is captured separately; the current candidate is
+never used as its own baseline. Candidate collection consumes only the
+canonical retained capture at
+`.cache/m7b/performance/frozen-baseline.json` and its adjacent
+`.provenance.json` receipt. `--baseline` and `M7B_PERFORMANCE_BASELINE` are
+rejected as caller-supplied evidence, not treated as an override.
+
+The capture helper binds the baseline to the frozen accepted SHA/build
+(`d25e80e6781de89e80fc3b3c240a922ada53d978` /
+`dc97ee41f6dbbc0e29d2`), re-derives the accepted Git tree, records a unique
+capture ID, explicit same-device ID, browser matrix, settings fingerprint,
+and checksummed artifact manifest. The collector revalidates those inputs,
+the summary digest, and every retained `{path,sha256}` entry before comparing
+metrics. Missing, self, forged, unrelated, or mismatched evidence is
+`BLOCKED` before metric comparison.
 
 Capture a baseline reproducibly from a detached worktree of that exact frozen
 SHA. The command requires an explicit physical/same-device identifier and
@@ -74,11 +82,12 @@ npm run capture:frozen-baseline
 
 The helper runs `npm ci --prefer-offline`, installs the pinned Chromium/WebKit
 builds into `.cache/ms-playwright`, runs the collector with
-`--capture-frozen-baseline`, validates the frozen SHA/build ID, and removes its
-temporary worktree. Set `--output=<path>` to retain the baseline elsewhere.
+`--capture-frozen-baseline`, validates the frozen SHA/build/tree ID, writes the
+summary and provenance receipt, and removes its temporary worktree. The
+canonical default output must remain at the path above; a custom `--output`
+is retained for inspection but is not consumed as candidate evidence.
 
 ```sh
-M7B_PERFORMANCE_BASELINE=.cache/m7b/performance/frozen-baseline.json \
 npm run collect:mobile-performance
 ```
 

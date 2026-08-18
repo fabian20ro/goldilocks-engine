@@ -47,4 +47,25 @@ describe("M7B evidence tooling contract", () => {
       "battery/thermal sub-gate",
     );
   });
+
+  it("keeps authenticity seams fail-closed", () => {
+    const performance = read("scripts/collect-mobile-performance.mjs");
+    const native = read("scripts/native-accessibility.mjs");
+    const webkitClassifier = read("scripts/webkit-result-classifier.mjs");
+    expect(performance).toContain("trustedBaselineProvenanceFindings");
+    expect(performance).toContain("M7B_PERFORMANCE_BASELINE");
+    expect(performance).toContain(
+      "caller-supplied baseline paths are rejected",
+    );
+    expect(native).toContain(
+      "row.actualCssViewport?.height !== expected.height",
+    );
+    expect(native).toContain("expectedHeight = width === 320 ? 693 : 742");
+    expect(webkitClassifier).toContain("report?.stats");
+    expect(webkitClassifier).toContain('result: "FAILED"');
+    expect(webkitClassifier).toContain('result: "BLOCKED"');
+    expect(read("scripts/run-webkit-e2e.mjs")).not.toContain(
+      "const infrastructureFailure =",
+    );
+  });
 });

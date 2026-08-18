@@ -143,6 +143,7 @@ function nativeChecklist(platform, device, browser) {
   ];
   const rows = [];
   for (const width of [393, 320]) {
+    const height = width === 320 ? 693 : 742;
     for (const name of destinations) {
       rows.push({
         id: `${platform}:${width}:${name}:100-normal`,
@@ -150,7 +151,7 @@ function nativeChecklist(platform, device, browser) {
         device,
         browser,
         width,
-        height: width === 320 ? 693 : 742,
+        height,
         textScale: "100%",
         reducedMotion: false,
         check: `screen-reader announces ${name} tab and active state`,
@@ -166,7 +167,7 @@ function nativeChecklist(platform, device, browser) {
         device,
         browser,
         width,
-        height: width === 320 ? 693 : 742,
+        height,
         textScale: "200%",
         reducedMotion: true,
         check:
@@ -487,17 +488,21 @@ function validateOperatorEvidence() {
         reason: "reduced-motion run is not recorded",
       });
     for (const width of [320, 393]) {
+      const expectedHeight = width === 320 ? 693 : 742;
       const viewport = device.actualCssViewports?.[String(width)];
       if (
         !viewport ||
         viewport.width !== width ||
-        !Number.isFinite(viewport.height)
+        viewport.height !== expectedHeight
       )
         blockers.push({
           gate: "actual-css-viewport",
           platform,
           width,
-          reason: "actual CSS viewport is missing or mismatched",
+          expected: { width, height: expectedHeight },
+          actual: viewport,
+          reason:
+            "actual CSS viewport must match the exact requested portrait dimensions",
         });
     }
   }
@@ -554,14 +559,29 @@ function validateOperatorEvidence() {
         row: expected.id,
         reason: "row screenshot must reference a retained evidence file",
       });
+    if (row.width !== expected.width || row.height !== expected.height)
+      blockers.push({
+        gate: "checklist",
+        row: expected.id,
+        expected: { width: expected.width, height: expected.height },
+        actual: { width: row.width, height: row.height },
+        reason:
+          "row declared viewport must match the exact requested portrait dimensions",
+      });
     if (
       row.actualCssViewport?.width !== expected.width ||
-      !Number.isFinite(row.actualCssViewport?.height)
+      row.actualCssViewport?.height !== expected.height
     )
       blockers.push({
         gate: "checklist",
         row: expected.id,
-        reason: "row actual CSS viewport is missing or mismatched",
+        expected: {
+          width: expected.width,
+          height: expected.height,
+        },
+        actual: row.actualCssViewport,
+        reason:
+          "row actual CSS viewport must match the exact requested portrait dimensions",
       });
   }
 
