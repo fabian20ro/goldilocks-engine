@@ -653,6 +653,19 @@
         ".agent/verification/round-114.md"
       ],
       "note": "Altered typed settlement accounting payloads are counted in recovered totals."
+    },
+    {
+      "id": "V-115-001",
+      "match": { "exact": ["V-115-001"] },
+      "status": "active",
+      "requirementId": "M7D-SAVE-001",
+      "regressionEvidence": [
+        ".agent/verification/round-115.md",
+        "scripts/generate-save-fixtures.ts",
+        "fixtures/save-fixtures/boundary-unsealed-current.json",
+        "fixtures/save-fixtures/boundary-unsupported-schema.json"
+      ],
+      "note": "The documented save-fixture generator rewrites committed provenance strings, so the audited corpus is not reproducible byte-for-byte until the source and fixtures agree."
     }
   ],
   "supersededProbes": [
