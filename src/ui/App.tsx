@@ -52,6 +52,7 @@ import type {
   RunEndingId,
   SimulationCommand,
   SimulationState,
+  SaveRecoveryStatus,
 } from "../simulation/types";
 import { TIME_SPEEDS, useSimulation, type TimeSpeed } from "./useSimulation";
 import {
@@ -737,6 +738,39 @@ function SecondaryControls({
         </div>
       </details>
     </section>
+  );
+}
+
+function SaveRecoveryNotice({
+  status,
+  onDismiss,
+}: {
+  status: SaveRecoveryStatus;
+  onDismiss: () => void;
+}) {
+  if (status.disposition === "none") return null;
+  return (
+    <aside
+      className="save-recovery-notice"
+      data-testid="save-recovery-status"
+      role="status"
+      aria-label="Save recovery status"
+    >
+      <strong>Save recovery · {status.reason.replaceAll("-", " ")}</strong>
+      <p>
+        Preserved: {status.preserved.join("; ") || "nothing from the saved run"}
+        . Reset: {status.reset.join("; ") || "none"}.
+      </p>
+      <p>
+        Next action: {status.nextAction}
+        {status.backupCreated
+          ? " One bounded raw recovery backup was preserved."
+          : " No raw backup was available."}
+      </p>
+      <button type="button" onClick={onDismiss}>
+        Dismiss recovery note
+      </button>
+    </aside>
   );
 }
 
@@ -4318,6 +4352,8 @@ export function App() {
     workerResponseBoundaries,
     consumeWorkerResponseBoundariesThrough,
     lastDurableRequestId,
+    saveRecoveryStatus,
+    dismissSaveRecoveryStatus,
     timeSpeed,
     setTimeSpeed,
   } = useSimulation();
@@ -5009,6 +5045,13 @@ export function App() {
           </div>
           <ResourceStrip state={state} />
         </header>
+
+        {saveRecoveryStatus ? (
+          <SaveRecoveryNotice
+            status={saveRecoveryStatus}
+            onDismiss={dismissSaveRecoveryStatus}
+          />
+        ) : null}
 
         <main id="main-content" className={`main-content ${tab}-content`}>
           {tab !== "build" && tab !== "inspect" ? secondaryControls : null}

@@ -100,6 +100,7 @@ import {
   type RunEndingId,
   type ResearchState,
   type SaveIntegrity,
+  type SaveRecoveryStatus,
   type SimulationCommand,
   type SimulationState,
   type UpgradeNotice,
@@ -6889,4 +6890,175 @@ export function restoreSimulationState(
   };
   const migrated = sealSimulationState(recalculate(migratedBase));
   return isStateValid(migrated) ? migrated : fallback;
+}
+
+function isSupportedRestoreRecord(record: Record<string, unknown>): boolean {
+  if (record.schemaVersion === 3 || record.schemaVersion === 4) return true;
+  if (record.schemaVersion === 5 || record.schemaVersion === 6) return true;
+  return (
+    record.schemaVersion === SCHEMA_VERSION &&
+    [
+      CONTENT_VERSION,
+      PREVIOUS_CONTENT_VERSION,
+      EARLIER_CONTENT_VERSION,
+      LEGACY_CONTENT_VERSION,
+    ].includes(record.contentVersion as string)
+  );
+}
+
+function isFallbackState(
+  state: SimulationState,
+  fallbackSeed: number,
+): boolean {
+  const fallback = createInitialState(fallbackSeed);
+  return (
+    state.seed === fallback.seed &&
+    state.tick === fallback.tick &&
+    state.eventSequence === fallback.eventSequence &&
+    state.integrity.digest === fallback.integrity.digest &&
+    JSON.stringify(state) === JSON.stringify(fallback)
+  );
+}
+
+function recoveryStatusFor(
+  value: unknown,
+  state: SimulationState,
+  fallbackSeed: number,
+  sourcePresent: boolean,
+): SaveRecoveryStatus {
+  const base = {
+    formatVersion: 1 as const,
+    preserved: [] as readonly string[],
+    reset: [] as readonly string[],
+    backupCreated: false,
+  };
+  if (!sourcePresent)
+    return {
+      ...base,
+      disposition: "none",
+      reason: "no-save",
+      preserved: [],
+      reset: [],
+      nextAction: "Start a run.",
+    };
+  if (typeof value !== "object" || value === null)
+    return {
+      ...base,
+      disposition: "reset",
+      reason: "malformed-save",
+      reset: ["the saved run"],
+      nextAction:
+        "Start a new run; the recovery backup is available for inspection.",
+    };
+  const record = value as Record<string, unknown>;
+  const schemaVersion = record.schemaVersion;
+  if (typeof schemaVersion !== "number" || !Number.isSafeInteger(schemaVersion))
+    return {
+      ...base,
+      disposition: "reset",
+      reason: "malformed-save-version",
+      reset: ["the saved run"],
+      nextAction:
+        "Start a new run; the recovery backup is available for inspection.",
+    };
+  if (schemaVersion > SCHEMA_VERSION)
+    return {
+      ...base,
+      disposition: "reset",
+      reason: "future-schema",
+      reset: ["unsupported future save fields"],
+      nextAction:
+        "Keep this build installed, then retry after a compatible update.",
+    };
+  if (!isSupportedRestoreRecord(record))
+    return {
+      ...base,
+      disposition: "reset",
+      reason: "unsupported-save-generation",
+      reset: ["unsupported schema or content fields"],
+      nextAction: "Start a new run on this supported build.",
+    };
+  if (schemaVersion < SCHEMA_VERSION)
+    return {
+      ...base,
+      disposition: "migrated",
+      reason: `schema-${schemaVersion}-migration`,
+      preserved: [
+        "seed and RNG state",
+        "pipeline topology and task progress",
+        "money and Career state supported by the source generation",
+        "retained event history with unique IDs",
+      ],
+      reset: ["features introduced after the source generation"],
+      nextAction: "Continue the migrated run and make one normal save.",
+    };
+  if (record.contentVersion !== CONTENT_VERSION)
+    return {
+      ...base,
+      disposition: "migrated",
+      reason: "content-generation-migration",
+      preserved: [
+        "seed and RNG state",
+        "pipeline, tasks, quotes, and accounting",
+        "Career, Research, Hype, Laboratory, and history where present",
+      ],
+      reset: ["content-only additions absent from the source generation"],
+      nextAction: "Continue the upgraded run and make one normal save.",
+    };
+  if (hasValidStateIntegrity(record as unknown as SimulationState))
+    return {
+      ...base,
+      disposition: "none",
+      reason: "sealed-current-save",
+      preserved: ["the complete sealed run"],
+      reset: [],
+      nextAction: "Continue playing.",
+    };
+  if (isFallbackState(state, fallbackSeed))
+    return {
+      ...base,
+      disposition: "reset",
+      reason: "malformed-or-uncorroborated-save",
+      reset: ["untrusted save fields"],
+      nextAction:
+        "Start a new run; the recovery backup is available for inspection.",
+    };
+  return {
+    ...base,
+    disposition: "recovered",
+    reason: "stale-or-unsealed-save",
+    preserved: [
+      "structurally valid core progress",
+      "corroborated task IDs, locked quotes, and accounting",
+      "seed and RNG state",
+      "event history with rebuilt unique IDs",
+    ],
+    reset: [
+      "untrusted progression additions and causal links",
+      "unsealed Research, Hype, or Laboratory fields when not corroborated",
+    ],
+    nextAction:
+      "Review the recovery note, then continue and make one normal save.",
+  };
+}
+
+export interface RestoreSimulationResult {
+  state: SimulationState;
+  recovery: SaveRecoveryStatus;
+}
+
+export function restoreSimulationStateWithReport(
+  value: unknown,
+  fallbackSeed = 20260715,
+  sourcePresent = value !== undefined,
+): RestoreSimulationResult {
+  const state = restoreSimulationState(value, fallbackSeed);
+  return {
+    state,
+    recovery: recoveryStatusFor(value, state, fallbackSeed, sourcePresent),
+  };
+}
+
+export function serializeSimulationState(state: SimulationState): string {
+  return JSON.stringify(state);
 }

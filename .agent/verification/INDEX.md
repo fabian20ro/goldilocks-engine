@@ -1,6 +1,11 @@
-# Verification index — accepted Milestone 7A release and active Milestone 7B
+# Verification index — accepted Milestone 7A release and active Milestone 7D
 
-M7B is parked as a commercial gate; active Milestone 7C follows below.
+M7B is parked as a commercial gate; M7C is retained as a presentation
+regression boundary; active Milestone 7D follows below.
+
+The historical route label “accepted Milestone 7A release and active Milestone 7B”
+remains retained in the navigation contract; D-044 parks that commercial gate
+while M7D is implemented.
 
 Navigation only. Immutable reports, `plan.md`, and `.agent/DECISIONS.md`
 remain authoritative. This index never claims live HEAD, latest verdict,
@@ -69,6 +74,20 @@ prioritized later M7 requirements in `.agent/RELEASE_ACCEPTANCE.md`.
 M7C remains presentation-only. It does not close the parked M7B commercial
 release gate or imply hosted exact-SHA deployment.
 
+## Active Milestone 7D save-stability route
+
+| Requirement | Source | Candidate evidence | Canonical lane |
+| --- | --- | --- | --- |
+| Audited support policy names only actually evidenced schema/content/build generations and explicit unsupported/future boundaries | D-046; `plan.md` §24.6; `.agent/RELEASE_ACCEPTANCE.md` | `src/simulation/saveSupport.ts`; `fixtures/save-fixtures/README.md`; `.agent/DECISIONS.md` | `verification-catalog` then `./scripts/verify` |
+| Every supported generation has provenance/checksum/invariants plus malformed/stale/unsealed/tampered/future fixtures | D-046; `plan.md` §§17, 24.6 | `fixtures/save-fixtures/*.json`; `src/simulation/saveFixtures.test.ts` | `npm run generate:save-fixtures`; focused fixture lane |
+| Single restore boundary migrates deterministically, preserves legitimate state, idempotently reseals, and prevents duplicate effects/IDs | D-046; `plan.md` §§9, 16, 17, 24.6 | `src/simulation/engine.ts`; `src/simulation/saveFixtures.test.ts`; `src/simulation/saveRecovery.test.ts` | `npm run test:save-stability`; unit/property suite |
+| Transactional recovery creates one bounded raw backup and user-visible preserved/reset/next-action status; future/unsupported input is not partially interpreted | D-046; `plan.md` §§17, 24.6 | `src/simulation/saveRecovery.ts`; `src/ui/useSimulation.ts`; `src/ui/App.tsx`; `tests/e2e/save-stability.spec.ts` | pinned root browser |
+| Browser Rule of Three covers normal migration, malformed/stale/tampered recovery, and reload/offline PWA lifecycle at 320/393 while retaining M7C/M7B boundaries | D-046; D-044–D-045; `plan.md` §§20, 23, 27 | `tests/e2e/save-stability.spec.ts`; `tests/e2e/pwa-update.spec.ts`; `.agent/HANDOFF.md` | `npm run test:e2e` from `./scripts/verify` |
+
+M7D is persistence/recovery closure only. It does not close the parked M7B
+commercial gate, imply hosted exact-SHA deployment, or authorize cloud sync,
+accounts, multiple slots, save editing/import, encryption, or a schema bump.
+
 ## Historical accepted Milestone 6 route
 
 Round 093 is immutable historical evidence for D-040's Lab lifecycle and
@@ -83,7 +102,8 @@ round 093 in the machine catalog. Do not rewrite either report.
 
 ## Finding and probe catalog
 
-`catalog.json` is the checked routing index for every immutable finding ID.
+`catalog.json` is the checked routing index for every immutable finding ID and
+the active M7D save requirements.
 It distinguishes resolved findings, superseded process blockers, archival
 blockers, retained M7A requirements, active M7B requirements, and superseded
 probes. The validator checks

@@ -1110,3 +1110,48 @@
 - **Reversal condition:** Replace a summary or density rule only with a
   presentation treatment that preserves the same live data, one next action,
   exact Details/evidence route, and portrait/accessibility/recovery evidence.
+
+## D-046 — Audited save support and bounded recovery
+
+- **Decision:** Add a single, data-driven save-support boundary for the
+  currently deployed schema/content history. The supported corpus is schema 3
+  `pipeline-toy-2`, schema 4 `pipeline-toy-3`, schema 5 `pipeline-toy-4`,
+  schema 6 `bedroom-career-1`, and schema 7 `evaluation-replay-1`,
+  `research-1`, `hype-fear-1`, and `local-lab-1`. Schema 1/2, unknown content,
+  future schema, and malformed records are unsupported and fail closed.
+- **Audit basis:** The policy records exact source commits for every
+  compatibility generation. Public-deployment evidence is limited to the
+  schema-7 evaluation publication identified by round 061's live Pages
+  inspection and the exact schema-7 Local Laboratory receipt in D-043,
+  round 100, and build `dc97ee41f6dbbc0e29d2`. Earlier generations remain
+  explicit legacy compatibility because their source/migration history is
+  auditable but no surviving independent public receipt proves deployment.
+  Fixtures record this distinction and never infer a test-only generation as
+  public.
+- **Restore transaction:** A valid sealed save upgrades completely and is
+  resealed deterministically. Old supported content upgrades through the
+  existing migration boundary. A stale or unsealed current save retains only
+  structurally corroborated core/task/accounting/seed/RNG/history fields;
+  uncorroborated progression and causal additions recover to safe defaults.
+  Future/unsupported input is never partially interpreted. Malformed input
+  recovers to a fresh valid state.
+- **Recovery contract:** Before fallback or destructive recovery, persist one
+  bounded, versioned raw source backup with source key, captured time, schema /
+  content metadata when parseable, and checksum. Expose a concise status naming
+  preserved fields, reset fields, and the next action. A backup is best-effort
+  under storage failure and never blocks the simulation from starting.
+- **Evidence contract:** Committed golden fixtures carry source/provenance,
+  checksum, and semantic invariants. The fixture harness proves deterministic
+  migration, serialize/restore idempotence, legitimate task/quote/topology,
+  Career/Research/Hype/Lab/history retention where applicable, unique event
+  IDs, and no duplicate money/command/task/deduction/reward/event effects.
+  Browser Rule of Three covers supported migration, malformed/stale/tampered
+  recovery, and reload/offline PWA lifecycle at 320/393. Existing Worker,
+  economy, navigation, M7C copy, and parked M7B release contracts remain
+  regression boundaries.
+- **Non-goals:** No schema bump, cloud sync, accounts, multiple slots, save
+  editor, arbitrary import, encryption, or new content/system is authorized by
+  this decision.
+- **Reversal condition:** Change a supported generation, recovery disposition,
+  or backup boundary only through a new audited source/deployment record and
+  independent fixture, adversarial, lifecycle, and browser evidence.

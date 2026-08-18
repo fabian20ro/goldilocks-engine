@@ -1,0 +1,20 @@
+{
+  "fixtureVersion": 1,
+  "policy": "D-046-save-support-v1",
+  "id": "boundary-malformed-json",
+  "source": {
+    "kind": "adversarial-boundary",
+    "supportTier": "boundary",
+    "derivation": "Fixed malformed text exercises the browser storage parse boundary; it is intentionally not JSON."
+  },
+  "payloadChecksum": {
+    "algorithm": "sha256-text-v1",
+    "value": "698450b43402ca86788979ce3ed60f20e7ac279dbbbdffdc1f18c9bf69b53c18"
+  },
+  "expected": {
+    "disposition": "reset",
+    "reason": "malformed-save"
+  },
+  "rawPayload": "{malformed save",
+  "payload": null
+}

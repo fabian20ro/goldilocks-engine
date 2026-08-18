@@ -1,0 +1,24 @@
+{
+  "fixtureVersion": 1,
+  "policy": "D-046-save-support-v1",
+  "id": "boundary-unsupported-schema",
+  "source": {
+    "kind": "adversarial-boundary",
+    "supportTier": "boundary",
+    "derivation": "Schema 2 pipeline-toy-1 is retained as an explicit unsupported historical boundary under D-046."
+  },
+  "payloadChecksum": {
+    "algorithm": "sha256-json-v1",
+    "value": "f7847ef0ac47beaef34251e18373983c21e18c62a138b2bde3d672d0ec911c64"
+  },
+  "expected": {
+    "disposition": "reset",
+    "reason": "unsupported-save-generation"
+  },
+  "rawPayload": null,
+  "payload": {
+    "schemaVersion": 2,
+    "contentVersion": "pipeline-toy-1",
+    "seed": 4704
+  }
+}

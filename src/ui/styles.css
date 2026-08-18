@@ -372,6 +372,26 @@ h2 {
   padding: 0.75rem;
 }
 
+.save-recovery-notice {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.75rem 0.9rem;
+  padding: 0.75rem;
+  border: 1px solid var(--warning);
+  border-radius: 0.65rem;
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.save-recovery-notice p {
+  margin: 0;
+}
+
+.save-recovery-notice button {
+  justify-self: start;
+  min-height: 44px;
+}
+
 .main-content > * {
   min-width: 0;
   max-width: 100%;

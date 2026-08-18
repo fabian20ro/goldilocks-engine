@@ -23,6 +23,8 @@
     "test:e2e:pages": "PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright playwright test --config=playwright.pages.config.ts",
     "test:native-a11y": "node scripts/native-accessibility.mjs",
     "test:native-a11y:validate": "node scripts/native-accessibility.mjs --mode=validate",
+    "test:save-stability": "vitest run --coverage=false src/simulation/saveFixtures.test.ts src/simulation/saveRecovery.test.ts",
+    "generate:save-fixtures": "tsx scripts/generate-save-fixtures.ts",
     "collect:mobile-performance": "PLAYWRIGHT_BROWSERS_PATH=.cache/ms-playwright node scripts/collect-mobile-performance.mjs",
     "capture:frozen-baseline": "node scripts/capture-frozen-baseline.mjs",
     "validate:verification-catalog": "node scripts/validate-verification-catalog.mjs",

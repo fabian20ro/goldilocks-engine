@@ -1,0 +1,392 @@
+{
+  "fixtureVersion": 1,
+  "policy": "D-046-save-support-v1",
+  "id": "boundary-unsealed-current",
+  "source": {
+    "kind": "adversarial-boundary",
+    "supportTier": "boundary",
+    "derivation": "Current initial state with the integrity seal omitted; safe core fields remain structurally corroborated."
+  },
+  "payloadChecksum": {
+    "algorithm": "sha256-json-v1",
+    "value": "e1d6f0ec6577f2295b4b46cd187d3b908d4978b45205c65250e28d4ad9796f23"
+  },
+  "expected": {
+    "disposition": "recovered",
+    "reason": "stale-or-unsealed-save"
+  },
+  "rawPayload": null,
+  "payload": {
+    "schemaVersion": 7,
+    "contentVersion": "local-lab-1",
+    "migration": {
+      "sourceSchemaVersion": 7,
+      "steps": []
+    },
+    "seed": 4701,
+    "rngState": 4701,
+    "tick": 0,
+    "hardwareId": "bedroom-cpu",
+    "ownedHardwareIds": ["bedroom-cpu"],
+    "ownedModuleIds": [
+      "request-buffer",
+      "stream-intake",
+      "basic-cleaner",
+      "context-packer",
+      "full-model",
+      "quantized-model",
+      "batch-runtime",
+      "smoke-check",
+      "robust-eval",
+      "delivery-gate",
+      "fast-export"
+    ],
+    "ownedExpansionIds": [],
+    "activeExpansionId": null,
+    "unlockedWorkloadIds": [
+      "interactive-chat",
+      "batch-classification",
+      "long-document",
+      "competition-run"
+    ],
+    "workloadDemand": [
+      {
+        "workloadId": "interactive-chat",
+        "level": 1,
+        "previousQuote": 1.4,
+        "successfulCompletions": 0
+      },
+      {
+        "workloadId": "batch-classification",
+        "level": 1,
+        "previousQuote": 2,
+        "successfulCompletions": 0
+      },
+      {
+        "workloadId": "long-document",
+        "level": 1,
+        "previousQuote": 2.2,
+        "successfulCompletions": 0
+      },
+      {
+        "workloadId": "competition-run",
+        "level": 1,
+        "previousQuote": 0.2,
+        "successfulCompletions": 0
+      },
+      {
+        "workloadId": "code-generation",
+        "level": 1,
+        "previousQuote": 2.6,
+        "successfulCompletions": 0
+      },
+      {
+        "workloadId": "evaluation-audit",
+        "level": 1,
+        "previousQuote": 2.9,
+        "successfulCompletions": 0
+      },
+      {
+        "workloadId": "small-finetune",
+        "level": 1,
+        "previousQuote": 4.8,
+        "successfulCompletions": 0
+      },
+      {
+        "workloadId": "tool-agent",
+        "level": 1,
+        "previousQuote": 5.2,
+        "successfulCompletions": 0
+      }
+    ],
+    "workloadId": "interactive-chat",
+    "slots": [
+      {
+        "slotId": "source",
+        "moduleId": "request-buffer"
+      },
+      {
+        "slotId": "prepare",
+        "moduleId": "basic-cleaner"
+      },
+      {
+        "slotId": "runtime",
+        "moduleId": "quantized-model"
+      },
+      {
+        "slotId": "verify",
+        "moduleId": "smoke-check"
+      },
+      {
+        "slotId": "sink",
+        "moduleId": "delivery-gate"
+      }
+    ],
+    "branchEnabled": false,
+    "computeAllocation": 80,
+    "memoryReserve": 10,
+    "resources": {
+      "money": 3,
+      "timeHours": 4,
+      "electricityKwh": 0,
+      "reputation": 0
+    },
+    "career": {
+      "schedule": {
+        "day": 1,
+        "hoursAvailable": 4,
+        "hoursRemaining": 4,
+        "allocations": {
+          "freelance": 0,
+          "competition": 0,
+          "product": 0,
+          "maintenance": 0
+        },
+        "completedEvenings": 0
+      },
+      "savings": 3,
+      "electricityCostsIncurred": 0,
+      "operatingCostsIncurred": 0,
+      "costsPaid": 0,
+      "unpaidCosts": 0,
+      "freelanceHours": 0,
+      "freelanceGross": 0,
+      "competition": {
+        "id": "bedroom-benchmark-cup",
+        "name": "Bedroom Benchmark Cup",
+        "progress": 0,
+        "submissions": 0,
+        "bestScore": 0,
+        "overfitRisk": 0,
+        "prizeClaimed": false,
+        "lifetimePrizeMoney": 0
+      },
+      "product": {
+        "id": "deskflow-local",
+        "name": "Deskflow Local",
+        "buildProgress": 0,
+        "released": false,
+        "releases": 0,
+        "serviceDebt": 0,
+        "lifetimeRevenue": 0,
+        "maintenanceHours": 0
+      },
+      "unlockedModelTierIds": ["lantern-3b"],
+      "activeModelTierId": "lantern-3b",
+      "quantization": "q4",
+      "offlinePolicy": {
+        "enabled": false,
+        "route": "freelance",
+        "maxHours": 1,
+        "maxElectricityCost": 0.1,
+        "maxOperatingCost": 0.4,
+        "minReliability": 0.9,
+        "lastReport": null
+      },
+      "exitAchieved": false,
+      "evaluation": {
+        "publicScore": null,
+        "privateAssessment": "not-run",
+        "coverage": 0,
+        "evaluationSpend": 0,
+        "publicEvaluations": 0,
+        "privateEvaluations": 0,
+        "leakageRisk": 0,
+        "distributionShiftRisk": 0,
+        "reliabilityIncidents": 0,
+        "ignoredWarnings": 0,
+        "warnings": {
+          "leakage": 0,
+          "reliability": 0,
+          "hardware": 0,
+          "tutorial": 0
+        },
+        "modelSwitches": 0,
+        "capitalCommitments": 0,
+        "hardwareDebt": 0
+      },
+      "runEnding": null
+    },
+    "research": {
+      "frontier": {
+        "discoveredProjectIds": ["context-reconstruction"],
+        "inspectedProjectIds": [],
+        "completedProjectIds": []
+      },
+      "goal": null,
+      "pendingDecision": "Inspect the first evidence card, then decide which uncertain question deserves scarce time and cash.",
+      "computeAllocation": 60,
+      "activeProject": null,
+      "availableResearcherIds": ["mira-voss"],
+      "recruitedResearcherIds": [],
+      "teamMemberIds": [],
+      "chemistry": 0,
+      "institutionalKnowledge": 0,
+      "retainedKnowledge": 0,
+      "tacitKnowledge": {
+        "mira-voss": 0,
+        "noor-adebayo": 0,
+        "eli-sato": 0,
+        "orin-kade": 0
+      },
+      "toolIds": [],
+      "strategicOptionIds": [],
+      "firstPrinciplesUses": 0,
+      "lastOutcome": null
+    },
+    "hypeFear": {
+      "unlocked": false,
+      "attention": 0,
+      "fear": 0,
+      "expectationDebt": 0,
+      "audienceReputation": {
+        "developers": 0,
+        "researchers": 0,
+        "enthusiasts": 0,
+        "entrepreneurs": 0,
+        "customers": 0,
+        "skeptics": 0
+      },
+      "stakeholderSelection": {
+        "escalationSeekers": 0,
+        "patientPartners": 0,
+        "supportHeavyUsers": 0,
+        "cautiousReviewers": 0
+      },
+      "currentToolId": "stable-local-stack",
+      "toolSwitchingPanic": 0,
+      "toolSwitches": 0,
+      "narratives": [],
+      "activeNarrativeId": null,
+      "nextNarrativeIndex": 0,
+      "pendingResponse": null,
+      "doomFeed": [],
+      "lastResponse": null,
+      "attentionOnlyActions": 0
+    },
+    "laboratory": {
+      "unlocked": false,
+      "unlockedAtTick": null,
+      "scenarioId": "high-public-fear",
+      "scenarioUnlockIds": [],
+      "scenarioProgress": {
+        "limited-hardware": 0,
+        "academic-collaboration": 0,
+        "creator-attention": 0,
+        "high-public-fear": 0,
+        "weak-economy": 0,
+        "expensive-electricity": 0
+      },
+      "machines": [
+        {
+          "id": "bench-node",
+          "acquiredAtTick": 0
+        }
+      ],
+      "pipelines": [
+        {
+          "id": "reproducibility",
+          "machineIds": ["bench-node"],
+          "waitingRuns": 0,
+          "activeRun": null,
+          "completedRuns": 0,
+          "failedRuns": 0,
+          "lastRunTick": null
+        }
+      ],
+      "collaboratorIds": [],
+      "cultureId": null,
+      "reproducibility": {
+        "versionedConfigs": false,
+        "lockedSeeds": false,
+        "independentEvaluation": false,
+        "documentedRuns": 0,
+        "score": 0
+      },
+      "foundingDecision": null,
+      "pendingDecision": "Complete one Research question and resolve one public-pressure response before opening the laboratory plan.",
+      "lastRun": null,
+      "totalOperatingCost": 0
+    },
+    "meta": {
+      "unlockedDiagnosticIds": [],
+      "completedEndingIds": [],
+      "replayCount": 0
+    },
+    "firstSession": {
+      "step": "queue-starter",
+      "starterTaskId": null,
+      "observedSettlementTaskId": null,
+      "purchasedModuleId": null
+    },
+    "jobs": {
+      "queued": 0,
+      "completed": 0,
+      "failed": 0,
+      "processingCarry": 0,
+      "paused": false,
+      "grossEarned": 0,
+      "operatingCostsPaid": 0,
+      "activeTask": null,
+      "waitingTasks": [],
+      "nextTaskSequence": 1
+    },
+    "lastSettlement": null,
+    "metrics": {
+      "throughputPerMinute": 7,
+      "latencySeconds": 5.76,
+      "memoryUsed": 6.7,
+      "memoryAvailable": 7.2,
+      "memoryPressure": 0.931,
+      "thermalLoad": 49.8,
+      "thermalPressure": 0.959,
+      "predictedQuality": 64,
+      "observedQuality": 66.7,
+      "reliability": 0.9316,
+      "observability": 0.7,
+      "evaluationCoverage": 0.38,
+      "operatingCost": 0.065,
+      "dominantBottleneck": "compute capacity",
+      "bottleneckSlotId": "runtime",
+      "orderWarnings": []
+    },
+    "baselineMetrics": null,
+    "baselineLabel": null,
+    "failedModuleId": null,
+    "lastWarning": "Evaluation blind spots widen observed uncertainty.",
+    "lastUpgradeNotice": null,
+    "eventSequence": 1,
+    "ledger": [
+      {
+        "kind": "info",
+        "message": "Pipeline initialized. Queue a workload, observe, then reconfigure.",
+        "id": "evt-0-1",
+        "tick": 0
+      }
+    ],
+    "causalEvidenceSnapshot": {
+      "eventSequence": 1,
+      "evaluation": {
+        "publicScore": null,
+        "privateAssessment": "not-run",
+        "coverage": 0,
+        "evaluationSpend": 0,
+        "publicEvaluations": 0,
+        "privateEvaluations": 0,
+        "leakageRisk": 0,
+        "distributionShiftRisk": 0,
+        "reliabilityIncidents": 0,
+        "ignoredWarnings": 0,
+        "warnings": {
+          "leakage": 0,
+          "reliability": 0,
+          "hardware": 0,
+          "tutorial": 0
+        },
+        "modelSwitches": 0,
+        "capitalCommitments": 0,
+        "hardwareDebt": 0
+      }
+    }
+  }
+}

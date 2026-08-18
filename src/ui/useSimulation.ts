@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  createInitialState,
-  restoreSimulationState,
-} from "../simulation/engine";
+import { restoreSimulationStateWithReport } from "../simulation/engine";
 import type {
   SimulationCommand,
   SimulationState,
@@ -13,6 +10,12 @@ import {
   acknowledgeDurableState,
   markDurableCommandPending,
 } from "./offlineReadiness";
+import {
+  persistSaveRecovery,
+  readSaveRecoveryStatus,
+  clearSaveRecoveryStatus,
+} from "../simulation/saveRecovery";
+import type { SaveRecoveryStatus } from "../simulation/types";
 
 export const TIME_SPEEDS = [1, 4, 16, 64] as const;
 export type TimeSpeed = (typeof TIME_SPEEDS)[number];
@@ -44,16 +47,36 @@ const isTimeSpeed = (value: number): value is TimeSpeed =>
 const isDurableRequestId = (value: unknown): value is number =>
   typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 
-function loadSavedState(): unknown {
+interface SavedStateRecord {
+  value: unknown;
+  raw: string | null;
+  sourceKey: string;
+}
+
+function loadSavedState(): SavedStateRecord {
   try {
-    const serialized =
-      localStorage.getItem(SAVE_KEY) ??
-      LEGACY_SAVE_KEYS.map((key) => localStorage.getItem(key)).find(
-        (value) => value !== null,
-      );
-    return serialized == null ? undefined : (JSON.parse(serialized) as unknown);
+    let sourceKey = SAVE_KEY;
+    let serialized = localStorage.getItem(SAVE_KEY);
+    if (serialized === null) {
+      const legacy = LEGACY_SAVE_KEYS.map((key) => ({
+        key,
+        value: localStorage.getItem(key),
+      })).find((entry) => entry.value !== null);
+      sourceKey = legacy?.key ?? SAVE_KEY;
+      serialized = legacy?.value ?? null;
+    }
+    if (serialized === null) return { value: undefined, raw: null, sourceKey };
+    try {
+      return {
+        value: JSON.parse(serialized) as unknown,
+        raw: serialized,
+        sourceKey,
+      };
+    } catch {
+      return { value: undefined, raw: serialized, sourceKey };
+    }
   } catch {
-    return undefined;
+    return { value: undefined, raw: null, sourceKey: SAVE_KEY };
   }
 }
 
@@ -90,12 +113,24 @@ export function persistBeforePublish<T>(
 }
 
 export function useSimulation() {
-  const savedStateRef = useRef<unknown>(loadSavedState());
-  const [state, setState] = useState<SimulationState>(() =>
-    savedStateRef.current === undefined
-      ? createInitialState()
-      : restoreSimulationState(savedStateRef.current),
+  const savedRecordRef = useRef<SavedStateRecord>(loadSavedState());
+  const savedStateRef = useRef<unknown>(savedRecordRef.current.value);
+  const initialRestoreRef = useRef(
+    restoreSimulationStateWithReport(
+      savedStateRef.current,
+      20260715,
+      savedRecordRef.current.raw !== null,
+    ),
   );
+  const [state, setState] = useState<SimulationState>(
+    () => initialRestoreRef.current.state,
+  );
+  const [saveRecoveryStatus, setSaveRecoveryStatus] =
+    useState<SaveRecoveryStatus | null>(() => {
+      const initial = initialRestoreRef.current.recovery;
+      if (initial.disposition !== "none") return initial;
+      return readSaveRecoveryStatus();
+    });
   const shouldApplyInitialOfflineRef = useRef(
     savedStateRef.current !== undefined && state.career.offlinePolicy.enabled,
   );
@@ -118,6 +153,10 @@ export function useSimulation() {
   const [lastDurableRequestId, setLastDurableRequestId] = useState(0);
   const [hasDurablePersistenceFailure, setHasDurablePersistenceFailure] =
     useState(false);
+  const dismissSaveRecoveryStatus = useCallback(() => {
+    clearSaveRecoveryStatus();
+    setSaveRecoveryStatus(null);
+  }, []);
 
   const postDurableRequest = useCallback((request: DurableWorkerRequest) => {
     const worker = workerRef.current;
@@ -140,6 +179,23 @@ export function useSimulation() {
     },
     [],
   );
+
+  useEffect(() => {
+    const recovery = initialRestoreRef.current.recovery;
+    if (recovery.disposition !== "none") {
+      const backupCreated =
+        savedRecordRef.current.raw !== null &&
+        persistSaveRecovery(
+          { ...recovery, backupCreated: savedRecordRef.current.raw !== null },
+          savedRecordRef.current.raw,
+          savedStateRef.current,
+          localStorage,
+          Date.now(),
+          savedRecordRef.current.sourceKey,
+        );
+      setSaveRecoveryStatus({ ...recovery, backupCreated });
+    }
+  }, []);
 
   useEffect(() => {
     const worker = new Worker(
@@ -247,6 +303,8 @@ export function useSimulation() {
     workerResponseBoundaries,
     consumeWorkerResponseBoundariesThrough,
     lastDurableRequestId,
+    saveRecoveryStatus,
+    dismissSaveRecoveryStatus,
     timeSpeed,
     setTimeSpeed,
   };

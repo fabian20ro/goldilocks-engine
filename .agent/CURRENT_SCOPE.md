@@ -1,6 +1,11 @@
-# Scope routing map — accepted Milestone 7A release and active Milestone 7B
+# Scope routing map — accepted Milestone 7A release and active Milestone 7D
 
-Parked commercial gate; active Milestone 7C follows below.
+Parked commercial gate; M7C presentation contract retained; active Milestone
+7D save stability follows below.
+
+The historical route label “accepted Milestone 7A release and active Milestone 7B”
+remains retained below; D-044 explicitly parks that commercial gate while M7D
+is implemented.
 
 Navigation only. This map is stable routing metadata, not authority. It never
 states live HEAD, latest verdict, current acceptance, or next gate. Run
@@ -64,7 +69,7 @@ continues to invoke the complete M7B lanes and remains strict. The named
 development profile records the parked gate explicitly while exercising all
 locally testable candidate lanes.
 
-## Active authorized scope: Milestone 7C Writing & Density Closure
+## Retained Milestone 7C Writing & Density Closure
 
 D-044 and D-045 authorize the smallest presentation-only closure across all
 eight existing destinations and global/onboarding chrome:
@@ -82,20 +87,48 @@ eight existing destinations and global/onboarding chrome:
   reload/offline, 100%/200% text, reduced motion, keyboard/touch, 320×693, and
   393×742 through a data-driven screenshot atlas.
 
-This is presentation and verification tooling only. Engine/Worker/schema,
+M7C remains a presentation and verification regression boundary. Engine/Worker/schema,
 economy/balance, navigation destinations, PWA, threat model, and out-of-scope
 startup/workforce/government/telemetry/audio/localization/packaging boundaries
 remain frozen.
+
+## Active authorized scope: Milestone 7D Save Stability
+
+D-046 authorizes one bounded save-support and recovery closure through the
+existing restore/migration boundary:
+
+- audit and record the actually deployed schema/content/build history; support
+  only the explicit schema 3–7 generations named by D-046, with schema 1/2,
+  unknown content, future records, and malformed input fail-closed;
+- commit golden fixtures for every supported generation plus malformed, stale,
+  unsealed, tampered, unsupported, and future boundaries, each with provenance,
+  source tier, checksum, and semantic invariants;
+- prove deterministic migration, serialize/restore idempotence, legitimate
+  progress/seed/RNG/task/quote/topology/accounting/Career/Research/Hype/Lab/
+  history retention where applicable, unique event IDs, and no duplicate
+  commands/tasks/deductions/rewards/events through one fixture harness;
+- persist one bounded versioned raw recovery backup before fallback, and show
+  user-visible preserved/reset/next-action status; future/unsupported data is
+  not partially interpreted and stale/unsealed fields are corroborated only;
+- prove normal migration, malformed/stale/tampered recovery, and reload/offline
+  PWA lifecycle at 320 and 393 through committed unit and Playwright checks.
+
+This is persistence/recovery closure only. Keep schema 7, the existing
+engine/Worker/economy/navigation/M7C editorial contract, and the parked M7B
+commercial gate unchanged. No cloud sync, accounts, multiple slots, save
+editor, arbitrary import, encryption, schema bump, new command, or new content
+is in scope.
 
 ## Frozen boundaries
 
 No `plan.md` edit, startup/workforce/government expansion, new navigation
 destination, simulation command, persistence schema, speculative telemetry,
 audio/localization implementation, store packaging, or broad architecture
-rewrite is authorized by M7C. Supported-save fixtures/version policy,
-localization readiness, audio, and the PWA-only versus store-packaging/
-distribution decision remain later commercial-release work. The unavailable
-M7B physical/native/browser evidence remains a release gate under D-044.
+rewrite is authorized by M7D. Cloud sync, accounts, multiple slots, save
+editor, arbitrary import, and encryption remain out of scope. Localization
+readiness, audio, and the PWA-only versus store-packaging/distribution decision
+remain later commercial-release work. The unavailable M7B physical/native/
+browser evidence remains a release gate under D-044.
 Existing deterministic simulation, accounting, causal truth, persistence,
 PWA/update, offline, reduced-motion, accessibility, and Lab lifecycle
 contracts remain regression boundaries.
@@ -114,6 +147,9 @@ contracts remain regression boundaries.
 | M7C profile and editorial contract       | D-044–D-045; `.agent/RELEASE_ACCEPTANCE.md` §Milestone 7C; `scripts/verify`; `src/ui/editorial.ts`; `src/ui/commandDeck.tsx`            |
 | M7C destination implementation           | `src/ui/App.tsx`; `src/ui/ResearchView.tsx`; `src/ui/LaboratoryView.tsx`; `src/ui/WorldView.tsx`; `src/ui/styles.css`                   |
 | M7C executable evidence                  | `src/ui/editorial.test.ts`; `src/test/verificationProfiles.test.ts`; `tests/e2e/command-deck.spec.ts`                                   |
+| M7D audited save policy                  | D-046; `src/simulation/saveSupport.ts`; `fixtures/save-fixtures/README.md`; `.agent/RELEASE_ACCEPTANCE.md`                              |
+| M7D restore/recovery implementation      | `src/simulation/engine.ts`; `src/simulation/saveRecovery.ts`; `src/ui/useSimulation.ts`; `src/ui/App.tsx`                               |
+| M7D executable evidence                  | `src/simulation/saveFixtures.test.ts`; `src/simulation/saveRecovery.test.ts`; `tests/e2e/save-stability.spec.ts`                        |
 | Live Git/report facts                    | `./scripts/agent-status` only                                                                                                           |
 
 ## Rule-of-Three retained M7A navigation map
@@ -148,6 +184,19 @@ contracts remain regression boundaries.
 3. Lifecycle: starter/expanded atlas captures, reload/offline resume,
    reduced-motion, keyboard/touch, and onboarding transitions retain the same
    single summary contract without simulation or input mutation.
+
+## Rule-of-Three M7D save map
+
+1. Normal: each audited supported generation migrates through the single
+   boundary to sealed current schema/content with deterministic state and
+   idempotent serialize/restore.
+2. Boundary: malformed, stale/unsealed, tampered, unsupported, and future
+   records preserve only corroborated data, create one bounded raw backup, and
+   expose preserved/reset/next-action recovery status without partial future
+   interpretation or duplicate effects.
+3. Lifecycle: supported/recovered state persists through Worker publication,
+   reload, offline shell resume, PWA update/reload regression, and 320/393
+   portrait operation; M7C copy/navigation and parked M7B lanes remain intact.
 
 The catalog's active requirements and historical finding groups are the
 machine-checked routing contract. If a report introduces a finding ID absent

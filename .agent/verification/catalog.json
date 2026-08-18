@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "catalogKind": "active-verification",
-  "description": "Machine-checked routing for immutable verifier evidence, the retained Milestone 7A release foundation, the parked Milestone 7B commercial gate, and the authorized Milestone 7C writing/density scope. The status command remains the source of live Git/report state.",
+  "description": "Machine-checked routing for immutable verifier evidence, the retained Milestone 7A release foundation, the parked Milestone 7B commercial gate, the retained Milestone 7C presentation contract, and the authorized Milestone 7D save-stability scope. The status command remains the source of live Git/report state.",
   "historicalAcceptedSnapshot": {
     "report": ".agent/verification/round-093.md",
     "round": 93,
@@ -10,7 +10,7 @@
     "verdict": "PASS"
   },
   "activeScope": {
-    "name": "Milestone 7C — Writing and Density Closure (M7B parked commercial gate)",
+    "name": "Milestone 7D — Save Stability (M7C retained; M7B parked commercial gate)",
     "status": "active",
     "authorities": [
       "plan.md",
@@ -18,7 +18,9 @@
       ".agent/verification/round-093.md",
       ".agent/verification/round-099.md",
       ".agent/RELEASE_ACCEPTANCE.md",
-      ".agent/verification/round-109.md"
+      ".agent/verification/round-109.md",
+      "src/simulation/saveSupport.ts",
+      "fixtures/save-fixtures/README.md"
     ],
     "requirements": [
       {
@@ -164,6 +166,51 @@
         "checks": [
           "tests/e2e/command-deck.spec.ts",
           "src/ui/styles.css",
+          "scripts/verify"
+        ]
+      },
+      {
+        "id": "M7D-SAVE-001",
+        "status": "active",
+        "intent": "Record audited supported schema/content/build generations and prove every supported, malformed, stale, unsealed, tampered, unsupported, and future boundary through provenance-bearing golden fixtures and one deterministic restore harness.",
+        "sources": [
+          "plan.md",
+          ".agent/CURRENT_SCOPE.md",
+          ".agent/DECISIONS.md",
+          ".agent/RELEASE_ACCEPTANCE.md"
+        ],
+        "checks": [
+          "src/simulation/saveSupport.ts",
+          "fixtures/save-fixtures/README.md",
+          "fixtures/save-fixtures/schema-3-pipeline-toy-2.json",
+          "fixtures/save-fixtures/schema-4-pipeline-toy-3.json",
+          "fixtures/save-fixtures/schema-5-pipeline-toy-4.json",
+          "fixtures/save-fixtures/schema-6-bedroom-career-1.json",
+          "fixtures/save-fixtures/schema-7-evaluation-replay-1.json",
+          "fixtures/save-fixtures/schema-7-research-1.json",
+          "fixtures/save-fixtures/schema-7-hype-fear-1.json",
+          "fixtures/save-fixtures/schema-7-local-lab-1.json",
+          "src/simulation/saveFixtures.test.ts"
+        ]
+      },
+      {
+        "id": "M7D-SAVE-002",
+        "status": "active",
+        "intent": "Apply transactional restore/recovery semantics with bounded raw backup and concise preserved/reset/next-action status, and prove browser normal, adversarial, and lifecycle behavior at representative portrait widths.",
+        "sources": [
+          "plan.md",
+          ".agent/CURRENT_SCOPE.md",
+          ".agent/DECISIONS.md",
+          ".agent/RELEASE_ACCEPTANCE.md"
+        ],
+        "checks": [
+          "src/simulation/engine.ts",
+          "src/simulation/saveRecovery.ts",
+          "src/simulation/saveRecovery.test.ts",
+          "src/ui/useSimulation.ts",
+          "src/ui/App.tsx",
+          "tests/e2e/save-stability.spec.ts",
+          "tests/e2e/pwa-update.spec.ts",
           "scripts/verify"
         ]
       }

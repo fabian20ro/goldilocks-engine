@@ -3,6 +3,22 @@ export const CONTENT_VERSION = "local-lab-1";
 export const PREVIOUS_CONTENT_VERSION = "hype-fear-1";
 export const SAVE_INTEGRITY_ALGORITHM = "fnv1a-32-json-v1";
 
+export type SaveRecoveryDisposition =
+  | "none"
+  | "migrated"
+  | "recovered"
+  | "reset";
+
+export interface SaveRecoveryStatus {
+  formatVersion: 1;
+  disposition: SaveRecoveryDisposition;
+  reason: string;
+  preserved: readonly string[];
+  reset: readonly string[];
+  nextAction: string;
+  backupCreated: boolean;
+}
+
 export type SlotType = "source" | "process" | "sink";
 export type ModuleRole =
   | "source"

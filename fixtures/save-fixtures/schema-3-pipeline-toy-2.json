@@ -1,0 +1,84 @@
+{
+  "fixtureVersion": 1,
+  "policy": "D-046-save-support-v1",
+  "id": "schema-3-pipeline-toy-2",
+  "source": {
+    "id": "schema-3-pipeline-toy-2",
+    "schemaVersion": 3,
+    "contentVersion": "pipeline-toy-2",
+    "sourceCommit": "65ee04f5b8815a5d60d70f354d8057aab49713d9",
+    "sourceDate": "2026-07-16",
+    "supportTier": "legacy-compatibility",
+    "publicDeployment": null,
+    "derivation": "Reconstructed from the schema-3 source commit and the committed engine migration boundary; no public deployment receipt survives."
+  },
+  "payloadChecksum": {
+    "algorithm": "sha256-json-v1",
+    "value": "1c177507769e00093d4039ca091ed33903f6ddd957c0254e5dbe1425380a00e2"
+  },
+  "expected": {
+    "seed": 4600,
+    "rngState": 4600,
+    "tick": 0,
+    "workloadId": "interactive-chat",
+    "sourceTaskCount": 2,
+    "sourceWaitingTaskIds": [],
+    "sourceLockedQuotes": [],
+    "sourceMoney": 4.113,
+    "sourceEventIds": [],
+    "sourceSlotIds": ["source", "prepare", "runtime", "verify", "sink"],
+    "sourceHasCareer": false,
+    "sourceHasResearch": false,
+    "sourceHasHypeFear": false,
+    "sourceHasLaboratory": false
+  },
+  "payload": {
+    "schemaVersion": 3,
+    "contentVersion": "pipeline-toy-2",
+    "seed": 4600,
+    "rngState": 4600,
+    "tick": 0,
+    "hardwareId": "bedroom-cpu",
+    "workloadId": "interactive-chat",
+    "slots": [
+      {
+        "slotId": "source",
+        "moduleId": "request-buffer"
+      },
+      {
+        "slotId": "prepare",
+        "moduleId": "basic-cleaner"
+      },
+      {
+        "slotId": "runtime",
+        "moduleId": "quantized-model"
+      },
+      {
+        "slotId": "verify",
+        "moduleId": "smoke-check"
+      },
+      {
+        "slotId": "sink",
+        "moduleId": "delivery-gate"
+      }
+    ],
+    "branchEnabled": false,
+    "computeAllocation": 80,
+    "memoryReserve": 10,
+    "resources": {
+      "money": 4.113,
+      "timeHours": 4,
+      "electricityKwh": 0.208,
+      "reputation": 0
+    },
+    "jobs": {
+      "queued": 2,
+      "completed": 0,
+      "failed": 0,
+      "processingCarry": 0,
+      "paused": false,
+      "grossEarned": 0,
+      "operatingCostsPaid": 0
+    }
+  }
+}

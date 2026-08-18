@@ -1,0 +1,98 @@
+{
+  "fixtureVersion": 1,
+  "policy": "D-046-save-support-v1",
+  "id": "schema-4-pipeline-toy-3",
+  "source": {
+    "id": "schema-4-pipeline-toy-3",
+    "schemaVersion": 4,
+    "contentVersion": "pipeline-toy-3",
+    "sourceCommit": "592838f825327f2c06c8233e13955e8844603b9c",
+    "sourceDate": "2026-07-16",
+    "supportTier": "legacy-compatibility",
+    "publicDeployment": null,
+    "derivation": "Reconstructed from the schema-4 upgrade-economy source commit and migration tests; no public deployment receipt survives."
+  },
+  "payloadChecksum": {
+    "algorithm": "sha256-json-v1",
+    "value": "fa40d8483e3c83dd11efa3b9de8be72d436b0ac350d2cda2f0563957887827d7"
+  },
+  "expected": {
+    "seed": 4601,
+    "rngState": 4601,
+    "tick": 0,
+    "workloadId": "interactive-chat",
+    "sourceTaskCount": 2,
+    "sourceWaitingTaskIds": [],
+    "sourceLockedQuotes": [],
+    "sourceMoney": 4.113,
+    "sourceEventIds": [],
+    "sourceSlotIds": ["source", "prepare", "runtime", "verify", "sink"],
+    "sourceHasCareer": false,
+    "sourceHasResearch": false,
+    "sourceHasHypeFear": false,
+    "sourceHasLaboratory": false
+  },
+  "payload": {
+    "schemaVersion": 4,
+    "contentVersion": "pipeline-toy-3",
+    "seed": 4601,
+    "rngState": 4601,
+    "tick": 0,
+    "hardwareId": "bedroom-cpu",
+    "ownedHardwareIds": ["bedroom-cpu"],
+    "ownedModuleIds": [
+      "request-buffer",
+      "stream-intake",
+      "basic-cleaner",
+      "context-packer",
+      "full-model",
+      "quantized-model",
+      "batch-runtime",
+      "smoke-check",
+      "robust-eval",
+      "delivery-gate",
+      "fast-export"
+    ],
+    "workloadId": "interactive-chat",
+    "slots": [
+      {
+        "slotId": "source",
+        "moduleId": "request-buffer"
+      },
+      {
+        "slotId": "prepare",
+        "moduleId": "basic-cleaner"
+      },
+      {
+        "slotId": "runtime",
+        "moduleId": "quantized-model"
+      },
+      {
+        "slotId": "verify",
+        "moduleId": "smoke-check"
+      },
+      {
+        "slotId": "sink",
+        "moduleId": "delivery-gate"
+      }
+    ],
+    "branchEnabled": false,
+    "computeAllocation": 80,
+    "memoryReserve": 10,
+    "resources": {
+      "money": 4.113,
+      "timeHours": 4,
+      "electricityKwh": 0.208,
+      "reputation": 0
+    },
+    "jobs": {
+      "queued": 2,
+      "completed": 0,
+      "failed": 0,
+      "processingCarry": 0,
+      "paused": false,
+      "grossEarned": 0,
+      "operatingCostsPaid": 0
+    }
+  }
+}

@@ -1,69 +1,69 @@
-# Candidate handoff — Milestone 7C Writing & Density Closure
+# Candidate handoff — Milestone 7D Save Stability
 
-Implementation base: `34c76e1a450075d3534efb5fe0dd48f8bd326054`.
-Implementation candidate: `3076be34c2bae5ee2e56a761e81b5b7a9497a8ce` before
-the final handoff-bookkeeping amend; the final candidate SHA is reported after
-that amend.
-Role: Implementer. This handoff makes no independent-verifier verdict or
-commercial-release acceptance claim.
+Implementation base: `321f8e2d33cb4b06efe0e14b3e4970aa70e0f6f1`.
+Implementation candidate before this handoff-only amend:
+`922912a3e49b347bb87f715c9060d86f851fa63f`; the final amended candidate SHA
+is reported after the amend. Role: Implementer. This handoff makes no
+independent-verifier verdict or commercial-release acceptance claim.
 
 ## Implemented behavior summary
 
-- Added a pure `src/ui/editorial.ts` presenter seam for Build, Jobs, Career,
-  Upgrades, Inspect, Research, Lab, and World. Each live summary states current
-  state, consequence, cost/risk, one next action, and the existing Details /
-  evidence boundary.
-- Added compact `DecisionSummary` and `LockedState` presentation primitives.
-  Research, Lab, and World locked surfaces now state requirement, progress, and
-  unlock action. Existing failure copy remains player-directed and preserves
-  work/recovery context.
-- Removed the duplicate Jobs first-session guide mount. Global and onboarding
-  chrome now carries editorial data attributes without adding a second action
-  source or changing navigation, Worker commands, persistence, or input.
-- Kept the expanded pipeline in normal document flow so the app scroll region
-  remains the only vertical owner; retained the 44px and horizontal-overflow
-  contracts.
-- Extended the data-driven command-deck screenshot atlas and browser contract
-  across all eight destinations, starter/expanded states, both portrait
-  widths, and the existing scale/reduced-motion/touch/reload/offline neighbors.
-- Formalized D-044 profiles in `scripts/verify`: development runs the local
-  candidate lanes and records the parked M7B commercial gate explicitly;
-  default/full-release retains WebKit/native/performance invocation and strict
-  BLOCKED propagation.
-- Routed D-044/D-045 through CURRENT_SCOPE, RELEASE_ACCEPTANCE, the
-  verification index/catalog, and this handoff. Immutable reports and
-  `plan.md` were not edited.
+- Added D-046's audited support policy in `src/simulation/saveSupport.ts`.
+  Exact source commits are recorded for schema 3 `pipeline-toy-2`, schema 4
+  `pipeline-toy-3`, schema 5 `pipeline-toy-4`, schema 6
+  `bedroom-career-1`, and schema 7 `evaluation-replay-1`, `research-1`,
+  `hype-fear-1`, and `local-lab-1`. Public-deployment tier is limited to the
+  independently evidenced schema-7 evaluation publication and the exact
+  schema-7 Local Laboratory receipt/build `dc97ee41f6dbbc0e29d2`; older
+  generations are explicitly legacy compatibility.
+- Added deterministic, committed golden save fixtures for every supported
+  generation and explicit malformed, stale, unsealed, tampered, future, and
+  unsupported boundaries. Each carries policy/source or boundary derivation,
+  checksum, and semantic expected invariants. Regeneration is
+  `npm run generate:save-fixtures`.
+- Added `restoreSimulationStateWithReport` and deterministic serialization at
+  the existing restore boundary. Valid sealed saves migrate and reseal;
+  supported old content upgrades; stale/unsealed state retains corroborated
+  core/task/accounting/seed/RNG/history only; future/unsupported input is not
+  partially interpreted; malformed input falls back to a valid fresh state.
+- Added one bounded, versioned raw recovery backup with source key, timestamp,
+  parseable schema/content metadata, truncation marker, and checksum. Added
+  concise user-visible recovery status naming preserved fields, reset fields,
+  next action, and backup availability, with dismiss/reload persistence.
+- Added the data-driven fixture/recovery unit harness and committed Playwright
+  coverage for normal migration, malformed/tampered recovery, stale/unsealed
+  recovery, reload/offline PWA resume, and 320/393 portrait operation.
+- Preserved schema 7, Worker-only simulation, economy/accounting, navigation,
+  M7C editorial copy, PWA/update behavior, and parked M7B release boundaries.
 
 ## Plan requirements covered
 
-- D-044: unavailable physical/native/WebKit M7B evidence remains a named
-  commercial-release gate; no tooling or BLOCKED evidence is relabeled or
-  omitted. Development-candidate evidence is explicitly not release evidence.
-- D-045: presentation-only editorial contract for all eight destinations and
-  global/onboarding chrome; exact accounting/evidence stays in existing
-  Details, Inspect, accounting, and ledger surfaces; no speculative controls,
-  duplicate onboarding, engine/Worker/schema/economy/balance/navigation/PWA
-  changes.
-- M7C Rule of Three: normal presenter output; locked/malformed/failure/recovery
-  boundaries; starter/expanded/reload/offline/reduced-motion/onboarding
-  lifecycle neighbors.
-- Portrait contract: 320×693 and 393×742, raw and scaled browser coverage,
-  44 CSS-pixel controls, no document horizontal overflow, no nested expanded
-  pipeline scroll trap, and reachable primary actions.
+- `plan.md` §24.6: save schema/content/migration/integrity metadata remains
+  explicit; supported historical restore paths are fixture-backed and
+  deterministic. `plan.md` was not edited.
+- `plan.md` §§9, 16, 17: malformed/stale recovery preserves only corroborated
+  work and keeps accounting/history identity safe; unsupported/future records
+  fail closed; no duplicate commands, tasks, deductions, rewards, money, or
+  events are introduced.
+- `plan.md` §§20, 23, 27: browser Rule of Three covers normal, adversarial,
+  and lifecycle behavior with representative portrait widths, persistence,
+  offline operation, and PWA update regression.
+- D-046 routing is recorded in `.agent/DECISIONS.md`, `.agent/CURRENT_SCOPE.md`,
+  `.agent/verification/INDEX.md`, `.agent/verification/catalog.json`, and
+  `.agent/RELEASE_ACCEPTANCE.md`.
 
 ## Verifier findings resolved / retained
 
-- No immutable verifier report was edited and no M7B finding is claimed closed.
-  Round 109 remains the honest BLOCKED infrastructure report; active M7B
-  catalog groups and tooling remain parked under D-044.
-- New candidate-owned regression coverage covers M7C profile parsing and the
-  editorial Rule of Three. Existing verifier suites remain in the canonical
-  lane; the eight strict-locator collisions found during independent full
-  browser rerun were repaired by avoiding duplicate exact copy in summaries.
+- No immutable verifier report was edited. No new verifier finding exists for
+  this Implementer turn; the D-046 candidate-owned fixture and recovery seams
+  are mapped in the routing catalog for independent assessment.
+- Active M7B OIV findings and round-109 infrastructure blockers remain
+  retained and parked under D-044. This candidate does not relabel, weaken, or
+  close those findings.
 
 ## Setup, startup, and verification commands
 
-All dependency and browser caches are ignored and repository-local:
+Dependency and browser caches are ignored and repository-local:
 
 ```sh
 export npm_config_cache="$PWD/.cache/npm"
@@ -72,93 +72,80 @@ export PLAYWRIGHT_BROWSERS_PATH="$PWD/.cache/ms-playwright"
 ./scripts/run
 ```
 
-`./scripts/run` starts Vite at `http://127.0.0.1:4173` with strict port
-ownership; Playwright-managed servers clean up after each run. The pinned
-browser package is a project dependency. Use the package-manager commands:
+`./scripts/run` starts Vite on deterministic loopback `127.0.0.1:4173`.
+Playwright's managed server uses `./scripts/run-e2e`, builds first, waits for
+the same loopback URL, and cleans up after each run. `@playwright/test` is
+pinned in `package.json` and the browser installation is project-cache based.
+
+Focused commands:
 
 ```sh
-npm run test:e2e
-npm run test:e2e:pages
-npm run test:e2e:webkit
-npm run test:native-a11y
-npm run collect:mobile-performance
+npm run generate:save-fixtures
+npm run test:save-stability
+npm test
+npm run build
+npm run validate:verification-catalog
+npm run test:e2e -- tests/e2e/save-stability.spec.ts
 ```
 
-Candidate profile and evidence directory used for this handoff:
+Canonical candidate command:
 
 ```sh
-VERIFY_EVIDENCE_DIR=.cache/verification/round-110-development-final2 \
+VERIFY_EVIDENCE_DIR=.cache/verification/round-111-development \
   ./scripts/verify --profile=development
 ```
 
-## Focused evidence executed
+Final canonical result: exit `0`; catalog, setup, format, lint, typecheck,
+unit (`71 files`, `346 tests`), balance, build, production audit (`0
+vulnerabilities`), root Chromium/PWA (`242 passed`), and Pages/offline (`2
+passed`) passed. The summary records
+`m7b-commercial-gate=blocked (parked under D-044; run --profile full-release)`
+and `verification=development-candidate` at
+`.cache/verification/round-111-development/summary.txt`.
 
-```sh
-npm run format:check
-npm run lint
-npm run typecheck
-npm run validate:verification-catalog
-npx vitest run src/ui/editorial.test.ts src/test/verificationProfiles.test.ts --coverage=false
-npx vitest run src/test/agentWorkflowRouting.test.ts src/test/verifierRound083Workflow.test.ts src/ui/researchView.test.tsx --coverage=false
-npm run test:e2e -- tests/e2e/command-deck.spec.ts
-npm run test:e2e -- tests/e2e/first-session.spec.ts
-npm run test:e2e -- tests/e2e/game.spec.ts tests/e2e/research.spec.ts \
-  tests/e2e/round-009-usability.spec.ts tests/e2e/round-012-upgrades.spec.ts \
-  tests/e2e/round-015-expansion.spec.ts
-```
-
-The final development profile completed catalog, setup, format, lint,
-typecheck, 319 unit tests, all balance lanes, build, production audit, root
-Chromium/PWA `238 passed`, explicit `m7b-commercial-gate=blocked`, and Pages
-`2 passed`; exit `0`. The full browser run needed host-authorized Chromium
-launch because the managed sandbox otherwise returned macOS MachPort launch
-permission errors. The atlas images inspected from the final run included:
-
-```text
-test-results/command-deck/320-starter-build.png
-test-results/command-deck/393-starter-research.png
-test-results/command-deck/320-expanded-world.png
-test-results/command-deck/393-expanded-jobs.png
-```
+Full release remains the separate strict command:
+`./scripts/verify --profile=full-release`.
 
 ## Important architectural decisions
 
-- Presenters are pure reads of existing engine/catalog/formatting helpers;
-  they cannot dispatch, persist, navigate, alter balance, or manufacture a
-  control. Summary text avoids duplicating exact source-of-truth values that
-  existing tests and Details surfaces already expose.
-- `LockedState` centralizes requirement/progress/action wording while allowing
-  the existing Research lock sentence to remain stable for screen-reader and
-  regression consumers.
-- The finite first-session guide remains the only onboarding action owner;
-  destination summaries point at it rather than repeating the action.
-- CSS changes remove only the nested vertical pipeline owner. No simulation,
-  Worker, schema, economy, PWA, persistence, navigation, threat-model, or
-  out-of-scope feature boundary changed.
+- `saveSupport.ts` is policy/provenance data only; it does not guess public
+  deployment history or create a second restore path.
+- `restoreSimulationStateWithReport` wraps the established engine restore
+  function rather than duplicating migration logic. Recovery classification is
+  derived from the source record, restored state, schema/content support, and
+  integrity result at that single boundary.
+- Backup persistence uses two fixed localStorage keys and a hard raw-length
+  bound. Backup/status failure cannot prevent the in-memory simulation from
+  starting. No cloud, account, slot, editor/import, encryption, or schema bump
+  was added.
+- React recovery status is presentation-only and does not dispatch simulation
+  commands. Worker publication still owns durable state; recovery storage is a
+  bounded diagnostic handoff for the next user action.
 
 ## Known limitations and risks
 
-- Commercial release remains BLOCKED until the physical/native/WebKit M7B
-  evidence is available: VoiceOver/TalkBack speech, unlocked physical Android,
-  physical battery/thermal, authenticated frozen baseline, and the known
-  WebKit offline top-level reload evidence. Round 109 and all M7B tooling are
-  retained as the source of that gate.
-- `./scripts/verify --profile=full-release` (also the no-argument default) was
-  not rerun in this candidate because immutable round-109 full-gate evidence
-  already records the same unavailable infrastructure; the script still
-  invokes every M7B lane and strictly propagates BLOCKED/FAILED outcomes.
-- The development profile is candidate evidence only. A fresh independent
-  Verifier must assess this exact committed SHA; no PASS or release claim is
-  issued here.
+- Commercial release remains blocked by the parked M7B physical/native/WebKit
+  evidence under D-044: VoiceOver/TalkBack speech, unlocked physical Android,
+  battery/thermal measurement, authenticated frozen baseline, and known WebKit
+  offline top-level reload evidence. The full-release script remains strict.
+- Historical schema 3–6 and intermediate schema-7 fixtures are deterministic
+  reconstructions from audited source/migration history, not byte captures of
+  surviving deployed storage. Their metadata explicitly records that
+  derivation and compatibility tier.
+- Raw recovery backup is best-effort if browser storage itself is unavailable;
+  the UI reports when no backup could be preserved and keeps the run operable.
+- Independent Verifier must assess the exact committed candidate SHA. This
+  handoff does not issue PASS or release acceptance.
 
 ## Checks not run / final evidence
 
-- Full-release/default profile: intentionally not run; reason above. Run it
-  only when the required M7B infrastructure is available.
-- WebKit, native accessibility, and measured-device lanes: not run in the
-  development profile because D-044 parks them as the explicit commercial
-  gate; their commands remain wired in full-release.
-- Native device speech, physical performance/battery/thermal, and hosted
-  exact-SHA deployment: unavailable/out of Implementer scope.
-- Final canonical development evidence:
-  `.cache/verification/round-110-development-final2/summary.txt`.
+- The canonical development profile completed successfully; exact summary and
+  lane results are recorded above.
+- Full-release/default profile, WebKit/native/device-performance lanes, hosted
+  exact-SHA verification, and deployment were not run: required M7B
+  infrastructure and release-owner authority remain out of scope/parked under
+  D-044.
+- A first sandboxed focused browser attempt failed before test execution with
+  macOS Chromium MachPort permission denial; the same pinned test was rerun
+  with scoped host browser permission and passed. This is retained as
+  infrastructure evidence, not hidden.
