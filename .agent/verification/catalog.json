@@ -406,10 +406,22 @@
       "requirementId": "M7B-NATIVE-001",
       "regressionEvidence": [
         ".agent/verification/round-106-adversarial.mjs",
+        ".agent/verification/round-107-adversarial.mjs",
         "scripts/native-accessibility.mjs",
         "docs/m7b-native-accessibility.md"
       ],
-      "note": "Native capture blocker instructions tell the operator to edit checklist.json, but validation consumes operator-submission.json; the recovery instruction points at the wrong input artifact."
+      "note": "Round 107 independently rechecks that native blocker recovery names operator-submission.json, the artifact consumed by validation; this FAIL round cannot serve as the catalog's PASS resolution report."
+    },
+    {
+      "id": "V-107-001",
+      "match": { "exact": ["V-107-001"] },
+      "status": "active",
+      "requirementId": "M7B-EVIDENCE-001",
+      "regressionEvidence": [
+        ".agent/verification/round-107-adversarial.mjs",
+        "scripts/webkit-result-classifier.mjs"
+      ],
+      "note": "The structured WebKit classifier accepts expected tests with missing, skipped, or unknown results as PASS instead of rejecting malformed or incomplete evidence."
     }
   ],
   "supersededProbes": [
