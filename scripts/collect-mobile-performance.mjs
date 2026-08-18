@@ -35,6 +35,16 @@ const browsers = (process.env.M7B_PERFORMANCE_BROWSERS ?? "chromium,webkit")
 const allowBlocked =
   process.env.M7B_PERFORMANCE_ALLOW_BLOCKED === "1" ||
   process.argv.includes("--allow-blocked");
+const captureFrozenBaseline = process.argv.includes(
+  "--capture-frozen-baseline",
+);
+const frozenAcceptedCandidateSha =
+  process.env.M7B_FROZEN_ACCEPTED_SHA ??
+  "d25e80e6781de89e80fc3b3c240a922ada53d978";
+const frozenAcceptedBuildId =
+  process.env.M7B_FROZEN_BUILD_ID ?? "dc97ee41f6dbbc0e29d2";
+const performanceDeviceId =
+  process.env.M7B_PERFORMANCE_DEVICE_ID ?? "unidentified-device";
 const baselineArg = process.argv.find((value) =>
   value.startsWith("--baseline="),
 );
@@ -50,6 +60,16 @@ const summaryPath = path.resolve(
   summaryArg?.slice("--output=".length) ??
     path.join(evidenceDir, "summary.json"),
 );
+const measurementSettings = {
+  hasTouch: true,
+  isMobile: true,
+  textScale: "100%",
+  reducedMotion: "no-preference",
+  viewportHeights: { 320: 693, 393: 742 },
+  browsers,
+  widths,
+};
+const measurementSettingsFingerprint = settingsFingerprint(measurementSettings);
 
 if (!Number.isInteger(runs) || runs < 5) {
   console.error(
@@ -123,6 +143,13 @@ function gitSha() {
   }
 }
 
+function settingsFingerprint(settings) {
+  return crypto
+    .createHash("sha256")
+    .update(JSON.stringify(settings))
+    .digest("hex");
+}
+
 function percentile(values, percentileValue) {
   const finite = values
     .filter((value) => Number.isFinite(value))
@@ -185,6 +212,45 @@ const observerScript = () => {
   }
 };
 
+// Test-only attribution for the product's Dedicated Worker. Renderer-wide
+// timing cannot identify this Worker; this hook measures the product Worker
+// request/response boundary without shipping telemetry.
+const dedicatedWorkerInstrumentation = () => {
+  const NativeWorker = window.Worker;
+  if (typeof NativeWorker !== "function") return;
+  const records = [];
+  window.__m7bDedicatedWorkerRecords = records;
+  window.Worker = class InstrumentedDedicatedWorker extends NativeWorker {
+    constructor(...args) {
+      super(...args);
+      const worker = this;
+      const workerUrl = String(args[0] ?? "");
+      const pending = [];
+      const postMessage = worker.postMessage.bind(worker);
+      worker.postMessage = (...messageArgs) => {
+        pending.push(performance.now());
+        records.push({
+          type: "request",
+          url: workerUrl,
+          atMs: performance.now(),
+        });
+        return postMessage(...messageArgs);
+      };
+      worker.addEventListener("message", () => {
+        const sentAt = pending.shift();
+        const receivedAt = performance.now();
+        records.push({
+          type: "response",
+          url: workerUrl,
+          atMs: receivedAt,
+          roundTripMs:
+            sentAt === undefined ? null : Math.max(0, receivedAt - sentAt),
+        });
+      });
+    }
+  };
+};
+
 async function waitForApp(page) {
   await page
     .locator("h1", { hasText: "Goldilocks Engine" })
@@ -225,24 +291,7 @@ async function clickSpeed(page, speed) {
   await details.getByRole("button", { name: speed, exact: true }).click();
 }
 
-async function measureWorkerProxy(page, browserName) {
-  let cdp = null;
-  if (browserName === "chromium") {
-    try {
-      cdp = await page.context().newCDPSession(page);
-      await cdp.send("Performance.enable");
-    } catch {
-      cdp = null;
-    }
-  }
-  const readTaskDuration = async () => {
-    if (!cdp) return null;
-    const response = await cdp.send("Performance.getMetrics");
-    return (
-      response.metrics.find((metric) => metric.name === "TaskDuration")
-        ?.value ?? null
-    );
-  };
+async function measureDedicatedWorkerCost(page) {
   const readMemory = async () =>
     page.evaluate(() =>
       performance.memory?.usedJSHeapSize != null
@@ -255,28 +304,66 @@ async function measureWorkerProxy(page, browserName) {
     ["64x", "64×"],
   ]) {
     await clickSpeed(page, speed);
-    const before = await readTaskDuration();
+    await page.evaluate(() => {
+      if (Array.isArray(window.__m7bDedicatedWorkerRecords))
+        window.__m7bDedicatedWorkerRecords.length = 0;
+    });
     const memoryBeforeMb = await readMemory();
     const start = Date.now();
     await page.waitForTimeout(1_000);
-    const after = await readTaskDuration();
     const memoryAfterMb = await readMemory();
+    const workerEvidence = await page.evaluate(() => {
+      const records = Array.isArray(window.__m7bDedicatedWorkerRecords)
+        ? window.__m7bDedicatedWorkerRecords
+        : [];
+      const responses = records
+        .filter(
+          (record) =>
+            record?.type === "response" && Number.isFinite(record.roundTripMs),
+        )
+        .map((record) => record.roundTripMs);
+      const sorted = responses.slice().sort((a, b) => a - b);
+      const atPercentile = (fraction) =>
+        sorted.length
+          ? sorted[
+              Math.min(
+                sorted.length - 1,
+                Math.max(0, Math.ceil(sorted.length * fraction) - 1),
+              )
+            ]
+          : null;
+      return {
+        requestCount: records.filter((record) => record?.type === "request")
+          .length,
+        responseCount: responses.length,
+        responseMedianMs: atPercentile(0.5),
+        responseP95Ms: atPercentile(0.95),
+        workerUrls: [
+          ...new Set(
+            records
+              .map((record) => record?.url)
+              .filter((url) => typeof url === "string" && url.length > 0),
+          ),
+        ],
+      };
+    });
     samples[label] = {
       elapsedMs: Date.now() - start,
-      mainThreadTaskDurationMs:
-        before !== null && after !== null ? (after - before) * 1_000 : null,
+      dedicatedWorkerResponseMs: workerEvidence.responseP95Ms,
+      dedicatedWorkerResponseMedianMs: workerEvidence.responseMedianMs,
+      dedicatedWorkerRequestCount: workerEvidence.requestCount,
+      dedicatedWorkerResponseCount: workerEvidence.responseCount,
+      dedicatedWorkerUrls: workerEvidence.workerUrls,
       memoryBeforeMb,
       memoryAfterMb,
       memoryDeltaMb:
         memoryBeforeMb !== null && memoryAfterMb !== null
           ? memoryAfterMb - memoryBeforeMb
           : null,
-      method: cdp
-        ? "Chromium CDP Performance.TaskDuration proxy"
-        : "unavailable for this browser",
+      method:
+        "test-only Dedicated Worker postMessage/message round-trip attribution",
     };
   }
-  await cdp?.detach().catch(() => undefined);
   return samples;
 }
 
@@ -306,6 +393,7 @@ async function runBrowserSample(browserName, width, runIndex, browser) {
   let sample;
   try {
     await page.addInitScript(observerScript);
+    await page.addInitScript(dedicatedWorkerInstrumentation);
     const navigationStart = Date.now();
     await page.goto(loopbackUrl, { waitUntil: "domcontentloaded" });
     await waitForApp(page);
@@ -322,7 +410,7 @@ async function runBrowserSample(browserName, width, runIndex, browser) {
         inpMs: state?.inp?.length ? Math.max(...state.inp) : null,
       };
     });
-    const worker = await measureWorkerProxy(page, browserName);
+    const worker = await measureDedicatedWorkerCost(page);
     const offlineStart = Date.now();
     const offlineNavigationError = await expectOfflineReload(
       page,
@@ -537,6 +625,7 @@ async function runAndroidChromeSample(
     const cdp = await context.newCDPSession(page);
     await clearAndroidOrigin(page, cdp);
     await page.addInitScript(observerScript);
+    await page.addInitScript(dedicatedWorkerInstrumentation);
     const navigationStart = Date.now();
     await page.goto(loopbackUrl, { waitUntil: "domcontentloaded" });
     await waitForApp(page);
@@ -553,7 +642,7 @@ async function runAndroidChromeSample(
         inpMs: state?.inp?.length ? Math.max(...state.inp) : null,
       };
     });
-    const worker = await measureWorkerProxy(page, "chromium");
+    const worker = await measureDedicatedWorkerCost(page);
     await expect
       .poll(
         async () =>
@@ -776,14 +865,18 @@ function summarizeCell(samples) {
   });
   const workerMetric = (speed) => ({
     median: median(
-      samples.map((sample) => sample.worker?.[speed]?.mainThreadTaskDurationMs),
+      samples.map(
+        (sample) => sample.worker?.[speed]?.dedicatedWorkerResponseMs,
+      ),
     ),
     p95: percentile(
-      samples.map((sample) => sample.worker?.[speed]?.mainThreadTaskDurationMs),
+      samples.map(
+        (sample) => sample.worker?.[speed]?.dedicatedWorkerResponseMs,
+      ),
       95,
     ),
     samples: samples.map(
-      (sample) => sample.worker?.[speed]?.mainThreadTaskDurationMs ?? null,
+      (sample) => sample.worker?.[speed]?.dedicatedWorkerResponseMs ?? null,
     ),
   });
   return {
@@ -838,6 +931,16 @@ function budgetFindings(cells) {
         reason: "fewer than five samples",
         result: "BLOCKED",
       });
+    for (const key of ["worker1xMs", "worker64xMs"])
+      if (cell.summary[key].p95 === null)
+        findings.push({
+          gate: "dedicated-worker-attribution",
+          cell: label,
+          speed: key === "worker1xMs" ? "1x" : "64x",
+          reason:
+            "product Dedicated Worker request/response evidence is unavailable",
+          result: "BLOCKED",
+        });
     if (cell.summary.errors.length > 0)
       findings.push({
         gate: "page-errors",
@@ -861,7 +964,70 @@ function budgetFindings(cells) {
   return findings;
 }
 
-function baselineFindings(cells, baseline) {
+function baselineArtifactFindings(baseline) {
+  const entries = [
+    ...(Array.isArray(baseline.artifacts) ? baseline.artifacts : []),
+    ...(Array.isArray(baseline.physicalDevice?.artifacts)
+      ? baseline.physicalDevice.artifacts
+      : []),
+    ...(Array.isArray(baseline.androidBrowser?.artifacts)
+      ? baseline.androidBrowser.artifacts
+      : []),
+  ];
+  const unique = [
+    ...new Map(
+      entries
+        .filter((entry) => entry && typeof entry === "object")
+        .map((entry) => [entry.path, entry]),
+    ).values(),
+  ];
+  if (unique.length === 0)
+    return [
+      {
+        gate: "same-device-baseline-artifacts",
+        reason: "baseline has no retained artifact manifest",
+        result: "BLOCKED",
+      },
+    ];
+  const findings = [];
+  for (const entry of unique) {
+    if (
+      typeof entry.path !== "string" ||
+      !/^[a-f0-9]{64}$/.test(entry.sha256 ?? "")
+    ) {
+      findings.push({
+        gate: "same-device-baseline-artifacts",
+        path: entry.path,
+        reason: "baseline artifact entries must be {path,sha256}",
+        result: "BLOCKED",
+      });
+      continue;
+    }
+    const filePath = path.resolve(root, entry.path);
+    if (
+      !filePath.startsWith(`${root}${path.sep}`) ||
+      !fs.existsSync(filePath)
+    ) {
+      findings.push({
+        gate: "same-device-baseline-artifacts",
+        path: entry.path,
+        reason: "baseline artifact is missing or outside the repository",
+        result: "BLOCKED",
+      });
+      continue;
+    }
+    if (sha256(filePath) !== entry.sha256)
+      findings.push({
+        gate: "same-device-baseline-artifacts",
+        path: entry.path,
+        reason: "baseline artifact digest does not match retained bytes",
+        result: "BLOCKED",
+      });
+  }
+  return findings;
+}
+
+function baselineFindings(cells, baseline, currentContext) {
   if (!baseline) {
     return [
       {
@@ -873,10 +1039,93 @@ function baselineFindings(cells, baseline) {
     ];
   }
   const findings = [];
+  findings.push(...baselineArtifactFindings(baseline));
+  const baselineDeviceId = baseline.environment?.deviceId;
+  const currentDeviceId = currentContext.environment?.deviceId;
+  const baselineBrowserSet = baseline.environment?.browserSet;
+  const currentBrowserSet = currentContext.environment?.browserSet;
+  const baselineIdentity = {
+    candidateSha: baseline.candidateSha,
+    buildId: baseline.buildInfo?.version,
+    deviceId: baselineDeviceId,
+    settingsFingerprint: baseline.environment?.settingsFingerprint,
+    browserSet: baselineBrowserSet,
+  };
+  if (baseline.candidateSha === currentContext.candidateSha)
+    findings.push({
+      gate: "same-device-baseline-identity",
+      reason: "baseline candidate SHA is the current candidate (self-baseline)",
+      baseline: baselineIdentity,
+      result: "BLOCKED",
+    });
+  if (baseline.candidateSha !== frozenAcceptedCandidateSha)
+    findings.push({
+      gate: "same-device-baseline-identity",
+      reason: "baseline candidate SHA is not the frozen accepted candidate",
+      expectedCandidateSha: frozenAcceptedCandidateSha,
+      baseline: baselineIdentity,
+      result: "BLOCKED",
+    });
+  if (baseline.buildInfo?.version !== frozenAcceptedBuildId)
+    findings.push({
+      gate: "same-device-baseline-identity",
+      reason: "baseline build ID is not the frozen accepted build",
+      expectedBuildId: frozenAcceptedBuildId,
+      baseline: baselineIdentity,
+      result: "BLOCKED",
+    });
+  if (
+    !currentDeviceId ||
+    currentDeviceId === "unidentified-device" ||
+    baselineDeviceId !== currentDeviceId
+  )
+    findings.push({
+      gate: "same-device-baseline-identity",
+      reason:
+        "baseline and current measurements do not identify the same explicit device",
+      currentDeviceId,
+      baselineDeviceId,
+      result: "BLOCKED",
+    });
+  if (
+    !Array.isArray(baselineBrowserSet) ||
+    !Array.isArray(currentBrowserSet) ||
+    JSON.stringify(baselineBrowserSet.slice().sort()) !==
+      JSON.stringify(currentBrowserSet.slice().sort())
+  )
+    findings.push({
+      gate: "same-device-baseline-identity",
+      reason: "baseline browser matrix differs from the current matrix",
+      currentBrowserSet,
+      baselineBrowserSet,
+      result: "BLOCKED",
+    });
+  if (
+    !baseline.environment?.settingsFingerprint ||
+    baseline.environment.settingsFingerprint !==
+      currentContext.environment?.settingsFingerprint
+  )
+    findings.push({
+      gate: "same-device-baseline-identity",
+      reason: "baseline settings fingerprint differs from current settings",
+      currentSettingsFingerprint:
+        currentContext.environment?.settingsFingerprint,
+      baselineSettingsFingerprint: baseline.environment?.settingsFingerprint,
+      result: "BLOCKED",
+    });
+  const identityBlocked = findings.some(
+    (finding) => finding.gate === "same-device-baseline-identity",
+  );
+  if (identityBlocked) return findings;
   for (const cell of cells) {
     const matching = baseline.cells?.find(
       (candidate) =>
-        candidate.browser === cell.browser && candidate.width === cell.width,
+        candidate.browser === cell.browser &&
+        candidate.width === cell.width &&
+        candidate.identity?.deviceId === cell.identity?.deviceId &&
+        candidate.identity?.settingsFingerprint ===
+          cell.identity?.settingsFingerprint &&
+        candidate.identity?.browser === cell.identity?.browser,
     );
     if (!matching) {
       findings.push({
@@ -940,7 +1189,15 @@ function baselineFindings(cells, baseline) {
 const summary = {
   schemaVersion: 1,
   kind: "m7b-mobile-performance",
+  mode: captureFrozenBaseline ? "frozen-baseline" : "candidate",
   candidateSha: gitSha(),
+  buildInfo: null,
+  environment: {
+    deviceId: performanceDeviceId,
+    browserSet: browsers.slice().sort(),
+    settings: measurementSettings,
+    settingsFingerprint: measurementSettingsFingerprint,
+  },
   generatedAt: new Date().toISOString(),
   loopback: {
     url: loopbackUrl,
@@ -1000,6 +1257,21 @@ try {
       result: "BLOCKED",
     });
   } else {
+    try {
+      const buildResponse = await fetch(
+        new URL("build-info.json", loopbackUrl),
+      );
+      if (!buildResponse.ok) throw new Error(`HTTP ${buildResponse.status}`);
+      summary.buildInfo = await buildResponse.json();
+      if (typeof summary.buildInfo?.version !== "string")
+        throw new Error("build-info.json has no version");
+    } catch (error) {
+      summary.findings.push({
+        gate: "build-identity",
+        reason: `deterministic loopback build-info.json unavailable: ${String(error)}`,
+        result: "BLOCKED",
+      });
+    }
     for (const browserName of browsers) {
       const launcher = { chromium, webkit }[browserName];
       if (!launcher) {
@@ -1041,6 +1313,14 @@ try {
             browser: browserName,
             width,
             height: width === 320 ? 693 : 742,
+            identity: {
+              candidateSha: summary.candidateSha,
+              buildId: summary.buildInfo?.version ?? null,
+              deviceId: performanceDeviceId,
+              browser: browserName,
+              width,
+              settingsFingerprint: measurementSettingsFingerprint,
+            },
             summary: summarizeCell(cellSamples),
             samples: cellSamples,
           });
@@ -1075,6 +1355,14 @@ try {
         browser: "android-chrome",
         width: viewport?.width ?? 0,
         height: viewport?.height ?? 0,
+        identity: {
+          candidateSha: summary.candidateSha,
+          buildId: summary.buildInfo?.version ?? null,
+          deviceId: summary.physicalDevice?.serial ?? performanceDeviceId,
+          browser: "android-chrome",
+          width: viewport?.width ?? 0,
+          settingsFingerprint: measurementSettingsFingerprint,
+        },
         summary: summarizeCell(samples),
         samples,
       });
@@ -1101,7 +1389,14 @@ try {
   } catch {
     baseline = null;
   }
-  summary.findings.push(...baselineFindings(summary.cells, baseline));
+  if (!captureFrozenBaseline)
+    summary.findings.push(
+      ...baselineFindings(summary.cells, baseline, {
+        candidateSha: summary.candidateSha,
+        buildInfo: summary.buildInfo,
+        environment: summary.environment,
+      }),
+    );
 } finally {
   if (server?.pid) {
     try {

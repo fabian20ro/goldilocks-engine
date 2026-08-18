@@ -18,9 +18,13 @@ The harness starts a production preview on a deterministic loopback port and
 cleans up its process group. It captures device identity, settings, browser
 launch commands, screenshots, accessibility logs/hierarchy, and a JSON
 checklist under `.cache/m7b/native/`. Every generated artifact is listed with
-its SHA-256 in `summary.json`.
+its SHA-256 in `summary.json` as `{ "path", "sha256" }` entries.
+
+Capture always requires a new, empty evidence directory. A rerun never
+overwrites an existing capture or operator submission:
 
 ```sh
+M7B_NATIVE_EVIDENCE_DIR=.cache/m7b/native/$(date +%Y%m%d-%H%M%S) \
 npm run test:native-a11y
 ```
 
@@ -30,8 +34,30 @@ verification uses the explicit infrastructure form below so it records the
 same `BLOCKED` artifact without treating it as a pass:
 
 ```sh
-M7B_NATIVE_ALLOW_BLOCKED=1 npm run test:native-a11y
+M7B_NATIVE_ALLOW_BLOCKED=1 \
+M7B_NATIVE_EVIDENCE_DIR=.cache/m7b/native/<new-capture-id> \
+npm run test:native-a11y
 ```
+
+The capture writes `operator-submission.json`, a machine-readable contract.
+The operator fills its build/device/settings/viewport fields, marks every
+normal and boundary checklist row `PASS`, records speech transcripts and
+screenshots as retained paths, records both retained settings-before and
+settings-after paths, updates the corresponding `{path,sha256}` entries in
+`artifactPaths`, and sets `submittedAt`. Validate that retained submission
+without rewriting it:
+
+```sh
+M7B_NATIVE_EVIDENCE_DIR=.cache/m7b/native/<capture-id> \
+M7B_NATIVE_ALLOW_BLOCKED=1 npm run test:native-a11y:validate
+```
+
+Validation requires the retained candidate SHA and build ID, both native
+device records, before/after settings plus restore attestation, actual 320/393
+CSS viewports, 100%/200% text and reduced-motion settings, every eight-tab row
+at both widths, non-placeholder VoiceOver/TalkBack transcripts, and matching
+SHA-256 bytes for every referenced artifact. It writes only a new
+`validation-summary.json`; an existing validation output is never overwritten.
 
 Override the port or artifact path when running parallel isolated work:
 

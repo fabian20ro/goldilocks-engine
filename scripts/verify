@@ -31,6 +31,59 @@ run_step() {
   return "$status"
 }
 
+M7B_BLOCKED=0
+
+run_m7b_lane() {
+  name=$1
+  summary_path=$2
+  shift 2
+  step_log="$EVIDENCE_DIR/$name.log"
+  printf '%s\n' "==> $name" | tee -a "$LOG"
+  if "$@" >"$step_log" 2>&1; then
+    command_status=0
+  else
+    command_status=$?
+  fi
+  cat "$step_log"
+  cat "$step_log" >> "$LOG"
+
+  if [ ! -f "$summary_path" ]; then
+    printf '%s=failed (missing evidence summary)\n' "$name" >> "$SUMMARY"
+    printf '%s\n' "Verification stopped at $name: missing $summary_path" >&2
+    return 1
+  fi
+
+  if result=$(node scripts/read-evidence-result.mjs "$summary_path" 2>>"$step_log"); then
+    :
+  else
+    :
+  fi
+  case "$result" in
+    PASS)
+      if [ "$command_status" -ne 0 ]; then
+        printf '%s=failed (%s)\n' "$name" "$command_status" >> "$SUMMARY"
+        return "$command_status"
+      fi
+      printf '%s=passed\n' "$name" >> "$SUMMARY"
+      return 0
+      ;;
+    BLOCKED)
+      M7B_BLOCKED=1
+      printf '%s=blocked\n' "$name" >> "$SUMMARY"
+      return 0
+      ;;
+    FAILED)
+      printf '%s=failed (evidence result)\n' "$name" >> "$SUMMARY"
+      printf '%s\n' "Verification stopped at $name: evidence result FAILED" >&2
+      return 1
+      ;;
+  esac
+
+  printf '%s=failed (invalid evidence result)\n' "$name" >> "$SUMMARY"
+  printf '%s\n' "Verification stopped at $name: invalid evidence result" >&2
+  return 1
+}
+
 preflight() {
   run_step verification-catalog npm run validate:verification-catalog
   run_step setup ./scripts/setup
@@ -45,9 +98,21 @@ run_step balance npm run balance
 run_step build npm run build
 run_step production-audit npm audit --omit=dev --audit-level=high
 run_step root-browser-pwa npm run test:e2e
-run_step webkit-browser npm run test:e2e:webkit
-run_step native-accessibility env M7B_NATIVE_ALLOW_BLOCKED=1 npm run test:native-a11y
-run_step mobile-performance env M7B_PERFORMANCE_ALLOW_BLOCKED=1 npm run collect:mobile-performance
+WEBKIT_EVIDENCE_DIR="$EVIDENCE_DIR/m7b-webkit-$$"
+NATIVE_EVIDENCE_DIR="$EVIDENCE_DIR/m7b-native-$$"
+PERFORMANCE_EVIDENCE_DIR="$EVIDENCE_DIR/m7b-performance-$$"
+run_m7b_lane webkit-browser "$WEBKIT_EVIDENCE_DIR/summary.json" \
+  env M7B_WEBKIT_EVIDENCE_DIR="$WEBKIT_EVIDENCE_DIR" npm run test:e2e:webkit
+run_m7b_lane native-accessibility "$NATIVE_EVIDENCE_DIR/summary.json" \
+  env M7B_NATIVE_ALLOW_BLOCKED=1 M7B_NATIVE_EVIDENCE_DIR="$NATIVE_EVIDENCE_DIR" npm run test:native-a11y
+run_m7b_lane mobile-performance "$PERFORMANCE_EVIDENCE_DIR/summary.json" \
+  env M7B_PERFORMANCE_ALLOW_BLOCKED=1 M7B_PERFORMANCE_EVIDENCE_DIR="$PERFORMANCE_EVIDENCE_DIR" npm run collect:mobile-performance
 run_step pages-offline npm run test:e2e:pages
+
+if [ "$M7B_BLOCKED" -ne 0 ]; then
+  printf '%s\n' 'verification=blocked' >> "$SUMMARY"
+  printf '%s\n' "Verification blocked by one or more M7B evidence lanes. Evidence: $EVIDENCE_DIR" | tee -a "$LOG" >&2
+  exit 2
+fi
 
 printf '%s\n' "Verification passed. Evidence: $EVIDENCE_DIR" | tee -a "$LOG"

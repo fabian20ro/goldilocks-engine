@@ -1,9 +1,8 @@
-# Candidate handoff — Milestone 7B OIV-first evidence tooling
+# Candidate handoff — Milestone 7B verifier repair
 
-Candidate SHA: see the exact commit returned by the Implementer; the metadata
-was finalized after the initial semantic commit. The implementation started
-from accepted verifier HEAD
-`756bf2631cdec61ac9aaac02d9915cd1de61e148`.
+Candidate SHA: see the exact full SHA returned with this handoff. Implementation
+started from verifier commit
+`6253de2f0a8e7e0aabd2a6a879eb27f7fc49bf8c`.
 
 ## Implemented behavior summary
 
@@ -15,19 +14,23 @@ from accepted verifier HEAD
   recovery, offline cache proof, and explicit WebKit offline-error annotation.
 - Added `scripts/native-accessibility.mjs`: xcrun simctl and adb/adb reverse
   setup, device identity, accessibility settings capture/optional enable and
-  restore, screenshots/logs/UI hierarchy, speech placeholders, checklist rows,
-  actual-viewport/manual evidence fields, artifact SHA-256 records, cleanup,
-  and honest BLOCKED exit behavior.
+  restore, screenshots/logs/UI hierarchy, retained operator submission and
+  validation, complete checklist rows, actual-viewport/manual evidence fields,
+  `{path,sha256}` artifact records, cleanup, and honest BLOCKED exit behavior.
 - Added `scripts/collect-mobile-performance.mjs`: five cold runs per pinned
   browser/portrait cell, PerformanceObserver LCP/INP/CLS, startup/transfer/
-  memory/offline samples, 1×/64× Worker-cost proxy plus memory, p95/median,
-  frozen-build baseline ratio checks, physical adb battery/thermal/memory,
-  and optional five-run Android Chrome CDP lane using adb reverse/forward.
-- Integrated setup, package-manager commands, and all three M7B lanes into
-  `./scripts/verify`; bulky evidence remains ignored under `.cache/`.
+  memory/offline samples, test-only shipped Dedicated Worker 1×/64×
+  request/response attribution plus memory, p95/median, authenticated frozen
+  baseline ratios, physical adb battery/thermal/memory, and optional Android
+  Chrome CDP lane using adb reverse/forward.
+- Added `scripts/capture-frozen-baseline.mjs` to recreate the accepted SHA in a
+  temporary detached worktree with repository-local npm/browser caches.
+- Integrated summary parsing into `./scripts/verify`; PASS, BLOCKED, and
+  FAILED remain distinct, and any blocked M7B lane makes canonical verification
+  return nonzero. Bulky evidence remains ignored under `.cache/`.
 - Added focused contract tests and M7B setup/evidence documentation. No
-  product behavior, telemetry, native wrapper, dependency, plan, decision,
-  scope, catalog, or immutable report was changed.
+  product behavior, telemetry, native wrapper, broad dependency, plan,
+  decision, scope, catalog, or immutable report was changed.
 
 ## Plan requirements covered
 
@@ -42,18 +45,19 @@ from accepted verifier HEAD
   SHA-256 paths; absent speech/viewport/device access remains BLOCKED.
 - Performance summary records absolute LCP ≤2500ms, INP ≤200ms, CLS ≤0.10,
   five-run count, startup/offline/Worker/memory/transfer values, p95/median,
-  same-device baseline ratio ≤1.20, and physical battery/thermal gate.
+  same-device baseline ratio ≤1.20, authenticated baseline metadata/artifact
+  checksums, and physical battery/thermal gate.
 
 ## Verifier findings resolved
 
 - Prior routing findings V-100-001 and V-098-001 remain resolved by the
   immutable accepted history; no immutable report was edited.
-- This candidate resolves the previously open M7B implementation/tooling
-  scope by adding executable WebKit/native/performance lanes. Native speech,
-  actual CSS viewport, frozen baseline, and unlocked physical Android are
-  evidence gates, not claims made by this handoff.
-- No new stable verifier finding was created by focused checks. Independent
-  verification remains required and this handoff issues no verdict.
+- Round-102 findings V-102-001 through V-102-006 are addressed in executable
+  tooling and retained evidence contracts. Native speech, actual CSS viewport,
+  frozen baseline, and unlocked physical Android remain evidence gates, not
+  claims made by this handoff.
+- The exact round-102 adversarial probe returned no findings. Independent
+  verification remains required; this handoff issues no verdict.
 
 ## Setup, startup, and verification commands
 
@@ -73,14 +77,19 @@ Focused checks run during implementation:
 npm run format:check
 npm run lint -- --quiet
 npm run typecheck
-npx vitest run --coverage=false src/test/m7bEvidenceTooling.test.ts
+npx vitest run src/test/m7bEvidenceTooling.test.ts \
+  src/test/verifierRound083Workflow.test.ts --pool=forks --maxWorkers=1
+node .agent/verification/round-102-adversarial.mjs
 node --check scripts/native-accessibility.mjs
 node --check scripts/collect-mobile-performance.mjs
+node --check scripts/capture-frozen-baseline.mjs
 git diff --check
-E2E_WEBKIT_PORT=43133 npm run test:e2e:webkit
-M7B_NATIVE_ALLOW_BLOCKED=1 M7B_NATIVE_PORT=43132 npm run test:native-a11y
-M7B_PERFORMANCE_ALLOW_BLOCKED=1 M7B_PERFORMANCE_RUNS=5 \
-  M7B_PERFORMANCE_PORT=43134 npm run collect:mobile-performance
+M7B_NATIVE_ALLOW_BLOCKED=1 M7B_NATIVE_EVIDENCE_DIR=.cache/m7b/native/focused \
+  npm run test:native-a11y
+M7B_PERFORMANCE_ALLOW_BLOCKED=1 M7B_PERFORMANCE_BROWSERS=chromium \
+  M7B_PERFORMANCE_RUNS=5 M7B_PERFORMANCE_DEVICE_ID=focused-local \
+  M7B_PERFORMANCE_EVIDENCE_DIR=.cache/m7b/performance/focused-worker \
+  npm run collect:mobile-performance
 ```
 
 The final canonical command is run once after the final candidate commit:
@@ -96,8 +105,10 @@ M7B_NATIVE_ENABLE_SETTINGS=1 M7B_NATIVE_ALLOW_BLOCKED=1 \
   npm run test:native-a11y
 ```
 
-Use `.cache/m7b/native/summary.json` and
-`.cache/m7b/performance/summary.json` plus their listed ignored artifacts.
+Use the unique `.cache/m7b/native/<capture-id>/summary.json` and
+`.cache/m7b/performance/<run-id>/summary.json` plus their listed ignored
+artifacts. The native validator writes only
+`<capture-id>/validation-summary.json` and refuses to overwrite it.
 
 ## Important architectural decisions
 
@@ -106,9 +117,14 @@ Use `.cache/m7b/native/summary.json` and
 - WebKit's known offline top-level navigation error is preserved as a
   concrete `BLOCKED` finding while service-worker/controller/cache proof is
   retained. Other page/console errors fail the lane.
-- Dedicated Worker CPU attribution is not exposed by browser CDP, so the
-  collector labels `Performance.TaskDuration` as a Worker-cost proxy and
-  records the limitation; the shipped 1×/64× controls are exercised.
+- Renderer-wide timing is not treated as Worker attribution. The collector
+  instruments the shipped Dedicated Worker only in the test page, records
+  request/response evidence at 1×/64×, and returns BLOCKED if that attribution
+  is absent.
+- Baseline comparison accepts only the frozen D-043 candidate/build identity,
+  explicit same-device identity, matching browser matrix, matching settings
+  fingerprint, and matching per-cell identity. Self/current/unrelated input
+  is BLOCKED.
 - Android Chrome uses `adb reverse` for deterministic loopback and
   `adb forward ... localabstract:chrome_devtools_remote` for Playwright CDP;
   force-stop/reopen separates cold runs and teardown removes both tunnels.
@@ -118,7 +134,8 @@ Use `.cache/m7b/native/summary.json` and
 ## Known limitations and risks
 
 - Focused environment evidence is infrastructure-blocked: CoreSimulatorService
-  is unavailable; the attached Pixel 6a is locked. The collector also has no
+  is unavailable; the attached Pixel 6a is locked; pinned Chromium launch is
+  blocked by the managed host's Mach-port permission. The collector also has no
   frozen accepted-build baseline artifact. These are retained in summaries and
   are not claimed as closed gates.
 - The current WebKit build reports `WebKit encountered an internal error` on
@@ -128,27 +145,45 @@ Use `.cache/m7b/native/summary.json` and
   session; AX/UIAutomator artifacts are supporting evidence only.
 - The managed macOS browser sandbox may require scoped host authority for
   pinned browser launch. No chrome-devtools MCP or global cache is used.
+- The single final canonical run stopped at the existing root-browser PWA lane
+  after one `tests/e2e/verifier-round-042.spec.ts` 393px test timed out waiting
+  for a disabled expansion purchase. The exact test passed when rerun alone;
+  this is recorded as a suite-order/flaky regression, not silently converted
+  to PASS.
 - Deferred M7 work remains out of scope: writing/density, save fixtures and
   support policy, localization, audio, packaging/distribution, telemetry,
   startup/workforce/government/remote content, native wrappers, and new game
   systems.
 
-## Checks not run / final evidence
+## Checks / final evidence
 
-- Focused format, lint, typecheck, M7B contract tests, syntax, and diff checks
-  passed.
-- WebKit host-authority lane passed 2/2 (393×742 and 320×693). Its normal,
-  boundary, reduced-motion, 200%-text, keyboard/touch, reload/offline/cache,
-  persistence, and recovery assertions executed.
-- Native harness returned BLOCKED with exact xcrun CoreSimulatorService error,
-  locked Android policy evidence, and missing manual speech/viewport evidence;
-  settings/reverse cleanup completed.
-- Performance collector completed Chromium 320/393 five-run cells and
-  Chromium+WebKit 320/393 five-run cells. Chromium p95s observed: LCP 176ms
-  (320) / 88ms (393), INP 56ms / 56ms, CLS 0; Worker TaskDuration proxy p95
-  10.37ms/9.744ms at 1× and 10.061ms/10.467ms at 64×. WebKit offline
-  navigation errors are retained as BLOCKED with cache proof. Android
-  five-run lane and physical battery/thermal closure are BLOCKED by the
-  locked device; frozen-baseline comparison is BLOCKED by missing input.
+- Passed: `npx vitest run src/test/m7bEvidenceTooling.test.ts
+src/test/verifierRound083Workflow.test.ts --pool=forks --maxWorkers=1`,
+  `node .agent/verification/round-102-adversarial.mjs`, syntax checks for all
+  changed JavaScript, and `git diff --check`.
+- Native focused capture returned BLOCKED with the exact xcrun
+  CoreSimulatorService error, locked Android policy evidence, and missing
+  manual speech/viewport evidence. Settings/reverse cleanup ran; capture and
+  submission artifact manifests contained only `{path,sha256}` entries. The
+  retained validator refuses a second validation write.
+- Chromium-only five-run performance focus returned BLOCKED before cells due
+  the managed host's Chromium Mach-port permission; adb battery/thermal also
+  remained BLOCKED because the attached Pixel 6a is locked; baseline input was
+  unavailable. No browser performance values are claimed.
+- The focused pinned WebKit wrapper returned `BLOCKED` with retained report and
+  stderr artifacts; no WebKit pass is claimed.
+- Full `npm run test`, format check, lint, typecheck, and build passed. The
+  single final canonical command was
+  `VERIFY_EVIDENCE_DIR=.cache/verification/round-103-final ./scripts/verify`
+  under scoped host authority. Catalog, setup, format, lint, typecheck, 311
+  unit tests, all balance lanes, build, and production audit passed. It
+  stopped at `root-browser-pwa` with exit 1 after 237/238 browser tests
+  passed; the focused rerun of the timed-out 393px test passed. Because
+  canonical stopped before M7B, the focused WebKit/native/performance results
+  above are the retained M7B evidence for this candidate; no M7B PASS is
+  claimed. If infrastructure remains unavailable, the next canonical run must
+  return nonzero/BLOCKED and the operator must provide an available
+  CoreSimulator, unlocked authorized Android, and an explicit same-device
+  frozen baseline capture.
 - Fresh independent verification must inspect this exact committed SHA and
   independently rerun applicable canonical and native/operator evidence.

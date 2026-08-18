@@ -21,6 +21,7 @@ function readRepositoryFile(path: string): string {
 function runVerificationWithFakeNpm(
   temporaryRoot: string,
   failure: string | null,
+  blocked = false,
 ) {
   const bin = join(temporaryRoot, "bin");
   const evidence = join(temporaryRoot, "evidence");
@@ -31,6 +32,24 @@ function runVerificationWithFakeNpm(
 printf '%s\\n' "$*" >> "$VERIFY_FAKE_CALLS"
 if [ "$1" = ci ]; then exit 0; fi
 if [ "$VERIFY_FAKE_FAILURE" = "$1:$2" ]; then exit 37; fi
+if [ "$1" = run ]; then
+  result=PASS
+  if [ "\${VERIFY_FAKE_M7B_BLOCKED:-0}" = 1 ]; then result=BLOCKED; fi
+  case "$2" in
+    test:e2e:webkit)
+      mkdir -p "$M7B_WEBKIT_EVIDENCE_DIR"
+      printf '{"result":"%s"}\\n' "$result" > "$M7B_WEBKIT_EVIDENCE_DIR/summary.json"
+      ;;
+    test:native-a11y)
+      mkdir -p "$M7B_NATIVE_EVIDENCE_DIR"
+      printf '{"result":"%s"}\\n' "$result" > "$M7B_NATIVE_EVIDENCE_DIR/summary.json"
+      ;;
+    collect:mobile-performance)
+      mkdir -p "$M7B_PERFORMANCE_EVIDENCE_DIR"
+      printf '{"result":"%s"}\\n' "$result" > "$M7B_PERFORMANCE_EVIDENCE_DIR/summary.json"
+      ;;
+  esac
+fi
 exit 0
 `,
   );
@@ -47,6 +66,7 @@ exit 0
         PATH: `${bin}:${process.env.PATH ?? ""}`,
         VERIFY_EVIDENCE_DIR: evidence,
         VERIFY_FAKE_CALLS: calls,
+        ...(blocked ? { VERIFY_FAKE_M7B_BLOCKED: "1" } : {}),
         ...(failure === null ? {} : { VERIFY_FAKE_FAILURE: failure }),
       },
     }),
@@ -226,6 +246,27 @@ describe("round 083 workflow and provenance routing", () => {
         "pages-offline",
       ])
         expect(existsSync(join(run.evidence, `${name}.log`))).toBe(true);
+    } finally {
+      rmSync(temporaryRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("returns BLOCKED when an M7B summary is blocked", () => {
+    const temporaryRoot = mkdtempSync(
+      join(tmpdir(), "goldlocks-round083-blocked-"),
+    );
+    const bin = join(temporaryRoot, "bin");
+    try {
+      spawnSync("mkdir", ["-p", bin], { cwd: repositoryRoot });
+      const run = runVerificationWithFakeNpm(temporaryRoot, null, true);
+      expect(run.result.status).toBe(2);
+      const summary = readFileSync(join(run.evidence, "summary.txt"), "utf8");
+      expect(summary).toContain("webkit-browser=blocked\n");
+      expect(summary).toContain("native-accessibility=blocked\n");
+      expect(summary).toContain("mobile-performance=blocked\n");
+      expect(summary).toContain("verification=blocked\n");
+      expect(summary).not.toContain("verification=passed\n");
+      expect(run.result.stderr).toContain("Verification blocked");
     } finally {
       rmSync(temporaryRoot, { recursive: true, force: true });
     }

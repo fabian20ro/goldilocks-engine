@@ -2,9 +2,9 @@
 
 `collect:mobile-performance` is the repository-native collector for the
 bounded M7B performance gate. It uses the pinned Playwright package, a
-production loopback preview, `PerformanceObserver`, Chromium CDP metrics when
-available, and optional `adb` device counters. It does not add telemetry or a
-Chrome DevTools MCP dependency.
+production loopback preview, `PerformanceObserver`, test-only instrumentation
+of the shipped Dedicated Worker, and optional `adb` device counters. It does
+not add telemetry or a Chrome DevTools MCP dependency.
 
 ## Setup, startup, and cache
 
@@ -34,17 +34,18 @@ npm run collect:mobile-performance
 
 Each raw sample is written under `.cache/m7b/performance/samples/`, each
 Playwright trace under `traces/`, and the machine-readable summary under
-`summary.json`. The summary contains candidate SHA, browser identity, actual
-CSS viewport, startup, LCP/INP/CLS, interaction, transfer, memory, offline
-startup, Worker 1×/64× proxy samples, median/p95 aggregates, thresholds,
-artifact SHA-256 values, page errors, and cleanup commands.
+`summary.json`. The summary contains candidate SHA/build identity, browser and
+device/settings identity, actual CSS viewport, startup, LCP/INP/CLS,
+interaction, transfer, memory, offline startup, Dedicated Worker 1×/64×
+request/response attribution, median/p95 aggregates, thresholds, artifact
+SHA-256 values, page errors, and cleanup commands.
 
 LCP/INP/CLS are measured from `PerformanceObserver`. When a browser does not
 expose an entry type, its metric is `null` and the summary is `BLOCKED`; no
-zero is fabricated. Chromium's CDP `Performance.TaskDuration` is labeled as a
-Worker-cost proxy because browser CDP does not expose the dedicated Worker's
-CPU attribution. The 1× and 64× controls are still exercised through the
-shipped UI and are recorded separately.
+zero is fabricated. The collector wraps the shipped `Worker` constructor only
+inside the test page, records the actual product Worker's `postMessage` to
+`message` round trips for 1× and 64×, and blocks if no attributable Worker
+evidence is present. This is local evidence, not product telemetry.
 
 The installed WebKit build may report `WebKit encountered an internal error`
 for a top-level offline reload even when the service-worker controller and
@@ -55,7 +56,26 @@ silently converted into a passing offline navigation.
 ## Frozen-build baseline and physical Android evidence
 
 The accepted-build baseline must be collected separately and passed explicitly;
-the current candidate is never used as its own baseline:
+the current candidate is never used as its own baseline. Baseline metadata must
+authenticate the frozen accepted SHA/build (`d25e80e6781de89e80fc3b3c240a922ada53d978` /
+`dc97ee41f6dbbc0e29d2`), an explicit same-device ID, the same browser matrix,
+and the same settings fingerprint. Missing, self, unrelated, or mismatched
+metadata is `BLOCKED` before metric comparison. Every baseline artifact is
+also required to be a retained `{path,sha256}` entry whose bytes still match.
+
+Capture a baseline reproducibly from a detached worktree of that exact frozen
+SHA. The command requires an explicit physical/same-device identifier and
+uses only ignored repository-local npm/browser caches:
+
+```sh
+M7B_PERFORMANCE_DEVICE_ID=my-device \
+npm run capture:frozen-baseline
+```
+
+The helper runs `npm ci --prefer-offline`, installs the pinned Chromium/WebKit
+builds into `.cache/ms-playwright`, runs the collector with
+`--capture-frozen-baseline`, validates the frozen SHA/build ID, and removes its
+temporary worktree. Set `--output=<path>` to retain the baseline elsewhere.
 
 ```sh
 M7B_PERFORMANCE_BASELINE=.cache/m7b/performance/frozen-baseline.json \

@@ -122,6 +122,7 @@ async function assertOfflineRecovery(
   await context.setOffline(true);
   try {
     let offlineNavigationError = "";
+    let result = "PASS";
     try {
       await page.reload({ waitUntil: "commit" });
     } catch (error) {
@@ -130,10 +131,7 @@ async function assertOfflineRecovery(
       // usable. Preserve this concrete limitation in the test artifact and
       // prove the cached shell directly instead of hiding the failed attempt.
       offlineNavigationError = String(error);
-      testInfo.annotations.push({
-        type: "infrastructure",
-        description: `WebKit offline reload reported: ${offlineNavigationError}`,
-      });
+      result = "BLOCKED";
     }
     await expect(
       page.locator("h1", { hasText: "Goldilocks Engine" }),
@@ -160,7 +158,12 @@ async function assertOfflineRecovery(
     });
     expect(cacheProof.controller).toBe(true);
     expect(cacheProof.shellCached).toBe(true);
-    if (offlineNavigationError)
+    if (result === "BLOCKED")
+      testInfo.annotations.push({
+        type: "infrastructure",
+        description: `WebKit offline reload reported: ${offlineNavigationError}`,
+      });
+    if (result === "BLOCKED")
       expect(offlineNavigationError).toMatch(
         /internal error|Blocked by Web Inspector/i,
       );

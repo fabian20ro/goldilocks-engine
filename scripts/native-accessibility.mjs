@@ -26,11 +26,17 @@ const allowBlocked =
   process.env.M7B_NATIVE_ALLOW_BLOCKED === "1" ||
   process.argv.includes("--allow-blocked");
 const enableNativeSettings = process.env.M7B_NATIVE_ENABLE_SETTINGS === "1";
+const modeArg = process.argv.find((value) => value.startsWith("--mode="));
+const mode =
+  modeArg?.slice("--mode=".length) ?? process.env.M7B_NATIVE_MODE ?? "capture";
 const outputArg = process.argv.find((value) => value.startsWith("--output="));
 const summaryPath = path.resolve(
   root,
   outputArg?.slice("--output=".length) ??
-    path.join(evidenceDir, "summary.json"),
+    path.join(
+      evidenceDir,
+      mode === "validate" ? "validation-summary.json" : "summary.json",
+    ),
 );
 
 fs.mkdirSync(evidenceDir, { recursive: true });
@@ -139,6 +145,7 @@ function nativeChecklist(platform, device, browser) {
   for (const width of [393, 320]) {
     for (const name of destinations) {
       rows.push({
+        id: `${platform}:${width}:${name}:100-normal`,
         platform,
         device,
         browser,
@@ -154,6 +161,7 @@ function nativeChecklist(platform, device, browser) {
         status: "UNVERIFIED",
       });
       rows.push({
+        id: `${platform}:${width}:${name}:200-boundary`,
         platform,
         device,
         browser,
@@ -175,6 +183,545 @@ function nativeChecklist(platform, device, browser) {
     }
   }
   return rows;
+}
+
+function operatorRows() {
+  return [
+    ...nativeChecklist(
+      "iOS Simulator",
+      "operator-supplied device",
+      "Safari + VoiceOver",
+    ),
+    ...nativeChecklist(
+      "USB Android",
+      "operator-supplied device",
+      "Chrome + TalkBack",
+    ),
+  ];
+}
+
+function operatorSubmissionTemplate(capture) {
+  const rows = operatorRows().map((row) => ({
+    ...row,
+    actualCssViewport: null,
+    observed: "",
+    screenshot: "",
+    speechEvidence: "",
+    status: "UNVERIFIED",
+  }));
+  const devices = [
+    {
+      platform: "ios-simulator",
+      id: "",
+      device: "",
+      os: "",
+      browser: "Safari + VoiceOver",
+      settingsBefore: {},
+      settingsAfter: {},
+      settingsRestored: false,
+      settingsBeforeArtifact: "",
+      settingsAfterArtifact: "",
+      actualCssViewports: { 320: null, 393: null },
+      textScales: [],
+      reducedMotion: null,
+    },
+    {
+      platform: "android-usb",
+      id: "",
+      device: "",
+      os: "",
+      browser: "Chrome + TalkBack",
+      settingsBefore: {},
+      settingsAfter: {},
+      settingsRestored: false,
+      settingsBeforeArtifact: "",
+      settingsAfterArtifact: "",
+      actualCssViewports: { 320: null, 393: null },
+      textScales: [],
+      reducedMotion: null,
+    },
+  ];
+  for (const captured of capture.devices) {
+    const target = devices.find(
+      (device) => device.platform === captured.platform,
+    );
+    if (!target) continue;
+    Object.assign(target, {
+      id: captured.id,
+      device: captured.device,
+      os: captured.os,
+      browser: captured.browser,
+      settingsBefore: captured.settings,
+      settingsBeforeArtifact: captured.settingsBeforeArtifact ?? "",
+      settingsAfterArtifact: captured.settingsAfterArtifact ?? "",
+    });
+  }
+  return {
+    schemaVersion: 1,
+    kind: "m7b-native-operator-submission",
+    candidateSha: capture.candidateSha,
+    buildId: capture.buildInfo?.version ?? "",
+    submittedAt: "",
+    devices,
+    checklist: rows,
+    speech: {
+      voiceover: { path: "ios-voiceover-speech.txt", transcript: "" },
+      talkback: { path: "android-talkback-speech.txt", transcript: "" },
+    },
+    artifactPaths: capture.artifacts.map((entry) => ({
+      path: entry.path,
+      sha256: entry.sha256,
+    })),
+  };
+}
+
+function readJson(filePath) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function safeEvidencePath(relativePath) {
+  if (typeof relativePath !== "string" || relativePath.length === 0)
+    return null;
+  const absolute = path.resolve(root, relativePath);
+  const prefix = `${evidenceDir}${path.sep}`;
+  return absolute.startsWith(prefix) ? absolute : null;
+}
+
+function validateOperatorEvidence() {
+  const blockers = [];
+  const captureSummaryPath = path.resolve(
+    root,
+    process.env.M7B_NATIVE_CAPTURE_SUMMARY ??
+      path.join(evidenceDir, "summary.json"),
+  );
+  const submissionPath = path.resolve(
+    root,
+    process.env.M7B_NATIVE_SUBMISSION ??
+      path.join(evidenceDir, "operator-submission.json"),
+  );
+  const capture = readJson(captureSummaryPath);
+  const submission = readJson(submissionPath);
+  if (!capture)
+    blockers.push({
+      gate: "capture-summary",
+      reason: "capture summary is missing or malformed",
+      path: path.relative(root, captureSummaryPath),
+    });
+  if (!submission)
+    blockers.push({
+      gate: "operator-submission",
+      reason: "operator-submission.json is missing or malformed",
+      path: path.relative(root, submissionPath),
+    });
+  if (blockers.length > 0) return { blockers, capture, submission };
+
+  for (const entry of Array.isArray(capture.artifacts)
+    ? capture.artifacts
+    : []) {
+    if (
+      !entry ||
+      typeof entry !== "object" ||
+      typeof entry.path !== "string" ||
+      !/^[a-f0-9]{64}$/.test(entry.sha256 ?? "")
+    ) {
+      blockers.push({
+        gate: "capture-artifact-manifest",
+        reason: "capture artifact entries must be {path,sha256}",
+        entry,
+      });
+      continue;
+    }
+    const filePath = safeEvidencePath(entry.path);
+    if (!filePath || !fs.existsSync(filePath)) {
+      blockers.push({
+        gate: "capture-artifact-manifest",
+        path: entry.path,
+        reason: "capture artifact is missing or outside retained evidence",
+      });
+      continue;
+    }
+    if (artifactRecord(filePath).sha256 !== entry.sha256)
+      blockers.push({
+        gate: "capture-artifact-manifest",
+        path: entry.path,
+        reason: "capture artifact digest does not match retained bytes",
+      });
+  }
+
+  if (
+    submission.schemaVersion !== 1 ||
+    submission.kind !== "m7b-native-operator-submission"
+  )
+    blockers.push({
+      gate: "submission-schema",
+      reason: "unsupported operator submission schema",
+    });
+  if (
+    submission.candidateSha !== capture.candidateSha ||
+    submission.candidateSha !== readGitSha()
+  )
+    blockers.push({
+      gate: "candidate-identity",
+      reason:
+        "submission candidate SHA does not match the retained capture and current candidate",
+      expected: readGitSha(),
+      actual: submission.candidateSha,
+    });
+  if (
+    !capture.buildInfo?.version ||
+    submission.buildId !== capture.buildInfo.version
+  )
+    blockers.push({
+      gate: "build-identity",
+      reason: "submission build ID does not match the retained capture",
+      expected: capture.buildInfo?.version ?? "missing",
+      actual: submission.buildId,
+    });
+  if (!submission.submittedAt)
+    blockers.push({
+      gate: "submission-time",
+      reason: "operator submission timestamp is missing",
+    });
+
+  const expectedDevices = ["ios-simulator", "android-usb"];
+  const devices = Array.isArray(submission.devices) ? submission.devices : [];
+  const requiredDeviceArtifacts = [];
+  for (const platform of expectedDevices) {
+    const device = devices.find((entry) => entry?.platform === platform);
+    if (!device) {
+      blockers.push({
+        gate: "device-identity",
+        platform,
+        reason: "device record is missing",
+      });
+      continue;
+    }
+    const capturedDevice = capture.devices?.find(
+      (entry) => entry?.platform === platform,
+    );
+    if (!capturedDevice) {
+      blockers.push({
+        gate: "device-identity",
+        platform,
+        reason: "submission device is not present in retained native capture",
+      });
+    } else {
+      if (device.id !== capturedDevice.id)
+        blockers.push({
+          gate: "device-identity",
+          platform,
+          reason: "submission device ID differs from retained capture",
+          expected: capturedDevice.id,
+          actual: device.id,
+        });
+      if (device.device !== capturedDevice.device)
+        blockers.push({
+          gate: "device-identity",
+          platform,
+          reason: "submission device description differs from retained capture",
+        });
+      if (platform === "android-usb" && capturedDevice.unlocked !== true)
+        blockers.push({
+          gate: "android-unlocked",
+          platform,
+          reason: "retained capture did not prove the USB Android was unlocked",
+        });
+    }
+    for (const key of ["id", "device", "os", "browser"]) {
+      if (typeof device[key] !== "string" || device[key].trim() === "")
+        blockers.push({
+          gate: "device-identity",
+          platform,
+          reason: `${key} is missing`,
+        });
+    }
+    if (
+      !device.settingsBefore ||
+      Object.keys(device.settingsBefore).length === 0
+    )
+      blockers.push({
+        gate: "settings",
+        platform,
+        reason: "before-settings snapshot is missing",
+      });
+    if (!device.settingsAfter || Object.keys(device.settingsAfter).length === 0)
+      blockers.push({
+        gate: "settings",
+        platform,
+        reason: "after-settings snapshot is missing",
+      });
+    if (device.settingsRestored !== true)
+      blockers.push({
+        gate: "settings",
+        platform,
+        reason: "settings restore was not attested",
+      });
+    for (const key of ["settingsBeforeArtifact", "settingsAfterArtifact"]) {
+      const artifactPath = safeEvidencePath(device[key]);
+      if (!artifactPath || !fs.existsSync(artifactPath))
+        blockers.push({
+          gate: "settings",
+          platform,
+          reason: `${key} must reference retained settings evidence`,
+        });
+      else requiredDeviceArtifacts.push(device[key]);
+    }
+    if (
+      !Array.isArray(device.textScales) ||
+      !device.textScales.includes("100%") ||
+      !device.textScales.includes("200%")
+    )
+      blockers.push({
+        gate: "settings",
+        platform,
+        reason: "100% and 200% text runs are not recorded",
+      });
+    if (device.reducedMotion !== true)
+      blockers.push({
+        gate: "settings",
+        platform,
+        reason: "reduced-motion run is not recorded",
+      });
+    for (const width of [320, 393]) {
+      const viewport = device.actualCssViewports?.[String(width)];
+      if (
+        !viewport ||
+        viewport.width !== width ||
+        !Number.isFinite(viewport.height)
+      )
+        blockers.push({
+          gate: "actual-css-viewport",
+          platform,
+          width,
+          reason: "actual CSS viewport is missing or mismatched",
+        });
+    }
+  }
+
+  const expectedRows = operatorRows();
+  const checklistEvidencePath = submissionPath;
+  let checklistEvidence = null;
+  try {
+    checklistEvidence = JSON.parse(
+      fs.readFileSync(checklistEvidencePath, "utf8"),
+    ).checklist;
+  } catch {
+    blockers.push({
+      gate: "checklist",
+      reason: "retained checklist evidence is not valid JSON",
+    });
+  }
+  const rows = Array.isArray(checklistEvidence) ? checklistEvidence : [];
+  const byId = new Map(rows.map((row) => [row?.id, row]));
+  if (rows.length !== expectedRows.length || byId.size !== expectedRows.length)
+    blockers.push({
+      gate: "checklist",
+      reason:
+        "checklist row count or IDs do not match the complete native matrix",
+    });
+  for (const expected of expectedRows) {
+    const row = byId.get(expected.id);
+    if (!row) {
+      blockers.push({
+        gate: "checklist",
+        row: expected.id,
+        reason: "required row is missing",
+      });
+      continue;
+    }
+    if (row.status !== "PASS")
+      blockers.push({
+        gate: "checklist",
+        row: expected.id,
+        reason: "row is not marked PASS",
+      });
+    for (const key of ["observed", "speechEvidence", "screenshot"]) {
+      if (typeof row[key] !== "string" || row[key].trim() === "")
+        blockers.push({
+          gate: "checklist",
+          row: expected.id,
+          reason: `${key} is missing`,
+        });
+    }
+    const screenshotPath = safeEvidencePath(row.screenshot);
+    if (!screenshotPath || !fs.existsSync(screenshotPath))
+      blockers.push({
+        gate: "checklist",
+        row: expected.id,
+        reason: "row screenshot must reference a retained evidence file",
+      });
+    if (
+      row.actualCssViewport?.width !== expected.width ||
+      !Number.isFinite(row.actualCssViewport?.height)
+    )
+      blockers.push({
+        gate: "checklist",
+        row: expected.id,
+        reason: "row actual CSS viewport is missing or mismatched",
+      });
+  }
+
+  const speech = submission.speech ?? {};
+  const artifactRecords = [];
+  for (const [key, platform] of [
+    ["voiceover", "ios-simulator"],
+    ["talkback", "android-usb"],
+  ]) {
+    const entry = speech[key];
+    const filePath = safeEvidencePath(entry?.path);
+    const content =
+      filePath && fs.existsSync(filePath)
+        ? fs.readFileSync(filePath, "utf8")
+        : "";
+    if (
+      !filePath ||
+      content.trim() === "" ||
+      /Manual evidence required/i.test(content) ||
+      typeof entry?.transcript !== "string" ||
+      entry.transcript.trim() === ""
+    )
+      blockers.push({
+        gate: "speech",
+        platform,
+        reason: "retained speech transcript is missing or placeholder",
+      });
+    if (filePath && fs.existsSync(filePath))
+      artifactRecords.push(artifactRecord(filePath));
+  }
+  const artifactPaths = Array.isArray(submission.artifactPaths)
+    ? submission.artifactPaths
+    : [];
+  const submittedArtifactPaths = new Set();
+  for (const entry of artifactPaths) {
+    if (
+      !entry ||
+      typeof entry !== "object" ||
+      typeof entry.path !== "string" ||
+      !/^[a-f0-9]{64}$/.test(entry.sha256 ?? "")
+    ) {
+      blockers.push({
+        gate: "artifact",
+        path: entry?.path,
+        reason: "every submitted artifact entry must be {path,sha256}",
+      });
+      continue;
+    }
+    const relativePath = entry.path;
+    submittedArtifactPaths.add(relativePath);
+    const filePath = safeEvidencePath(relativePath);
+    if (!filePath || !fs.existsSync(filePath)) {
+      blockers.push({
+        gate: "artifact",
+        path: relativePath,
+        reason:
+          "referenced evidence artifact is missing or escapes evidence directory",
+      });
+      continue;
+    }
+    const record = artifactRecord(filePath);
+    if (entry.sha256 !== record.sha256)
+      blockers.push({
+        gate: "artifact",
+        path: relativePath,
+        reason: "submitted artifact digest does not match retained bytes",
+      });
+    artifactRecords.push(record);
+  }
+  for (const row of rows) {
+    if (
+      typeof row?.screenshot === "string" &&
+      row.screenshot.trim() !== "" &&
+      safeEvidencePath(row.screenshot) &&
+      !submittedArtifactPaths.has(row.screenshot)
+    )
+      blockers.push({
+        gate: "checklist",
+        row: row.id,
+        reason: "row screenshot must be listed with its checksum",
+      });
+  }
+  for (const artifactPath of requiredDeviceArtifacts)
+    if (!submittedArtifactPaths.has(artifactPath))
+      blockers.push({
+        gate: "settings",
+        path: artifactPath,
+        reason: "settings evidence must be listed with its checksum",
+      });
+  for (const entry of Array.isArray(capture.artifacts)
+    ? capture.artifacts
+    : []) {
+    if (
+      path.basename(entry.path) !== "operator-submission.json" &&
+      !submittedArtifactPaths.has(entry.path)
+    )
+      blockers.push({
+        gate: "artifact",
+        path: entry.path,
+        reason: "operator submission omitted a retained capture artifact",
+      });
+  }
+  for (const entry of Object.values(speech)) {
+    const speechPath = safeEvidencePath(entry?.path);
+    if (speechPath && !submittedArtifactPaths.has(entry.path))
+      blockers.push({
+        gate: "speech",
+        path: entry.path,
+        reason: "speech evidence must be listed with its checksum",
+      });
+  }
+  return {
+    blockers,
+    capture,
+    submission,
+    artifacts: artifactRecords,
+  };
+}
+
+if (mode !== "capture" && mode !== "validate") {
+  console.error(`M7B_NATIVE_MODE must be capture or validate, got ${mode}`);
+  process.exit(64);
+}
+
+if (mode === "validate") {
+  if (fs.existsSync(summaryPath)) {
+    console.error(
+      `Refusing to overwrite retained native validation: ${summaryPath}`,
+    );
+    process.exit(2);
+  }
+  const validation = validateOperatorEvidence();
+  const sourceSubmissionPath = path.resolve(
+    root,
+    process.env.M7B_NATIVE_SUBMISSION ??
+      path.join(evidenceDir, "operator-submission.json"),
+  );
+  const output = {
+    schemaVersion: 1,
+    kind: "m7b-native-operator-validation",
+    candidateSha: validation.submission?.candidateSha ?? readGitSha(),
+    buildId: validation.submission?.buildId ?? null,
+    result: validation.blockers.length === 0 ? "PASS" : "BLOCKED",
+    sourceSubmission: path.relative(root, sourceSubmissionPath),
+    blockers: validation.blockers,
+    artifacts: validation.artifacts ?? [],
+    validatedAt: new Date().toISOString(),
+  };
+  fs.writeFileSync(summaryPath, JSON.stringify(output, null, 2) + "\n");
+  console.log(JSON.stringify(output, null, 2));
+  if (output.result === "BLOCKED" && !allowBlocked) process.exit(2);
+  process.exit(0);
+}
+
+const existingCaptureEntries = fs.readdirSync(evidenceDir);
+if (existingCaptureEntries.length > 0) {
+  console.error(
+    `Refusing to overwrite existing native evidence directory: ${evidenceDir}. Use a new capture directory or --mode=validate.`,
+  );
+  process.exit(2);
 }
 
 function captureIos(result) {
@@ -272,9 +819,12 @@ function captureIos(result) {
     ["spawn", id, "defaults", "read", "com.apple.Accessibility"],
     "capture accessibility settings",
   );
-  deviceResult.artifacts.push(
-    writeArtifact("ios-settings-before.txt", settingsBefore.stdout),
+  const settingsBeforeArtifact = writeArtifact(
+    "ios-settings-before.txt",
+    settingsBefore.stdout,
   );
+  deviceResult.settingsBeforeArtifact = settingsBeforeArtifact.path;
+  deviceResult.artifacts.push(settingsBeforeArtifact);
   for (const key of ["VoiceOverTouchEnabled", "ReduceMotionEnabled"]) {
     const setting = run(
       ["spawn", id, "defaults", "read", "com.apple.Accessibility", key],
@@ -283,7 +833,7 @@ function captureIos(result) {
     captureSetting(deviceResult, key, setting.stdout);
   }
   if (enableNativeSettings) {
-    run(
+    const voiceOverEnable = run(
       [
         "spawn",
         id,
@@ -296,7 +846,13 @@ function captureIos(result) {
       ],
       "enable VoiceOver for operator session",
     );
-    run(
+    if (voiceOverEnable.status !== 0)
+      result.blockers.push({
+        gate: "voiceover-setup",
+        reason: "VoiceOver setting could not be enabled",
+        stderr: voiceOverEnable.stderr,
+      });
+    const reduceMotionEnable = run(
       [
         "spawn",
         id,
@@ -309,6 +865,12 @@ function captureIos(result) {
       ],
       "enable reduced motion for operator session",
     );
+    if (reduceMotionEnable.status !== 0)
+      result.blockers.push({
+        gate: "ios-reduced-motion-setup",
+        reason: "iOS reduced-motion setting could not be enabled",
+        stderr: reduceMotionEnable.stderr,
+      });
   }
   const open = run(
     ["openurl", id, loopbackUrl],
@@ -342,6 +904,17 @@ function captureIos(result) {
       "Manual evidence required. With VoiceOver enabled, record the exact spoken transcript for every checklist row.\n",
     ),
   );
+  const settingsAfter = run(
+    ["spawn", id, "defaults", "read", "com.apple.Accessibility"],
+    "capture accessibility settings after operator setup",
+  );
+  const settingsAfterArtifact = writeArtifact(
+    "ios-settings-after.txt",
+    settingsAfter.stdout,
+  );
+  deviceResult.settingsAfterArtifact = settingsAfterArtifact.path;
+  deviceResult.artifacts.push(settingsAfterArtifact);
+  deviceResult.settingsAfter = settingsAfter.stdout;
   result.devices.push(deviceResult);
   result.checklist.push(
     ...nativeChecklist(
@@ -422,6 +995,7 @@ function captureAndroid(result) {
       "capture Android version",
     ).stdout.trim(),
     browser: "Chrome (operator-selected stable build)",
+    unlocked: isAndroidUnlocked(policy.stdout),
     actualCssViewport: null,
     settings: {},
     artifacts: [],
@@ -443,9 +1017,12 @@ function captureAndroid(result) {
   const settingsBefore = Object.entries(deviceResult.settings)
     .map(([key, value]) => `${key}=${value}`)
     .join("\n");
-  deviceResult.artifacts.push(
-    writeArtifact("android-settings-before.txt", settingsBefore),
+  const settingsBeforeArtifact = writeArtifact(
+    "android-settings-before.txt",
+    settingsBefore,
   );
+  deviceResult.settingsBeforeArtifact = settingsBeforeArtifact.path;
+  deviceResult.artifacts.push(settingsBeforeArtifact);
   if (enableNativeSettings) {
     const packages = run(
       ["shell", "pm", "list", "packages"],
@@ -463,11 +1040,17 @@ function captureAndroid(result) {
         stderr: packages,
       });
     } else {
-      run(
+      const accessibilityEnable = run(
         ["shell", "settings", "put", "secure", "accessibility_enabled", "1"],
         "enable Android accessibility",
       );
-      run(
+      if (accessibilityEnable.status !== 0)
+        result.blockers.push({
+          gate: "android-accessibility-setup",
+          reason: "Android accessibility setting could not be enabled",
+          stderr: accessibilityEnable.stderr,
+        });
+      const talkBackEnable = run(
         [
           "shell",
           "settings",
@@ -478,15 +1061,29 @@ function captureAndroid(result) {
         ],
         "enable TalkBack for operator session",
       );
+      if (talkBackEnable.status !== 0)
+        result.blockers.push({
+          gate: "talkback-setup",
+          reason: "TalkBack setting could not be enabled",
+          stderr: talkBackEnable.stderr,
+        });
       for (const key of [
         "transition_animation_scale",
         "window_animation_scale",
         "animator_duration_scale",
-      ])
-        run(
+      ]) {
+        const reducedMotionEnable = run(
           ["shell", "settings", "put", "global", key, "0"],
           `enable reduced motion ${key}`,
         );
+        if (reducedMotionEnable.status !== 0)
+          result.blockers.push({
+            gate: "android-reduced-motion-setup",
+            key,
+            reason: "Android reduced-motion setting could not be enabled",
+            stderr: reducedMotionEnable.stderr,
+          });
+      }
     }
   }
   const reverse = run(
@@ -531,7 +1128,7 @@ function captureAndroid(result) {
   ]);
   if (screenshot.status === 0) {
     fs.writeFileSync(screenshotPath, screenshot.stdout);
-    deviceResult.artifacts.push(path.relative(root, screenshotPath));
+    deviceResult.artifacts.push(artifactRecord(screenshotPath));
   }
   const hierarchy = run(
     ["shell", "uiautomator", "dump", "/sdcard/m7b-window.xml"],
@@ -556,6 +1153,15 @@ function captureAndroid(result) {
       "Manual evidence required. With TalkBack enabled, record the exact spoken transcript for every checklist row.\n",
     ),
   );
+  const settingsAfter = Object.entries(deviceResult.settings)
+    .map(([key, value]) => `${key}=${value}`)
+    .join("\n");
+  const settingsAfterArtifact = writeArtifact(
+    "android-settings-after.txt",
+    settingsAfter,
+  );
+  deviceResult.settingsAfterArtifact = settingsAfterArtifact.path;
+  deviceResult.artifacts.push(settingsAfterArtifact);
   result.devices.push(deviceResult);
   result.checklist.push(
     ...nativeChecklist("USB Android", deviceResult.device, "Chrome + TalkBack"),
@@ -594,6 +1200,7 @@ const result = {
   commands: [],
   devices: [],
   checklist: [],
+  buildInfo: null,
   blockers: [],
   artifacts: [],
 };
@@ -626,6 +1233,25 @@ try {
       command: `E2E_PORT=${port} ./scripts/run-e2e`,
       stderr: "timeout after 120 seconds",
     });
+  } else {
+    try {
+      const buildResponse = await fetch(
+        new URL("build-info.json", loopbackUrl),
+      );
+      result.buildInfo = await buildResponse.json();
+      result.commands.push({
+        command: `${loopbackUrl}build-info.json`,
+        label: "capture build identity",
+        status: buildResponse.ok ? 0 : 1,
+        stderr: buildResponse.ok ? "" : `HTTP ${buildResponse.status}`,
+      });
+    } catch (error) {
+      result.blockers.push({
+        gate: "build-identity",
+        reason: "deterministic loopback build-info.json could not be captured",
+        stderr: String(error),
+      });
+    }
   }
   captureIos(result);
   const android = captureAndroid(result);
@@ -652,6 +1278,13 @@ try {
           status: restore.status,
           stderr: restore.stderr,
         });
+        if (restore.status !== 0)
+          result.blockers.push({
+            gate: "ios-settings-restore",
+            key,
+            reason: "captured iOS accessibility setting could not be restored",
+            stderr: restore.stderr,
+          });
       }
     }
     if (device.platform === "android-usb" && device.id) {
@@ -684,11 +1317,31 @@ try {
           status: restore.status,
           stderr: restore.stderr,
         });
+        if (restore.status !== 0)
+          result.blockers.push({
+            gate: "android-settings-restore",
+            key,
+            reason: "captured Android setting could not be restored",
+            stderr: restore.stderr,
+          });
       }
     }
   }
-  if (androidId)
-    command("adb", ["-s", androidId, "reverse", "--remove", `tcp:${port}`]);
+  if (androidId) {
+    const reverseCleanup = command("adb", [
+      "-s",
+      androidId,
+      "reverse",
+      "--remove",
+      `tcp:${port}`,
+    ]);
+    if (reverseCleanup.status !== 0)
+      result.blockers.push({
+        gate: "android-loopback-cleanup",
+        reason: "adb reverse tunnel could not be removed",
+        stderr: reverseCleanup.stderr,
+      });
+  }
   if (server?.pid) {
     try {
       process.kill(-server.pid, "SIGTERM");
@@ -704,6 +1357,16 @@ const checklistPath = writeArtifact(
 );
 result.artifacts.push(checklistPath);
 result.artifacts.push(...result.devices.flatMap((device) => device.artifacts));
+const operatorSubmissionPath = path.join(
+  evidenceDir,
+  "operator-submission.json",
+);
+fs.writeFileSync(
+  operatorSubmissionPath,
+  JSON.stringify(operatorSubmissionTemplate(result), null, 2) + "\n",
+);
+result.operatorSubmissionTemplate = artifactRecord(operatorSubmissionPath);
+result.artifacts.push(result.operatorSubmissionTemplate);
 result.result = result.blockers.length === 0 ? "PASS" : "BLOCKED";
 fs.mkdirSync(path.dirname(summaryPath), { recursive: true });
 fs.writeFileSync(summaryPath, JSON.stringify(result, null, 2) + "\n");
