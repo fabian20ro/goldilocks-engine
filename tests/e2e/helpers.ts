@@ -1,6 +1,21 @@
 import { expect, type Page } from "@playwright/test";
+import { sealSaveRecord } from "../../src/simulation/engine";
 
 export const STARTER_QUEUE_NAME = "Queue one safe Interactive Chat job";
+
+/** Re-seal a deliberately edited valid fixture before the next app boot. */
+export async function resealSavedRecord(
+  page: Page,
+  saveKey = "goldilocks-simulation-save-v4",
+): Promise<void> {
+  const raw = await page.evaluate((key) => localStorage.getItem(key), saveKey);
+  if (raw === null) throw new Error("Expected a persisted simulation state");
+  const value = JSON.parse(raw) as Record<string, unknown>;
+  await page.evaluate(
+    ({ key, serialized }) => localStorage.setItem(key, serialized),
+    { key: saveKey, serialized: JSON.stringify(sealSaveRecord(value)) },
+  );
+}
 
 /** Global controls are intentionally compact until the player asks for them. */
 export async function openSimulationContext(page: Page) {

@@ -37,10 +37,8 @@ describe("verifier round 080 settlement provenance recovery", () => {
       }),
     );
 
-    // This is untrusted persisted state: it preserves every required shape and
-    // the genuine task event, but changes a later unrelated baseline record
-    // into a failure mentioning the task marker. Recovery keeps gameplay but
-    // must not reseal any precise settlement provenance from a stale seal.
+    // This is untrusted persisted state. D-047 backs it up and resets before
+    // reading the genuine task event or the forged later record.
     const corrupted: SimulationState = structuredClone(state);
     const laterEvent = corrupted.ledger.at(-1);
     expect(laterEvent).toBeDefined();
@@ -57,11 +55,7 @@ describe("verifier round 080 settlement provenance recovery", () => {
 
     const restored = restoreSimulationState(corrupted, 80_080);
     expect(isStateValid(restored)).toBe(true);
-    expect(restored.lastSettlement).toMatchObject({
-      failed: 1,
-      taskId: settlement?.taskId,
-    });
-    expect(restored.lastSettlement?.ledgerEventId).toBeUndefined();
+    expect(restored).toEqual(createInitialState(80_080));
 
     render(
       <JobsView
@@ -75,10 +69,6 @@ describe("verifier round 080 settlement provenance recovery", () => {
       />,
     );
 
-    const failureRecord = screen.getByText("Failure record:").parentElement;
-    expect(failureRecord).toHaveTextContent(
-      "Cause unknown — the retained settlement record is unavailable.",
-    );
-    expect(failureRecord).not.toHaveTextContent("Forged unrelated cause.");
+    expect(screen.queryByText("Failure record:")).toBeNull();
   });
 });

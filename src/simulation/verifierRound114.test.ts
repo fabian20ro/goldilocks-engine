@@ -36,7 +36,8 @@ describe("round 114 independent closed-world recovery adversaries", () => {
 
     const result = restoreSimulationStateWithReport(forged, seed, true);
 
-    expect(result.recovery.disposition).toBe("recovered");
+    expect(result.recovery.disposition).toBe("reset");
+    expect(result.recovery.reason).toBe("invalid-integrity");
     expect(result.state.career.evaluation).toEqual(baseline.career.evaluation);
     expect(isStateValid(result.state)).toBe(true);
   });
@@ -66,11 +67,9 @@ describe("round 114 independent closed-world recovery adversaries", () => {
 
     const result = restoreSimulationStateWithReport(forged, seed, true);
 
-    expect(result.recovery.disposition).toBe("recovered");
-    expect(result.state.ownedModuleIds).toContain("precision-cleaner");
-    expect(
-      result.state.slots.find((slot) => slot.slotId === "verify")?.moduleId,
-    ).toBe("smoke-check");
+    expect(result.recovery.disposition).toBe("reset");
+    expect(result.recovery.reason).toBe("invalid-integrity");
+    expect(result.state).toEqual(createInitialState(seed));
     expect(isStateValid(result.state)).toBe(true);
   });
 
@@ -96,10 +95,9 @@ describe("round 114 independent closed-world recovery adversaries", () => {
 
     const result = restoreSimulationStateWithReport(forged, seed, true);
 
-    expect(result.recovery.disposition).toBe("recovered");
-    expect(result.state.jobs.queued).toBe(0);
-    expect(result.state.jobs.waitingTasks).toEqual([]);
-    expect(result.state.firstSession.step).toBe("queue-starter");
+    expect(result.recovery.disposition).toBe("reset");
+    expect(result.recovery.reason).toBe("invalid-integrity");
+    expect(result.state).toEqual(createInitialState(seed));
     expect(isStateValid(result.state)).toBe(true);
   });
 
@@ -133,14 +131,13 @@ describe("round 114 independent closed-world recovery adversaries", () => {
 
     const result = restoreSimulationStateWithReport(forged, seed, true);
 
-    expect(result.recovery.disposition).toBe("recovered");
-    expect(result.state.jobs.grossEarned).toBe(0);
-    expect(result.state.jobs.operatingCostsPaid).toBe(0);
-    expect(result.state.lastSettlement).toBeNull();
+    expect(result.recovery.disposition).toBe("reset");
+    expect(result.recovery.reason).toBe("invalid-integrity");
+    expect(result.state).toEqual(createInitialState(seed));
     expect(isStateValid(result.state)).toBe(true);
   });
 
-  it("retains a legitimate settlement and is idempotent through a resealed reload", () => {
+  it("resets an unsealed settlement, while a sealed settlement reloads idempotently", () => {
     const seed = 114_104;
     let source = applyCommand(createInitialState(seed), {
       type: "QUEUE_JOBS",
@@ -157,20 +154,25 @@ describe("round 114 independent closed-world recovery adversaries", () => {
       seed,
       true,
     );
-    expect(recovered.recovery.disposition).toBe("recovered");
-    expect(recovered.state.jobs.completed).toBe(source.jobs.completed);
-    expect(recovered.state.jobs.failed).toBe(source.jobs.failed);
-    expect(recovered.state.jobs.grossEarned).toBe(source.jobs.grossEarned);
+    expect(recovered.recovery.disposition).toBe("reset");
+    expect(recovered.recovery.reason).toBe("invalid-integrity");
+    expect(recovered.state).toEqual(createInitialState(seed));
+
+    const sealed = restoreSimulationStateWithReport(source, seed, true);
+    expect(sealed.recovery.disposition).toBe("none");
+    expect(sealed.state.jobs.completed).toBe(source.jobs.completed);
+    expect(sealed.state.jobs.failed).toBe(source.jobs.failed);
+    expect(sealed.state.jobs.grossEarned).toBe(source.jobs.grossEarned);
     expect(isStateValid(recovered.state)).toBe(true);
 
     const reloaded = restoreSimulationStateWithReport(
-      JSON.parse(serializeSimulationState(recovered.state)) as unknown,
+      JSON.parse(serializeSimulationState(sealed.state)) as unknown,
       seed,
       true,
     );
     expect(reloaded.recovery.disposition).toBe("none");
     expect(serializeSimulationState(reloaded.state)).toBe(
-      serializeSimulationState(recovered.state),
+      serializeSimulationState(sealed.state),
     );
   });
 });

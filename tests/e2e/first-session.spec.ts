@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { sealSaveRecord } from "../../src/simulation/engine";
 import { chooseSimulationSpeed } from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
@@ -40,9 +41,10 @@ async function setSavedMoney(page: Page, money: number): Promise<Page> {
   // Stop that page first, then seed the saved fixture before the next app boot.
   const context = page.context();
   await page.close();
+  const sealed = JSON.stringify(sealSaveRecord(state));
   await context.addInitScript(
     ({ key, saved }) => localStorage.setItem(key, saved),
-    { key: SAVE_KEY, saved: JSON.stringify(state) },
+    { key: SAVE_KEY, saved: sealed },
   );
   const restoredPage = await context.newPage();
   await restoredPage.setViewportSize(viewport);

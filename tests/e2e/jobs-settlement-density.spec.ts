@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { chooseSimulationSpeed } from "./helpers";
+import { chooseSimulationSpeed, resealSavedRecord } from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 const MINIMUM_NAV_CLEARANCE_PX = 8;
@@ -33,6 +33,7 @@ async function setSavedMoney(page: Page, money: number) {
     },
     { key: SAVE_KEY, value: money },
   );
+  await resealSavedRecord(page, SAVE_KEY);
   await page.reload({ waitUntil: "domcontentloaded" });
 }
 

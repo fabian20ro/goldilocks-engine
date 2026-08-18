@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { sealSaveRecord } from "../../src/simulation/engine";
 import { chooseSimulationSpeed } from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
@@ -60,7 +61,7 @@ async function seedBeforeBoot(page: Page, money: number): Promise<Page> {
     },
     {
       key: SAVE_KEY,
-      saved: JSON.stringify(state),
+      saved: JSON.stringify(sealSaveRecord(state)),
       marker: "verifier-round-049-seeded",
     },
   );

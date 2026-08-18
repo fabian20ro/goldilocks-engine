@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { resealSavedRecord } from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 
@@ -27,6 +28,7 @@ test.describe("Research frontier", () => {
       state.jobs.paused = true;
       localStorage.setItem(key, JSON.stringify(state));
     }, SAVE_KEY);
+    await resealSavedRecord(page, SAVE_KEY);
     await page.reload();
   });
 

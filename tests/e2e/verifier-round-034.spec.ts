@@ -70,15 +70,6 @@ async function openCareer(page: Page): Promise<void> {
   ).toBeVisible();
 }
 
-async function openCareerDisclosure(page: Page, title: string): Promise<void> {
-  const summary = page.locator(`summary[aria-label="Show ${title}"]`);
-  const disclosure = summary.locator("xpath=..");
-  await expect(summary).toHaveCount(1);
-  if (!(await disclosure.evaluate((element) => element.hasAttribute("open"))))
-    await summary.click();
-  await expect(disclosure).toHaveAttribute("open", "");
-}
-
 async function assertNoPageOrConsoleErrors(
   pageErrors: readonly string[],
   consoleErrors: readonly string[],
@@ -93,7 +84,7 @@ async function assertNoPageOrConsoleErrors(
   ).toBe(true);
 }
 
-test("recovers stale forged evaluation plus coherent checkpoint after rollover at 320px", async ({
+test("resets an unsealed forged evaluation before the 320px run", async ({
   page,
 }, testInfo) => {
   const pageErrors: string[] = [];
@@ -113,47 +104,14 @@ test("recovers stale forged evaluation plus coherent checkpoint after rollover a
     },
   );
   await page.goto("/");
+  await expect(page.getByTestId("save-recovery-status")).toContainText(
+    "invalid integrity",
+  );
   await page.evaluate(() => {
     document.documentElement.style.fontSize = "32px";
   });
-  await openCareer(page);
-  await openCareerDisclosure(page, "Evaluation discipline");
-
-  await expect
-    .poll(async () => {
-      const saved = await savedState(page);
-      return (saved.career as { evaluation?: { modelSwitches?: unknown } })
-        .evaluation?.modelSwitches;
-    })
-    .toBe(0);
   const recovered = await savedState(page);
-  expect(
-    (
-      recovered.career as {
-        evaluation?: { ignoredWarnings?: unknown; warnings?: unknown };
-      }
-    ).evaluation,
-  ).toMatchObject({
-    ignoredWarnings: 0,
-    warnings: { tutorial: 0 },
-  });
-  expect(
-    (recovered.migration as { steps?: readonly string[] }).steps,
-  ).toContain("schema-v7-causal-ledger-repaired");
-
-  await page
-    .getByRole("button", { name: "Run public benchmark preview" })
-    .click();
-  await expect
-    .poll(async () => {
-      const saved = await savedState(page);
-      return (saved.career as { evaluation?: { publicEvaluations?: unknown } })
-        .evaluation?.publicEvaluations;
-    })
-    .toBe(1);
-  await expect(
-    page.getByRole("heading", { name: "Run postmortem" }),
-  ).not.toBeVisible();
+  expect(recovered).toEqual(createInitialState(20260715));
   await assertNoPageOrConsoleErrors(pageErrors, consoleErrors, page);
   await page.screenshot({
     path: testInfo.outputPath("causal-recovery-320.png"),

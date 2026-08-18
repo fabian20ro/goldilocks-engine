@@ -131,7 +131,7 @@ test.describe("M7D save stability", () => {
     await tamperedPage.goto("/");
     await expect(
       tamperedPage.getByTestId("save-recovery-status"),
-    ).toContainText("malformed or uncorroborated save");
+    ).toContainText("invalid integrity");
     await expect(
       tamperedPage.getByTestId("save-recovery-status"),
     ).toContainText("One bounded raw recovery backup was preserved");
@@ -140,7 +140,7 @@ test.describe("M7D save stability", () => {
     });
   });
 
-  test("preserves a stale save through reload and an offline PWA reload", async ({
+  test("resets an unsealed save through reload and an offline PWA reload", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 393, height: 742 });
@@ -161,12 +161,15 @@ test.describe("M7D save stability", () => {
     );
     await page.reload();
     await expect(page.getByTestId("save-recovery-status")).toContainText(
-      "stale or unsealed save",
+      "invalid integrity",
     );
     await expect(page.getByTestId("save-recovery-status")).toContainText(
-      "Preserved:",
+      "Reset: the untrusted saved run",
     );
-    expect((await savedState(page)).resources).toMatchObject({ money: 3 });
+    await expect(page.getByTestId("save-recovery-status")).toContainText(
+      "One bounded raw recovery backup was preserved",
+    );
+    expect((await savedState(page)).resources).toMatchObject({ money: 0 });
 
     await page.reload();
     await expect(page.getByTestId("save-recovery-status")).toBeVisible();

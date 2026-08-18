@@ -4,6 +4,7 @@ import {
   openHelpAndMotionSettings,
   openSimulationContext,
 } from "./helpers";
+import { sealSaveRecord } from "../../src/simulation/engine";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 const tabs = [
@@ -235,7 +236,7 @@ async function activateExpansion(page: Page): Promise<Page> {
     },
     {
       key: SAVE_KEY,
-      serialized: JSON.stringify(state),
+      serialized: JSON.stringify(sealSaveRecord(state)),
       marker: "command-deck-expansion-seeded",
     },
   );

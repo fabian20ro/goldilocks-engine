@@ -5,6 +5,7 @@ import {
   getPostmortemEvent,
   isStateValid,
   restoreSimulationState,
+  sealSaveRecord,
 } from "./engine";
 import { runEndingScenario } from "./evaluationBalance";
 import type { RunEndingId, SimulationState } from "./types";
@@ -87,9 +88,7 @@ describe("verifier round 034: causal checkpoint boundaries", () => {
       expect(recovered.career.evaluation).toEqual(
         createInitialState(seed).career.evaluation,
       );
-      expect(recovered.migration.steps).toContain(
-        "schema-v7-causal-ledger-repaired",
-      );
+      expect(recovered.migration.steps).toEqual([]);
       expect(advanced.career.runEnding).toBeNull();
       expect(getPostmortemEvent(advanced)).toBeNull();
       expect(isStateValid(advanced)).toBe(true);
@@ -120,7 +119,7 @@ describe("verifier round 034: causal checkpoint boundaries", () => {
     delete legacy.causalEvidenceSnapshot;
     (legacy.integrity as { digest: string }).digest =
       legacyIntegrityDigest(legacy);
-    const migrated = restoreSimulationState(legacy, seed);
+    const migrated = restoreSimulationState(sealSaveRecord(legacy), seed);
 
     expect(migrated.career.evaluation).toEqual(saturated.career.evaluation);
     expect(migrated.causalEvidenceSnapshot).toMatchObject({
@@ -182,7 +181,7 @@ describe("verifier round 034: causal checkpoint boundaries", () => {
     delete (legacy.career as Record<string, unknown>).runEnding;
     delete legacy.meta;
 
-    const migrated = restoreSimulationState(legacy, seed);
+    const migrated = restoreSimulationState(sealSaveRecord(legacy), seed);
     expect(migrated.schemaVersion).toBe(7);
     expect(migrated.career.schedule).toEqual(current.career.schedule);
     expect(migrated.career.evaluation).toEqual(current.career.evaluation);

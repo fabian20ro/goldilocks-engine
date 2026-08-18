@@ -1,5 +1,5 @@
 /**
- * D-046 audited save-generation policy.
+ * D-046 audited save-generation compatibility catalogue.
  *
  * `public-deployment` means an immutable report or release receipt identifies
  * the build as public. `legacy-compatibility` means the current restore
@@ -26,7 +26,8 @@ export interface SaveGenerationRecord {
   derivation: string;
 }
 
-export const SAVE_SUPPORT_POLICY_ID = "D-046-save-support-v1" as const;
+/** D-047 trust-boundary policy: only sealed catalogue entries may migrate. */
+export const SAVE_SUPPORT_POLICY_ID = "D-047-save-support-v2" as const;
 
 export const SUPPORTED_SAVE_GENERATIONS: readonly SaveGenerationRecord[] = [
   {

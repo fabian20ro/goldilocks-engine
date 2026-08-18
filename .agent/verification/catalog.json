@@ -172,7 +172,7 @@
       {
         "id": "M7D-SAVE-001",
         "status": "active",
-        "intent": "Record audited supported schema/content/build generations and prove every supported, malformed, stale, unsealed, tampered, unsupported, and future boundary through provenance-bearing golden fixtures and one deterministic restore harness.",
+        "intent": "Record audited supported schema/content/build generations and prove every supported sealed, malformed, stale, unsealed, tampered, unsupported, and future boundary through provenance-bearing golden fixtures and one deterministic restore harness.",
         "sources": [
           "plan.md",
           ".agent/CURRENT_SCOPE.md",
@@ -190,13 +190,14 @@
           "fixtures/save-fixtures/schema-7-research-1.json",
           "fixtures/save-fixtures/schema-7-hype-fear-1.json",
           "fixtures/save-fixtures/schema-7-local-lab-1.json",
-          "src/simulation/saveFixtures.test.ts"
+          "src/simulation/saveFixtures.test.ts",
+          "src/simulation/engine.ts"
         ]
       },
       {
         "id": "M7D-SAVE-002",
         "status": "active",
-        "intent": "Apply transactional restore/recovery semantics with bounded raw backup and concise preserved/reset/next-action status, and prove browser normal, adversarial, and lifecycle behavior at representative portrait widths.",
+        "intent": "Apply D-047 sealed-only transactional restore/recovery semantics with bounded raw backup before truthful reset status, and prove browser normal, adversarial, and lifecycle behavior at representative portrait widths.",
         "sources": [
           "plan.md",
           ".agent/CURRENT_SCOPE.md",

@@ -107,7 +107,7 @@ describe("capital and exit ledger money", () => {
     ).toContain("Bedroom Developer exit reached: $24.000 durable savings");
   });
 
-  it("accepts a legacy cents purchase record only for stale-save recovery", () => {
+  it("resets a legacy cents purchase record without a valid original seal", () => {
     let state = createInitialState(70_004);
     state = applyCommand(state, { type: "QUEUE_JOBS", count: 1 });
     state = tick(state, 60);
@@ -129,10 +129,7 @@ describe("capital and exit ledger money", () => {
 
     const restored = restoreSimulationState(legacy, 70_004);
 
-    expect(restored.firstSession).toMatchObject({
-      step: "buy-and-install",
-      purchasedModuleId: "precision-cleaner",
-    });
+    expect(restored).toEqual(createInitialState(70_004));
     expect(isStateValid(restored)).toBe(true);
   });
 });

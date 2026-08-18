@@ -1,6 +1,6 @@
 {
   "fixtureVersion": 1,
-  "policy": "D-046-save-support-v1",
+  "policy": "D-047-save-support-v2",
   "id": "schema-7-local-lab-1",
   "source": {
     "id": "schema-7-local-lab-1",
@@ -18,7 +18,7 @@
   },
   "payloadChecksum": {
     "algorithm": "sha256-json-v1",
-    "value": "15b75be8779b1a669f2c94e7f1dbf1482ce6e3a6aefd087c90d243530edbcdee"
+    "value": "74e74c33ad97718499b3a123ac3a79e7b3e8706051762541faba1d93a1fc1fd1"
   },
   "expected": {
     "seed": 4607,
@@ -53,7 +53,7 @@
     },
     "integrity": {
       "algorithm": "fnv1a-32-json-v1",
-      "digest": "735ed561"
+      "digest": "f180f2f4"
     },
     "seed": 4607,
     "rngState": 4607,
@@ -413,6 +413,9 @@
       {
         "kind": "info",
         "message": "2 interactive chat jobs queued.",
+        "queuedTaskIds": ["task-0-1", "task-0-2"],
+        "queuedTaskWorkloadIds": ["interactive-chat", "interactive-chat"],
+        "queuedTaskQuotes": [1.4, 1.303],
         "id": "evt-0-2",
         "tick": 0
       },

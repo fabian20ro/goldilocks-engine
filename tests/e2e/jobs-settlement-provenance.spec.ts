@@ -142,18 +142,41 @@ async function armForgedSettlementMarkerForNextDocument(page: Page) {
   }, SAVE_KEY);
 }
 
-async function expectUnknownSettlementCause(page: Page) {
-  await openTab(page, "Jobs");
-  const record = page.locator(".settlement-recovery");
-  await expect(record).toContainText(
-    "Cause unknown — the retained settlement record is unavailable.",
+async function expectInvalidIntegrityReset(page: Page) {
+  await expect(page.getByTestId("save-recovery-status")).toContainText(
+    "invalid integrity",
   );
-  await expect(record).not.toContainText(
-    "Required memory exceeded available memory.",
-  );
+  const state = await savedState(page);
+  expect(state.jobs.queued).toBe(0);
+  expect(state.lastSettlement).toBeNull();
 }
 
-test("keeps a forged stale settlement link unknown through reload and offline", async ({
+async function reopenWithUnsealedRecord(
+  page: Page,
+  serialized: string,
+  marker: string,
+): Promise<Page> {
+  const viewport = await page.evaluate(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }));
+  const context = page.context();
+  await context.addInitScript(
+    ({ key, marker: markerKey, serialized: next }) => {
+      if (sessionStorage.getItem(markerKey) === "seeded") return;
+      localStorage.setItem(key, next);
+      sessionStorage.setItem(markerKey, "seeded");
+    },
+    { key: SAVE_KEY, marker, serialized },
+  );
+  await page.close();
+  const reopened = await context.newPage();
+  await reopened.setViewportSize(viewport);
+  await reopened.goto("/", { waitUntil: "domcontentloaded" });
+  return reopened;
+}
+
+test("resets a forged settlement link through reload and offline", async ({
   page,
   context,
 }) => {
@@ -166,7 +189,7 @@ test("keeps a forged stale settlement link unknown through reload and offline", 
 
   await page.reload({ waitUntil: "domcontentloaded" });
   await waitForSave(page);
-  await expectUnknownSettlementCause(page);
+  await expectInvalidIntegrityReset(page);
 
   await page.locator("html[data-offline-ready='true']").waitFor({
     timeout: 15_000,
@@ -175,13 +198,13 @@ test("keeps a forged stale settlement link unknown through reload and offline", 
   try {
     await page.reload({ waitUntil: "domcontentloaded" });
     await waitForSave(page);
-    await expectUnknownSettlementCause(page);
+    await expectInvalidIntegrityReset(page);
   } finally {
     await context.setOffline(false);
   }
 });
 
-test("clears a stale settlement marker through restore, reseal, and offline reload", async ({
+test("resets a stale settlement marker through restore and offline reload", async ({
   page,
   context,
 }) => {
@@ -210,13 +233,9 @@ test("clears a stale settlement marker through restore, reseal, and offline relo
   );
   expect(staleIntegrity.computed).not.toBe(staleIntegrity.stored);
   expect(staleIntegrity.marker).toBe("memory-capacity-exceeded");
-  await expectUnknownSettlementCause(page);
-  await expect
-    .poll(async () => (await savedState(page)).lastSettlement?.ledgerEventId)
-    .toBeUndefined();
+  await expectInvalidIntegrityReset(page);
   const restored = await savedState(page);
-  expect(restored.lastSettlement).toMatchObject({ failed: 1 });
-  expect(restored.lastSettlement?.ledgerEventId).toBeUndefined();
+  expect(restored.lastSettlement).toBeNull();
 
   await page.locator("html[data-offline-ready='true']").waitFor({
     timeout: 15_000,
@@ -225,19 +244,15 @@ test("clears a stale settlement marker through restore, reseal, and offline relo
   try {
     await page.reload({ waitUntil: "domcontentloaded" });
     await waitForSave(page);
-    await expect
-      .poll(async () => (await savedState(page)).lastSettlement?.ledgerEventId)
-      .toBeUndefined();
+    await expectInvalidIntegrityReset(page);
     const offlineRestored = await savedState(page);
-    expect(offlineRestored.lastSettlement).toMatchObject({ failed: 1 });
-    expect(offlineRestored.lastSettlement?.ledgerEventId).toBeUndefined();
-    await expectUnknownSettlementCause(page);
+    expect(offlineRestored.lastSettlement).toBeNull();
   } finally {
     await context.setOffline(false);
   }
 });
 
-test("repairs a stale future ledger ID and keeps restored progress unique", async ({
+test("resets a stale future ledger ID before offline resume", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 393, height: 742 });
@@ -254,7 +269,7 @@ test("repairs a stale future ledger ID and keeps restored progress unique", asyn
   await page.getByRole("button", { name: "Queue 1", exact: true }).click();
   await expect.poll(async () => (await savedState(page)).jobs.queued).toBe(1);
 
-  const before = await page.evaluate((key) => {
+  const forged = await page.evaluate((key) => {
     const raw = localStorage.getItem(key);
     if (raw === null) throw new Error("Simulation save is not available.");
     const state = JSON.parse(raw) as SavedState;
@@ -265,32 +280,25 @@ test("repairs a stale future ledger ID and keeps restored progress unique", asyn
     if (!target) throw new Error("Expected captured ledger event.");
     target.id = `evt-${state.tick + 10_000}-${state.eventSequence + 1}`;
     localStorage.setItem(key, JSON.stringify(state));
-    return { tick: state.tick };
+    return localStorage.getItem(key);
   }, SAVE_KEY);
+  if (forged === null) throw new Error("Expected forged save");
+
+  page = await reopenWithUnsealedRecord(
+    page,
+    forged,
+    "jobs-settlement-provenance-stale-future-ledger",
+  );
+  await waitForSave(page);
+  await expect.poll(async () => (await savedState(page)).jobs.queued).toBe(0);
+  await expect
+    .poll(async () => (await savedState(page)).lastSettlement)
+    .toBeNull();
+  await expect(page.getByTestId("save-recovery-status")).toContainText(
+    "invalid integrity",
+  );
 
   await page.reload({ waitUntil: "domcontentloaded" });
   await waitForSave(page);
-  const restored = await savedState(page);
-  expect(new Set(restored.ledger.map((event) => event.id)).size).toBe(
-    restored.ledger.length,
-  );
-
-  await openTab(page, "Jobs");
-  await page.getByRole("button", { name: "Resume", exact: true }).click();
-  await chooseSimulationSpeed(page, "64×");
-  await expect
-    .poll(async () => (await savedState(page)).tick)
-    .toBeGreaterThan(before.tick);
-  const progressed = await savedState(page);
-
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await waitForSave(page);
-  await chooseSimulationSpeed(page, "64×");
-  await expect
-    .poll(async () => (await savedState(page)).tick)
-    .toBeGreaterThan(progressed.tick);
-  const resumed = await savedState(page);
-  expect(new Set(resumed.ledger.map((event) => event.id)).size).toBe(
-    resumed.ledger.length,
-  );
+  expect((await savedState(page)).jobs.queued).toBe(0);
 });

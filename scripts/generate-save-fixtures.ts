@@ -5,7 +5,9 @@ import {
   applyCommand,
   createInitialState,
   createEstablishedScenarioState,
+  hasValidSaveRecordIntegrity,
   hasValidStateIntegrity,
+  sealSaveRecord,
   sealSimulationState,
 } from "../src/simulation/engine";
 import {
@@ -128,11 +130,11 @@ function buildPayload(id: string, seed: number): unknown {
   const state = establishedProgress(seed);
   switch (id) {
     case "schema-3-pipeline-toy-2":
-      return legacyPipelinePayload(state, 3, "pipeline-toy-2");
+      return sealSaveRecord(legacyPipelinePayload(state, 3, "pipeline-toy-2"));
     case "schema-4-pipeline-toy-3":
-      return legacyPipelinePayload(state, 4, "pipeline-toy-3");
+      return sealSaveRecord(legacyPipelinePayload(state, 4, "pipeline-toy-3"));
     case "schema-5-pipeline-toy-4":
-      return legacyPipelinePayload(state, 5, "pipeline-toy-4");
+      return sealSaveRecord(legacyPipelinePayload(state, 5, "pipeline-toy-4"));
     case "schema-6-bedroom-career-1": {
       const legacy = clone(state) as unknown as Record<string, unknown>;
       legacy.schemaVersion = 6;
@@ -143,7 +145,7 @@ function buildPayload(id: string, seed: number): unknown {
       delete legacy.meta;
       delete legacy.causalEvidenceSnapshot;
       delete legacy.integrity;
-      return legacy;
+      return sealSaveRecord(legacy);
     }
     case "schema-7-evaluation-replay-1":
       return sealWithContent(state, "evaluation-replay-1");
@@ -170,7 +172,7 @@ type BoundaryFixture = {
   rawPayload?: string;
   payload?: unknown;
   expected: {
-    disposition: "recovered" | "reset";
+    disposition: "reset";
     reason: string;
   };
   derivation: string;
@@ -226,7 +228,7 @@ function boundaryFixtures(): readonly BoundaryFixture[] {
       id: "boundary-stale-current",
       kind: "stale",
       payload: stale,
-      expected: { disposition: "recovered", reason: "stale-or-unsealed-save" },
+      expected: { disposition: "reset", reason: "invalid-integrity" },
       derivation:
         "Current initial state with a durable field changed while retaining stale integrity-shaped metadata.",
     },
@@ -234,9 +236,9 @@ function boundaryFixtures(): readonly BoundaryFixture[] {
       id: "boundary-unsealed-current",
       kind: "unsealed",
       payload: unsealed,
-      expected: { disposition: "recovered", reason: "stale-or-unsealed-save" },
+      expected: { disposition: "reset", reason: "invalid-integrity" },
       derivation:
-        "Current initial state with the integrity seal omitted; safe core fields remain structurally corroborated.",
+        "Current initial state with the integrity seal omitted; no simulation field is trusted at the reset boundary.",
     },
     {
       id: "boundary-tampered-current",
@@ -244,7 +246,7 @@ function boundaryFixtures(): readonly BoundaryFixture[] {
       payload: tampered,
       expected: {
         disposition: "reset",
-        reason: "malformed-or-uncorroborated-save",
+        reason: "invalid-integrity",
       },
       derivation:
         "Current unsealed state with forged first-session identifiers; invalid progression is not retained.",
@@ -263,7 +265,7 @@ function boundaryFixtures(): readonly BoundaryFixture[] {
       payload: unsupported,
       expected: { disposition: "reset", reason: "unsupported-save-generation" },
       derivation:
-        "Schema 2 pipeline-toy-1 is retained as an explicit unsupported historical boundary under D-046.",
+        "Schema 2 pipeline-toy-1 is retained as an explicit unsupported historical boundary under D-047.",
     },
   ];
 }
@@ -312,9 +314,9 @@ for (const [index, generation] of SUPPORTED_SAVE_GENERATIONS.entries()) {
   const seed = 4600 + index;
   const payload = buildPayload(generation.id, seed);
   if (
-    generation.schemaVersion === 7 &&
-    (!hasValidStateIntegrity(payload as SimulationState) ||
-      typeof (payload as Record<string, unknown>).integrity !== "object")
+    !hasValidSaveRecordIntegrity(payload) ||
+    (generation.schemaVersion === 7 &&
+      !hasValidStateIntegrity(payload as SimulationState))
   )
     throw new Error(`${generation.id} was not a valid sealed source payload`);
   const fixture = {

@@ -50,17 +50,17 @@ save-support, localization, audio, or packaging gates are complete.
 
 ## Milestone 7 matrix
 
-| Area                       | Required acceptance evidence                                                                                                                                                                                                | Current routing state                                                                                                                                                                      |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Balance and strategy       | Deterministic unit/property/scenario checks; balance sweeps for the Bedroom → Lab route; no dominant strategy within declared bounds; viable recoveries and varied endings                                                  | Baseline evidence is retained by round 093; rerun and record the release matrix after M7 changes                                                                                           |
-| Accessibility              | 320/393 portrait; 200% and pseudo-localized text; 44px controls; keyboard; touch; visible focus; screen-reader names/live updates; reduced motion; no color-only meaning; WebKit smoke; native VoiceOver/TalkBack checklist | Chromium/M7A evidence and live smoke are retained; WebKit/native speech is the first M7B gate                                                                                              |
-| Mobile performance         | Clean install measurements for representative 320/393 portraits; LCP/INP/CLS budgets; low-end Android CPU/memory; Worker 1×/64× cost; battery/thermal observation; offline startup                                          | Baseline payload is recorded in the audit; measured device evidence is the first M7B gate                                                                                                  |
-| Writing and density        | Editorial pass for every primary card and disclosure: consequence, cost/risk, next action; no duplicated onboarding; concise locked states; screenshot review at raw and scaled widths                                      | M7C candidate seam: live summaries, Details preservation, lock/recovery copy, and atlas are routed by D-045; independent verification remains required                                     |
-| Audio                      | Small local cue set for important settlement/warning/completion transitions; persistent mute; visual equivalent for every cue; no remote or generative dependency                                                           | Open; not part of the M7A receipt or M7B OIV implementation                                                                                                                                |
-| Save stability             | Golden fixtures for supported schema/content history; malformed/stale/unsealed recovery; reload/offline; update across old saves; explicit supported-version policy; no duplicate commands or deductions                    | M7D candidate route: D-046 policy, committed fixture corpus, single-boundary recovery report/status, and focused Browser Rule-of-Three evidence; independent verification remains required |
-| Localization readiness     | Stable message catalog; locale-aware number/currency/plural formatting; pseudo-localization; expansion-safe cards and disclosures; stable internal IDs                                                                      | Open; translation implementation is not part of M7A/M7B                                                                                                                                    |
-| Packaging and distribution | Root and Pages PWA install/update/offline; deterministic build identity; release notes/version display; supported browser/OS matrix; rollback procedure; explicit PWA-only versus store-package decision                    | PWA mechanics are covered; distribution target and release receipt remain open                                                                                                             |
-| Deployment and operations  | Fresh Verifier report names exact candidate SHA; hosted aggregate passes; Pages deploys that SHA; live `build-info.json` matches; clean branch and post-deploy smoke                                                        | External release-owner gate; never inferred from local PASS                                                                                                                                |
+| Area                       | Required acceptance evidence                                                                                                                                                                                                | Current routing state                                                                                                                                                                                              |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Balance and strategy       | Deterministic unit/property/scenario checks; balance sweeps for the Bedroom → Lab route; no dominant strategy within declared bounds; viable recoveries and varied endings                                                  | Baseline evidence is retained by round 093; rerun and record the release matrix after M7 changes                                                                                                                   |
+| Accessibility              | 320/393 portrait; 200% and pseudo-localized text; 44px controls; keyboard; touch; visible focus; screen-reader names/live updates; reduced motion; no color-only meaning; WebKit smoke; native VoiceOver/TalkBack checklist | Chromium/M7A evidence and live smoke are retained; WebKit/native speech is the first M7B gate                                                                                                                      |
+| Mobile performance         | Clean install measurements for representative 320/393 portraits; LCP/INP/CLS budgets; low-end Android CPU/memory; Worker 1×/64× cost; battery/thermal observation; offline startup                                          | Baseline payload is recorded in the audit; measured device evidence is the first M7B gate                                                                                                                          |
+| Writing and density        | Editorial pass for every primary card and disclosure: consequence, cost/risk, next action; no duplicated onboarding; concise locked states; screenshot review at raw and scaled widths                                      | M7C candidate seam: live summaries, Details preservation, lock/recovery copy, and atlas are routed by D-045; independent verification remains required                                                             |
+| Audio                      | Small local cue set for important settlement/warning/completion transitions; persistent mute; visual equivalent for every cue; no remote or generative dependency                                                           | Open; not part of the M7A receipt or M7B OIV implementation                                                                                                                                                        |
+| Save stability             | Golden fixtures for supported schema/content history; sealed-only malformed/stale/unsealed recovery; reload/offline; update across old saves; explicit supported-version policy; no duplicate commands or deductions        | M7D candidate route: D-046 catalogue + D-047 trust policy, committed fixture corpus, single-boundary recovery report/status, and focused Browser Rule-of-Three evidence; independent verification remains required |
+| Localization readiness     | Stable message catalog; locale-aware number/currency/plural formatting; pseudo-localization; expansion-safe cards and disclosures; stable internal IDs                                                                      | Open; translation implementation is not part of M7A/M7B                                                                                                                                                            |
+| Packaging and distribution | Root and Pages PWA install/update/offline; deterministic build identity; release notes/version display; supported browser/OS matrix; rollback procedure; explicit PWA-only versus store-package decision                    | PWA mechanics are covered; distribution target and release receipt remain open                                                                                                                                     |
+| Deployment and operations  | Fresh Verifier report names exact candidate SHA; hosted aggregate passes; Pages deploys that SHA; live `build-info.json` matches; clean branch and post-deploy smoke                                                        | External release-owner gate; never inferred from local PASS                                                                                                                                                        |
 
 ## Milestone 7B OIV-first handoff
 
@@ -181,9 +181,9 @@ the parked M7B physical evidence remains required for commercial release.
 
 ## Milestone 7D save-stability closure
 
-M7D is the bounded save-support and recovery slice authorized by D-046. It
-does not change `plan.md`, bump schema 7, add content, or close the parked M7B
-commercial gate.
+M7D is the bounded save-support and recovery slice authorized by D-046 and
+the D-047 trust-boundary decision. It does not change `plan.md`, bump schema
+7, add content, or close the parked M7B commercial gate.
 
 ### Audited support policy
 
@@ -209,26 +209,30 @@ serialize/restore idempotence, seed/RNG/task/quote/topology/accounting and
 Career/Research/Hype/Laboratory/history retention where applicable, unique
 event IDs, and no duplicate commands, tasks, deductions, rewards, money, or
 events. Malformed, stale, unsealed, tampered, unsupported, and future
-boundaries are covered explicitly.
+boundaries are covered explicitly. Schema 3–6 fixtures carry a documented
+current deterministic seal over the audited reconstructed historical payload;
+the generator does not claim those seals were present in the unavailable old
+deployment artifacts.
 
-The single restore boundary fully migrates valid sealed saves, upgrades old
-supported content, retains only corroborated fields from stale/unsealed
-records, and never partially interprets future/unsupported records. Before a
-destructive fallback it preserves one bounded, versioned raw source backup
-with checksum and parseable source metadata. The UI status names preserved
-fields, reset fields, and the next action; storage failure leaves the run
-operable without claiming a backup.
+The single restore boundary validates the applicable original seal before any
+migration read. Valid sealed saves migrate fully and idempotently; absent,
+stale, malformed, or otherwise invalid integrity preserves one bounded,
+versioned raw source backup and resets the simulation to a fresh safe run.
+No simulation progression is salvaged from that untrusted payload. Independent
+UI preferences may remain. Future/unsupported records are never partially
+interpreted. The UI status names what was preserved/reset and the next action;
+storage failure leaves the run operable without claiming a backup.
 
 ### Rule of Three and retained contracts
 
 1. Normal: supported sealed generation migration and deterministic
    serialize/restore idempotence.
 2. Boundary: malformed/stale/unsealed/tampered/future/unsupported recovery,
-   bounded raw backup, no partial future interpretation, and no duplicate
-   effects.
+   bounded raw backup before reset, no untrusted progression salvage, no
+   partial future interpretation, and no duplicate effects.
 3. Lifecycle: Worker publication, reload, offline shell resume, PWA A/B update
-   regression, and 320/393 portraits retain the recovered run and M7C
-   editorial/M7B parked contracts.
+   regression, and 320/393 portraits retain a valid sealed run or the fresh
+   reset baseline while preserving the M7C editorial/M7B parked contracts.
 
 The focused commands are `npm run generate:save-fixtures`,
 `npm run test:save-stability`, and `npm run test:e2e --

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { STARTER_QUEUE_NAME } from "./helpers";
+import { resealSavedRecord, STARTER_QUEUE_NAME } from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 
@@ -39,6 +39,7 @@ test.describe("verifier round 013 persistence and configuration recovery", () =>
       state.resources.money = 14;
       localStorage.setItem(key, JSON.stringify(state));
     }, SAVE_KEY);
+    await resealSavedRecord(page, SAVE_KEY);
     await page.reload();
 
     await openPrimary(page, "Upgrades");
@@ -71,7 +72,7 @@ test.describe("verifier round 013 persistence and configuration recovery", () =>
     expect(errors).toEqual([]);
   });
 
-  test("a stale integrity digest is resealed and the recovered run stays operable", async ({
+  test("an invalid integrity digest resets before the fresh run stays operable", async ({
     page,
   }) => {
     const errors = captureErrors(page);
@@ -87,28 +88,19 @@ test.describe("verifier round 013 persistence and configuration recovery", () =>
     }, SAVE_KEY);
     await page.reload();
 
-    await expect
-      .poll(() =>
-        page.evaluate((key) => {
-          const state = JSON.parse(localStorage.getItem(key) ?? "null") as {
-            integrity?: { digest?: string };
-            migration?: { steps?: string[] };
-          } | null;
-          return {
-            digest: state?.integrity?.digest,
-            resealed: state?.migration?.steps?.includes("integrity-resealed"),
-          };
-        }, SAVE_KEY),
-      )
-      .toMatchObject({ resealed: true });
+    await expect(page.getByTestId("save-recovery-status")).toContainText(
+      "invalid integrity",
+    );
     expect(
       await page.evaluate((key) => {
         const state = JSON.parse(localStorage.getItem(key) ?? "null") as {
           integrity: { digest: string };
+          resources: { money: number };
         };
-        return state.integrity.digest;
+        return { digest: state.integrity.digest, money: state.resources.money };
       }, SAVE_KEY),
-    ).not.toBe(staleDigest);
+    ).toMatchObject({ money: 0 });
+    expect(staleDigest).toBe("00000000");
 
     await openPrimary(page, "Jobs");
     await page.getByRole("button", { name: STARTER_QUEUE_NAME }).click();

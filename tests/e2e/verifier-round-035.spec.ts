@@ -172,7 +172,7 @@ test("preserves a sealed saturated ending through offline reload and touch resta
   await assertNoErrorsOrOverflow(page, pageErrors, consoleErrors);
 });
 
-test("repairs a stale matching saturated checkpoint before it reaches the 393px UI", async ({
+test("resets a stale matching saturated checkpoint before it reaches the 393px UI", async ({
   page,
 }, testInfo) => {
   const pageErrors: string[] = [];
@@ -192,30 +192,14 @@ test("repairs a stale matching saturated checkpoint before it reaches the 393px 
     },
   );
   await page.goto("/");
+  await expect(page.getByTestId("save-recovery-status")).toContainText(
+    "invalid integrity",
+  );
   await page.evaluate(() => {
     document.documentElement.style.fontSize = "32px";
   });
-  await openCareer(page);
-  await expect
-    .poll(async () => {
-      const saved = await savedState(page);
-      const career = saved.career as {
-        evaluation?: { hardwareDebt?: unknown };
-        runEnding?: unknown;
-      };
-      return {
-        hardwareDebt: career.evaluation?.hardwareDebt,
-        runEnding: career.runEnding ?? null,
-      };
-    })
-    .toEqual({ hardwareDebt: 0, runEnding: null });
   const saved = await savedState(page);
-  expect((saved.migration as { steps?: readonly string[] }).steps).toContain(
-    "schema-v7-causal-ledger-repaired",
-  );
-  await expect(
-    page.getByRole("heading", { name: "Run postmortem" }),
-  ).not.toBeVisible();
+  expect(saved).toEqual(createInitialState(20260715));
   await assertNoErrorsOrOverflow(page, pageErrors, consoleErrors);
   await page.screenshot({
     path: testInfo.outputPath("recovered-career-393.png"),

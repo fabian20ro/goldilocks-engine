@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { sealSaveRecord } from "../../src/simulation/engine";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 const SAVE_BOOTSTRAP_KEY = "goldilocks-e2e-phase-3-save-bootstrap-v1";
@@ -36,7 +37,7 @@ async function setSavedMoney(page: Page, money: number): Promise<Page> {
 
   const state = JSON.parse(serialized) as { resources: { money: number } };
   state.resources.money = money;
-  const seededState = JSON.stringify(state);
+  const seededState = JSON.stringify(sealSaveRecord(state));
   const token = `money-${++nextSaveBootstrapToken}`;
   await page.evaluate(
     ({ markerKey, nextToken }) => localStorage.setItem(markerKey, nextToken),

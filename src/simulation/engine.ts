@@ -115,10 +115,7 @@ import {
   type ToolId,
 } from "./types";
 import { formatCurrency, formatExactCurrency } from "./currency";
-import {
-  allocateNextLedgerEvent,
-  canonicalizeLedgerEventIds,
-} from "./ledgerIdentity";
+import { allocateNextLedgerEvent } from "./ledgerIdentity";
 import { findSupportedSaveGeneration } from "./saveSupport";
 
 const MAX_LEDGER_EVENTS = 80;
@@ -332,30 +329,9 @@ function hasCoherentFirstSessionProgress(state: SimulationState): boolean {
 }
 
 /**
- * An intact save seal is authoritative historical evidence that the player
- * explicitly installed the recorded module. A damaged current save has no
- * such proof, so its completed guide needs the live topology as corroboration
- * before recovery may retain the Queue 10 boundary relaxation.
- */
-function hasInstalledFirstSessionPurchase(state: SimulationState): boolean {
-  const progress = state.firstSession;
-  const purchasedModule = progress.purchasedModuleId
-    ? findModule(progress.purchasedModuleId)
-    : undefined;
-  return (
-    progress.step === "complete" &&
-    purchasedModule !== undefined &&
-    purchasedModule.purchaseCost > 0 &&
-    state.ownedModuleIds.includes(purchasedModule.id) &&
-    state.slots.some((slot) => slot.moduleId === purchasedModule.id)
-  );
-}
-
-/**
  * The purchase event is the durable accounting record emitted by BUY_MODULE.
- * Keep its text in one place: stale-save recovery must verify the same exact
- * event that the command boundary writes, rather than infer a purchase from
- * current cash, inventory, or a module's position in the pipeline.
+ * Keep its text in one place so structural ledger validation recognizes only
+ * the exact engine-authored event, never a free-form lookalike.
  */
 function modulePurchaseLedgerMessage(
   moduleId: string,
@@ -364,53 +340,6 @@ function modulePurchaseLedgerMessage(
   const item = findModule(moduleId);
   if (!item || item.purchaseCost <= 0) return null;
   return `${item.name} purchased for ${formatMoney(item.purchaseCost)} and is now owned. Add it to a compatible ${item.slotTypes.join("/")} slot in Build; purchase deducted exactly once.`;
-}
-
-function hasRecordedFirstSessionPurchase(state: SimulationState): boolean {
-  const purchasedModuleId = state.firstSession.purchasedModuleId;
-  if (!purchasedModuleId) return false;
-  const item = findModule(purchasedModuleId);
-  if (!item) return false;
-  const messages = [
-    modulePurchaseLedgerMessage(purchasedModuleId),
-    // Existing saved purchase evidence predates exact ledger presentation.
-    // Keep it as valid provenance during safe stale-save recovery; new events
-    // always use the fixed-three default above.
-    modulePurchaseLedgerMessage(purchasedModuleId, (amount) =>
-      formatCurrency(amount, 2),
-    ),
-  ].filter((message): message is string => message !== null);
-  return hasRecordedCapitalPurchase(state, {
-    id: item.id,
-    kind: "module",
-    cost: item.purchaseCost,
-    messages,
-  });
-}
-
-function hasRecordedCapitalPurchase(
-  state: Pick<SimulationState, "ledger">,
-  purchase: {
-    id: string;
-    kind: "hardware" | "module" | "expansion";
-    cost: number;
-    messages: readonly (string | null)[];
-  },
-): boolean {
-  const exactMessages = purchase.messages.filter(
-    (message): message is string => message !== null,
-  );
-  return state.ledger.some(
-    (event) =>
-      event.kind === "success" &&
-      exactMessages.includes(event.message) &&
-      (event.capitalPurchaseId === undefined
-        ? event.capitalPurchaseType === undefined &&
-          event.capitalPurchaseCost === undefined
-        : event.capitalPurchaseId === purchase.id &&
-          event.capitalPurchaseType === purchase.kind &&
-          event.capitalPurchaseCost === purchase.cost),
-  );
 }
 
 function isCapitalPurchaseLedgerEvidence(event: LedgerEvent): boolean {
@@ -496,78 +425,6 @@ function allExactCapitalPurchaseLedgerMessages(): readonly string[] {
 const EXACT_CAPITAL_PURCHASE_LEDGER_MESSAGES = new Set(
   allExactCapitalPurchaseLedgerMessages(),
 );
-
-function hasExactSuccessLedgerMessage(
-  state: Pick<SimulationState, "ledger">,
-  message: string | null,
-  expansionId?: string,
-): boolean {
-  return (
-    message !== null &&
-    state.ledger.some(
-      (event) =>
-        event.kind === "success" &&
-        event.message === message &&
-        (expansionId === undefined
-          ? event.expansionActivationId === undefined
-          : event.expansionActivationId === undefined ||
-            event.expansionActivationId === expansionId),
-    )
-  );
-}
-
-/**
- * Settlement events retain the accepted task ID, unlike lastSettlement, which
- * intentionally advances as later work completes. A damaged save may use this
- * bounded historical record to repair the starter rail only while that record
- * is still retained; an intact integrity seal remains authoritative once old
- * ledger events roll out of the window.
- */
-function hasRecordedStarterSettlement(
-  state: SimulationState,
-  starterTaskId: string | null,
-): boolean {
-  if (!starterTaskId) return false;
-  return state.ledger.some(
-    (event) =>
-      event.settlementTaskId === starterTaskId &&
-      event.settlementWorkloadId === "interactive-chat" &&
-      (event.kind === "success" || event.kind === "failure") &&
-      isSettlementLedgerPayloadValid(event),
-  );
-}
-
-/**
- * A current save with a broken integrity seal may be repaired and resealed for
- * benign persistence damage, but it must not manufacture progress past the
- * starter rail. Advanced guide stages need retained command/accounting records
- * for both the starter settlement and any paid first module before repair can
- * retain that progress. Current inventory, topology, and lastSettlement alone
- * are all mutable snapshots, not proof that those commands happened.
- */
-function hasSafeUnsealedFirstSessionProgress(state: SimulationState): boolean {
-  if (!hasCoherentFirstSessionProgress(state)) return false;
-  const progress = state.firstSession;
-  if (
-    progress.step === "queue-starter" ||
-    progress.step === "observe-settlement"
-  )
-    return true;
-  const hasStarterSettlement =
-    state.firstSession.starterTaskId !== null &&
-    state.firstSession.observedSettlementTaskId ===
-      state.firstSession.starterTaskId &&
-    hasRecordedStarterSettlement(state, state.firstSession.starterTaskId);
-  if (!hasStarterSettlement) return false;
-  if (
-    state.firstSession.purchasedModuleId !== null &&
-    !hasRecordedFirstSessionPurchase(state)
-  )
-    return false;
-  return (
-    progress.step !== "complete" || hasInstalledFirstSessionPurchase(state)
-  );
-}
 
 /**
  * Worker messages are structured-cloned runtime input, not TypeScript values.
@@ -760,16 +617,20 @@ export function isRuntimeSimulationCommand(command: unknown): boolean {
   }
 }
 
-function stateIntegrityDigest(state: SimulationState): string {
-  const payload = { ...state } as Record<string, unknown>;
+function integrityDigest(value: Record<string, unknown>): string {
+  const payload = { ...value };
   delete payload.integrity;
-  const serialized = JSON.stringify(payload);
+  const serialized = JSON.stringify(payload) ?? "";
   let hash = 0x811c9dc5;
   for (let index = 0; index < serialized.length; index += 1) {
     hash ^= serialized.charCodeAt(index);
     hash = Math.imul(hash, 0x01000193);
   }
   return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function stateIntegrityDigest(state: SimulationState): string {
+  return integrityDigest(state as unknown as Record<string, unknown>);
 }
 
 function cloneEvaluationState(evaluation: EvaluationState): EvaluationState {
@@ -804,15 +665,48 @@ export function sealSimulationState(state: SimulationState): SimulationState {
 }
 
 export function hasValidStateIntegrity(state: SimulationState): boolean {
+  return hasValidSaveRecordIntegrity(state);
+}
+
+/**
+ * Validates the original deterministic seal before a save is interpreted.
+ * This intentionally accepts legacy record shapes; migration must not have
+ * to coerce a field before the source record has passed this gate.
+ */
+export function hasValidSaveRecordIntegrity(value: unknown): boolean {
   try {
+    if (typeof value !== "object" || value === null) return false;
+    const record = value as Record<string, unknown>;
+    const integrity = record.integrity;
+    const digest =
+      typeof integrity === "object" && integrity !== null
+        ? (integrity as Record<string, unknown>).digest
+        : undefined;
     return (
-      state.integrity.algorithm === SAVE_INTEGRITY_ALGORITHM &&
-      /^[0-9a-f]{8}$/.test(state.integrity.digest) &&
-      state.integrity.digest === stateIntegrityDigest(state)
+      typeof integrity === "object" &&
+      integrity !== null &&
+      (integrity as Record<string, unknown>).algorithm ===
+        SAVE_INTEGRITY_ALGORITHM &&
+      typeof digest === "string" &&
+      /^[0-9a-f]{8}$/.test(digest) &&
+      digest === integrityDigest(record)
     );
   } catch {
     return false;
   }
+}
+
+/** Adds the current deterministic seal to an audited historical record. */
+export function sealSaveRecord<T extends Record<string, unknown>>(
+  record: T,
+): T & { integrity: SaveIntegrity } {
+  return {
+    ...record,
+    integrity: {
+      algorithm: SAVE_INTEGRITY_ALGORITHM,
+      digest: integrityDigest(record),
+    },
+  };
 }
 
 function modulesFor(state: Pick<SimulationState, "slots">) {
@@ -1145,39 +1039,6 @@ const ENDING_DETAILS: Readonly<
       "Carry the lab's bounded methods forward: preserve seeds, publish uncertainty, and keep a route for useful delivery alongside research.",
   },
 };
-
-function endingLedgerMessage(endingId: RunEndingId): string {
-  return `Run ended: ${ENDING_DETAILS[endingId].title}. Review the evidence-backed postmortem in Career or Inspect before restarting.`;
-}
-
-function causalEvidenceMatches(
-  left: CausalEvidence | undefined,
-  right: CausalEvidence,
-): boolean {
-  return left !== undefined && JSON.stringify(left) === JSON.stringify(right);
-}
-
-/**
- * A stale ending is retained only when the retained event still carries the
- * exact engine message and the causal payload recomputes from the same state.
- * Allowed IDs and a shape-valid event are not enough: they permit swapping a
- * different ending identity onto an unrelated causal event.
- */
-function hasMatchingEndingEvidence(
-  state: SimulationState,
-  ending: RunEnding | null,
-): boolean {
-  if (ending === null) return false;
-  const detail = ENDING_DETAILS[ending.id];
-  const event = state.ledger.find((entry) => entry.id === ending.eventId);
-  return (
-    event !== undefined &&
-    event.kind === (detail.outcome === "success" ? "success" : "failure") &&
-    event.message === endingLedgerMessage(ending.id) &&
-    event.tick === ending.reachedAtTick &&
-    causalEvidenceMatches(event.causal, endingCausalEvidence(state, ending.id))
-  );
-}
 
 function privateAssessmentFor(
   state: SimulationState,
@@ -6053,77 +5914,6 @@ function hasCoherentCausalEvidenceSnapshot(
   );
 }
 
-const warningLedgerPrefixes: Readonly<
-  Record<EvaluationWarningKey, readonly string[]>
-> = {
-  leakage: ["Leakage warning"],
-  reliability: ["Distribution-shift warning", "Reliability warning"],
-  hardware: ["Hardware commitment warning"],
-  tutorial: ["Tutorial-loop warning"],
-};
-
-function hasRetainedCausalLedgerEvidence(
-  state: Pick<SimulationState, "career" | "eventSequence" | "ledger">,
-): boolean {
-  const { evaluation } = state.career;
-  const { ledger } = state;
-
-  // Complete retained history can independently verify causal counters. Once
-  // the bounded window has evicted an event, restoration must instead rely on
-  // the integrity-sealed causal checkpoint; a full ledger is not evidence by
-  // itself.
-  if (state.eventSequence > MAX_LEDGER_EVENTS) return false;
-  if (ledger.length !== state.eventSequence) return false;
-
-  const ignoredWarningEvents = ledger.filter(
-    (event) =>
-      event.kind === "warning" &&
-      event.message.startsWith("Ignored ") &&
-      event.directCause !== undefined &&
-      event.contributingCondition !== undefined,
-  ).length;
-  if (evaluation.ignoredWarnings > ignoredWarningEvents) return false;
-
-  for (const warning of Object.keys(
-    warningLedgerPrefixes,
-  ) as EvaluationWarningKey[]) {
-    const evidence = ledger.filter(
-      (event) =>
-        event.kind === "warning" &&
-        warningLedgerPrefixes[warning].some((prefix) =>
-          event.message.startsWith(prefix),
-        ),
-    ).length;
-    if (evaluation.warnings[warning] > evidence) return false;
-  }
-
-  const modelSwitchEvents = ledger.filter(
-    (event) =>
-      event.kind === "info" &&
-      (/^Q[48] selected:/.test(event.message) ||
-        event.message.endsWith(
-          "selected. Its memory, throughput, quality, reliability, and nightly operating tradeoffs now apply to model stages.",
-        )),
-  ).length;
-  if (evaluation.modelSwitches > modelSwitchEvents) return false;
-
-  const capitalCommitmentEvents = ledger.filter((event) =>
-    isCapitalPurchaseLedgerEvidence(event),
-  ).length;
-  if (evaluation.capitalCommitments > capitalCommitmentEvents) return false;
-
-  const reliabilityIncidentEvents = ledger.filter(
-    (event) =>
-      event.kind === "failure" &&
-      event.message.startsWith(
-        "Distribution-shift reliability incident recorded",
-      ),
-  ).length;
-  if (evaluation.reliabilityIncidents > reliabilityIncidentEvents) return false;
-
-  return true;
-}
-
 function isMetaProgressionValid(value: unknown): value is MetaProgression {
   if (typeof value !== "object" || value === null) return false;
   const meta = value as MetaProgression;
@@ -6878,6 +6668,87 @@ function safeLegacySlots(value: unknown): readonly PipelineSlotState[] | null {
   return candidate as readonly PipelineSlotState[];
 }
 
+/**
+ * Legacy migration is a typed boundary, not a coercion boundary. Validate the
+ * fields that the schema-5/6 adapters read before any finiteOr/Math coercion;
+ * a sealed but malformed record still resets rather than laundering a value.
+ */
+function isLegacyCareerRecordShapeValid(
+  record: Record<string, unknown>,
+  schemaVersion: number,
+): boolean {
+  if (schemaVersion !== 5 && schemaVersion !== 6) return true;
+  if (
+    typeof record.computeAllocation !== "number" ||
+    typeof record.memoryReserve !== "number"
+  )
+    return false;
+  const computeAllocation = record.computeAllocation;
+  const memoryReserve = record.memoryReserve;
+  const requiredNumbers = [
+    record.seed,
+    record.rngState,
+    record.tick,
+    record.computeAllocation,
+    record.memoryReserve,
+  ];
+  if (
+    requiredNumbers.some((value) => !Number.isFinite(value)) ||
+    !Number.isInteger(record.seed) ||
+    !Number.isInteger(record.rngState) ||
+    !Number.isInteger(record.tick) ||
+    !Number.isInteger(record.computeAllocation) ||
+    !Number.isInteger(record.memoryReserve) ||
+    computeAllocation < 25 ||
+    computeAllocation > 100 ||
+    memoryReserve < 0 ||
+    memoryReserve > 30 ||
+    typeof record.hardwareId !== "string" ||
+    findHardware(record.hardwareId) === undefined ||
+    typeof record.workloadId !== "string" ||
+    findWorkload(record.workloadId) === undefined ||
+    !Array.isArray(record.slots) ||
+    safeLegacySlots(record.slots) === null ||
+    typeof record.branchEnabled !== "boolean"
+  )
+    return false;
+  const resources = record.resources;
+  const jobs = record.jobs;
+  if (typeof resources !== "object" || resources === null) return false;
+  if (typeof jobs !== "object" || jobs === null) return false;
+  const resourceRecord = resources as Record<string, unknown>;
+  const jobRecord = jobs as Record<string, unknown>;
+  if (
+    [
+      resourceRecord.money,
+      resourceRecord.timeHours,
+      resourceRecord.electricityKwh,
+      resourceRecord.reputation,
+      jobRecord.processingCarry,
+      jobRecord.grossEarned,
+      jobRecord.operatingCostsPaid,
+    ].some((value) => !isNonNegativeFinite(value)) ||
+    [jobRecord.queued, jobRecord.completed, jobRecord.failed].some(
+      (value) => !isNonNegativeSafeInteger(value),
+    ) ||
+    (jobRecord.queued as number) > MAX_QUEUED_TASKS ||
+    (jobRecord.processingCarry as number) >= 1 ||
+    typeof jobRecord.paused !== "boolean"
+  )
+    return false;
+  if (schemaVersion === 6) {
+    const career = record.career;
+    if (typeof career !== "object" || career === null) return false;
+    const migratedCareer = {
+      ...(career as Record<string, unknown>),
+      evaluation: createInitialEvaluationState(),
+      runEnding: null,
+    } as unknown as CareerState;
+    if (!isCareerStateValid(migratedCareer)) return false;
+  }
+  return true;
+}
+
 function withMigrationStep(
   migration: MigrationMetadata,
   step: string,
@@ -6891,463 +6762,6 @@ function withMigrationStep(
   };
 }
 
-/**
- * A stale save can retain gameplay state after the established semantic
- * recovery checks, but its ledger IDs and optional settlement provenance are
- * input, not historical proof. Rebuild the deterministic ID tail solely to
- * keep future appends operable, then remove the optional causal link before
- * resealing. Canonical-looking IDs, order, task fields, and typed markers are
- * all mutable with a stale seal and cannot authenticate a precise cause.
- */
-function normalizeUntrustedLedgerState(
-  state: SimulationState,
-): SimulationState {
-  if (
-    !Array.isArray(state.ledger) ||
-    !state.ledger.every((event) => typeof event === "object" && event !== null)
-  )
-    return state;
-  const ledger = canonicalizeLedgerEventIds(state.ledger, state.eventSequence);
-  if (!ledger) return state;
-  const settlement = state.lastSettlement;
-  if (settlement === null || typeof settlement !== "object")
-    return { ...state, ledger };
-  return {
-    ...state,
-    ledger,
-    lastSettlement: { ...settlement, ledgerEventId: undefined },
-  };
-}
-
-function queuedJobsLedgerMessage(
-  count: number,
-  workloadId: string,
-): string | null {
-  const workload = findWorkload(workloadId);
-  if (!workload || !Number.isSafeInteger(count) || count <= 0) return null;
-  return `${count} ${workload.name.toLowerCase()} job${count === 1 ? "" : "s"} queued.`;
-}
-
-function hasCorroboratedQueuedTasks(state: SimulationState): boolean {
-  const tasks = [
-    ...(state.jobs.activeTask ? [state.jobs.activeTask] : []),
-    ...state.jobs.waitingTasks,
-  ];
-  if (tasks.length === 0) return state.jobs.queued === 0;
-  if (
-    state.eventSequence > MAX_LEDGER_EVENTS ||
-    state.ledger.length !== state.eventSequence ||
-    state.jobs.queued !== tasks.length
-  )
-    return false;
-
-  const taskIds = new Set<string>();
-  for (const task of tasks) {
-    const sequence = /^task-(\d+)-(\d+)$/.exec(task.id);
-    if (
-      sequence === null ||
-      Number(sequence[1]) !== task.acceptedAtTick ||
-      !Number.isSafeInteger(Number(sequence[2])) ||
-      Number(sequence[2]) < 1 ||
-      taskIds.has(task.id)
-    )
-      return false;
-    taskIds.add(task.id);
-  }
-
-  const queueEvents = state.ledger.filter(
-    (event) =>
-      event.kind === "info" &&
-      event.queuedTaskIds !== undefined &&
-      event.queuedTaskWorkloadIds !== undefined &&
-      event.queuedTaskQuotes !== undefined,
-  );
-  if (queueEvents.length === 0) return false;
-  return tasks.every((task) =>
-    queueEvents.some((event) => {
-      const ids = event.queuedTaskIds ?? [];
-      const workloadIds = event.queuedTaskWorkloadIds ?? [];
-      const quotes = event.queuedTaskQuotes ?? [];
-      const index = ids.indexOf(task.id);
-      const message = queuedJobsLedgerMessage(ids.length, task.workloadId);
-      return (
-        index >= 0 &&
-        workloadIds[index] === task.workloadId &&
-        event.tick === task.acceptedAtTick &&
-        message !== null &&
-        event.message === message &&
-        quotes[index] === task.lockedGrossQuote
-      );
-    }),
-  );
-}
-
-function taskSequenceFromId(id: string): number | null {
-  const match = /^task-\d+-(\d+)$/.exec(id);
-  if (!match) return null;
-  const sequence = Number(match[1]);
-  return Number.isSafeInteger(sequence) && sequence > 0 ? sequence : null;
-}
-
-function safeNextTaskSequence(state: SimulationState): number {
-  const ids = [
-    ...(state.jobs.activeTask ? [state.jobs.activeTask.id] : []),
-    ...state.jobs.waitingTasks.map((task) => task.id),
-    ...state.ledger.flatMap((event) =>
-      event.settlementTaskId ? [event.settlementTaskId] : [],
-    ),
-  ];
-  const maximum = ids.reduce((current, id) => {
-    const sequence = taskSequenceFromId(id);
-    return sequence === null ? current : Math.max(current, sequence);
-  }, 0);
-  return Math.max(1, maximum + 1);
-}
-
-function matchingSettlementEvent(
-  state: SimulationState,
-  settlement: SimulationState["lastSettlement"],
-): LedgerEvent | undefined {
-  if (!settlement) return undefined;
-  return state.ledger.find(
-    (event) =>
-      event.settlementTaskId === settlement.taskId &&
-      event.tick === settlement.tick &&
-      (event.kind === "success" || event.kind === "failure") &&
-      isSettlementLedgerPayloadValid(event) &&
-      event.settlementWorkloadId === settlement.workloadId &&
-      event.settlementLockedGrossQuote === settlement.lockedGrossQuote &&
-      event.settlementGrossPayout === settlement.grossPayout &&
-      event.settlementOperatingCost === settlement.operatingCost &&
-      event.settlementNetChange === settlement.netChange,
-  );
-}
-
-function hasCompleteRetainedLedger(state: SimulationState): boolean {
-  return (
-    state.eventSequence <= MAX_LEDGER_EVENTS &&
-    state.ledger.length === state.eventSequence
-  );
-}
-
-function reconstructUnsealedJobs(
-  state: SimulationState,
-  fallback: SimulationState,
-): {
-  jobs: SimulationState["jobs"];
-  lastSettlement: SimulationState["lastSettlement"];
-} {
-  const completeLedger = hasCompleteRetainedLedger(state);
-  const settlementEvents = state.ledger.filter(
-    (event) =>
-      event.settlementTaskId !== undefined &&
-      (event.kind === "success" || event.kind === "failure"),
-  );
-  const corroboratedSettlements = completeLedger
-    ? settlementEvents.filter(
-        (event) =>
-          isSettlementLedgerPayloadValid(event) &&
-          event.settlementWorkloadId !== undefined &&
-          event.settlementLockedGrossQuote !== undefined &&
-          event.settlementGrossPayout !== undefined &&
-          event.settlementOperatingCost !== undefined &&
-          event.settlementOperatingCostPaid !== undefined &&
-          event.settlementNetChange !== undefined,
-      )
-    : [];
-  const completed = corroboratedSettlements.filter(
-    (event) => event.kind === "success",
-  ).length;
-  const failed = corroboratedSettlements.filter(
-    (event) => event.kind === "failure",
-  ).length;
-  const tasksCorroborated = completeLedger && hasCorroboratedQueuedTasks(state);
-  const lastSettlement = matchingSettlementEvent(state, state.lastSettlement)
-    ? state.lastSettlement && {
-        ...state.lastSettlement,
-        ledgerEventId: undefined,
-      }
-    : null;
-  const jobs = {
-    ...fallback.jobs,
-    completed,
-    failed,
-    grossEarned: completeLedger
-      ? round(
-          corroboratedSettlements.reduce(
-            (total, event) => total + (event.settlementGrossPayout ?? 0),
-            0,
-          ),
-          3,
-        )
-      : 0,
-    operatingCostsPaid: completeLedger
-      ? round(
-          corroboratedSettlements.reduce(
-            (total, event) => total + (event.settlementOperatingCostPaid ?? 0),
-            0,
-          ),
-          3,
-        )
-      : 0,
-    activeTask: tasksCorroborated ? state.jobs.activeTask : null,
-    waitingTasks: tasksCorroborated ? state.jobs.waitingTasks : [],
-    queued: tasksCorroborated ? state.jobs.queued : 0,
-    processingCarry: tasksCorroborated
-      ? (state.jobs.activeTask?.progress ?? 0)
-      : 0,
-    paused: state.jobs.paused,
-    nextTaskSequence: safeNextTaskSequence(state),
-  };
-  return { jobs, lastSettlement };
-}
-
-function reconstructUnsealedFirstSession(
-  state: SimulationState,
-  fallback: SimulationState,
-  ownedModuleIds: readonly string[],
-  tasksCorroborated: boolean,
-): SimulationState["firstSession"] {
-  const progress = state.firstSession;
-  if (isLegacyFirstSessionProgress(progress)) return progress;
-  if (!isFirstSessionProgressValid(progress)) return fallback.firstSession;
-  if (progress.step === "queue-starter") return fallback.firstSession;
-  if (progress.step === "observe-settlement")
-    return tasksCorroborated ? progress : fallback.firstSession;
-  const hasStarterSettlement =
-    progress.starterTaskId !== null &&
-    progress.observedSettlementTaskId === progress.starterTaskId &&
-    hasRecordedStarterSettlement(state, progress.starterTaskId);
-  if (!hasStarterSettlement) return fallback.firstSession;
-  const hasPurchase =
-    progress.purchasedModuleId === null ||
-    (ownedModuleIds.includes(progress.purchasedModuleId) &&
-      hasRecordedFirstSessionPurchase(state));
-  if (!hasPurchase)
-    return {
-      ...progress,
-      step: "buy-and-install",
-      purchasedModuleId: null,
-    };
-  return {
-    ...progress,
-    // Completion is corroborated by the retained starter settlement, paid
-    // purchase, and the pre-restore installed topology check. The slot map
-    // itself is not authority and is rebuilt canonically below.
-    step: progress.step,
-  };
-}
-
-function canonicalRecoverySlots(
-  fallback: SimulationState,
-  activeExpansionId: string | null,
-  state: Pick<SimulationState, "ledger">,
-  ownedModuleIds: readonly string[],
-): readonly PipelineSlotState[] {
-  const topology = activeExpansionId === null ? starterSlots : slots;
-  const recovered = topology.map((slot) => {
-    const baseline = fallback.slots.find((entry) => entry.slotId === slot.id);
-    return baseline ?? { slotId: slot.id, moduleId: null };
-  });
-  const slotState = (slotId: string) =>
-    recovered.find((entry) => entry.slotId === slotId);
-  for (const event of state.ledger) {
-    if (!isModuleTopologyLedgerPayloadValid(event)) continue;
-    if (
-      event.moduleRemovalId !== undefined &&
-      event.moduleRemovalSlotId !== undefined
-    ) {
-      const slot = slotState(event.moduleRemovalSlotId);
-      if (slot?.moduleId === event.moduleRemovalId) slot.moduleId = null;
-      continue;
-    }
-    if (
-      event.modulePlacementId === undefined ||
-      event.modulePlacementSlotId === undefined ||
-      !ownedModuleIds.includes(event.modulePlacementId)
-    )
-      continue;
-    const destination = slotState(event.modulePlacementSlotId);
-    if (!destination) continue;
-    const source =
-      event.modulePlacementFromSlotId === undefined
-        ? undefined
-        : slotState(event.modulePlacementFromSlotId);
-    if (event.modulePlacementFromSlotId !== undefined) {
-      if (!source || source.moduleId !== event.modulePlacementId) continue;
-      const displaced = destination.moduleId;
-      destination.moduleId = event.modulePlacementId;
-      source.moduleId = displaced;
-      continue;
-    }
-    const previous = recovered.find(
-      (entry) =>
-        entry.moduleId === event.modulePlacementId &&
-        entry.slotId !== destination.slotId,
-    );
-    if (previous) previous.moduleId = destination.moduleId;
-    destination.moduleId = event.modulePlacementId;
-  }
-  return recovered;
-}
-
-/**
- * Rebuild an unsealed snapshot from the safe seed baseline. Every retained
- * progression group has an explicit engine-owned corroborator: exact purchase
- * text for inventory, purchase plus activation for expanded topology, typed
- * settlement/queue records for task accounting, and recomputed causal evidence
- * for evaluation/ending identity. Shape-valid projections are never copied as
- * authority merely because they pass the structural validator.
- */
-function normalizeUnsealedProgressionState(
-  state: SimulationState,
-  fallback: SimulationState,
-): SimulationState {
-  const ownedHardwareIds = [
-    STARTER_HARDWARE_ID,
-    ...state.ownedHardwareIds.filter((id) => {
-      const item = findHardware(id);
-      return (
-        item !== undefined &&
-        id !== STARTER_HARDWARE_ID &&
-        hasRecordedCapitalPurchase(state, {
-          id: item.id,
-          kind: "hardware",
-          cost: item.purchaseCost,
-          messages: [hardwarePurchaseLedgerMessage(item.id)],
-        })
-      );
-    }),
-  ];
-  const ownedModuleIds = [
-    ...starterModuleIds,
-    ...state.ownedModuleIds.filter((id) => {
-      const item = findModule(id);
-      return (
-        item !== undefined &&
-        !starterModuleIds.includes(id) &&
-        hasRecordedCapitalPurchase(state, {
-          id: item.id,
-          kind: "module",
-          cost: item.purchaseCost,
-          messages: [
-            modulePurchaseLedgerMessage(item.id),
-            modulePurchaseLedgerMessage(item.id, (amount) =>
-              formatCurrency(amount, 2),
-            ),
-          ],
-        })
-      );
-    }),
-  ];
-  const ownedExpansionIds = state.ownedExpansionIds.filter((id) => {
-    const item = findPipelineExpansion(id);
-    return (
-      item !== undefined &&
-      hasRecordedCapitalPurchase(state, {
-        id: item.id,
-        kind: "expansion",
-        cost: item.purchaseCost,
-        messages: [expansionPurchaseLedgerMessage(item.id)],
-      })
-    );
-  });
-  const activeExpansionItem =
-    state.activeExpansionId !== null &&
-    ownedExpansionIds.includes(state.activeExpansionId)
-      ? findPipelineExpansion(state.activeExpansionId)
-      : undefined;
-  const safeActiveExpansionId =
-    activeExpansionItem &&
-    hasExactSuccessLedgerMessage(
-      state,
-      expansionActivationLedgerMessage(activeExpansionItem.id),
-      activeExpansionItem.id,
-    )
-      ? activeExpansionItem.id
-      : null;
-  const { jobs, lastSettlement } = reconstructUnsealedJobs(state, fallback);
-  const sourceCareer = state.career;
-  const causalEvidenceCorroborated =
-    isEvaluationStateValid(sourceCareer.evaluation) &&
-    hasRetainedCausalLedgerEvidence(state);
-  const endingCorroborated =
-    causalEvidenceCorroborated &&
-    hasMatchingEndingEvidence(state, sourceCareer.runEnding);
-  const safeEnding = endingCorroborated ? sourceCareer.runEnding : null;
-  const safeMeta = safeEnding
-    ? {
-        ...fallback.meta,
-        unlockedDiagnosticIds: [safeEnding.diagnosticUnlockId],
-        completedEndingIds: [safeEnding.id],
-      }
-    : fallback.meta;
-  const safeCareer: CareerState = {
-    ...fallback.career,
-    evaluation: causalEvidenceCorroborated
-      ? sourceCareer.evaluation
-      : fallback.career.evaluation,
-    runEnding: safeEnding,
-  };
-  const firstSession = reconstructUnsealedFirstSession(
-    state,
-    fallback,
-    ownedModuleIds,
-    jobs.queued > 0 || state.firstSession.step !== "observe-settlement",
-  );
-  const causalEvidenceSnapshot =
-    state.causalEvidenceSnapshot !== undefined &&
-    isCausalEvidenceSnapshotShapeValid(state.causalEvidenceSnapshot) &&
-    evaluationStatesMatch(
-      state.causalEvidenceSnapshot.evaluation,
-      safeCareer.evaluation,
-    )
-      ? state.causalEvidenceSnapshot
-      : undefined;
-  return {
-    ...state,
-    hardwareId: STARTER_HARDWARE_ID,
-    ownedHardwareIds: [...new Set(ownedHardwareIds)],
-    ownedModuleIds: [...new Set(ownedModuleIds)],
-    ownedExpansionIds: [...new Set(ownedExpansionIds)],
-    activeExpansionId: safeActiveExpansionId,
-    unlockedWorkloadIds: fallback.unlockedWorkloadIds,
-    workloadDemand: fallback.workloadDemand,
-    // Workload selection is a mutable projection, not a retained transition
-    // record. Rebuild it from the canonical starter baseline at this trust
-    // boundary; queue/task identity is retained only through the typed ledger
-    // corroborator above.
-    workloadId: fallback.workloadId,
-    slots: canonicalRecoverySlots(
-      fallback,
-      safeActiveExpansionId,
-      state,
-      ownedModuleIds,
-    ),
-    branchEnabled: fallback.branchEnabled,
-    // Core runtime controls remain bounded, structurally validated state. They
-    // do not authorize progression, ownership, or causal evidence, and keeping
-    // them preserves a paused stale save across a worker/PWA restart.
-    computeAllocation: state.computeAllocation,
-    memoryReserve: state.memoryReserve,
-    career: safeCareer,
-    research: fallback.research,
-    hypeFear: fallback.hypeFear,
-    laboratory: fallback.laboratory,
-    meta: safeMeta,
-    firstSession,
-    jobs,
-    lastSettlement,
-    metrics: fallback.metrics,
-    baselineMetrics: null,
-    baselineLabel: null,
-    failedModuleId: null,
-    lastWarning: fallback.lastWarning,
-    lastUpgradeNotice: null,
-    causalEvidenceSnapshot,
-  };
-}
-
 /** Restores current saves or migrates legacy Pipeline Toy/Career saves safely. */
 export function restoreSimulationState(
   value: unknown,
@@ -7357,6 +6771,10 @@ export function restoreSimulationState(
   if (typeof value !== "object" || value === null) return fallback;
   const record = value as Record<string, unknown>;
   if (!isSupportedRestoreRecord(record)) return fallback;
+  // D-047: no simulation field is trusted until the original seal for the
+  // exact audited generation validates. Missing, stale, and malformed seals
+  // all take the same bounded recovery path; there is no unsealed salvage.
+  if (!hasValidSaveRecordIntegrity(record)) return fallback;
   if (record.schemaVersion === SCHEMA_VERSION) {
     if (
       record.contentVersion !== CONTENT_VERSION &&
@@ -7370,14 +6788,6 @@ export function restoreSimulationState(
       storedFirstSession !== undefined &&
       !isFirstSessionProgressValid(storedFirstSession)
     )
-      return fallback;
-    const originalIntegrityValid =
-      isIntegrityShapeValid(record.integrity) &&
-      hasValidStateIntegrity(record as unknown as SimulationState);
-    // Missing guide state is a documented pre-guide schema-7 migration only
-    // when the original record proves it was not deleted after persistence.
-    // Do this before substituting the legacy-complete sentinel below.
-    if (storedFirstSession === undefined && !originalIntegrityValid)
       return fallback;
     let migration = isMigrationMetadataValid(record.migration)
       ? record.migration
@@ -7394,10 +6804,7 @@ export function restoreSimulationState(
       storedResearch,
       restoreTick,
     );
-    // A shape-valid Research object is not historical proof. Preserve frontier,
-    // team, goal, and knowledge only when the complete save was sealed before
-    // the object was supplied to restore; otherwise recover the safe default.
-    const researchIsValid = originalIntegrityValid && researchShapeValid;
+    const researchIsValid = researchShapeValid;
     const research = researchIsValid
       ? storedResearch
       : createInitialResearchState();
@@ -7405,10 +6812,7 @@ export function restoreSimulationState(
       storedHypeFear,
       restoreTick,
     );
-    // Hype/Fear is a durable semantic layer. Like Research, a shape-valid
-    // object is retained only when the complete pre-restore record was sealed;
-    // stale or forged additions recover to the safe default.
-    const hypeFearIsValid = originalIntegrityValid && hypeFearShapeValid;
+    const hypeFearIsValid = hypeFearShapeValid;
     const hypeFear = hypeFearIsValid
       ? storedHypeFear
       : createInitialHypeFearState();
@@ -7416,7 +6820,7 @@ export function restoreSimulationState(
       storedLaboratory,
       restoreTick,
     );
-    const laboratoryIsValid = originalIntegrityValid && laboratoryShapeValid;
+    const laboratoryIsValid = laboratoryShapeValid;
     const laboratory = laboratoryIsValid
       ? storedLaboratory
       : createInitialLaboratoryState(
@@ -7466,140 +6870,30 @@ export function restoreSimulationState(
         migration,
         "content-hype-fear-to-local-lab",
       );
-    if (!originalIntegrityValid)
-      candidate = normalizeUntrustedLedgerState(candidate);
-    let structurallyValid = isStateStructurallyValid(candidate);
-    let unsealedCausalEvidenceRepaired = false;
+    // The seal authenticates the complete source snapshot. Validate its
+    // migrated shape, then refresh only derived metadata before resealing;
+    // no mutable ledger reconstruction is permitted at this boundary.
     if (
-      storedFirstSession !== undefined &&
-      !originalIntegrityValid &&
-      structurallyValid &&
-      !hasSafeUnsealedFirstSessionProgress(candidate)
+      !isStateStructurallyValid(candidate) ||
+      !isEvaluationStateValid(candidate.career.evaluation)
     )
       return fallback;
-    if (!originalIntegrityValid && structurallyValid) {
-      unsealedCausalEvidenceRepaired =
-        !isEvaluationStateValid(candidate.career.evaluation) ||
-        !hasRetainedCausalLedgerEvidence(candidate) ||
-        !hasCoherentCausalEvidenceSnapshot(candidate) ||
-        (candidate.career.runEnding !== null &&
-          !hasMatchingEndingEvidence(candidate, candidate.career.runEnding));
-      candidate = normalizeUnsealedProgressionState(candidate, fallback);
-      structurallyValid = isStateStructurallyValid(candidate);
-      if (unsealedCausalEvidenceRepaired)
-        migration = withMigrationStep(
-          migration,
-          "schema-v7-causal-ledger-repaired",
-        );
-    }
-    const career =
-      typeof candidate.career === "object" && candidate.career !== null
-        ? candidate.career
-        : null;
-    const evaluation = career?.evaluation;
-    const evaluationEvidenceInvalid =
-      isEvaluationStateShapeValid(evaluation) &&
-      !isEvaluationStateValid(evaluation);
-    const hasRetainedCausalEvidence =
-      structurallyValid && hasRetainedCausalLedgerEvidence(candidate);
-    const hasCoherentCausalSnapshot =
-      structurallyValid && hasCoherentCausalEvidenceSnapshot(candidate);
-    const hasTrustedCausalSnapshot =
-      candidate.causalEvidenceSnapshot !== undefined &&
-      originalIntegrityValid &&
-      hasCoherentCausalSnapshot;
-    // Schema-7 saves written before causal checkpoints can still prove their
-    // bounded history through their original integrity seal. The first restore
-    // upgrades that proof into an explicit checkpoint.
-    const hasTrustedLegacyCausalHistory =
-      candidate.causalEvidenceSnapshot === undefined &&
-      originalIntegrityValid &&
-      structurallyValid;
-    const causalEvidenceInvalid =
-      structurallyValid &&
-      !hasRetainedCausalEvidence &&
-      !hasTrustedCausalSnapshot &&
-      !hasTrustedLegacyCausalHistory;
-    if (!structurallyValid || causalEvidenceInvalid) {
-      if (
-        career === null ||
-        !isEvaluationStateShapeValid(evaluation) ||
-        (!evaluationEvidenceInvalid && !causalEvidenceInvalid)
-      )
-        return fallback;
-
-      const invalidEnding = causalEvidenceInvalid ? career.runEnding : null;
-      candidate = {
-        ...candidate,
-        meta:
-          invalidEnding !== null
-            ? {
-                ...candidate.meta,
-                completedEndingIds: candidate.meta.completedEndingIds.filter(
-                  (id) => id !== invalidEnding.id,
-                ),
-                unlockedDiagnosticIds:
-                  candidate.meta.unlockedDiagnosticIds.filter(
-                    (id) => id !== invalidEnding.diagnosticUnlockId,
-                  ),
-              }
-            : candidate.meta,
-        career: {
-          ...career,
-          evaluation: createInitialEvaluationState(),
-          runEnding: invalidEnding === null ? career.runEnding : null,
-        },
-      };
-      candidate = {
-        ...candidate,
-        causalEvidenceSnapshot: createCausalEvidenceSnapshot(candidate),
-      };
-      if (evaluationEvidenceInvalid)
-        migration = withMigrationStep(
-          migration,
-          "schema-v7-evaluation-evidence-repaired",
-        );
-      if (causalEvidenceInvalid)
-        migration = withMigrationStep(
-          migration,
-          "schema-v7-causal-ledger-repaired",
-        );
-      if (
-        !isStateStructurallyValid(candidate) ||
-        !hasCoherentCausalEvidenceSnapshot(candidate)
-      )
-        return fallback;
-    } else if (candidate.causalEvidenceSnapshot === undefined) {
-      candidate = {
-        ...candidate,
-        causalEvidenceSnapshot: createCausalEvidenceSnapshot(candidate),
-      };
+    candidate = {
+      ...candidate,
+      causalEvidenceSnapshot: createCausalEvidenceSnapshot(candidate),
+    };
+    if (record.causalEvidenceSnapshot === undefined)
       migration = withMigrationStep(
         migration,
         "schema-v7-causal-snapshot-added",
       );
-    } else if (!hasCoherentCausalSnapshot) {
-      // Complete retained history independently proves this non-saturated
-      // evaluation, so rebuild only its stale checkpoint before resealing.
-      candidate = {
-        ...candidate,
-        causalEvidenceSnapshot: createCausalEvidenceSnapshot(candidate),
-      };
-      migration = withMigrationStep(
-        migration,
-        "schema-v7-causal-snapshot-rebuilt",
-      );
-    }
-    if (!isIntegrityShapeValid(record.integrity))
-      migration = withMigrationStep(migration, "integrity-added");
-    else if (!originalIntegrityValid)
-      migration = withMigrationStep(migration, "integrity-resealed");
     const restored = sealSimulationState(
       recalculate({ ...candidate, migration }),
     );
     return isStateValid(restored) ? restored : fallback;
   }
   if (record.schemaVersion === 6) {
+    if (!isLegacyCareerRecordShapeValid(record, 6)) return fallback;
     const inheritedMigration = isMigrationMetadataValid(record.migration)
       ? record.migration
       : { sourceSchemaVersion: 6, steps: [] };
@@ -7641,6 +6935,7 @@ export function restoreSimulationState(
     return isStateValid(migrated) ? migrated : fallback;
   }
   if (record.schemaVersion === 5) {
+    if (!isLegacyCareerRecordShapeValid(record, 5)) return fallback;
     const inheritedMigration = isMigrationMetadataValid(record.migration)
       ? record.migration
       : { sourceSchemaVersion: 5, steps: [] };
@@ -7903,6 +7198,15 @@ function recoveryStatusFor(
       reset: ["unsupported schema or content fields"],
       nextAction: "Start a new run on this supported build.",
     };
+  if (!hasValidSaveRecordIntegrity(record))
+    return {
+      ...base,
+      disposition: "reset",
+      reason: "invalid-integrity",
+      reset: ["the untrusted saved run"],
+      nextAction:
+        "Start a fresh run; one bounded raw recovery backup is preserved for inspection.",
+    };
   if (schemaVersion < SCHEMA_VERSION) {
     if (isFallbackState(state, fallbackSeed))
       return {
@@ -7950,7 +7254,10 @@ function recoveryStatusFor(
       nextAction: "Continue the upgraded run and make one normal save.",
     };
   }
-  if (hasValidStateIntegrity(record as unknown as SimulationState))
+  if (
+    hasValidStateIntegrity(record as unknown as SimulationState) &&
+    isStateValid(record as unknown as SimulationState)
+  )
     return {
       ...base,
       disposition: "none",
@@ -7959,31 +7266,13 @@ function recoveryStatusFor(
       reset: [],
       nextAction: "Continue playing.",
     };
-  if (isFallbackState(state, fallbackSeed))
-    return {
-      ...base,
-      disposition: "reset",
-      reason: "malformed-or-uncorroborated-save",
-      reset: ["untrusted save fields"],
-      nextAction:
-        "Start a new run; the recovery backup is available for inspection.",
-    };
   return {
     ...base,
-    disposition: "recovered",
-    reason: "stale-or-unsealed-save",
-    preserved: [
-      "structurally valid core progress",
-      "corroborated task IDs, locked quotes, and accounting",
-      "seed and RNG state",
-      "event history with rebuilt unique IDs",
-    ],
-    reset: [
-      "untrusted progression additions and causal links",
-      "unsealed Research, Hype, or Laboratory fields when not corroborated",
-    ],
+    disposition: "reset",
+    reason: "malformed-save",
+    reset: ["the saved run"],
     nextAction:
-      "Review the recovery note, then continue and make one normal save.",
+      "Start a fresh run; one bounded raw recovery backup is preserved for inspection.",
   };
 }
 

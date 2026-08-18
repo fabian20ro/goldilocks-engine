@@ -7,6 +7,7 @@ import {
   getPostmortemEvent,
   isStateValid,
   restoreSimulationState,
+  sealSaveRecord,
   sealSimulationState,
 } from "./engine";
 import {
@@ -138,7 +139,7 @@ describe("D-011 evaluation, failure, and replay", () => {
     delete career.runEnding;
     delete schema6.meta;
 
-    const migrated = restoreSimulationState(schema6, 61);
+    const migrated = restoreSimulationState(sealSaveRecord(schema6), 61);
 
     expect(migrated.schemaVersion).toBe(SCHEMA_VERSION);
     expect(migrated.career.schedule).toEqual(current.career.schedule);
@@ -210,9 +211,7 @@ describe("D-011 evaluation, failure, and replay", () => {
     expect(recovered.career.evaluation).toEqual(
       createInitialState(66).career.evaluation,
     );
-    expect(recovered.migration.steps).toContain(
-      "schema-v7-evaluation-evidence-repaired",
-    );
+    expect(recovered.migration.steps).toEqual([]);
     expect(isStateValid(recovered)).toBe(true);
   });
 
@@ -246,9 +245,7 @@ describe("D-011 evaluation, failure, and replay", () => {
     expect(coverageRecovered.career.evaluation).toEqual(
       createInitialState(68).career.evaluation,
     );
-    expect(coverageRecovered.migration.steps).toContain(
-      "schema-v7-evaluation-evidence-repaired",
-    );
+    expect(coverageRecovered.migration.steps).toEqual([]);
 
     const unrecordedCounters = JSON.parse(
       JSON.stringify(createInitialState(69)),
@@ -272,9 +269,7 @@ describe("D-011 evaluation, failure, and replay", () => {
     expect(causalityRecovered.career.evaluation).toEqual(
       createInitialState(69).career.evaluation,
     );
-    expect(causalityRecovered.migration.steps).toContain(
-      "schema-v7-causal-ledger-repaired",
-    );
+    expect(causalityRecovered.migration.steps).toEqual([]);
     expect(advanced.career.runEnding).toBeNull();
     expect(isStateValid(advanced)).toBe(true);
   });
@@ -390,9 +385,7 @@ describe("D-011 evaluation, failure, and replay", () => {
     expect(recovered.career.evaluation).toEqual(
       createInitialState(seed).career.evaluation,
     );
-    expect(recovered.migration.steps).toContain(
-      "schema-v7-causal-ledger-repaired",
-    );
+    expect(recovered.migration.steps).toEqual([]);
     expect(advanced.career.runEnding).toBeNull();
     expect(getPostmortemEvent(advanced)).toBeNull();
   });

@@ -17,6 +17,7 @@ import {
   hasValidStateIntegrity,
   isStateValid,
   restoreSimulationState,
+  sealSaveRecord,
   sealSimulationState,
   tick,
   workloadUnlockProgress,
@@ -233,11 +234,8 @@ describe("deterministic simulation engine", () => {
       count: 10,
     });
 
-    expect(restored.firstSession).toMatchObject({
-      step: "complete",
-      purchasedModuleId: "precision-cleaner",
-    });
-    expect(batchAttempt.jobs.queued).toBe(10);
+    expect(restored).toEqual(createInitialState(710));
+    expect(batchAttempt.jobs.queued).toBe(0);
     expect(isStateValid(restored)).toBe(true);
   });
 
@@ -252,11 +250,8 @@ describe("deterministic simulation engine", () => {
     const damaged = { ...purchased, lastUpgradeNotice: null };
     const restored = restoreSimulationState(damaged, 711);
 
-    expect(restored.firstSession).toMatchObject({
-      step: "buy-and-install",
-      purchasedModuleId: "precision-cleaner",
-    });
-    expect(restored.ownedModuleIds).toContain("precision-cleaner");
+    expect(restored).toEqual(createInitialState(711));
+    expect(restored.ownedModuleIds).not.toContain("precision-cleaner");
     expect(isStateValid(restored)).toBe(true);
   });
 
@@ -626,7 +621,7 @@ describe("deterministic simulation engine", () => {
     delete legacy.ownedHardwareIds;
     delete legacy.ownedModuleIds;
     delete legacy.lastUpgradeNotice;
-    const migrated = restoreSimulationState(legacy);
+    const migrated = restoreSimulationState(sealSaveRecord(legacy));
     expect(migrated.schemaVersion).toBe(SCHEMA_VERSION);
     expect(migrated.hardwareId).toBe("used-gpu");
     expect(migrated.ownedHardwareIds).toEqual(["bedroom-cpu", "used-gpu"]);
@@ -674,8 +669,7 @@ describe("deterministic simulation engine", () => {
       JSON.parse(JSON.stringify(edited)),
       41,
     );
-    expect(restored.resources.money).toBe(14);
-    expect(restored.migration.steps).toContain("integrity-resealed");
+    expect(restored).toEqual(initial);
     expect(hasValidStateIntegrity(restored)).toBe(true);
     expect(isStateValid(restored)).toBe(true);
   });
@@ -708,13 +702,8 @@ describe("deterministic simulation engine", () => {
     );
 
     let restored = restoreSimulationState(stale, 82_081);
-    expect(restored.lastSettlement?.ledgerEventId).toBeUndefined();
-    expect(
-      restored.ledger.find(
-        (event) =>
-          event.message === "Current configuration captured for comparison.",
-      )?.id,
-    ).toBe(originalId);
+    expect(restored).toEqual(createInitialState(82_081));
+    expect(originalId).toBeDefined();
     expect(isStateValid(restored)).toBe(true);
     for (let index = 0; index < 3; index += 1) {
       const before = restored.tick;
@@ -810,17 +799,17 @@ describe("deterministic simulation engine", () => {
       expect(restoreSimulationState(malformed, 43)).toEqual(initial);
     }
 
-    const repairedMetadata = restoreSimulationState({
-      ...initial,
-      migration: {
-        sourceSchemaVersion: 4,
-        steps: ["duplicate", "duplicate"],
+    const repairedMetadata = restoreSimulationState(
+      {
+        ...initial,
+        migration: {
+          sourceSchemaVersion: 4,
+          steps: ["duplicate", "duplicate"],
+        },
       },
-    });
-    expect(repairedMetadata.migration.steps).toEqual([
-      "schema-v7-metadata-added",
-      "integrity-resealed",
-    ]);
+      43,
+    );
+    expect(repairedMetadata).toEqual(initial);
     expect(isStateValid(repairedMetadata)).toBe(true);
   });
 
@@ -1279,7 +1268,7 @@ describe("deterministic simulation engine", () => {
     delete jobs.activeTask;
     delete jobs.waitingTasks;
     delete jobs.nextTaskSequence;
-    const migrated = restoreSimulationState(legacy, 97);
+    const migrated = restoreSimulationState(sealSaveRecord(legacy), 97);
     expect(migrated.schemaVersion).toBe(SCHEMA_VERSION);
     expect(migrated.jobs.queued).toBe(3);
     expect(migrated.jobs.waitingTasks).toHaveLength(3);
@@ -1308,7 +1297,7 @@ describe("deterministic simulation engine", () => {
     legacy.migration = { sourceSchemaVersion: 5, steps: [] };
     delete legacy.career;
 
-    const migrated = restoreSimulationState(legacy, 191);
+    const migrated = restoreSimulationState(sealSaveRecord(legacy), 191);
 
     expect(migrated.schemaVersion).toBe(SCHEMA_VERSION);
     expect(migrated.jobs.queued).toBe(2);

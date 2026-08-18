@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { resealSavedRecord } from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 
@@ -28,6 +29,7 @@ test.describe("verifier round 012 persistence boundaries", () => {
       state.resources.money = 14;
       localStorage.setItem(key, JSON.stringify(state));
     }, SAVE_KEY);
+    await resealSavedRecord(page, SAVE_KEY);
     await page.reload();
 
     await openPrimary(page, "Upgrades");

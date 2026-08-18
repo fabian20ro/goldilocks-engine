@@ -33,7 +33,7 @@ class MemoryStorage implements Storage {
   }
 }
 
-describe("D-046 bounded recovery backup", () => {
+describe("D-047 bounded recovery backup", () => {
   it("keeps one versioned bounded raw backup with provenance and checksum", () => {
     const raw = "x".repeat(MAX_SAVE_RECOVERY_RAW_LENGTH + 20);
     const backup = createSaveRecoveryBackup(

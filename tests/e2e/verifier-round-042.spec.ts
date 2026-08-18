@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { sealSaveRecord } from "../../src/simulation/engine";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 const tabs = ["Build", "Jobs", "Career", "Upgrades", "Inspect"] as const;
@@ -36,18 +37,36 @@ async function assertPortrait(page: Page, width: number) {
   expect(undersized).toEqual([]);
 }
 
-async function activateExpansion(page: Page) {
+async function activateExpansion(page: Page): Promise<Page> {
+  const viewport = await page.evaluate(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }));
   await expect
     .poll(() => page.evaluate((key) => localStorage.getItem(key), SAVE_KEY))
     .not.toBeNull();
-  await page.evaluate((key) => {
+  const state = await page.evaluate((key) => {
     const save = JSON.parse(localStorage.getItem(key) ?? "null") as {
       resources: { money: number };
     };
     save.resources.money = 45;
-    localStorage.setItem(key, JSON.stringify(save));
+    return save;
   }, SAVE_KEY);
-  await page.reload();
+  const serialized = JSON.stringify(sealSaveRecord(state));
+  const context = page.context();
+  const marker = `verifier-round-042-expansion-${viewport.width}-seeded`;
+  await context.addInitScript(
+    ({ key, marker: markerKey, saved }) => {
+      if (sessionStorage.getItem(markerKey) === "seeded") return;
+      localStorage.setItem(key, saved);
+      sessionStorage.setItem(markerKey, "seeded");
+    },
+    { key: SAVE_KEY, marker, saved: serialized },
+  );
+  await page.close();
+  page = await context.newPage();
+  await page.setViewportSize(viewport);
+  await page.goto("/", { waitUntil: "domcontentloaded" });
   await openTab(page, "Upgrades");
   await page
     .getByRole("button", {
@@ -58,6 +77,7 @@ async function activateExpansion(page: Page) {
     .getByRole("button", { name: "Activate six-position pipeline" })
     .click();
   await openTab(page, "Build");
+  return page;
 }
 
 for (const viewport of [
@@ -102,7 +122,7 @@ for (const viewport of [
       });
     }
 
-    await activateExpansion(page);
+    page = await activateExpansion(page);
     await expect(
       page.getByTestId("pipeline").locator(".pipeline-slot"),
     ).toHaveCount(8);

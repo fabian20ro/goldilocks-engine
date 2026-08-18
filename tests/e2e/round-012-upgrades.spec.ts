@@ -1,5 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
-import { chooseSimulationSpeed, settleStarterJob } from "./helpers";
+import {
+  chooseSimulationSpeed,
+  resealSavedRecord,
+  settleStarterJob,
+} from "./helpers";
+import { sealSaveRecord } from "../../src/simulation/engine";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 const LEGACY_SAVE_KEY = "goldilocks-simulation-save-v3";
@@ -22,6 +27,7 @@ async function setSavedMoney(page: Page, money: number) {
     },
     { key: SAVE_KEY, money },
   );
+  await resealSavedRecord(page, SAVE_KEY);
   await page.reload();
 }
 
@@ -249,7 +255,7 @@ test.describe("round 012 persistent upgrade economy and UX", () => {
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto("/");
     await waitForSavedState(page);
-    await page.evaluate(
+    const legacyRecord = await page.evaluate(
       ({ currentKey, legacyKey }) => {
         const state = JSON.parse(
           localStorage.getItem(currentKey) ?? "null",
@@ -259,10 +265,21 @@ test.describe("round 012 persistent upgrade economy and UX", () => {
         delete state.ownedHardwareIds;
         delete state.ownedModuleIds;
         delete state.lastUpgradeNotice;
-        localStorage.setItem(legacyKey, JSON.stringify(state));
-        localStorage.removeItem(currentKey);
+        return { legacyKey, state };
       },
       { currentKey: SAVE_KEY, legacyKey: LEGACY_SAVE_KEY },
+    );
+    const sealedLegacy = JSON.stringify(sealSaveRecord(legacyRecord.state));
+    await page.evaluate(
+      ({ currentKey, legacyKey, serialized }) => {
+        localStorage.setItem(legacyKey, serialized);
+        localStorage.removeItem(currentKey);
+      },
+      {
+        currentKey: SAVE_KEY,
+        legacyKey: LEGACY_SAVE_KEY,
+        serialized: sealedLegacy,
+      },
     );
     await page.reload();
     await expect(page.getByLabel("Latest upgrade action")).toContainText(
@@ -280,6 +297,9 @@ test.describe("round 012 persistent upgrade economy and UX", () => {
       localStorage.setItem(key, JSON.stringify(state));
     }, SAVE_KEY);
     await page.reload();
+    await expect(page.getByTestId("save-recovery-status")).toContainText(
+      "invalid integrity",
+    );
     await expect(page.getByTestId("pipeline")).toBeVisible();
     await openUpgrades(page);
     await expect(page.getByText("$0.00 available")).toBeVisible();

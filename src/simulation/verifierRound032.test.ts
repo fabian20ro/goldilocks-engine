@@ -41,9 +41,7 @@ describe("verifier round 032: semantic evaluation-save recovery", () => {
     const restored = restoreSimulationState(forged, 32_002);
 
     expect(restored.career.evaluation).toEqual(initial.career.evaluation);
-    expect(restored.migration.steps).toContain(
-      "schema-v7-evaluation-evidence-repaired",
-    );
+    expect(restored.migration.steps).toEqual([]);
     expect(isStateValid(restored)).toBe(true);
   });
 

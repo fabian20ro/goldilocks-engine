@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { extname, relative, resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
+import { resealSavedRecord } from "./helpers";
 
 const ROOT = resolve(process.cwd());
 const FIXTURE_ROOT = resolve(ROOT, ".cache/pwa-update");
@@ -435,6 +436,7 @@ async function establishNonDefaultPausedSave(page: Page): Promise<unknown> {
     state.jobs.paused = true;
     localStorage.setItem(key, JSON.stringify(state));
   }, SAVE_KEY);
+  await resealSavedRecord(page, SAVE_KEY);
   await page.reload({ waitUntil: "domcontentloaded" });
   await waitForSave(page);
   return page.evaluate((key) => {

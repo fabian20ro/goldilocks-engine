@@ -95,14 +95,9 @@ describe("round 111 independent M7D save adversaries", () => {
 
     const result = restoreSimulationStateWithReport(unsealed, 47_300, true);
 
-    expect(result.recovery.disposition).toBe("recovered");
-    expect(result.state.hardwareId).toBe(source.hardwareId);
-    expect(result.state.ownedHardwareIds).toEqual(source.ownedHardwareIds);
-    expect(result.state.ownedModuleIds).toEqual(source.ownedModuleIds);
-    expect(result.state.meta.completedEndingIds).toEqual(
-      source.meta.completedEndingIds,
-    );
-    expect(result.state.career.savings).toBe(source.career.savings);
+    expect(result.recovery.disposition).toBe("reset");
+    expect(result.recovery.reason).toBe("invalid-integrity");
+    expect(result.state).toEqual(createInitialState(47_300));
   });
 
   it("keeps a storage failure best-effort during recovery backup", () => {

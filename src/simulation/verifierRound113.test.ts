@@ -31,7 +31,7 @@ describe("round 113 independent M7D save adversaries", () => {
       );
 
       expect(result.recovery.disposition).toBe("reset");
-      expect(result.recovery.reason).toMatch(/malformed|uncorroborated/i);
+      expect(result.recovery.reason).toBe("invalid-integrity");
       expect(result.state).toEqual(createInitialState(113_100 + schemaVersion));
     },
   );
@@ -55,9 +55,9 @@ describe("round 113 independent M7D save adversaries", () => {
 
     const result = restoreSimulationStateWithReport(forged, 113_101, true);
 
-    expect(result.recovery.disposition).toBe("recovered");
-    expect(result.state.career.runEnding).toBeNull();
-    expect(result.state.meta).toEqual(createInitialState(113_101).meta);
+    expect(result.recovery.disposition).toBe("reset");
+    expect(result.recovery.reason).toBe("invalid-integrity");
+    expect(result.state).toEqual(createInitialState(113_101));
     expect(isStateValid(result.state)).toBe(true);
   });
 
@@ -89,11 +89,9 @@ describe("round 113 independent M7D save adversaries", () => {
     );
     const result = restoreSimulationStateWithReport(forged, 113_102, true);
 
-    expect(result.recovery.disposition).toBe("recovered");
-    expect(result.state.resources.money).toBe(expanded.resources.money);
-    expect(result.state.activeExpansionId).toBeNull();
-    expect(result.state.ownedExpansionIds).toEqual([]);
-    expect(result.state.slots).toHaveLength(5);
+    expect(result.recovery.disposition).toBe("reset");
+    expect(result.recovery.reason).toBe("invalid-integrity");
+    expect(result.state).toEqual(createInitialState(113_102));
     expect(isStateValid(result.state)).toBe(true);
   });
 });

@@ -21,8 +21,8 @@ function unsealed<T extends object>(value: T): T {
   return copy;
 }
 
-describe("M7D closed-world stale recovery invariants", () => {
-  it("retains a current exact queue transaction but drops a forged locked quote", () => {
+describe("M7D sealed-only recovery invariants", () => {
+  it("resets an unsealed queue transaction before reading its quote", () => {
     const queued = applyCommand(createInitialState(114_001), {
       type: "QUEUE_JOBS",
       count: 1,
@@ -32,11 +32,9 @@ describe("M7D closed-world stale recovery invariants", () => {
       114_001,
       true,
     );
-    expect(valid.recovery.disposition).toBe("recovered");
-    expect(valid.state.jobs.queued).toBe(1);
-    expect(valid.state.jobs.waitingTasks[0]?.lockedGrossQuote).toBe(
-      queued.jobs.waitingTasks[0]?.lockedGrossQuote,
-    );
+    expect(valid.recovery.disposition).toBe("reset");
+    expect(valid.recovery.reason).toBe("invalid-integrity");
+    expect(valid.state).toEqual(createInitialState(114_001));
     expect(isStateValid(valid.state)).toBe(true);
 
     const forged = unsealed(queued) as typeof queued;
@@ -48,9 +46,9 @@ describe("M7D closed-world stale recovery invariants", () => {
       })),
     };
     const recovered = restoreSimulationStateWithReport(forged, 114_001, true);
-    expect(recovered.state.jobs.queued).toBe(0);
-    expect(recovered.state.jobs.waitingTasks).toEqual([]);
-    expect(recovered.state.firstSession.step).toBe("queue-starter");
+    expect(recovered.recovery.disposition).toBe("reset");
+    expect(recovered.recovery.reason).toBe("invalid-integrity");
+    expect(recovered.state).toEqual(createInitialState(114_001));
     expect(isStateValid(recovered.state)).toBe(true);
   });
 
@@ -100,12 +98,9 @@ describe("M7D closed-world stale recovery invariants", () => {
 
       const result = restoreSimulationStateWithReport(source, 114_010, true);
       const baseline = createInitialState(114_010);
-      expect(result.recovery.disposition).toBe("recovered");
-      expect(result.state.career).toEqual(baseline.career);
-      expect(result.state.research).toEqual(baseline.research);
-      expect(result.state.hypeFear).toEqual(baseline.hypeFear);
-      expect(result.state.laboratory).toEqual(baseline.laboratory);
-      expect(result.state.workloadId).toBe(baseline.workloadId);
+      expect(result.recovery.disposition).toBe("reset");
+      expect(result.recovery.reason).toBe("invalid-integrity");
+      expect(result.state).toEqual(baseline);
       expect(isStateValid(result.state)).toBe(true);
     },
   );
@@ -138,11 +133,9 @@ describe("M7D closed-world stale recovery invariants", () => {
       114_020,
       true,
     );
-    expect(recovered.state.resources.money).toBe(expanded.resources.money);
-    expect(recovered.state.activeExpansionId).toBeNull();
-    expect(recovered.state.ownedExpansionIds).toEqual([]);
-    expect(recovered.state.slots).toHaveLength(5);
-    expect(recovered.state.slots).toEqual(createInitialState(114_020).slots);
+    expect(recovered.recovery.disposition).toBe("reset");
+    expect(recovered.recovery.reason).toBe("invalid-integrity");
+    expect(recovered.state).toEqual(createInitialState(114_020));
     expect(isStateValid(recovered.state)).toBe(true);
   });
 
@@ -161,10 +154,9 @@ describe("M7D closed-world stale recovery invariants", () => {
       operatingCostsPaid: 999,
     };
     const recovered = restoreSimulationStateWithReport(forged, 114_025, true);
-    expect(recovered.state.jobs.grossEarned).toBe(settled.jobs.grossEarned);
-    expect(recovered.state.jobs.operatingCostsPaid).toBe(
-      settled.jobs.operatingCostsPaid,
-    );
+    expect(recovered.recovery.disposition).toBe("reset");
+    expect(recovered.recovery.reason).toBe("invalid-integrity");
+    expect(recovered.state).toEqual(createInitialState(114_025));
     expect(isStateValid(recovered.state)).toBe(true);
   });
 
@@ -192,8 +184,9 @@ describe("M7D closed-world stale recovery invariants", () => {
       completedEndingIds: ["public-leaderboard-hero"],
     };
     const recovered = restoreSimulationStateWithReport(forged, 114_030, true);
-    expect(recovered.state.career.runEnding).toBeNull();
-    expect(recovered.state.meta).toEqual(createInitialState(114_030).meta);
+    expect(recovered.recovery.disposition).toBe("reset");
+    expect(recovered.recovery.reason).toBe("invalid-integrity");
+    expect(recovered.state).toEqual(createInitialState(114_030));
     expect(isStateValid(recovered.state)).toBe(true);
   });
 

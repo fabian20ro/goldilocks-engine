@@ -16,6 +16,7 @@ import boundaryUnsealed from "../../fixtures/save-fixtures/boundary-unsealed-cur
 import boundaryUnsupported from "../../fixtures/save-fixtures/boundary-unsupported-schema.json";
 import {
   createInitialState,
+  hasValidSaveRecordIntegrity,
   hasValidStateIntegrity,
   isStateValid,
   restoreSimulationStateWithReport,
@@ -106,7 +107,7 @@ function unique<T>(values: readonly T[]): boolean {
   return new Set(values).size === values.length;
 }
 
-describe("D-046 golden save fixture boundary", () => {
+describe("D-047 sealed golden save fixture boundary", () => {
   it.each(fixtures.map((fixture) => [fixture.id, fixture] as const))(
     "%s has provenance, checksum, and semantic invariants",
     (_id, fixture) => {
@@ -117,6 +118,7 @@ describe("D-046 golden save fixture boundary", () => {
       );
       expect(fixture.payloadChecksum.algorithm).toBe("sha256-json-v1");
       expect(checksum(fixture.payload)).toBe(fixture.payloadChecksum.value);
+      expect(hasValidSaveRecordIntegrity(fixture.payload)).toBe(true);
       expect(fixture.expected.seed).toBe(record(fixture.payload).seed);
       expect(fixture.expected.rngState).toBe(record(fixture.payload).rngState);
       expect(fixture.expected.workloadId).toBe(
@@ -263,32 +265,48 @@ describe("D-046 golden save fixture boundary", () => {
     },
   );
 
-  it("preserves only corroborated state for a stale current save", () => {
+  it.each(fixtures.map((fixture) => [fixture.id, fixture] as const))(
+    "%s resets absent and invalid seals before migration",
+    (_id, fixture) => {
+      for (const mutate of [
+        (payload: Record<string, unknown>) => {
+          delete payload.integrity;
+        },
+        (payload: Record<string, unknown>) => {
+          const integrity = payload.integrity as Record<string, unknown>;
+          integrity.digest = "00000000";
+        },
+      ]) {
+        const payload = JSON.parse(JSON.stringify(fixture.payload)) as Record<
+          string,
+          unknown
+        >;
+        mutate(payload);
+        const result = restoreSimulationStateWithReport(
+          payload,
+          fixture.expected.seed,
+          true,
+        );
+        expect(result.recovery.disposition).toBe("reset");
+        expect(result.recovery.reason).toBe("invalid-integrity");
+        expect(result.state).toEqual(createInitialState(fixture.expected.seed));
+        expect(result.recovery.reset).toContain("the untrusted saved run");
+        expect(result.recovery.nextAction).toMatch(/fresh run|backup/i);
+      }
+    },
+  );
+
+  it("resets a stale current save without interpreting any progression", () => {
     const source = createInitialState(46_100);
     const stale = JSON.parse(JSON.stringify(source)) as Record<string, unknown>;
-    const staleResources = stale.resources as Record<string, unknown>;
-    const staleCareer = stale.career as Record<string, unknown>;
-    delete stale.integrity;
-    staleResources.money = 3;
-    stale.hardwareId = "used-gpu";
-    stale.ownedHardwareIds = ["bedroom-cpu", "used-gpu"];
-    stale.ownedModuleIds = [...source.ownedModuleIds, "precision-cleaner"];
+    (stale.resources as Record<string, unknown>).money = 3;
     (stale.meta as Record<string, unknown>).completedEndingIds = [
       "honest-foundation",
     ];
-    staleCareer.savings = 99;
     const result = restoreSimulationStateWithReport(stale, 46_100, true);
-    expect(result.recovery.disposition).toBe("recovered");
-    expect(result.state.resources.money).toBe(3);
-    expect(result.state.hardwareId).toBe(source.hardwareId);
-    expect(result.state.ownedHardwareIds).toEqual(source.ownedHardwareIds);
-    expect(result.state.ownedModuleIds).toEqual(source.ownedModuleIds);
-    expect(result.state.meta).toEqual(source.meta);
-    expect(result.state.career.savings).toBe(source.career.savings);
-    expect(result.state.research).toEqual(source.research);
-    expect(result.state.hypeFear).toEqual(source.hypeFear);
-    expect(result.state.laboratory).toEqual(source.laboratory);
-    expect(isStateValid(result.state)).toBe(true);
+    expect(result.recovery.disposition).toBe("reset");
+    expect(result.recovery.reason).toBe("invalid-integrity");
+    expect(result.state).toEqual(source);
   });
 
   it("fails closed for malformed, tampered-guide, unsupported, and future records", () => {

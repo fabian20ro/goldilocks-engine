@@ -1,6 +1,6 @@
 {
   "fixtureVersion": 1,
-  "policy": "D-046-save-support-v1",
+  "policy": "D-047-save-support-v2",
   "id": "boundary-stale-current",
   "source": {
     "kind": "adversarial-boundary",
@@ -12,8 +12,8 @@
     "value": "a34143b52a7cb639fc73fd36a99adb2ea5504ec1b22f297637c9bc3bfb2a3b79"
   },
   "expected": {
-    "disposition": "recovered",
-    "reason": "stale-or-unsealed-save"
+    "disposition": "reset",
+    "reason": "invalid-integrity"
   },
   "rawPayload": null,
   "payload": {

@@ -12,7 +12,6 @@ import {
   findCreator,
   narrativeTemplates,
 } from "./hypeFearCatalog";
-import { createInitialHypeFearState } from "./hypeFear";
 import type { SimulationState } from "./types";
 
 function recognizedState(seed = 90001): SimulationState {
@@ -203,8 +202,7 @@ describe("round 090 Hype/Fear independent boundaries", () => {
       ],
     };
     const recovered = restoreSimulationState(forged, state.seed);
-    expect(recovered.hypeFear).toEqual(createInitialHypeFearState());
-    expect(recovered.tick).toBe(state.tick);
+    expect(recovered).toEqual(createInitialState(state.seed));
     expect(isStateValid(recovered)).toBe(true);
   });
 

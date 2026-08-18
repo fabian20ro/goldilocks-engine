@@ -40,6 +40,10 @@ describe("latest settlement failure provenance", () => {
     );
   }
 
+  function expectNoFailureRecord() {
+    expect(screen.queryByText("Failure record:")).toBeNull();
+  }
+
   it("retains an integrity-valid task cause after a later Career incident and restore", () => {
     let state = failedStarter(80_078);
     const settlementEventId = state.lastSettlement?.ledgerEventId;
@@ -152,12 +156,7 @@ describe("latest settlement failure provenance", () => {
     expect(settlementRecord).toBeNull();
 
     renderJobs(restored);
-    expect(screen.getByText("Failure record:").parentElement).toHaveTextContent(
-      "Cause unknown — the retained settlement record is unavailable.",
-    );
-    expect(
-      screen.getByText("Failure record:").parentElement,
-    ).not.toHaveTextContent("Forged unrelated cause.");
+    expectNoFailureRecord();
   });
 
   it("clears a stale cause-only marker mutation before resealing", () => {
@@ -181,12 +180,7 @@ describe("latest settlement failure provenance", () => {
     ).toBeNull();
 
     renderJobs(restored);
-    expect(screen.getByText("Failure record:").parentElement).toHaveTextContent(
-      "Cause unknown — the retained settlement record is unavailable.",
-    );
-    expect(
-      screen.getByText("Failure record:").parentElement,
-    ).not.toHaveTextContent("Required memory exceeded available memory.");
+    expectNoFailureRecord();
   });
 
   it("does not reseal a forged structural relink as a precise failure", () => {
@@ -220,12 +214,7 @@ describe("latest settlement failure provenance", () => {
     ).toBeNull();
 
     renderJobs(restored);
-    expect(screen.getByText("Failure record:").parentElement).toHaveTextContent(
-      "Cause unknown — the retained settlement record is unavailable.",
-    );
-    expect(
-      screen.getByText("Failure record:").parentElement,
-    ).not.toHaveTextContent("Forged unrelated cause.");
+    expectNoFailureRecord();
   });
 
   it("does not trust a reordered stale tail as settlement provenance", () => {
@@ -258,9 +247,7 @@ describe("latest settlement failure provenance", () => {
     ).toBeNull();
 
     renderJobs(restored);
-    expect(screen.getByText("Failure record:").parentElement).toHaveTextContent(
-      "Cause unknown — the retained settlement record is unavailable.",
-    );
+    expectNoFailureRecord();
   });
 
   it("keeps legacy or malformed provenance as an honest unknown", () => {
@@ -295,11 +282,7 @@ describe("latest settlement failure provenance", () => {
 
     expect(isStateValid(restoredLegacy)).toBe(true);
     expect(isStateValid(restoredMalformed)).toBe(true);
-    expect(restoredMalformed.lastSettlement).toMatchObject({
-      failed: 1,
-      taskId: legacy.lastSettlement?.taskId,
-    });
-    expect(restoredMalformed.lastSettlement?.ledgerEventId).toBeUndefined();
+    expect(restoredMalformed).toEqual(createInitialState(81_002));
     expect(
       findSettlementFailureRecord(
         restoredLegacy.lastSettlement,
@@ -314,11 +297,6 @@ describe("latest settlement failure provenance", () => {
     ).toBeNull();
 
     renderJobs(restoredLegacy);
-    expect(screen.getByText("Failure record:").parentElement).toHaveTextContent(
-      "Cause unknown — the retained settlement record is unavailable.",
-    );
-    expect(
-      screen.getByText("Failure record:").parentElement,
-    ).not.toHaveTextContent("Forged unrelated cause.");
+    expectNoFailureRecord();
   });
 });

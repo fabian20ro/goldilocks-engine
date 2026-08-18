@@ -94,8 +94,9 @@ remain frozen.
 
 ## Active authorized scope: Milestone 7D Save Stability
 
-D-046 authorizes one bounded save-support and recovery closure through the
-existing restore/migration boundary:
+D-046 supplies the audited generation catalogue; D-047 authorizes one bounded
+trust-boundary and recovery closure through the existing restore/migration
+boundary:
 
 - audit and record the actually deployed schema/content/build history; support
   only the explicit schema 3–7 generations named by D-046, with schema 1/2,
@@ -107,9 +108,11 @@ existing restore/migration boundary:
   progress/seed/RNG/task/quote/topology/accounting/Career/Research/Hype/Lab/
   history retention where applicable, unique event IDs, and no duplicate
   commands/tasks/deductions/rewards/events through one fixture harness;
-- persist one bounded versioned raw recovery backup before fallback, and show
-  user-visible preserved/reset/next-action status; future/unsupported data is
-  not partially interpreted and stale/unsealed fields are corroborated only;
+- validate the applicable original integrity seal before any migration read;
+  absent, stale, malformed, or otherwise invalid integrity preserves one
+  bounded versioned raw recovery backup before resetting to a fresh safe run;
+  no simulation progression is salvaged. Independent UI preferences may remain;
+  future/unsupported data is not partially interpreted;
 - prove normal migration, malformed/stale/tampered recovery, and reload/offline
   PWA lifecycle at 320 and 393 through committed unit and Playwright checks.
 
@@ -135,22 +138,22 @@ contracts remain regression boundaries.
 
 ## Exact authority map
 
-| Need                                     | Source                                                                                                                                  |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Product and release boundary             | `plan.md` §§2.4, 20, 24, 27, 29, 34; D-040–D-045                                                                                        |
-| Historical accepted Milestone 6 behavior | `.agent/verification/round-093.md`; `.agent/verification/round-093-adversarial.mjs`; `.agent/verification/round-093-ui-adversarial.mjs` |
-| Frozen M7A receipt and active M7 matrix  | `.agent/RELEASE_ACCEPTANCE.md`; D-043                                                                                                   |
-| Active finding/probe status              | `.agent/verification/catalog.json`; `scripts/validate-verification-catalog.mjs`                                                         |
-| Navigation implementation                | `src/ui/App.tsx`; `src/ui/styles.css`; `src/ui/glyphs.tsx`                                                                              |
-| Navigation acceptance                    | `tests/e2e/navigation-affordance.spec.ts`; `scripts/verify`                                                                             |
-| M7B OIV evidence contract                | `.agent/RELEASE_ACCEPTANCE.md` §Milestone 7B; `.agent/HANDOFF.md`                                                                       |
-| M7C profile and editorial contract       | D-044–D-045; `.agent/RELEASE_ACCEPTANCE.md` §Milestone 7C; `scripts/verify`; `src/ui/editorial.ts`; `src/ui/commandDeck.tsx`            |
-| M7C destination implementation           | `src/ui/App.tsx`; `src/ui/ResearchView.tsx`; `src/ui/LaboratoryView.tsx`; `src/ui/WorldView.tsx`; `src/ui/styles.css`                   |
-| M7C executable evidence                  | `src/ui/editorial.test.ts`; `src/test/verificationProfiles.test.ts`; `tests/e2e/command-deck.spec.ts`                                   |
-| M7D audited save policy                  | D-046; `src/simulation/saveSupport.ts`; `fixtures/save-fixtures/README.md`; `.agent/RELEASE_ACCEPTANCE.md`                              |
-| M7D restore/recovery implementation      | `src/simulation/engine.ts`; `src/simulation/saveRecovery.ts`; `src/ui/useSimulation.ts`; `src/ui/App.tsx`                               |
-| M7D executable evidence                  | `src/simulation/saveFixtures.test.ts`; `src/simulation/saveRecovery.test.ts`; `tests/e2e/save-stability.spec.ts`                        |
-| Live Git/report facts                    | `./scripts/agent-status` only                                                                                                           |
+| Need                                             | Source                                                                                                                                  |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Product and release boundary                     | `plan.md` §§2.4, 20, 24, 27, 29, 34; D-040–D-045                                                                                        |
+| Historical accepted Milestone 6 behavior         | `.agent/verification/round-093.md`; `.agent/verification/round-093-adversarial.mjs`; `.agent/verification/round-093-ui-adversarial.mjs` |
+| Frozen M7A receipt and active M7 matrix          | `.agent/RELEASE_ACCEPTANCE.md`; D-043                                                                                                   |
+| Active finding/probe status                      | `.agent/verification/catalog.json`; `scripts/validate-verification-catalog.mjs`                                                         |
+| Navigation implementation                        | `src/ui/App.tsx`; `src/ui/styles.css`; `src/ui/glyphs.tsx`                                                                              |
+| Navigation acceptance                            | `tests/e2e/navigation-affordance.spec.ts`; `scripts/verify`                                                                             |
+| M7B OIV evidence contract                        | `.agent/RELEASE_ACCEPTANCE.md` §Milestone 7B; `.agent/HANDOFF.md`                                                                       |
+| M7C profile and editorial contract               | D-044–D-045; `.agent/RELEASE_ACCEPTANCE.md` §Milestone 7C; `scripts/verify`; `src/ui/editorial.ts`; `src/ui/commandDeck.tsx`            |
+| M7C destination implementation                   | `src/ui/App.tsx`; `src/ui/ResearchView.tsx`; `src/ui/LaboratoryView.tsx`; `src/ui/WorldView.tsx`; `src/ui/styles.css`                   |
+| M7C executable evidence                          | `src/ui/editorial.test.ts`; `src/test/verificationProfiles.test.ts`; `tests/e2e/command-deck.spec.ts`                                   |
+| M7D audited save policy and D-047 trust boundary | D-046–D-047; `src/simulation/saveSupport.ts`; `fixtures/save-fixtures/README.md`; `.agent/RELEASE_ACCEPTANCE.md`                        |
+| M7D restore/recovery implementation              | `src/simulation/engine.ts`; `src/simulation/saveRecovery.ts`; `src/ui/useSimulation.ts`; `src/ui/App.tsx`                               |
+| M7D executable evidence                          | `src/simulation/saveFixtures.test.ts`; `src/simulation/saveRecovery.test.ts`; `tests/e2e/save-stability.spec.ts`                        |
+| Live Git/report facts                            | `./scripts/agent-status` only                                                                                                           |
 
 ## Rule-of-Three retained M7A navigation map
 
@@ -191,12 +194,13 @@ contracts remain regression boundaries.
    boundary to sealed current schema/content with deterministic state and
    idempotent serialize/restore.
 2. Boundary: malformed, stale/unsealed, tampered, unsupported, and future
-   records preserve only corroborated data, create one bounded raw backup, and
-   expose preserved/reset/next-action recovery status without partial future
-   interpretation or duplicate effects.
-3. Lifecycle: supported/recovered state persists through Worker publication,
-   reload, offline shell resume, PWA update/reload regression, and 320/393
-   portrait operation; M7C copy/navigation and parked M7B lanes remain intact.
+   records create one bounded raw backup, reset untrusted simulation state, and
+   expose truthful preserved/reset/next-action recovery status without partial
+   future interpretation or duplicate effects.
+3. Lifecycle: supported sealed state and the fresh reset baseline persist
+   through Worker publication, reload, offline shell resume, PWA update/reload
+   regression, and 320/393 portrait operation; M7C copy/navigation and parked
+   M7B lanes remain intact.
 
 The catalog's active requirements and historical finding groups are the
 machine-checked routing contract. If a report introduces a finding ID absent

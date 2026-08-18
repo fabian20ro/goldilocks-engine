@@ -110,7 +110,7 @@ describe("verifier round 041: stale purchase provenance", () => {
         event.message.includes("purchased for $4.000"),
       ),
     ).toBe(true);
-    expect(restored.firstSession.step).toBe("complete");
-    expect(batchAttempt.jobs.queued).toBe(10);
+    expect(restored).toEqual(createInitialState(41_002));
+    expect(batchAttempt.jobs.queued).toBe(0);
   });
 });

@@ -1,6 +1,6 @@
 {
   "fixtureVersion": 1,
-  "policy": "D-046-save-support-v1",
+  "policy": "D-047-save-support-v2",
   "id": "schema-6-bedroom-career-1",
   "source": {
     "id": "schema-6-bedroom-career-1",
@@ -14,7 +14,7 @@
   },
   "payloadChecksum": {
     "algorithm": "sha256-json-v1",
-    "value": "3601f3f69c6f1a23710e7d11e1ed6d1fe0c7df409ed1053828ef521588c1b104"
+    "value": "3e72105b462b0b1e03db194d9384920105f9c4ebaacbe471289cb20747cb7cee"
   },
   "expected": {
     "seed": 4603,
@@ -378,6 +378,9 @@
       {
         "kind": "info",
         "message": "2 interactive chat jobs queued.",
+        "queuedTaskIds": ["task-0-1", "task-0-2"],
+        "queuedTaskWorkloadIds": ["interactive-chat", "interactive-chat"],
+        "queuedTaskQuotes": [1.4, 1.303],
         "id": "evt-0-2",
         "tick": 0
       },
@@ -411,6 +414,10 @@
         "id": "evt-0-7",
         "tick": 0
       }
-    ]
+    ],
+    "integrity": {
+      "algorithm": "fnv1a-32-json-v1",
+      "digest": "45a31a12"
+    }
   }
 }

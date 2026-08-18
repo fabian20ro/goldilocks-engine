@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import {
   beginStagePlacement,
   chooseSimulationSpeed,
+  resealSavedRecord,
   settleStarterJob,
 } from "./helpers";
 
@@ -25,6 +26,7 @@ async function setSavedMoney(page: Page, money: number) {
     },
     { key: SAVE_KEY, money },
   );
+  await resealSavedRecord(page, SAVE_KEY);
   await page.reload();
 }
 

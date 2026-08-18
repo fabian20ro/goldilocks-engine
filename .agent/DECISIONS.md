@@ -1128,18 +1128,17 @@
   auditable but no surviving independent public receipt proves deployment.
   Fixtures record this distinction and never infer a test-only generation as
   public.
-- **Restore transaction:** A valid sealed save upgrades completely and is
-  resealed deterministically. Old supported content upgrades through the
-  existing migration boundary. A stale or unsealed current save retains only
-  structurally corroborated core/task/accounting/seed/RNG/history fields;
-  uncorroborated progression and causal additions recover to safe defaults.
-  Future/unsupported input is never partially interpreted. Malformed input
-  recovers to a fresh valid state.
+- **Restore transaction:** D-047 later narrows this transaction to sealed-only
+  migration. A valid sealed save upgrades completely and is resealed
+  deterministically; a stale or unsealed save is untrusted and is reset without
+  interpreting progression. Future/unsupported input is never partially
+  interpreted. Malformed input recovers to a fresh valid state.
 - **Recovery contract:** Before fallback or destructive recovery, persist one
   bounded, versioned raw source backup with source key, captured time, schema /
   content metadata when parseable, and checksum. Expose a concise status naming
   preserved fields, reset fields, and the next action. A backup is best-effort
-  under storage failure and never blocks the simulation from starting.
+  under storage failure and never blocks the simulation from starting. See
+  D-047 for the sealed-only trust rule and no-salvage semantics.
 - **Evidence contract:** Committed golden fixtures carry source/provenance,
   checksum, and semantic invariants. The fixture harness proves deterministic
   migration, serialize/restore idempotence, legitimate task/quote/topology,
@@ -1155,3 +1154,39 @@
 - **Reversal condition:** Change a supported generation, recovery disposition,
   or backup boundary only through a new audited source/deployment record and
   independent fixture, adversarial, lifecycle, and browser evidence.
+
+## D-047 — Sealed-save-only migration and honest reset recovery
+
+- **Decision:** D-047 supersedes D-046's stale/unsealed salvage wording. Every
+  simulation save must first match an exact audited schema/content pair and
+  validate its applicable original `fnv1a-32-json-v1` integrity seal. A missing,
+  stale, malformed, or otherwise invalid seal is untrusted input: preserve one
+  bounded, versioned, checksummed raw recovery backup, then reset to a fresh
+  safe simulation. No simulation progression, ledger interpretation, task,
+  quote, ownership, topology, Career, Research, Hype, Laboratory, ending, or
+  causal counter may be salvaged from that payload.
+- **Compatibility:** Valid sealed schema 3–6 reconstructed historical records
+  and valid sealed schema-7 content generations migrate through the existing
+  boundary and reseal deterministically. The schema/content catalogue and
+  source/deployment tiers remain D-046's audited compatibility record; D-047
+  changes only the trust/recovery transaction and does not bump schema 7.
+  Schema 1/2, unknown content, future records, malformed records, and failed
+  migration remain fail-closed. UI preferences outside the simulation save may
+  remain under their existing independent storage contract.
+- **Fixture derivation:** Historical schema 3–6 source artifacts do not retain
+  a compatible integrity field. The committed fixtures therefore carry a
+  current deterministic seal over the audited reconstructed payload, with that
+  unavoidable derivation documented; this is not a claim of historical public
+  deployment or a new supported content generation.
+- **Evidence contract:** Table/property coverage compares every valid sealed
+  supported generation with absent/invalid-seal variants. Rule of Three covers
+  valid sealed migration, malformed/unsealed/tampered reset with backup/status,
+  and reload/offline/PWA update recovery at 320/393. Preserve the existing
+  Worker, engine, economy, navigation, M7C copy, and parked M7B contracts.
+- **Non-goals:** No cloud sync, accounts, multiple slots, save editor,
+  arbitrary import, encryption, backend, new command/content, broad redesign,
+  or schema bump is authorized.
+- **Reversal condition:** Change sealed-only trust, reset semantics, backup
+  bound, or supported generation only through a new explicit decision backed by
+  audited source/deployment evidence and independent fixture, adversarial,
+  lifecycle, and browser verification.

@@ -8,6 +8,7 @@ import type { SimulationState } from "../../src/simulation/types";
 import {
   chooseSimulationSpeed,
   openSimulationContext,
+  resealSavedRecord,
   settleStarterJob,
 } from "./helpers";
 
@@ -35,6 +36,7 @@ async function setSavedMoney(page: Page, money: number): Promise<void> {
     },
     { key: SAVE_KEY, value: money },
   );
+  await resealSavedRecord(page, SAVE_KEY);
   await page.reload({ waitUntil: "domcontentloaded" });
 }
 

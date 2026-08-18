@@ -1,5 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
-import { chooseSimulationSpeed, STARTER_QUEUE_NAME } from "./helpers";
+import {
+  chooseSimulationSpeed,
+  resealSavedRecord,
+  STARTER_QUEUE_NAME,
+} from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 
@@ -24,6 +28,7 @@ async function setSavedMoney(page: Page, money: number) {
     },
     { key: SAVE_KEY, money },
   );
+  await resealSavedRecord(page, SAVE_KEY);
   await page.reload();
 }
 

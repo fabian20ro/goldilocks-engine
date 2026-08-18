@@ -38,10 +38,7 @@ describe("round 086 malformed Research temporal recovery", () => {
 
     const restored = restoreSimulationState(malformed, valid.seed);
 
-    expect(restored.research.activeProject).toBeNull();
-    expect(restored.research.goal).toBeNull();
-    expect(restored.research.teamMemberIds).toEqual([]);
-    expect(restored.resources.money).toBe(valid.resources.money);
+    expect(restored).toEqual(createInitialState(valid.seed));
     expect(isStateValid(restored)).toBe(true);
   });
 });

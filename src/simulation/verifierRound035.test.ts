@@ -66,9 +66,7 @@ describe("verifier round 035: saturated ending integrity", () => {
     expect(recovered.meta.unlockedDiagnosticIds).not.toContain(
       "decision-history",
     );
-    expect(recovered.migration.steps).toContain(
-      "schema-v7-causal-ledger-repaired",
-    );
+    expect(recovered.migration.steps).toEqual([]);
     expect(getPostmortemEvent(recovered)).toBeNull();
     expect(isStateValid(recovered)).toBe(true);
   });

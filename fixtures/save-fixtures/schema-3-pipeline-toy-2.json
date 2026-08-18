@@ -1,6 +1,6 @@
 {
   "fixtureVersion": 1,
-  "policy": "D-046-save-support-v1",
+  "policy": "D-047-save-support-v2",
   "id": "schema-3-pipeline-toy-2",
   "source": {
     "id": "schema-3-pipeline-toy-2",
@@ -14,7 +14,7 @@
   },
   "payloadChecksum": {
     "algorithm": "sha256-json-v1",
-    "value": "1c177507769e00093d4039ca091ed33903f6ddd957c0254e5dbe1425380a00e2"
+    "value": "39483879844cd9b7c659c2d72438de0adf105a37be261901f41ea149cc212203"
   },
   "expected": {
     "seed": 4600,
@@ -79,6 +79,10 @@
       "paused": false,
       "grossEarned": 0,
       "operatingCostsPaid": 0
+    },
+    "integrity": {
+      "algorithm": "fnv1a-32-json-v1",
+      "digest": "adaac4ab"
     }
   }
 }

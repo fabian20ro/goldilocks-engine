@@ -17,7 +17,7 @@ describe("round 112 independent M7D recovery adversaries", () => {
 
       expect(result.state).toEqual(createInitialState(112_001));
       expect(result.recovery.disposition).toBe("reset");
-      expect(result.recovery.reason).toMatch(/malformed|uncorroborated/i);
+      expect(result.recovery.reason).toBe("invalid-integrity");
     },
   );
 
@@ -43,7 +43,8 @@ describe("round 112 independent M7D recovery adversaries", () => {
 
     const result = restoreSimulationStateWithReport(source, 112_002, true);
 
-    expect(result.recovery.disposition).toBe("recovered");
+    expect(result.recovery.disposition).toBe("reset");
+    expect(result.recovery.reason).toBe("invalid-integrity");
     expect(result.state.hardwareId).toBe("bedroom-cpu");
     expect(result.state.ownedHardwareIds).toEqual(["bedroom-cpu"]);
   });
@@ -71,7 +72,8 @@ describe("round 112 independent M7D recovery adversaries", () => {
 
     const result = restoreSimulationStateWithReport(source, 112_003, true);
 
-    expect(result.recovery.disposition).toBe("recovered");
+    expect(result.recovery.disposition).toBe("reset");
+    expect(result.recovery.reason).toBe("invalid-integrity");
     expect(result.state.career.evaluation).toEqual(
       createInitialState(112_003).career.evaluation,
     );

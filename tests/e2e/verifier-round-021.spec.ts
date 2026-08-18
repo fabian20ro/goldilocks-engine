@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { resealSavedRecord } from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
 
@@ -20,6 +21,7 @@ async function buyAndActivateExpansion(page: Page) {
     state.resources.money = 45;
     localStorage.setItem(key, JSON.stringify(state));
   }, SAVE_KEY);
+  await resealSavedRecord(page, SAVE_KEY);
   await page.reload();
   await openTab(page, "Upgrades");
   await page

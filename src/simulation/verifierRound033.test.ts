@@ -41,9 +41,7 @@ describe("verifier round 033: bounded causal-ledger recovery", () => {
     expect(restored.career.evaluation).toEqual(
       createInitialState(seed).career.evaluation,
     );
-    expect(restored.migration.steps).toContain(
-      "schema-v7-causal-ledger-repaired",
-    );
+    expect(restored.migration.steps).toEqual([]);
     expect(advanced.career.runEnding).toBeNull();
     expect(getPostmortemEvent(advanced)).toBeNull();
   });

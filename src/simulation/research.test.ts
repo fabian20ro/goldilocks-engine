@@ -147,18 +147,14 @@ describe("Research pipeline", () => {
       malformedActive,
       active.seed,
     );
-    expect(recoveredActive.research.activeProject).toBeNull();
-    expect(recoveredActive.research.goal).toBeNull();
-    expect(recoveredActive.research.teamMemberIds).toEqual([]);
-    expect(recoveredActive.resources.money).toBe(active.resources.money);
+    expect(recoveredActive).toEqual(createInitialState(active.seed));
     expect(isStateValid(recoveredActive)).toBe(true);
     const malformed = {
       ...state,
       research: { ...state.research, teamMemberIds: ["unknown"] },
     };
     const recovered = restoreSimulationState(malformed, state.seed);
-    expect(recovered.research.teamMemberIds).toEqual([]);
-    expect(recovered.resources.money).toBe(state.resources.money);
+    expect(recovered).toEqual(createInitialState(state.seed));
     expect(isStateValid(recovered)).toBe(true);
   });
 
@@ -181,16 +177,7 @@ describe("Research pipeline", () => {
     malformed.research.institutionalKnowledge = 1;
 
     const recovered = restoreSimulationState(malformed, state.seed);
-    expect(recovered.research.frontier).toEqual({
-      discoveredProjectIds: ["context-reconstruction"],
-      inspectedProjectIds: [],
-      completedProjectIds: [],
-    });
-    expect(recovered.research.goal).toBeNull();
-    expect(recovered.research.availableResearcherIds).toEqual(["mira-voss"]);
-    expect(recovered.research.recruitedResearcherIds).toEqual([]);
-    expect(recovered.research.teamMemberIds).toEqual([]);
-    expect(recovered.research.institutionalKnowledge).toBe(0);
+    expect(recovered).toEqual(createInitialState(state.seed));
 
     const offlineConfigured = applyCommand(recovered, {
       type: "SET_OFFLINE_POLICY",
@@ -220,10 +207,7 @@ describe("Research pipeline", () => {
 
     const recovered = restoreSimulationState(malformed, active.seed);
 
-    expect(recovered.research.activeProject).toBeNull();
-    expect(recovered.research.goal).toBeNull();
-    expect(recovered.research.teamMemberIds).toEqual([]);
-    expect(recovered.resources.money).toBe(active.resources.money);
+    expect(recovered).toEqual(createInitialState(active.seed));
     expect(isStateValid(recovered)).toBe(true);
   });
 

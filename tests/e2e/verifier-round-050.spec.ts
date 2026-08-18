@@ -5,6 +5,7 @@ import {
   type BrowserContext,
   type Page,
 } from "@playwright/test";
+import { sealSaveRecord } from "../../src/simulation/engine";
 import { chooseSimulationSpeed } from "./helpers";
 
 const SAVE_KEY = "goldilocks-simulation-save-v4";
@@ -111,13 +112,16 @@ for (const viewport of [
     await page.setViewportSize(viewport);
     await page.goto("/");
     await waitForSave(page);
-    const saved = await page.evaluate((key) => {
-      const state = JSON.parse(localStorage.getItem(key) ?? "null") as {
-        resources: { money: number };
-      };
-      state.resources.money = 45;
-      return JSON.stringify(state);
-    }, SAVE_KEY);
+    const raw = await page.evaluate(
+      (key) => localStorage.getItem(key),
+      SAVE_KEY,
+    );
+    if (raw === null) throw new Error("Expected a persisted simulation state");
+    const seedState = JSON.parse(raw) as Record<string, unknown> & {
+      resources: { money: number };
+    };
+    seedState.resources.money = 45;
+    const saved = JSON.stringify(sealSaveRecord(seedState));
 
     // Match the candidate's same-context repair: the source Worker is closed
     // before a one-shot fixture can reach the next application boot.
@@ -268,7 +272,7 @@ test("verifier round 050: an audited forged completion fails closed through a re
   expect(errors).toEqual([]);
 });
 
-test("verifier round 050: audited paid completion survives stale-save recovery without another deduction", async ({
+test("verifier round 050: invalid post-purchase save resets before another deduction", async ({
   browser,
   page,
 }) => {
@@ -345,10 +349,10 @@ test("verifier round 050: audited paid completion survives stale-save recovery w
       restored.marker,
       stale,
     );
-    await expect(restored.page.getByTestId("first-session-guide")).toHaveCount(
-      0,
-    );
-    const assertCompletedState = async () => {
+    await expect(
+      restored.page.getByTestId("save-recovery-status"),
+    ).toContainText("invalid integrity");
+    const assertResetState = async () => {
       const state = await restored.page.evaluate((key) => {
         const state = JSON.parse(localStorage.getItem(key) ?? "null") as {
           firstSession: { step: string };
@@ -359,12 +363,12 @@ test("verifier round 050: audited paid completion survives stale-save recovery w
         };
         return state;
       }, SAVE_KEY);
-      expect(state.firstSession.step).toBe("complete");
-      expect(state.resources.money).toBe(expected.resources.money);
-      expect(state.ownedModuleIds).toContain("precision-cleaner");
+      expect(state.firstSession.step).toBe("queue-starter");
+      expect(state.resources.money).toBe(0);
+      expect(state.ownedModuleIds).not.toContain("precision-cleaner");
       expect(
         state.slots.find((slot) => slot.slotId === "prepare")?.moduleId,
-      ).toBe("precision-cleaner");
+      ).toBe("basic-cleaner");
       expect(
         state.ledger.filter(
           (event) =>
@@ -372,19 +376,22 @@ test("verifier round 050: audited paid completion survives stale-save recovery w
             event.message ===
               "Precision Cleaner purchased for $4.000 and is now owned. Add it to a compatible process slot in Build; purchase deducted exactly once.",
         ),
-      ).toHaveLength(1);
+      ).toHaveLength(0);
     };
-    await assertCompletedState();
+    await expect(
+      restored.page.getByTestId("first-session-guide"),
+    ).toContainText("step 1 of 3");
+    await assertResetState();
     await openTab(restored.page, "Jobs");
     await expect(
       restored.page.getByRole("button", { name: "Queue 10" }),
-    ).toHaveCount(1);
+    ).toHaveCount(0);
     await restored.page.reload();
     await waitForSave(restored.page);
-    await expect(restored.page.getByTestId("first-session-guide")).toHaveCount(
-      0,
-    );
-    await assertCompletedState();
+    await expect(
+      restored.page.getByTestId("first-session-guide"),
+    ).toContainText("step 1 of 3");
+    await assertResetState();
   } finally {
     await restored.context.close();
   }

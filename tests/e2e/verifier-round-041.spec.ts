@@ -185,7 +185,7 @@ test("a damaged save cannot use a forged installed module to skip the first purc
   expect(errors).toEqual([]);
 });
 
-test("a real first purchase survives benign stale-save recovery after later work", async ({
+test("an invalid post-purchase save resets without reusing the purchase", async ({
   page,
   browser,
 }) => {
@@ -270,9 +270,15 @@ test("a real first purchase survives benign stale-save recovery after later work
   // Its pass condition would otherwise also pass if the intended damage lost.
   const restored = await openSavedStateBeforeBoot(browser, staleSave);
   try {
-    await expect(restored.page.getByTestId("first-session-guide")).toHaveCount(
-      0,
-    );
+    await expect(
+      restored.page.getByTestId("save-recovery-status"),
+    ).toContainText("invalid integrity");
+    await expect(
+      restored.page.getByTestId("first-session-guide"),
+    ).toContainText("step 1 of 3");
+    await expect(
+      restored.page.getByRole("button", { name: "Queue 10" }),
+    ).toHaveCount(0);
   } finally {
     await restored.context.close();
   }

@@ -1,6 +1,6 @@
 {
   "fixtureVersion": 1,
-  "policy": "D-046-save-support-v1",
+  "policy": "D-047-save-support-v2",
   "id": "schema-5-pipeline-toy-4",
   "source": {
     "id": "schema-5-pipeline-toy-4",
@@ -14,7 +14,7 @@
   },
   "payloadChecksum": {
     "algorithm": "sha256-json-v1",
-    "value": "2849e6b7a77eb7afd610b37cb639ea332baca6c6e0d9a56188867bb18860f25f"
+    "value": "98e2d2e3ce49598de0f3b8a1e458d41ee1200cbef1c10c6edda29dec99e389fe"
   },
   "expected": {
     "seed": 4602,
@@ -189,6 +189,9 @@
       {
         "kind": "info",
         "message": "2 interactive chat jobs queued.",
+        "queuedTaskIds": ["task-0-1", "task-0-2"],
+        "queuedTaskWorkloadIds": ["interactive-chat", "interactive-chat"],
+        "queuedTaskQuotes": [1.4, 1.303],
         "id": "evt-0-2",
         "tick": 0
       },
@@ -246,6 +249,10 @@
     "failedModuleId": null,
     "lastWarning": "Evaluation blind spots widen observed uncertainty.",
     "lastUpgradeNotice": null,
-    "lastSettlement": null
+    "lastSettlement": null,
+    "integrity": {
+      "algorithm": "fnv1a-32-json-v1",
+      "digest": "b279a041"
+    }
   }
 }
