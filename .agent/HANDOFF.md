@@ -1,6 +1,6 @@
 # Candidate handoff — Milestone 7B verifier repair
 
-Candidate SHA: see the exact full SHA returned with this handoff. Implementation
+Candidate SHA: `70d2315e674bf27eda646a755ef394faab192de6`. Implementation
 started from verifier commit
 `ea80ade71a0fc45088218aae31b79a560e5d0fd7`.
 
