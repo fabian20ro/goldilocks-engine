@@ -608,6 +608,50 @@
       "requirementId": "M7D-SAVE-001",
       "regressionEvidence": ["src/simulation/verifierRound113.test.ts"],
       "note": "Malformed numeric fields in exact schema-3/4 legacy records are defaulted and reported as migrated instead of failing closed."
+    },
+    {
+      "id": "V-114-001",
+      "match": { "exact": ["V-114-001"] },
+      "status": "active",
+      "requirementId": "M7D-SAVE-002",
+      "regressionEvidence": [
+        "src/simulation/verifierRound114.test.ts",
+        ".agent/verification/round-114.md"
+      ],
+      "note": "Shape-valid unsealed evaluation additions survive without an engine event proving them."
+    },
+    {
+      "id": "V-114-002",
+      "match": { "exact": ["V-114-002"] },
+      "status": "active",
+      "requirementId": "M7D-SAVE-002",
+      "regressionEvidence": [
+        "src/simulation/verifierRound114.test.ts",
+        ".agent/verification/round-114.md"
+      ],
+      "note": "Altered module-placement prose still authorizes stale topology reconstruction."
+    },
+    {
+      "id": "V-114-003",
+      "match": { "exact": ["V-114-003"] },
+      "status": "active",
+      "requirementId": "M7D-SAVE-002",
+      "regressionEvidence": [
+        "src/simulation/verifierRound114.test.ts",
+        ".agent/verification/round-114.md"
+      ],
+      "note": "A forged locked quote survives when both the unsealed task projection and queue payload are changed together."
+    },
+    {
+      "id": "V-114-004",
+      "match": { "exact": ["V-114-004"] },
+      "status": "active",
+      "requirementId": "M7D-SAVE-002",
+      "regressionEvidence": [
+        "src/simulation/verifierRound114.test.ts",
+        ".agent/verification/round-114.md"
+      ],
+      "note": "Altered typed settlement accounting payloads are counted in recovered totals."
     }
   ],
   "supersededProbes": [
