@@ -584,6 +584,30 @@
         ".agent/verification/round-112.md"
       ],
       "note": "Unsealed causal/evaluation counters are reconstructed from the same malformed free-text capital event instead of resetting to safe defaults."
+    },
+    {
+      "id": "V-113-001",
+      "match": { "exact": ["V-113-001"] },
+      "status": "active",
+      "requirementId": "M7D-SAVE-002",
+      "regressionEvidence": ["src/simulation/verifierRound113.test.ts"],
+      "note": "An unsealed ending identity can be changed to another valid ending while retaining the original causal event and meta progression."
+    },
+    {
+      "id": "V-113-002",
+      "match": { "exact": ["V-113-002"] },
+      "status": "active",
+      "requirementId": "M7D-SAVE-002",
+      "regressionEvidence": ["src/simulation/verifierRound113.test.ts"],
+      "note": "An uncorroborated active expanded topology falls back to a fresh run instead of resetting topology while preserving corroborated core state."
+    },
+    {
+      "id": "V-113-003",
+      "match": { "exact": ["V-113-003"] },
+      "status": "active",
+      "requirementId": "M7D-SAVE-001",
+      "regressionEvidence": ["src/simulation/verifierRound113.test.ts"],
+      "note": "Malformed numeric fields in exact schema-3/4 legacy records are defaulted and reported as migrated instead of failing closed."
     }
   ],
   "supersededProbes": [
