@@ -228,6 +228,72 @@
         "scripts/verify"
       ],
       "note": "The M7B routing documentation is internally consistent, but two implementation-authored routing assertions still require the replaced M7A headings and stop the canonical unit gate."
+    },
+    {
+      "id": "V-102-001",
+      "match": { "exact": ["V-102-001"] },
+      "status": "active",
+      "requirementId": "M7B-EVIDENCE-001",
+      "regressionEvidence": [
+        ".agent/verification/round-102-adversarial.mjs",
+        "scripts/verify"
+      ],
+      "note": "The canonical lane labels explicitly allowed native/performance BLOCKED summaries as passed and exits successfully."
+    },
+    {
+      "id": "V-102-002",
+      "match": { "exact": ["V-102-002"] },
+      "status": "active",
+      "requirementId": "M7B-EVIDENCE-001",
+      "regressionEvidence": [
+        ".agent/verification/round-102-adversarial.mjs",
+        "scripts/native-accessibility.mjs"
+      ],
+      "note": "The Android native screenshot is emitted as a bare path instead of a path-plus-SHA-256 artifact record."
+    },
+    {
+      "id": "V-102-003",
+      "match": { "exact": ["V-102-003"] },
+      "status": "active",
+      "requirementId": "M7B-NATIVE-001",
+      "regressionEvidence": [
+        ".agent/verification/round-102-adversarial.mjs",
+        "scripts/native-accessibility.mjs"
+      ],
+      "note": "The native harness documents manual evidence but never ingests it; every invocation recreates UNVERIFIED checklist rows and speech blockers."
+    },
+    {
+      "id": "V-102-004",
+      "match": { "exact": ["V-102-004"] },
+      "status": "active",
+      "requirementId": "M7B-PERF-001",
+      "regressionEvidence": [
+        ".agent/verification/round-102-adversarial.mjs",
+        "scripts/collect-mobile-performance.mjs"
+      ],
+      "note": "The reported Worker 1x/64x values are renderer TaskDuration proxy samples, not Dedicated Worker CPU measurements."
+    },
+    {
+      "id": "V-102-005",
+      "match": { "exact": ["V-102-005"] },
+      "status": "active",
+      "requirementId": "M7B-PERF-001",
+      "regressionEvidence": [
+        ".agent/verification/round-102-adversarial.mjs",
+        "scripts/collect-mobile-performance.mjs"
+      ],
+      "note": "Baseline comparison accepts matching browser/width cells without authenticating the frozen accepted-build identity."
+    },
+    {
+      "id": "V-102-006",
+      "match": { "exact": ["V-102-006"] },
+      "status": "active",
+      "requirementId": "M7B-WEBKIT-001",
+      "regressionEvidence": [
+        ".agent/verification/round-102-adversarial.mjs",
+        "tests/e2e/m7b-webkit.spec.ts"
+      ],
+      "note": "WebKit offline reload errors are annotated and then accepted by the test rather than failing or producing a blocked lane result."
     }
   ],
   "supersededProbes": [
