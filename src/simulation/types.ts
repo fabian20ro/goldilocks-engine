@@ -790,11 +790,32 @@ export interface LedgerEvent {
   tick: number;
   kind: EventKind;
   message: string;
+  /** Optional structured transition provenance for current engine writes. */
+  capitalPurchaseId?: string;
+  capitalPurchaseType?: "hardware" | "module" | "expansion";
+  capitalPurchaseCost?: number;
+  expansionActivationId?: string;
+  /** Engine-authored topology transitions used by stale-save reconstruction. */
+  modulePlacementId?: string;
+  modulePlacementSlotId?: string;
+  modulePlacementFromSlotId?: string;
+  moduleRemovalId?: string;
+  moduleRemovalSlotId?: string;
+  /** Exact queue transaction payload; absent on older retained history. */
+  queuedTaskIds?: readonly string[];
+  queuedTaskWorkloadIds?: readonly string[];
+  queuedTaskQuotes?: readonly number[];
   /**
    * Exact task linkage written only for engine-owned job settlement records.
    * It avoids treating descriptive ledger prose as causal provenance.
    */
   settlementTaskId?: string;
+  settlementWorkloadId?: string;
+  settlementLockedGrossQuote?: number;
+  settlementGrossPayout?: number;
+  settlementOperatingCost?: number;
+  settlementOperatingCostPaid?: number;
+  settlementNetChange?: number;
   settlementFailureCause?: JobSettlementFailureCause;
   directCause?: string;
   contributingCondition?: string;

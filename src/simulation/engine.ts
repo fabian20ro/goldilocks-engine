@@ -369,6 +369,8 @@ function modulePurchaseLedgerMessage(
 function hasRecordedFirstSessionPurchase(state: SimulationState): boolean {
   const purchasedModuleId = state.firstSession.purchasedModuleId;
   if (!purchasedModuleId) return false;
+  const item = findModule(purchasedModuleId);
+  if (!item) return false;
   const messages = [
     modulePurchaseLedgerMessage(purchasedModuleId),
     // Existing saved purchase evidence predates exact ledger presentation.
@@ -378,25 +380,78 @@ function hasRecordedFirstSessionPurchase(state: SimulationState): boolean {
       formatCurrency(amount, 2),
     ),
   ].filter((message): message is string => message !== null);
-  return (
-    messages.length > 0 &&
-    state.ledger.some(
-      (event) => event.kind === "success" && messages.includes(event.message),
-    )
-  );
+  return hasRecordedCapitalPurchase(state, {
+    id: item.id,
+    kind: "module",
+    cost: item.purchaseCost,
+    messages,
+  });
 }
 
 function hasRecordedCapitalPurchase(
   state: Pick<SimulationState, "ledger">,
-  messages: readonly (string | null)[],
+  purchase: {
+    id: string;
+    kind: "hardware" | "module" | "expansion";
+    cost: number;
+    messages: readonly (string | null)[];
+  },
 ): boolean {
-  const exactMessages = messages.filter(
+  const exactMessages = purchase.messages.filter(
     (message): message is string => message !== null,
   );
   return state.ledger.some(
     (event) =>
-      event.kind === "success" && exactMessages.includes(event.message),
+      event.kind === "success" &&
+      exactMessages.includes(event.message) &&
+      (event.capitalPurchaseId === undefined
+        ? event.capitalPurchaseType === undefined &&
+          event.capitalPurchaseCost === undefined
+        : event.capitalPurchaseId === purchase.id &&
+          event.capitalPurchaseType === purchase.kind &&
+          event.capitalPurchaseCost === purchase.cost),
   );
+}
+
+function isCapitalPurchaseLedgerEvidence(event: LedgerEvent): boolean {
+  if (event.kind !== "success") return false;
+  if (
+    event.capitalPurchaseId === undefined &&
+    event.capitalPurchaseType === undefined &&
+    event.capitalPurchaseCost === undefined
+  )
+    return EXACT_CAPITAL_PURCHASE_LEDGER_MESSAGES.has(event.message);
+  if (
+    event.capitalPurchaseId === undefined ||
+    event.capitalPurchaseType === undefined ||
+    event.capitalPurchaseCost === undefined
+  )
+    return false;
+  if (
+    event.capitalPurchaseType !== "hardware" &&
+    event.capitalPurchaseType !== "module" &&
+    event.capitalPurchaseType !== "expansion"
+  )
+    return false;
+  const item =
+    event.capitalPurchaseType === "hardware"
+      ? findHardware(event.capitalPurchaseId)
+      : event.capitalPurchaseType === "module"
+        ? findModule(event.capitalPurchaseId)
+        : findPipelineExpansion(event.capitalPurchaseId);
+  if (!item || item.purchaseCost !== event.capitalPurchaseCost) return false;
+  const messages =
+    event.capitalPurchaseType === "hardware"
+      ? [hardwarePurchaseLedgerMessage(item.id)]
+      : event.capitalPurchaseType === "module"
+        ? [
+            modulePurchaseLedgerMessage(item.id),
+            modulePurchaseLedgerMessage(item.id, (amount) =>
+              formatCurrency(amount, 2),
+            ),
+          ]
+        : [expansionPurchaseLedgerMessage(item.id)];
+  return messages.includes(event.message);
 }
 
 function hardwarePurchaseLedgerMessage(hardwareId: string): string | null {
@@ -409,6 +464,12 @@ function expansionPurchaseLedgerMessage(expansionId: string): string | null {
   const item = findPipelineExpansion(expansionId);
   if (!item || item.purchaseCost <= 0) return null;
   return `${item.name} purchased for ${formatExactCurrency(item.purchaseCost)} and is now owned. Activate it explicitly; its three new positions start empty and no module was bought or filled automatically.`;
+}
+
+function expansionActivationLedgerMessage(expansionId: string): string | null {
+  const item = findPipelineExpansion(expansionId);
+  if (!item || item.purchaseCost <= 0) return null;
+  return `${item.name} activated: six usable process positions in one ordered pipeline. Three new positions are empty/bypassed.`;
 }
 
 function allExactCapitalPurchaseLedgerMessages(): readonly string[] {
@@ -436,6 +497,25 @@ const EXACT_CAPITAL_PURCHASE_LEDGER_MESSAGES = new Set(
   allExactCapitalPurchaseLedgerMessages(),
 );
 
+function hasExactSuccessLedgerMessage(
+  state: Pick<SimulationState, "ledger">,
+  message: string | null,
+  expansionId?: string,
+): boolean {
+  return (
+    message !== null &&
+    state.ledger.some(
+      (event) =>
+        event.kind === "success" &&
+        event.message === message &&
+        (expansionId === undefined
+          ? event.expansionActivationId === undefined
+          : event.expansionActivationId === undefined ||
+            event.expansionActivationId === expansionId),
+    )
+  );
+}
+
 /**
  * Settlement events retain the accepted task ID, unlike lastSettlement, which
  * intentionally advances as later work completes. A damaged save may use this
@@ -448,16 +528,12 @@ function hasRecordedStarterSettlement(
   starterTaskId: string | null,
 ): boolean {
   if (!starterTaskId) return false;
-  const taskPrefix = `${getWorkload("interactive-chat").name} task ${starterTaskId} `;
   return state.ledger.some(
     (event) =>
-      (event.kind === "success" &&
-        event.message.startsWith(`${taskPrefix}completed;`)) ||
-      (event.kind === "failure" &&
-        (event.message.startsWith(`${taskPrefix}failed before delivery:`) ||
-          event.message.startsWith(
-            `${taskPrefix}produced unstable output and was rejected.`,
-          ))),
+      event.settlementTaskId === starterTaskId &&
+      event.settlementWorkloadId === "interactive-chat" &&
+      (event.kind === "success" || event.kind === "failure") &&
+      isSettlementLedgerPayloadValid(event),
   );
 }
 
@@ -1070,6 +1146,39 @@ const ENDING_DETAILS: Readonly<
   },
 };
 
+function endingLedgerMessage(endingId: RunEndingId): string {
+  return `Run ended: ${ENDING_DETAILS[endingId].title}. Review the evidence-backed postmortem in Career or Inspect before restarting.`;
+}
+
+function causalEvidenceMatches(
+  left: CausalEvidence | undefined,
+  right: CausalEvidence,
+): boolean {
+  return left !== undefined && JSON.stringify(left) === JSON.stringify(right);
+}
+
+/**
+ * A stale ending is retained only when the retained event still carries the
+ * exact engine message and the causal payload recomputes from the same state.
+ * Allowed IDs and a shape-valid event are not enough: they permit swapping a
+ * different ending identity onto an unrelated causal event.
+ */
+function hasMatchingEndingEvidence(
+  state: SimulationState,
+  ending: RunEnding | null,
+): boolean {
+  if (ending === null) return false;
+  const detail = ENDING_DETAILS[ending.id];
+  const event = state.ledger.find((entry) => entry.id === ending.eventId);
+  return (
+    event !== undefined &&
+    event.kind === (detail.outcome === "success" ? "success" : "failure") &&
+    event.message === endingLedgerMessage(ending.id) &&
+    event.tick === ending.reachedAtTick &&
+    causalEvidenceMatches(event.causal, endingCausalEvidence(state, ending.id))
+  );
+}
+
 function privateAssessmentFor(
   state: SimulationState,
   coverage = state.career.evaluation.coverage,
@@ -1610,8 +1719,25 @@ export function endingNextRunResponse(endingId: RunEndingId): string {
 function withUpgradeNotice(
   state: SimulationState,
   notice: UpgradeNotice,
+  eventMetadata: Partial<
+    Pick<
+      LedgerEvent,
+      | "capitalPurchaseId"
+      | "capitalPurchaseType"
+      | "capitalPurchaseCost"
+      | "expansionActivationId"
+      | "modulePlacementId"
+      | "modulePlacementSlotId"
+      | "modulePlacementFromSlotId"
+      | "moduleRemovalId"
+      | "moduleRemovalSlotId"
+    >
+  > = {},
 ): SimulationState {
-  return appendEvent({ ...state, lastUpgradeNotice: notice }, notice);
+  return appendEvent(
+    { ...state, lastUpgradeNotice: notice },
+    { ...notice, ...eventMetadata },
+  );
 }
 
 function recalculate(state: SimulationState): SimulationState {
@@ -4086,10 +4212,18 @@ function applyValidCommand(
               }
             : state.firstSession,
       });
-      return withUpgradeNotice(next, {
-        kind: "info",
-        message: `${module.name} equipped in ${slot.name}. Observed delta: ${previous.throughputPerMinute}/m → ${next.metrics.throughputPerMinute}/m throughput, ${previous.latencySeconds}s → ${next.metrics.latencySeconds}s latency, ${previous.memoryUsed} GB → ${next.metrics.memoryUsed} GB memory, ${previous.predictedQuality} → ${next.metrics.predictedQuality} predicted quality.`,
-      });
+      return withUpgradeNotice(
+        next,
+        {
+          kind: "info",
+          message: `${module.name} equipped in ${slot.name}. Observed delta: ${previous.throughputPerMinute}/m → ${next.metrics.throughputPerMinute}/m throughput, ${previous.latencySeconds}s → ${next.metrics.latencySeconds}s latency, ${previous.memoryUsed} GB → ${next.metrics.memoryUsed} GB memory, ${previous.predictedQuality} → ${next.metrics.predictedQuality} predicted quality.`,
+        },
+        {
+          modulePlacementId: module.id,
+          modulePlacementSlotId: slot.id,
+          modulePlacementFromSlotId: command.fromSlotId,
+        },
+      );
     }
     case "SET_WORKLOAD": {
       const workload = findWorkload(command.workloadId);
@@ -4150,6 +4284,11 @@ function applyValidCommand(
           {
             kind: "success",
             message: `${item.name} purchased for ${formatExactCurrency(item.purchaseCost)} and is now owned. Equip it to apply its constraints; purchase deducted exactly once.`,
+          },
+          {
+            capitalPurchaseId: item.id,
+            capitalPurchaseType: "hardware",
+            capitalPurchaseCost: item.purchaseCost,
           },
         ),
         item.purchaseCost,
@@ -4225,10 +4364,18 @@ function applyValidCommand(
             : state.firstSession,
       };
       return recordCapitalCommitment(
-        withUpgradeNotice(purchased, {
-          kind: "success",
-          message: modulePurchaseLedgerMessage(item.id)!,
-        }),
+        withUpgradeNotice(
+          purchased,
+          {
+            kind: "success",
+            message: modulePurchaseLedgerMessage(item.id)!,
+          },
+          {
+            capitalPurchaseId: item.id,
+            capitalPurchaseType: "module",
+            capitalPurchaseCost: item.purchaseCost,
+          },
+        ),
         item.purchaseCost,
       );
     }
@@ -4263,6 +4410,11 @@ function applyValidCommand(
             kind: "success",
             message: `${item.name} purchased for ${formatExactCurrency(item.purchaseCost)} and is now owned. Activate it explicitly; its three new positions start empty and no module was bought or filled automatically.`,
           },
+          {
+            capitalPurchaseId: item.id,
+            capitalPurchaseType: "expansion",
+            capitalPurchaseCost: item.purchaseCost,
+          },
         ),
         item.purchaseCost,
       );
@@ -4292,10 +4444,14 @@ function applyValidCommand(
           baselineMetrics: state.metrics,
           baselineLabel: "Before pipeline expansion",
         });
-        return withUpgradeNotice(next, {
-          kind: "success",
-          message: `${item.name} activated: six usable process positions in one ordered pipeline. Three new positions are empty/bypassed.`,
-        });
+        return withUpgradeNotice(
+          next,
+          {
+            kind: "success",
+            message: `${item.name} activated: six usable process positions in one ordered pipeline. Three new positions are empty/bypassed.`,
+          },
+          { expansionActivationId: item.id },
+        );
       }
       if (state.activeExpansionId === null) return state;
       const occupiedExtra = state.slots.some(
@@ -4338,10 +4494,14 @@ function applyValidCommand(
         baselineLabel: "Before module bypass",
         failedModuleId: null,
       });
-      return withUpgradeNotice(next, {
-        kind: "info",
-        message: `${item.name} removed from ${slot.name}; the empty position is bypassed and the owned module remains in inventory.`,
-      });
+      return withUpgradeNotice(
+        next,
+        {
+          kind: "info",
+          message: `${item.name} removed from ${slot.name}; the empty position is bypassed and the owned module remains in inventory.`,
+        },
+        { moduleRemovalId: item.id, moduleRemovalSlotId: slot.id },
+      );
     }
     case "SET_COMPUTE_ALLOCATION":
       return recalculate({
@@ -4420,6 +4580,9 @@ function applyValidCommand(
         {
           kind: "info",
           message: `${count} ${getWorkload(state.workloadId).name.toLowerCase()} job${count === 1 ? "" : "s"} queued.`,
+          queuedTaskIds: tasks.map((task) => task.id),
+          queuedTaskWorkloadIds: tasks.map((task) => task.workloadId),
+          queuedTaskQuotes: tasks.map((task) => task.lockedGrossQuote),
         },
       );
     }
@@ -5642,6 +5805,12 @@ function advanceTickQuantum(
     next = appendEvent(next, {
       kind: "success",
       settlementTaskId: task.id,
+      settlementWorkloadId: task.workloadId,
+      settlementLockedGrossQuote: task.lockedGrossQuote,
+      settlementGrossPayout: grossPayout,
+      settlementOperatingCost: operatingCost,
+      settlementOperatingCostPaid: operatingCostPaid,
+      settlementNetChange: round(moneyAfter - moneyBeforeSettlement, 3),
       message: `${workload.name} task ${task.id} completed; ${settlementCurrency(task.lockedGrossQuote)} gross payout earned before operating cost (locked quote) − ${settlementCurrency(operatingCost)} configured actual cost = ${signedSettlementCurrency(economicNet)} net. ${unpaidOperatingCost > 0 ? `${settlementCurrency(operatingCostPaid)} was paid and ${settlementCurrency(unpaidOperatingCost)} remains unpaid because cash cannot go below ${settlementCurrency(0)}.` : "The configured cost was paid in full."} Future ${workload.name} demand is lower and recovers with simulated time.`,
     });
   } else {
@@ -5649,6 +5818,12 @@ function advanceTickQuantum(
       kind: "failure",
       settlementTaskId: task.id,
       settlementFailureCause: settlementFailureCause ?? undefined,
+      settlementWorkloadId: task.workloadId,
+      settlementLockedGrossQuote: task.lockedGrossQuote,
+      settlementGrossPayout: grossPayout,
+      settlementOperatingCost: operatingCost,
+      settlementOperatingCostPaid: operatingCostPaid,
+      settlementNetChange: round(moneyAfter - moneyBeforeSettlement, 3),
       message: missingModel
         ? `${workload.name} task ${task.id} failed before delivery: no model stage produced an answer. Locked quote paid ${settlementCurrency(0)} gross; configured actual cost was ${settlementCurrency(operatingCost)}. ${unpaidOperatingCost > 0 ? `${settlementCurrency(operatingCostPaid)} was paid and ${settlementCurrency(unpaidOperatingCost)} remains unpaid because cash cannot go below ${settlementCurrency(0)}.` : "The configured cost was paid in full."}`
         : memoryFailure
@@ -5932,10 +6107,8 @@ function hasRetainedCausalLedgerEvidence(
   ).length;
   if (evaluation.modelSwitches > modelSwitchEvents) return false;
 
-  const capitalCommitmentEvents = ledger.filter(
-    (event) =>
-      event.kind === "success" &&
-      EXACT_CAPITAL_PURCHASE_LEDGER_MESSAGES.has(event.message),
+  const capitalCommitmentEvents = ledger.filter((event) =>
+    isCapitalPurchaseLedgerEvidence(event),
   ).length;
   if (evaluation.capitalCommitments > capitalCommitmentEvents) return false;
 
@@ -6177,6 +6350,160 @@ function isQueuedTaskValid(
   );
 }
 
+function isSettlementLedgerPayloadValid(event: LedgerEvent): boolean {
+  const fields = [
+    event.settlementWorkloadId,
+    event.settlementLockedGrossQuote,
+    event.settlementGrossPayout,
+    event.settlementOperatingCost,
+    event.settlementOperatingCostPaid,
+    event.settlementNetChange,
+  ];
+  if (fields.every((field) => field === undefined)) return true;
+  if (
+    event.settlementTaskId === undefined ||
+    fields.some((field) => field === undefined) ||
+    event.kind === "info" ||
+    event.kind === "warning"
+  )
+    return false;
+  const workloadId = event.settlementWorkloadId;
+  const lockedGrossQuote = event.settlementLockedGrossQuote;
+  const grossPayout = event.settlementGrossPayout;
+  const operatingCost = event.settlementOperatingCost;
+  const operatingCostPaid = event.settlementOperatingCostPaid;
+  const netChange = event.settlementNetChange;
+  const workload = findWorkload(workloadId);
+  return (
+    workload !== undefined &&
+    workloadId !== undefined &&
+    lockedGrossQuote !== undefined &&
+    grossPayout !== undefined &&
+    operatingCost !== undefined &&
+    operatingCostPaid !== undefined &&
+    netChange !== undefined &&
+    Number.isFinite(lockedGrossQuote) &&
+    lockedGrossQuote >= 0 &&
+    lockedGrossQuote <= workload.rewardMoney &&
+    Number.isFinite(grossPayout) &&
+    grossPayout >= 0 &&
+    grossPayout <= lockedGrossQuote &&
+    Number.isFinite(operatingCost) &&
+    operatingCost >= 0 &&
+    Number.isFinite(operatingCostPaid) &&
+    operatingCostPaid >= 0 &&
+    operatingCostPaid <= operatingCost &&
+    Number.isFinite(netChange)
+  );
+}
+
+function isCapitalPurchaseLedgerPayloadValid(event: LedgerEvent): boolean {
+  const fields = [
+    event.capitalPurchaseId,
+    event.capitalPurchaseType,
+    event.capitalPurchaseCost,
+  ];
+  if (fields.every((field) => field === undefined)) return true;
+  return (
+    fields.every((field) => field !== undefined) &&
+    Number.isFinite(event.capitalPurchaseCost) &&
+    isCapitalPurchaseLedgerEvidence(event)
+  );
+}
+
+function isExpansionActivationLedgerPayloadValid(event: LedgerEvent): boolean {
+  if (event.expansionActivationId === undefined) return true;
+  const item = findPipelineExpansion(event.expansionActivationId);
+  return (
+    event.kind === "success" &&
+    item !== undefined &&
+    event.message === expansionActivationLedgerMessage(item.id)
+  );
+}
+
+function isModuleTopologyLedgerPayloadValid(event: LedgerEvent): boolean {
+  const placementFields = [
+    event.modulePlacementId,
+    event.modulePlacementSlotId,
+    event.modulePlacementFromSlotId,
+  ];
+  const removalFields = [event.moduleRemovalId, event.moduleRemovalSlotId];
+  if (
+    placementFields.every((field) => field === undefined) &&
+    removalFields.every((field) => field === undefined)
+  )
+    return true;
+  const hasPlacement = placementFields.some((field) => field !== undefined);
+  const hasRemoval = removalFields.some((field) => field !== undefined);
+  if (
+    event.kind !== "info" ||
+    (event.modulePlacementId === undefined) !==
+      (event.modulePlacementSlotId === undefined) ||
+    (event.moduleRemovalId === undefined) !==
+      (event.moduleRemovalSlotId === undefined) ||
+    (hasPlacement && hasRemoval)
+  )
+    return false;
+  if (event.modulePlacementId !== undefined) {
+    const module = findModule(event.modulePlacementId);
+    const slot =
+      event.modulePlacementSlotId === undefined
+        ? undefined
+        : findSlot(event.modulePlacementSlotId);
+    const fromSlot =
+      event.modulePlacementFromSlotId === undefined
+        ? undefined
+        : findSlot(event.modulePlacementFromSlotId);
+    return (
+      module !== undefined &&
+      slot !== undefined &&
+      slot.type === "process" &&
+      module.slotTypes.includes(slot.type) &&
+      (fromSlot === undefined ||
+        (fromSlot.id !== slot.id && fromSlot.type === "process")) &&
+      event.message.startsWith(`${module.name} equipped in ${slot.name}.`)
+    );
+  }
+  const module =
+    event.moduleRemovalId === undefined
+      ? undefined
+      : findModule(event.moduleRemovalId);
+  const slot =
+    event.moduleRemovalSlotId === undefined
+      ? undefined
+      : findSlot(event.moduleRemovalSlotId);
+  return (
+    module !== undefined &&
+    slot !== undefined &&
+    slot.type === "process" &&
+    event.message.startsWith(
+      `${module.name} removed from ${slot.name}; the empty position is bypassed`,
+    )
+  );
+}
+
+function isQueueLedgerPayloadValid(event: LedgerEvent): boolean {
+  const ids = event.queuedTaskIds;
+  const workloadIds = event.queuedTaskWorkloadIds;
+  const quotes = event.queuedTaskQuotes;
+  if (ids === undefined && workloadIds === undefined && quotes === undefined)
+    return true;
+  return (
+    event.kind === "info" &&
+    Array.isArray(ids) &&
+    Array.isArray(workloadIds) &&
+    Array.isArray(quotes) &&
+    ids.length > 0 &&
+    ids.length <= MAX_QUEUED_TASKS &&
+    ids.length === workloadIds.length &&
+    ids.length === quotes.length &&
+    ids.every((id) => isText(id, 128) && id.length > 0) &&
+    new Set(ids).size === ids.length &&
+    workloadIds.every((id) => findWorkload(id) !== undefined) &&
+    quotes.every((quote) => Number.isFinite(quote) && quote >= 0)
+  );
+}
+
 function isStateStructurallyValid(value: unknown): value is SimulationState {
   if (typeof value !== "object" || value === null) return false;
   const state = value as SimulationState;
@@ -6394,6 +6721,11 @@ function isStateStructurallyValid(value: unknown): value is SimulationState {
             (event.kind === "failure" &&
               event.settlementTaskId !== undefined &&
               isJobSettlementFailureCause(event.settlementFailureCause))) &&
+          isSettlementLedgerPayloadValid(event) &&
+          isCapitalPurchaseLedgerPayloadValid(event) &&
+          isExpansionActivationLedgerPayloadValid(event) &&
+          isModuleTopologyLedgerPayloadValid(event) &&
+          isQueueLedgerPayloadValid(event) &&
           (event.directCause === undefined || isText(event.directCause, 800)) &&
           (event.contributingCondition === undefined ||
             isText(event.contributingCondition, 800)) &&
@@ -6425,6 +6757,104 @@ function finiteOr(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0
     ? value
     : fallback;
+}
+
+function isNonNegativeFinite(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function isNonNegativeSafeInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) >= 0;
+}
+
+function isKnownUniqueIdArray(
+  value: unknown,
+  lookup: (id: string) => unknown,
+): value is readonly string[] {
+  return (
+    Array.isArray(value) &&
+    value.every((id) => typeof id === "string" && lookup(id) !== undefined) &&
+    new Set(value).size === value.length
+  );
+}
+
+/**
+ * Schema 3/4 are the only migrations that intentionally coerce old aggregate
+ * fields. Validate their complete required source shape first so a supported
+ * label cannot turn an invalid type into a plausible defaulted save.
+ */
+function isLegacyPipelineToyRecordValid(
+  record: Record<string, unknown>,
+): boolean {
+  const schemaVersion = record.schemaVersion;
+  if (schemaVersion !== 3 && schemaVersion !== 4) return false;
+  if (
+    !isNonNegativeSafeInteger(record.seed) ||
+    record.seed === 0 ||
+    record.seed > 0xffff_ffff ||
+    !isNonNegativeSafeInteger(record.rngState) ||
+    record.rngState === 0 ||
+    record.rngState > 0xffff_ffff ||
+    !isNonNegativeSafeInteger(record.tick) ||
+    typeof record.hardwareId !== "string" ||
+    findHardware(record.hardwareId) === undefined ||
+    typeof record.workloadId !== "string" ||
+    findWorkload(record.workloadId) === undefined ||
+    typeof record.branchEnabled !== "boolean" ||
+    typeof record.computeAllocation !== "number" ||
+    !Number.isInteger(record.computeAllocation) ||
+    record.computeAllocation < 25 ||
+    record.computeAllocation > 100 ||
+    typeof record.memoryReserve !== "number" ||
+    !Number.isInteger(record.memoryReserve) ||
+    record.memoryReserve < 0 ||
+    record.memoryReserve > 30 ||
+    safeLegacySlots(record.slots) === null
+  )
+    return false;
+
+  const resources = record.resources;
+  if (
+    typeof resources !== "object" ||
+    resources === null ||
+    !isNonNegativeFinite((resources as Record<string, unknown>).money) ||
+    !isNonNegativeFinite((resources as Record<string, unknown>).timeHours) ||
+    !isNonNegativeFinite(
+      (resources as Record<string, unknown>).electricityKwh,
+    ) ||
+    !isNonNegativeFinite((resources as Record<string, unknown>).reputation)
+  )
+    return false;
+
+  const jobs = record.jobs;
+  if (
+    typeof jobs !== "object" ||
+    jobs === null ||
+    !isNonNegativeSafeInteger((jobs as Record<string, unknown>).queued) ||
+    ((jobs as Record<string, unknown>).queued as number) > MAX_QUEUED_TASKS ||
+    !isNonNegativeSafeInteger((jobs as Record<string, unknown>).completed) ||
+    !isNonNegativeSafeInteger((jobs as Record<string, unknown>).failed) ||
+    !isNonNegativeFinite((jobs as Record<string, unknown>).processingCarry) ||
+    ((jobs as Record<string, unknown>).processingCarry as number) >= 1 ||
+    typeof (jobs as Record<string, unknown>).paused !== "boolean" ||
+    !isNonNegativeFinite((jobs as Record<string, unknown>).grossEarned) ||
+    !isNonNegativeFinite((jobs as Record<string, unknown>).operatingCostsPaid)
+  )
+    return false;
+
+  if (schemaVersion === 4) {
+    const ownedHardwareIds = record.ownedHardwareIds;
+    const ownedModuleIds = record.ownedModuleIds;
+    if (
+      !isKnownUniqueIdArray(ownedHardwareIds, findHardware) ||
+      !isKnownUniqueIdArray(ownedModuleIds, findModule) ||
+      !ownedHardwareIds.includes(STARTER_HARDWARE_ID) ||
+      !ownedHardwareIds.includes(record.hardwareId) ||
+      !starterModuleIds.every((id) => ownedModuleIds.includes(id))
+    )
+      return false;
+  }
+  return true;
 }
 
 function safeLegacySlots(value: unknown): readonly PipelineSlotState[] | null {
@@ -6489,13 +6919,285 @@ function normalizeUntrustedLedgerState(
   };
 }
 
+function queuedJobsLedgerMessage(
+  count: number,
+  workloadId: string,
+): string | null {
+  const workload = findWorkload(workloadId);
+  if (!workload || !Number.isSafeInteger(count) || count <= 0) return null;
+  return `${count} ${workload.name.toLowerCase()} job${count === 1 ? "" : "s"} queued.`;
+}
+
+function hasCorroboratedQueuedTasks(state: SimulationState): boolean {
+  const tasks = [
+    ...(state.jobs.activeTask ? [state.jobs.activeTask] : []),
+    ...state.jobs.waitingTasks,
+  ];
+  if (tasks.length === 0) return state.jobs.queued === 0;
+  if (
+    state.eventSequence > MAX_LEDGER_EVENTS ||
+    state.ledger.length !== state.eventSequence ||
+    state.jobs.queued !== tasks.length
+  )
+    return false;
+
+  const taskIds = new Set<string>();
+  for (const task of tasks) {
+    const sequence = /^task-(\d+)-(\d+)$/.exec(task.id);
+    if (
+      sequence === null ||
+      Number(sequence[1]) !== task.acceptedAtTick ||
+      !Number.isSafeInteger(Number(sequence[2])) ||
+      Number(sequence[2]) < 1 ||
+      taskIds.has(task.id)
+    )
+      return false;
+    taskIds.add(task.id);
+  }
+
+  const queueEvents = state.ledger.filter(
+    (event) =>
+      event.kind === "info" &&
+      event.queuedTaskIds !== undefined &&
+      event.queuedTaskWorkloadIds !== undefined &&
+      event.queuedTaskQuotes !== undefined,
+  );
+  if (queueEvents.length === 0) return false;
+  return tasks.every((task) =>
+    queueEvents.some((event) => {
+      const ids = event.queuedTaskIds ?? [];
+      const workloadIds = event.queuedTaskWorkloadIds ?? [];
+      const quotes = event.queuedTaskQuotes ?? [];
+      const index = ids.indexOf(task.id);
+      const message = queuedJobsLedgerMessage(ids.length, task.workloadId);
+      return (
+        index >= 0 &&
+        workloadIds[index] === task.workloadId &&
+        event.tick === task.acceptedAtTick &&
+        message !== null &&
+        event.message === message &&
+        quotes[index] === task.lockedGrossQuote
+      );
+    }),
+  );
+}
+
+function taskSequenceFromId(id: string): number | null {
+  const match = /^task-\d+-(\d+)$/.exec(id);
+  if (!match) return null;
+  const sequence = Number(match[1]);
+  return Number.isSafeInteger(sequence) && sequence > 0 ? sequence : null;
+}
+
+function safeNextTaskSequence(state: SimulationState): number {
+  const ids = [
+    ...(state.jobs.activeTask ? [state.jobs.activeTask.id] : []),
+    ...state.jobs.waitingTasks.map((task) => task.id),
+    ...state.ledger.flatMap((event) =>
+      event.settlementTaskId ? [event.settlementTaskId] : [],
+    ),
+  ];
+  const maximum = ids.reduce((current, id) => {
+    const sequence = taskSequenceFromId(id);
+    return sequence === null ? current : Math.max(current, sequence);
+  }, 0);
+  return Math.max(1, maximum + 1);
+}
+
+function matchingSettlementEvent(
+  state: SimulationState,
+  settlement: SimulationState["lastSettlement"],
+): LedgerEvent | undefined {
+  if (!settlement) return undefined;
+  return state.ledger.find(
+    (event) =>
+      event.settlementTaskId === settlement.taskId &&
+      event.tick === settlement.tick &&
+      (event.kind === "success" || event.kind === "failure") &&
+      isSettlementLedgerPayloadValid(event) &&
+      event.settlementWorkloadId === settlement.workloadId &&
+      event.settlementLockedGrossQuote === settlement.lockedGrossQuote &&
+      event.settlementGrossPayout === settlement.grossPayout &&
+      event.settlementOperatingCost === settlement.operatingCost &&
+      event.settlementNetChange === settlement.netChange,
+  );
+}
+
+function hasCompleteRetainedLedger(state: SimulationState): boolean {
+  return (
+    state.eventSequence <= MAX_LEDGER_EVENTS &&
+    state.ledger.length === state.eventSequence
+  );
+}
+
+function reconstructUnsealedJobs(
+  state: SimulationState,
+  fallback: SimulationState,
+): {
+  jobs: SimulationState["jobs"];
+  lastSettlement: SimulationState["lastSettlement"];
+} {
+  const completeLedger = hasCompleteRetainedLedger(state);
+  const settlementEvents = state.ledger.filter(
+    (event) =>
+      event.settlementTaskId !== undefined &&
+      (event.kind === "success" || event.kind === "failure"),
+  );
+  const corroboratedSettlements = completeLedger
+    ? settlementEvents.filter(
+        (event) =>
+          isSettlementLedgerPayloadValid(event) &&
+          event.settlementWorkloadId !== undefined &&
+          event.settlementLockedGrossQuote !== undefined &&
+          event.settlementGrossPayout !== undefined &&
+          event.settlementOperatingCost !== undefined &&
+          event.settlementOperatingCostPaid !== undefined &&
+          event.settlementNetChange !== undefined,
+      )
+    : [];
+  const completed = corroboratedSettlements.filter(
+    (event) => event.kind === "success",
+  ).length;
+  const failed = corroboratedSettlements.filter(
+    (event) => event.kind === "failure",
+  ).length;
+  const tasksCorroborated = completeLedger && hasCorroboratedQueuedTasks(state);
+  const lastSettlement = matchingSettlementEvent(state, state.lastSettlement)
+    ? state.lastSettlement && {
+        ...state.lastSettlement,
+        ledgerEventId: undefined,
+      }
+    : null;
+  const jobs = {
+    ...fallback.jobs,
+    completed,
+    failed,
+    grossEarned: completeLedger
+      ? round(
+          corroboratedSettlements.reduce(
+            (total, event) => total + (event.settlementGrossPayout ?? 0),
+            0,
+          ),
+          3,
+        )
+      : 0,
+    operatingCostsPaid: completeLedger
+      ? round(
+          corroboratedSettlements.reduce(
+            (total, event) => total + (event.settlementOperatingCostPaid ?? 0),
+            0,
+          ),
+          3,
+        )
+      : 0,
+    activeTask: tasksCorroborated ? state.jobs.activeTask : null,
+    waitingTasks: tasksCorroborated ? state.jobs.waitingTasks : [],
+    queued: tasksCorroborated ? state.jobs.queued : 0,
+    processingCarry: tasksCorroborated
+      ? (state.jobs.activeTask?.progress ?? 0)
+      : 0,
+    paused: state.jobs.paused,
+    nextTaskSequence: safeNextTaskSequence(state),
+  };
+  return { jobs, lastSettlement };
+}
+
+function reconstructUnsealedFirstSession(
+  state: SimulationState,
+  fallback: SimulationState,
+  ownedModuleIds: readonly string[],
+  tasksCorroborated: boolean,
+): SimulationState["firstSession"] {
+  const progress = state.firstSession;
+  if (isLegacyFirstSessionProgress(progress)) return progress;
+  if (!isFirstSessionProgressValid(progress)) return fallback.firstSession;
+  if (progress.step === "queue-starter") return fallback.firstSession;
+  if (progress.step === "observe-settlement")
+    return tasksCorroborated ? progress : fallback.firstSession;
+  const hasStarterSettlement =
+    progress.starterTaskId !== null &&
+    progress.observedSettlementTaskId === progress.starterTaskId &&
+    hasRecordedStarterSettlement(state, progress.starterTaskId);
+  if (!hasStarterSettlement) return fallback.firstSession;
+  const hasPurchase =
+    progress.purchasedModuleId === null ||
+    (ownedModuleIds.includes(progress.purchasedModuleId) &&
+      hasRecordedFirstSessionPurchase(state));
+  if (!hasPurchase)
+    return {
+      ...progress,
+      step: "buy-and-install",
+      purchasedModuleId: null,
+    };
+  return {
+    ...progress,
+    // Completion is corroborated by the retained starter settlement, paid
+    // purchase, and the pre-restore installed topology check. The slot map
+    // itself is not authority and is rebuilt canonically below.
+    step: progress.step,
+  };
+}
+
+function canonicalRecoverySlots(
+  fallback: SimulationState,
+  activeExpansionId: string | null,
+  state: Pick<SimulationState, "ledger">,
+  ownedModuleIds: readonly string[],
+): readonly PipelineSlotState[] {
+  const topology = activeExpansionId === null ? starterSlots : slots;
+  const recovered = topology.map((slot) => {
+    const baseline = fallback.slots.find((entry) => entry.slotId === slot.id);
+    return baseline ?? { slotId: slot.id, moduleId: null };
+  });
+  const slotState = (slotId: string) =>
+    recovered.find((entry) => entry.slotId === slotId);
+  for (const event of state.ledger) {
+    if (!isModuleTopologyLedgerPayloadValid(event)) continue;
+    if (
+      event.moduleRemovalId !== undefined &&
+      event.moduleRemovalSlotId !== undefined
+    ) {
+      const slot = slotState(event.moduleRemovalSlotId);
+      if (slot?.moduleId === event.moduleRemovalId) slot.moduleId = null;
+      continue;
+    }
+    if (
+      event.modulePlacementId === undefined ||
+      event.modulePlacementSlotId === undefined ||
+      !ownedModuleIds.includes(event.modulePlacementId)
+    )
+      continue;
+    const destination = slotState(event.modulePlacementSlotId);
+    if (!destination) continue;
+    const source =
+      event.modulePlacementFromSlotId === undefined
+        ? undefined
+        : slotState(event.modulePlacementFromSlotId);
+    if (event.modulePlacementFromSlotId !== undefined) {
+      if (!source || source.moduleId !== event.modulePlacementId) continue;
+      const displaced = destination.moduleId;
+      destination.moduleId = event.modulePlacementId;
+      source.moduleId = displaced;
+      continue;
+    }
+    const previous = recovered.find(
+      (entry) =>
+        entry.moduleId === event.modulePlacementId &&
+        entry.slotId !== destination.slotId,
+    );
+    if (previous) previous.moduleId = destination.moduleId;
+    destination.moduleId = event.modulePlacementId;
+  }
+  return recovered;
+}
+
 /**
- * An unsealed snapshot can retain work/accounting history, but its mutable
- * ownership and progression projections are not proof of a purchase or
- * unlock. Keep only ownership backed by the bounded purchase ledger and reset
- * the remaining progression to the seed-specific safe baseline. This keeps
- * the normal stale-save path useful without treating a shape-valid forgery as
- * authoritative.
+ * Rebuild an unsealed snapshot from the safe seed baseline. Every retained
+ * progression group has an explicit engine-owned corroborator: exact purchase
+ * text for inventory, purchase plus activation for expanded topology, typed
+ * settlement/queue records for task accounting, and recomputed causal evidence
+ * for evaluation/ending identity. Shape-valid projections are never copied as
+ * authority merely because they pass the structural validator.
  */
 function normalizeUnsealedProgressionState(
   state: SimulationState,
@@ -6508,9 +7210,12 @@ function normalizeUnsealedProgressionState(
       return (
         item !== undefined &&
         id !== STARTER_HARDWARE_ID &&
-        hasRecordedCapitalPurchase(state, [
-          hardwarePurchaseLedgerMessage(item.id),
-        ])
+        hasRecordedCapitalPurchase(state, {
+          id: item.id,
+          kind: "hardware",
+          cost: item.purchaseCost,
+          messages: [hardwarePurchaseLedgerMessage(item.id)],
+        })
       );
     }),
   ];
@@ -6521,12 +7226,17 @@ function normalizeUnsealedProgressionState(
       return (
         item !== undefined &&
         !starterModuleIds.includes(id) &&
-        hasRecordedCapitalPurchase(state, [
-          modulePurchaseLedgerMessage(item.id),
-          modulePurchaseLedgerMessage(item.id, (amount) =>
-            formatCurrency(amount, 2),
-          ),
-        ])
+        hasRecordedCapitalPurchase(state, {
+          id: item.id,
+          kind: "module",
+          cost: item.purchaseCost,
+          messages: [
+            modulePurchaseLedgerMessage(item.id),
+            modulePurchaseLedgerMessage(item.id, (amount) =>
+              formatCurrency(amount, 2),
+            ),
+          ],
+        })
       );
     }),
   ];
@@ -6534,64 +7244,107 @@ function normalizeUnsealedProgressionState(
     const item = findPipelineExpansion(id);
     return (
       item !== undefined &&
-      hasRecordedCapitalPurchase(state, [
-        expansionPurchaseLedgerMessage(item.id),
-      ])
+      hasRecordedCapitalPurchase(state, {
+        id: item.id,
+        kind: "expansion",
+        cost: item.purchaseCost,
+        messages: [expansionPurchaseLedgerMessage(item.id)],
+      })
     );
   });
-  const safeHardwareId = ownedHardwareIds.includes(state.hardwareId)
-    ? state.hardwareId
-    : STARTER_HARDWARE_ID;
-  const safeActiveExpansionId =
+  const activeExpansionItem =
     state.activeExpansionId !== null &&
     ownedExpansionIds.includes(state.activeExpansionId)
-      ? state.activeExpansionId
+      ? findPipelineExpansion(state.activeExpansionId)
+      : undefined;
+  const safeActiveExpansionId =
+    activeExpansionItem &&
+    hasExactSuccessLedgerMessage(
+      state,
+      expansionActivationLedgerMessage(activeExpansionItem.id),
+      activeExpansionItem.id,
+    )
+      ? activeExpansionItem.id
       : null;
-  const safeSlots = state.slots.map((slot) => {
-    const fallbackSlot = fallback.slots.find(
-      (candidate) => candidate.slotId === slot.slotId,
-    );
-    if (slot.moduleId === null || ownedModuleIds.includes(slot.moduleId))
-      return slot;
-    return fallbackSlot ?? { slotId: slot.slotId, moduleId: null };
-  });
+  const { jobs, lastSettlement } = reconstructUnsealedJobs(state, fallback);
   const sourceCareer = state.career;
+  const causalEvidenceCorroborated =
+    isEvaluationStateValid(sourceCareer.evaluation) &&
+    hasRetainedCausalLedgerEvidence(state);
+  const endingCorroborated =
+    causalEvidenceCorroborated &&
+    hasMatchingEndingEvidence(state, sourceCareer.runEnding);
+  const safeEnding = endingCorroborated ? sourceCareer.runEnding : null;
+  const safeMeta = safeEnding
+    ? {
+        ...fallback.meta,
+        unlockedDiagnosticIds: [safeEnding.diagnosticUnlockId],
+        completedEndingIds: [safeEnding.id],
+      }
+    : fallback.meta;
   const safeCareer: CareerState = {
     ...fallback.career,
-    // These counters are accounting, not unlock authority. Preserve their
-    // values while resetting savings, route progression, and model unlocks;
-    // causal/evaluation fields remain available to the repair checks below.
-    electricityCostsIncurred: sourceCareer.electricityCostsIncurred,
-    operatingCostsIncurred: sourceCareer.operatingCostsIncurred,
-    costsPaid: sourceCareer.costsPaid,
-    unpaidCosts: sourceCareer.unpaidCosts,
-    freelanceHours: sourceCareer.freelanceHours,
-    freelanceGross: sourceCareer.freelanceGross,
-    // The existing causal/evaluation repair below must inspect these fields
-    // before deciding whether retained ledger evidence can clear them.
-    evaluation: sourceCareer.evaluation,
-    runEnding: sourceCareer.runEnding,
+    evaluation: causalEvidenceCorroborated
+      ? sourceCareer.evaluation
+      : fallback.career.evaluation,
+    runEnding: safeEnding,
   };
+  const firstSession = reconstructUnsealedFirstSession(
+    state,
+    fallback,
+    ownedModuleIds,
+    jobs.queued > 0 || state.firstSession.step !== "observe-settlement",
+  );
+  const causalEvidenceSnapshot =
+    state.causalEvidenceSnapshot !== undefined &&
+    isCausalEvidenceSnapshotShapeValid(state.causalEvidenceSnapshot) &&
+    evaluationStatesMatch(
+      state.causalEvidenceSnapshot.evaluation,
+      safeCareer.evaluation,
+    )
+      ? state.causalEvidenceSnapshot
+      : undefined;
   return {
     ...state,
-    hardwareId: safeHardwareId,
+    hardwareId: STARTER_HARDWARE_ID,
     ownedHardwareIds: [...new Set(ownedHardwareIds)],
     ownedModuleIds: [...new Set(ownedModuleIds)],
     ownedExpansionIds: [...new Set(ownedExpansionIds)],
     activeExpansionId: safeActiveExpansionId,
     unlockedWorkloadIds: fallback.unlockedWorkloadIds,
     workloadDemand: fallback.workloadDemand,
-    workloadId: findWorkload(state.workloadId)
-      ? state.workloadId
-      : fallback.workloadId,
-    slots: safeSlots,
+    // Workload selection is a mutable projection, not a retained transition
+    // record. Rebuild it from the canonical starter baseline at this trust
+    // boundary; queue/task identity is retained only through the typed ledger
+    // corroborator above.
+    workloadId: fallback.workloadId,
+    slots: canonicalRecoverySlots(
+      fallback,
+      safeActiveExpansionId,
+      state,
+      ownedModuleIds,
+    ),
     branchEnabled: fallback.branchEnabled,
+    // Core runtime controls remain bounded, structurally validated state. They
+    // do not authorize progression, ownership, or causal evidence, and keeping
+    // them preserves a paused stale save across a worker/PWA restart.
+    computeAllocation: state.computeAllocation,
+    memoryReserve: state.memoryReserve,
     career: safeCareer,
-    meta: sourceCareer.runEnding === null ? fallback.meta : state.meta,
+    research: fallback.research,
+    hypeFear: fallback.hypeFear,
+    laboratory: fallback.laboratory,
+    meta: safeMeta,
+    firstSession,
+    jobs,
+    lastSettlement,
     metrics: fallback.metrics,
     baselineMetrics: null,
     baselineLabel: null,
     failedModuleId: null,
+    lastWarning: fallback.lastWarning,
+    lastUpgradeNotice: null,
+    causalEvidenceSnapshot,
   };
 }
 
@@ -6716,6 +7469,7 @@ export function restoreSimulationState(
     if (!originalIntegrityValid)
       candidate = normalizeUntrustedLedgerState(candidate);
     let structurallyValid = isStateStructurallyValid(candidate);
+    let unsealedCausalEvidenceRepaired = false;
     if (
       storedFirstSession !== undefined &&
       !originalIntegrityValid &&
@@ -6724,8 +7478,19 @@ export function restoreSimulationState(
     )
       return fallback;
     if (!originalIntegrityValid && structurallyValid) {
+      unsealedCausalEvidenceRepaired =
+        !isEvaluationStateValid(candidate.career.evaluation) ||
+        !hasRetainedCausalLedgerEvidence(candidate) ||
+        !hasCoherentCausalEvidenceSnapshot(candidate) ||
+        (candidate.career.runEnding !== null &&
+          !hasMatchingEndingEvidence(candidate, candidate.career.runEnding));
       candidate = normalizeUnsealedProgressionState(candidate, fallback);
       structurallyValid = isStateStructurallyValid(candidate);
+      if (unsealedCausalEvidenceRepaired)
+        migration = withMigrationStep(
+          migration,
+          "schema-v7-causal-ledger-repaired",
+        );
     }
     const career =
       typeof candidate.career === "object" && candidate.career !== null
@@ -6910,6 +7675,8 @@ export function restoreSimulationState(
     return isStateValid(migrated) ? migrated : fallback;
   }
   if (record.schemaVersion !== 3 && record.schemaVersion !== 4) return fallback;
+
+  if (!isLegacyPipelineToyRecordValid(record)) return fallback;
 
   const legacySlots = safeLegacySlots(record.slots);
   const legacyHardware = findHardware(record.hardwareId);

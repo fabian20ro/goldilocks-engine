@@ -1,73 +1,69 @@
-# Candidate handoff — Round 113 M7D save-stability repair
+# Candidate handoff — Round 114 M7D closed-world recovery repair
 
-Implementation base: `5d691392dd35c2d2138c4af5d6ee4c98149daeb6` (immutable
-round-112 Verifier commit). Candidate SHA is recorded after the final commit;
+Implementation base: `69ccc3359109f0d7071e84edc9bbc1c927a853c6` (immutable
+Round-113 Verifier commit). Candidate SHA is recorded after the final commit;
 this handoff makes no independent-verifier verdict or commercial-release
 acceptance claim.
 
 ## Implemented behavior summary
 
-- The existing restore boundary now admits only the exact D-046
-  schema/content pairs through `findSupportedSaveGeneration`. Schema 3–6 no
-  longer accept arbitrary content labels; unknown content, future schema,
-  schema 1/2, and malformed records fail closed.
-- A fallback result is classified as `reset` before any legacy migration status
-  is reported. Minimal records naming a supported legacy generation cannot be
-  described as migrated or as preserving source fields.
-- Supported schema-7 legacy-content records are classified as `migrated` only
-  when the restore produced a non-fallback migrated state; malformed records
-  now receive reset/next-action copy.
-- Structurally valid unsealed current saves retain task/accounting/seed/RNG and
-  bounded ledger history. Ownership is retained only when a complete,
-  engine-authored purchase message matches the audited item-specific message
-  (including the audited legacy two-decimal first-session wording); malformed
-  free-text suffixes do not corroborate ownership. Causal capital counters use
-  the same exact message set. Uncorroborated hardware/module/expansion
-  ownership, workload unlocks, Career route/savings, and meta progression
-  return to safe defaults. Existing causal/evaluation repair remains
-  authoritative for retained ending evidence. Structurally malformed records
-  still fall back rather than being normalized into a recovery.
-- Added candidate-owned fixture regressions for exact legacy admission,
-  malformed legacy reset classification, and forged unsealed progression.
-- Preserved immutable `.agent/verification/round-111.md`,
-  `.agent/verification/round-112.md`, both verifier-owned regression tests,
-  and verifier catalog changes.
+- Replaced unsealed progression copying with a closed-world reconstruction from
+  the seed-specific baseline. Ownership survives only exact audited purchase
+  evidence; expansion capacity requires both purchase and exact activation
+  evidence; slots, workload selection/demand, branch controls, and mutable
+  metrics rebuild canonically.
+- Ending identity and meta unlocks survive stale recovery only when the exact
+  engine ending message, event kind/tick, and recomputed causal payload match
+  the recorded ending. Mismatches reset both ending and meta additions.
+- Research, Hype/Fear, Laboratory, Career route progression, and evaluation
+  projections reset to safe defaults unless their bounded engine evidence is
+  retained. Exact settlement counters, task identity, and accounting retain
+  only structurally corroborated records; stale settlement links lose optional
+  ledger provenance.
+- Queue transactions now carry optional engine-authored task ID, workload ID,
+  and locked-quote payloads. Unsealed task/quote projections survive only when
+  every task matches that typed queue record; shape-valid quote/workload edits
+  recover to the empty safe queue without inventing payout or task effects.
+- Module placement/removal transitions now carry typed engine provenance. Stale
+  recovery replays only valid placement records over the canonical starter or
+  corroborated expanded topology, preserving a legitimate paid install while
+  rejecting untrusted slot-array substitutions. Bounded core runtime controls
+  and the paused lifecycle flag remain structurally validated so a PWA reload
+  does not lose a legitimate paused configuration.
+- Schema-3/4 migration validates the complete required source shape and all
+  numeric/type fields before any `finiteOr` coercion. Malformed legacy records
+  fail closed and receive truthful reset handling.
+- Added table/property candidate coverage for valid sealed migration,
+  malformed/unsealed group substitutions, forged ending/topology/task edges,
+  canonical reconstruction, and restore idempotence.
 
 ## Plan requirements covered
 
-- D-046 / `plan.md` §§9, 16, 17, 24.6: exact audited support policy, bounded
-  deterministic migration boundary, truthful malformed/stale/unsealed
-  recovery, no partial future/unsupported interpretation, and no duplicate
-  task/effect/event behavior.
-- Fixture and recovery contract: committed provenance/checksum/invariant
-  corpus remains covered by `npm run test:save-stability`; the implementation
-  closes the schema/content and unsealed progression gaps found by rounds 111
-  and 112.
-- Browser Rule of Three / `plan.md` §§20, 23, 27: the existing pinned lane
-  still covers supported migration, malformed/tampered recovery, reload,
-  offline PWA resume, and 320/393 portraits.
-- Schema 7, Worker simulation, economy/accounting, navigation, M7C copy, and
-  parked M7B boundaries remain unchanged. No cloud sync, accounts, slots,
-  editor/import, encryption, content, or schema bump added.
+- D-046 / `plan.md` §§9, 16, 17, 24.6: audited supported generations,
+  transactional single-boundary migration, closed-world stale/unsealed
+  recovery, truthful malformed handling, deterministic restore, and no partial
+  future/unsupported interpretation.
+- Fixture/recovery contract: existing provenance/checksum fixture corpus,
+  bounded raw recovery backup/status path, unique ledger IDs, and no duplicate
+  task, money, command, deduction, reward, or event effects remain covered.
+- Rule of Three: exact sealed/current behavior, malformed or forged
+  stale/unsealed boundaries, and existing reload/offline/PWA lifecycle lanes at
+  320/393 remain regression boundaries.
+- Worker simulation, economy/accounting, navigation, M7C copy, and parked M7B
+  contracts unchanged. No cloud sync, accounts, multiple slots, editor/import,
+  encryption, new content, or schema bump added.
 
 ## Verifier findings addressed
 
-- `V-111-001`: production restore and recovery status use the audited exact
-  schema/content lookup; unknown legacy content returns the fallback and
-  `reset` status.
-- `V-111-002`: fallback detection precedes legacy migration classification;
-  malformed supported legacy records report reset copy naming the reset and
-  next action.
-- `V-111-003`: the unsealed normalizer clears uncorroborated ownership and
-  progression while retaining only bounded corroborated purchase/history and
-  core task/accounting state; the causal repair path remains compatible with
-  prior saturated-ending protections.
-- `V-112-001`: schema-7 legacy-content status now checks fallback after restore
-  before claiming content migration.
-- `V-112-002`: ownership corroboration requires exact full engine-authored
-  hardware/module/expansion purchase text; a tampered suffix is rejected.
-- `V-112-003`: causal capital-commitment evidence uses the same exact purchase
-  message set, so malformed free text cannot preserve forged counters.
+- `V-113-001`: ending/meta identity now binds to exact event semantics and
+  recomputed causal evidence; forged identity falls back to null/initial meta.
+- `V-113-002`: expansion recovery retains corroborated core state and money,
+  rebuilds starter or expanded canonical topology from purchase/activation
+  evidence, and never maps an untrusted slot array into the topology.
+- `V-113-003`: exact schema-3/4 required-field validation precedes coercion;
+  malformed numeric/type records return seed-specific reset state.
+- Prior `V-111-*` and `V-112-*` findings remain covered by preserved immutable
+  reports/tests; no verifier report or verifier-owned test was edited.
 
 Independent verification remains required; this handoff does not issue PASS.
 
@@ -87,61 +83,64 @@ export PLAYWRIGHT_BROWSERS_PATH="$PWD/.cache/ms-playwright"
 `@playwright/test` is pinned in `package.json`; browser binaries stay in the
 ignored repository cache.
 
-Focused commands:
+Focused commands run this turn:
 
 ```sh
-npm run test:save-stability
-npm test
 npm run typecheck -- --pretty false
-npm run lint
-npm run format:check
-npm run validate:verification-catalog
-npm run test:e2e -- tests/e2e/save-stability.spec.ts
+npm run lint -- --no-warn-ignored
+npx prettier --check src/simulation/engine.ts src/simulation/types.ts src/simulation/closedWorldRecovery.test.ts
+npm run test:save-stability
+node_modules/.bin/vitest run --coverage=false src/simulation/closedWorldRecovery.test.ts src/simulation/verifierRound111.test.ts src/simulation/verifierRound112.test.ts src/simulation/verifierRound113.test.ts src/simulation/saveFixtures.test.ts src/simulation/engine.test.ts src/simulation/verifierRound034.test.ts src/simulation/verifierRound035.test.ts --reporter=dot
 ```
 
-Canonical command for this candidate:
+Focused results: typecheck, lint, save-stability `29/29`, and the mapped
+Round-034/035, Round-111/112/113, fixture, engine, and candidate lanes `120/120`
+passed. The focused stale-save browser regressions passed: jobs provenance and
+paid completion `2/2`; atomic root PWA refresh `1/1`. The final canonical
+development verification ran after all executable changes:
 
 ```sh
-VERIFY_EVIDENCE_DIR=.cache/verification/round-113-development \
+VERIFY_EVIDENCE_DIR=.cache/verification/round-114-development-final2 \
   ./scripts/verify --profile=development
 ```
 
-Pre-canonical focused evidence: complete unit lane `73 files / 366 tests`,
-Round-111/112 adversarial and adjacent suites `59/59`, save-stability lane
-`29/29`, focused browser lifecycle `4/4`, typecheck, lint, format, and catalog
-validation clean. The single canonical development invocation completed with
-exit 0 and recorded `verification=development-candidate`. Its lanes reported
-verification-catalog, setup, format, lint, typecheck, unit, balance, build,
-production-audit, root-browser-pwa, and pages-offline as passed; the output
-also records `m7b-commercial-gate=blocked` as parked under D-044, with no
-full-release profile run.
-
-The first sandboxed browser attempt failed before execution on macOS Chromium
-MachPort permission; the same pinned command with scoped host permission passed
-all four tests. This is recorded infrastructure evidence, not a test waiver.
+Final canonical evidence: verification catalog `113` reports / `123` findings,
+setup, format, lint, typecheck, unit `381/381`, all balance lanes, build,
+production audit, root browser/PWA `242/242`, and Pages offline `2/2` completed;
+M7B commercial gate remained parked under D-044.
 
 ## Important architectural decisions
 
 - `saveSupport.ts` remains the sole audited policy/provenance table; the engine
   consumes its exact lookup rather than maintaining a second permissive list.
-- Unsealed normalization runs only after structural validation and before
-  causal checks. Purchase messages are bounded ledger corroboration, not
-  arbitrary import authority. Invalid structural records still return the
-  seed-specific fresh state.
-- Recovery backup/status behavior, Worker publication, and all M7C/M7B
-  contracts remain unchanged.
+- Unsealed normalization occurs only after structural validation. It starts
+  from `createInitialState(seed)` and retains narrowly corroborated transitions:
+  exact capital records, purchase+activation, typed queue records, typed
+  settlement records, and recomputed ending semantics.
+- Queue provenance is optional for compatibility with older sealed records;
+  absent provenance cannot authorize stale task/quote retention. This adds no
+  schema bump and preserves intact historical seals unchanged.
+- Canonical starter/expanded topology is selected from corroborated expansion
+  state, never by copying stale slot arrays. The pre-restore D-016 installed
+  check can authorize guide completion, while the recovered slot projection is
+  still canonical.
+- Placement/removal provenance is optional for older history; only current
+  engine-authored typed records can alter the canonical recovered slot map.
 
 ## Known limitations and risks
 
-- The parked M7B commercial/native/WebKit/device evidence and deployment gates
-  remain outside this repair; no full-release profile was run.
+- Parked M7B commercial/native/WebKit/device-performance, hosted exact-SHA,
+  deployment, and release-owner checks remain outside this repair; no
+  full-release physical gate is run.
 - Schema 3–6 and intermediate schema-7 fixtures are audited reconstructions,
-  not surviving byte captures; provenance and derivation remain explicit.
+  not surviving byte captures; existing provenance/derivation metadata remains
+  explicit.
 - Raw recovery backup remains best-effort under storage quota/unavailability;
-  the UI reports when no backup was preserved and keeps the run operable.
+  UI status reports whether one bounded backup was preserved.
 
 ## Checks not run
 
-- Full-release / M7B physical, native, WebKit, device-performance, hosted
-  exact-SHA, deployment, and release-owner checks: explicitly parked/out of
-  scope under D-044.
+- Full-release / M7B physical, native, WebKit, device-performance, hosted,
+  deployment, and release-owner checks: explicitly parked/out of scope under
+  D-044. Independent verifier evaluation and any release-owner gate remain
+  required; the completed development gate is not a substitute for either.
