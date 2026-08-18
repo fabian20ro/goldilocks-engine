@@ -25,6 +25,10 @@ Regenerate with:
 npm run generate:save-fixtures
 ```
 
+The generator is authoritative for payload, provenance, and JSON formatting;
+it uses the pinned repository Prettier dependency so a clean or repeated run
+is byte-for-byte idempotent. Do not hand-edit generated fixture JSON.
+
 The same directory contains explicit adversarial boundary fixtures for malformed
 JSON, stale integrity, unsealed current state, tampered progression, future
 schema, and unsupported schema. Missing or invalid integrity always resets to a

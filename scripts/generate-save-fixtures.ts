@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { format as formatJson } from "prettier";
 import {
   applyCommand,
   createInitialState,
@@ -333,7 +334,7 @@ for (const [index, generation] of SUPPORTED_SAVE_GENERATIONS.entries()) {
   };
   writeFileSync(
     resolve(outputDirectory, `${generation.id}.json`),
-    `${JSON.stringify(fixture, null, 2)}\n`,
+    await formatJson(JSON.stringify(fixture, null, 2), { parser: "json" }),
   );
 }
 
@@ -360,6 +361,6 @@ for (const boundary of boundaryFixtures()) {
   };
   writeFileSync(
     resolve(outputDirectory, `${boundary.id}.json`),
-    `${JSON.stringify(fixture, null, 2)}\n`,
+    await formatJson(JSON.stringify(fixture, null, 2), { parser: "json" }),
   );
 }

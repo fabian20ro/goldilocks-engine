@@ -5,7 +5,7 @@
   "source": {
     "kind": "adversarial-boundary",
     "supportTier": "boundary",
-    "derivation": "Schema 2 pipeline-toy-1 is retained as an explicit unsupported historical boundary under D-046."
+    "derivation": "Schema 2 pipeline-toy-1 is retained as an explicit unsupported historical boundary under D-047."
   },
   "payloadChecksum": {
     "algorithm": "sha256-json-v1",

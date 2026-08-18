@@ -1,7 +1,7 @@
-# Candidate handoff — Round 115 M7D D-047 sealed-save recovery boundary
+# Candidate handoff — Round 116 M7D fixture reproducibility repair
 
-Implementation base: `7e65e909baf9f44fe536ec02d62f6a78b1c64eb4` (immutable
-Round-114 Verifier commit). Candidate SHA is recorded after the final commit;
+Implementation base: `0e40d109b1d834ccaf8513ea418a5b4f937b499e` (immutable
+Round-115 Verifier commit). Candidate SHA is recorded after the final commit;
 this handoff makes no independent-verifier verdict or release-acceptance
 claim.
 
@@ -30,6 +30,10 @@ claim.
   boundary. Schema 3–6 fixtures carry documented deterministic seals over
   audited reconstructed historical payloads; the repository does not claim
   unavailable old deployment artifacts contained those seals.
+- Made `scripts/generate-save-fixtures.ts` authoritative for fixture payload,
+  provenance strings, and JSON formatting by using the pinned Prettier
+  dependency during generation. The committed corpus now reproduces
+  byte-for-byte on clean and repeated runs; generated JSON is not hand-edited.
 
 ## Plan requirements covered
 
@@ -52,10 +56,14 @@ claim.
 - `V-114-001` through `V-114-004` are addressed by the pre-migration seal
   gate, no-salvage reset transaction, bounded recovery status/backup, and
   sealed schema 3–7 fixture coverage.
+- `V-115-001` is addressed: the generator's two D-047 provenance strings and
+  formatter output now match the committed corpus, and repeated generation is
+  idempotent.
 - Immutable reports `.agent/verification/round-111.md` through
-  `.agent/verification/round-114.md` remain untouched. Their regression
-  cases remain present and are aligned to the explicitly authorized D-047
-  semantics; an independent Verifier must issue the next report.
+  `.agent/verification/round-115.md`, their regression tests, and the catalog
+  remain untouched. Their regression cases remain present and are aligned to
+  the explicitly authorized D-047 semantics; an independent Verifier must
+  issue the next report.
 
 ## Setup, startup, and verification commands
 
@@ -80,8 +88,9 @@ npm run typecheck -- --pretty false
 npm run lint -- --no-warn-ignored
 npm run format:check
 npm run validate:verification-catalog
+npm run generate:save-fixtures
 npm run test:save-stability
-npx vitest run --coverage=false --reporter=dot
+npx vitest run --coverage=false src/simulation/saveFixtures.test.ts src/simulation/saveRecovery.test.ts --reporter=dot
 E2E_PORT=4174 npm run test:e2e -- tests/e2e/save-stability.spec.ts --reporter=line
 E2E_PORT=4174 npm run test:e2e -- \
   tests/e2e/jobs-settlement-provenance.spec.ts \
@@ -98,18 +107,24 @@ E2E_PORT=4174 npm run test:e2e -- \
   --grep "one-shot preboot expansion" --reporter=line
 ```
 
-Results: typecheck, lint, format, catalog, full Vitest (`76` files / `394`
-tests), save-stability (`37` tests), and the save-stability browser lane
-(`4/4`) passed. The affected browser matrix passed `16/19` on its first
-focused run; after deterministic fixture repairs, the remaining stale-ledger
-case passed `1/1` and the two sealed-expansion portrait cases passed `2/2`.
+Results: typecheck, lint, format, catalog, generator execution, save-stability
+(`37` tests), and the focused Round-115 fixture/recovery unit lane (`6` tests)
+passed. After the generator formatter was made authoritative, its clean output
+changed only the two stale provenance strings named by `V-115-001`; a second
+run produced the identical working-tree diff. After commit, two clean
+`npm run generate:save-fixtures` runs both left the worktree clean.
+
+The retained Round-115 canonical development evidence covered production
+behavior and the root/Pages browser lanes (`244/244` root tests, `2/2` Pages
+tests). This repair changes only the fixture generator, generated JSON, and
+documentation, so the broad canonical gate was not rerun.
 
 One attempted `npm run test:save-stability -- --runInBand` probe was rejected
 by Vitest's CLI; the corrected command above was used. Chromium required the
 approved host-elevated launch because the default sandbox denied MachPort
 bootstrap; the repository-local browser/cache contract was retained.
 
-The one permitted final canonical attempt was:
+The prior Round-115 canonical command was:
 
 ```sh
 VERIFY_EVIDENCE_DIR=.cache/verification/round-115-development-final \
@@ -118,14 +133,11 @@ PLAYWRIGHT_BROWSERS_PATH="$PWD/.cache/ms-playwright" \
 ./scripts/verify --profile=development
 ```
 
-It completed setup, format, lint, typecheck, unit (`76` files / `394` tests),
-balance, build, and production-audit lanes, then stopped in root browser/PWA
-with `49` failed, `178` passed, `15` not run (`242` total). Those failures
-were stale E2E fixtures/expectations that injected deliberate state without a
-D-047 seal; the focused repairs above were made afterward. The canonical gate
-was not rerun because this role permits one final canonical invocation per
-turn. A fresh independent verification must run the canonical command against
-the committed candidate.
+completed setup, format, lint, typecheck, unit (`77` files / `400` tests),
+balance, build, production audit, root browser/PWA, and Pages/offline lanes;
+the immutable Round-115 report records that evidence. No executable
+production save semantics changed in Round 116, so the canonical gate is
+intentionally skipped here.
 
 ## Important architectural decisions
 
@@ -137,13 +149,16 @@ the committed candidate.
 - Schema 3–6 fixture seals are reproducible derivations from audited source
   and migration history, explicitly labeled as such; no schema bump or
   alternate import path was added.
+- The generator serializes with indented JSON then applies the repository's
+  pinned Prettier formatter. Generator source, not an independently edited
+  fixture, owns provenance and checksum inputs.
 - Recovery preserves at most one bounded raw payload with source metadata and
   checksum before replacing the simulation with `createInitialState`.
 
 ## Known limitations and risks
 
-- Independent Verifier review and a fresh canonical run remain required; this
-  handoff does not issue PASS or release acceptance.
+- Independent Verifier review remains required; this handoff does not issue
+  PASS or release acceptance.
 - Parked M7B commercial/native/WebKit/device-performance, hosted exact-SHA,
   deployment, and release-owner checks were not run. Full-release physical
   M7B was intentionally not rerun.
@@ -157,10 +172,9 @@ the committed candidate.
 - `./scripts/verify --profile=full-release`: not run; M7B is parked under
   D-044 and the user explicitly prohibited rerunning the full-release M7B
   physical gate.
-- Canonical development verification after the final fixture-only repairs:
-  intentionally not rerun because the one final canonical invocation above
-  was already consumed in this role turn. Independent verification must
-  rerun it on the committed SHA.
+- `./scripts/verify --profile=development`: not rerun because Round 116
+  changes no production save semantics and the immutable Round-115 canonical
+  development evidence already covers the affected product lanes.
 - Native device, WebKit, physical performance, hosted deployment, and release
   owner checks remain outside this repair and require their documented
   infrastructure.

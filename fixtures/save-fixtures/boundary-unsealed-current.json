@@ -5,7 +5,7 @@
   "source": {
     "kind": "adversarial-boundary",
     "supportTier": "boundary",
-    "derivation": "Current initial state with the integrity seal omitted; safe core fields remain structurally corroborated."
+    "derivation": "Current initial state with the integrity seal omitted; no simulation field is trusted at the reset boundary."
   },
   "payloadChecksum": {
     "algorithm": "sha256-json-v1",
