@@ -69,14 +69,30 @@ M7B_NATIVE_EVIDENCE_DIR=.cache/m7b/native/round-local \
 npm run test:native-a11y
 ```
 
+After `simctl openurl` or the Android browser launch, the harness waits four
+seconds before its screenshot/log capture and records that wait in the device
+command list. Override the bounded wait when a slow simulator needs more time:
+
+```sh
+M7B_NATIVE_BROWSER_SETTLE_MS=6000 \
+M7B_NATIVE_EVIDENCE_DIR=.cache/m7b/native/round-local \
+npm run test:native-a11y
+```
+
+The capture also records `emulator -list-avds` inventory when the Android SDK
+emulator executable is installed. An empty inventory is informational; it
+does not substitute an unlocked USB Android device or close the physical
+performance/battery/thermal gate.
+
 ## iOS Simulator / Safari / VoiceOver
 
 The harness uses `xcrun simctl list devices available --json`, boots one
 available device when needed, captures `com.apple.Accessibility` settings,
 opens `http://127.0.0.1:<port>/` with `xcrun simctl openurl`, captures a
-simulator screenshot and accessibility log, and restores captured accessibility
-settings during teardown. The generated command list is retained in
-`summary.json`.
+simulator screenshot and accessibility log after the recorded browser-settle
+wait, and restores captured accessibility settings during teardown. A simulator
+booted by the harness is shut down during cleanup; a simulator that was already
+booted is left running. The generated command list is retained in `summary.json`.
 
 On the booted simulator, use the rows copied into
 `operator-submission.json` with VoiceOver enabled. At both 393×742 and
@@ -113,6 +129,12 @@ Complete the same checklist in `operator-submission.json` with TalkBack
 enabled at both widths and 200% text/reduced motion. Record exact speech in
 `android-talkback-speech.txt`, actual CSS viewport, and evidence paths.
 UIAutomator is supporting semantics, not a TalkBack speech substitute.
+
+If the selected USB device is locked, the harness records the lock-policy
+output, settings, and explicit skipped-interaction command, then does not launch
+Chrome, mutate accessibility settings, create a reverse tunnel, or capture a
+misleading browser screenshot/hierarchy. Unlocking the device is required for
+the operator session.
 
 With `M7B_NATIVE_ENABLE_SETTINGS=1`, the harness discovers the installed
 TalkBack package, captures the secure/global settings, enables TalkBack and

@@ -22,6 +22,10 @@ const evidenceDir = path.resolve(
 );
 const port = Number(process.env.M7B_NATIVE_PORT ?? "4175");
 const loopbackUrl = `http://127.0.0.1:${port}/`;
+const browserSettleMs = (() => {
+  const value = Number(process.env.M7B_NATIVE_BROWSER_SETTLE_MS ?? "4000");
+  return Number.isFinite(value) && value >= 0 && value <= 30_000 ? value : 4000;
+})();
 const allowBlocked =
   process.env.M7B_NATIVE_ALLOW_BLOCKED === "1" ||
   process.argv.includes("--allow-blocked");
@@ -113,6 +117,72 @@ function readGitSha() {
 
 function shellQuote(value) {
   return `'${String(value).replaceAll("'", "'\\''")}'`;
+}
+
+function waitForNativeBrowser(deviceResult, result) {
+  const seconds = String(browserSettleMs / 1000);
+  const wait = command("sleep", [seconds]);
+  deviceResult.commands.push({
+    command: `sleep ${seconds}`,
+    label: "wait for native browser shell readiness",
+    status: wait.status,
+    stderr: wait.stderr,
+  });
+  if (wait.status !== 0) {
+    result.blockers.push({
+      gate: "native-browser-readiness",
+      reason: "native browser settle wait could not complete",
+      command: `sleep ${seconds}`,
+      stderr: wait.stderr,
+    });
+  }
+}
+
+function androidEmulatorBinary() {
+  const roots = [
+    process.env.ANDROID_HOME,
+    process.env.ANDROID_SDK_ROOT,
+    "/opt/homebrew/share/android-commandlinetools",
+    "/usr/local/share/android-commandlinetools",
+  ].filter(Boolean);
+  const candidates = [
+    ...roots.map((rootPath) => path.join(rootPath, "emulator", "emulator")),
+    "emulator",
+  ];
+  return candidates.find((candidate) =>
+    candidate === "emulator" ? true : fs.existsSync(candidate),
+  );
+}
+
+function captureAndroidEmulatorInventory(result) {
+  const binary = androidEmulatorBinary();
+  const inventory = binary
+    ? command(binary, ["-list-avds"])
+    : {
+        available: false,
+        status: 127,
+        stdout: "",
+        stderr: "no Android emulator executable found",
+      };
+  result.androidEmulatorInventory = {
+    binary: binary ?? null,
+    command: binary
+      ? `${shellQuote(binary)} -list-avds`
+      : "emulator -list-avds",
+    available: inventory.available && inventory.status === 0,
+    status: inventory.status,
+    avds: inventory.stdout
+      .split(/\r?\n/)
+      .map((value) => value.trim())
+      .filter(Boolean),
+    stderr: inventory.stderr,
+  };
+  result.commands.push({
+    command: result.androidEmulatorInventory.command,
+    label: "inventory installed Android emulators",
+    status: inventory.status,
+    stderr: inventory.stderr,
+  });
 }
 
 function operatorSubmissionPath() {
@@ -813,6 +883,7 @@ function captureIos(result) {
     device: `${device.name ?? "iOS Simulator"} (${id})`,
     os: device.runtime ?? "unknown",
     browser: "Safari",
+    bootedByHarness: false,
     actualCssViewport: null,
     settings: {},
     artifacts: [],
@@ -841,6 +912,7 @@ function captureIos(result) {
       return deviceResult;
     }
     run(["bootstatus", id, "-b"], "wait for simulator boot");
+    deviceResult.bootedByHarness = boot.status === 0;
   }
 
   const settingsBefore = run(
@@ -911,6 +983,8 @@ function captureIos(result) {
       command: `xcrun simctl openurl ${id} ${loopbackUrl}`,
       stderr: open.stderr,
     });
+  } else {
+    waitForNativeBrowser(deviceResult, result);
   }
   const screenshotPath = path.join(evidenceDir, "ios-safari.png");
   const screenshot = run(
@@ -962,6 +1036,7 @@ function captureIos(result) {
 }
 
 function captureAndroid(result) {
+  captureAndroidEmulatorInventory(result);
   const listing = command("adb", ["devices", "-l"]);
   result.commands.push({
     command: "adb devices -l",
@@ -1050,6 +1125,46 @@ function captureAndroid(result) {
   );
   deviceResult.settingsBeforeArtifact = settingsBeforeArtifact.path;
   deviceResult.artifacts.push(settingsBeforeArtifact);
+  if (!deviceResult.unlocked) {
+    deviceResult.commands.push({
+      command: "skipped native browser interaction",
+      label: "skip locked Android browser capture",
+      status: 0,
+      stderr:
+        "device lock state was not proven; no Chrome launch, settings mutation, reverse tunnel, screenshot, or hierarchy capture attempted",
+    });
+    deviceResult.artifacts.push(
+      writeArtifact(
+        "android-talkback-speech.txt",
+        "Manual evidence required after an operator unlocks the device. With TalkBack enabled, record the exact spoken transcript for every checklist row.\n",
+      ),
+    );
+    const settingsAfterArtifact = writeArtifact(
+      "android-settings-after.txt",
+      Object.entries(deviceResult.settings)
+        .map(([key, value]) => `${key}=${value}`)
+        .join("\n"),
+    );
+    deviceResult.settingsAfterArtifact = settingsAfterArtifact.path;
+    deviceResult.artifacts.push(settingsAfterArtifact);
+    result.devices.push(deviceResult);
+    result.checklist.push(
+      ...nativeChecklist(
+        "USB Android",
+        deviceResult.device,
+        "Chrome + TalkBack",
+      ),
+    );
+    result.blockers.push({
+      gate: "talkback-speech",
+      reason:
+        "native TalkBack speech transcript and actual CSS viewport require an operator session",
+      command: `Complete ${operatorSubmissionPath()} after the Chrome session (checklist.json is generated supporting output); then run ${operatorValidationCommand()}`,
+      stderr:
+        "Chrome interaction was skipped because the USB Android device is locked; UIAutomator output is not available",
+    });
+    return deviceResult;
+  }
   if (enableNativeSettings) {
     const packages = run(
       ["shell", "pm", "list", "packages"],
@@ -1124,6 +1239,8 @@ function captureAndroid(result) {
       command: `adb -s ${id} reverse tcp:${port} tcp:${port}`,
       stderr: reverse.stderr,
     });
+  } else {
+    deviceResult.reverseCreated = true;
   }
   const open = run(
     [
@@ -1144,6 +1261,8 @@ function captureAndroid(result) {
       command: `adb -s ${id} shell am start -a android.intent.action.VIEW -d ${loopbackUrl}`,
       stderr: open.stderr,
     });
+  } else {
+    waitForNativeBrowser(deviceResult, result);
   }
   const screenshotPath = path.join(evidenceDir, "android-chrome.png");
   const screenshot = binaryCommand("adb", [
@@ -1212,6 +1331,7 @@ const result = {
   loopback: {
     url: loopbackUrl,
     port,
+    browserSettleMs,
     startup: "./scripts/run-e2e",
     cleanup:
       "terminate process group; adb reverse --remove; restore captured settings",
@@ -1224,6 +1344,7 @@ const result = {
     reducedMotion: true,
   },
   commands: [],
+  androidEmulatorInventory: null,
   devices: [],
   checklist: [],
   buildInfo: null,
@@ -1233,6 +1354,7 @@ const result = {
 
 let server;
 let androidId = null;
+let androidReverseCreated = false;
 try {
   // The loopback server is started even when native infrastructure is absent;
   // the recorded startup command and error make the blocker reproducible.
@@ -1282,6 +1404,7 @@ try {
   captureIos(result);
   const android = captureAndroid(result);
   androidId = android?.id ?? null;
+  androidReverseCreated = android?.reverseCreated === true;
 } finally {
   for (const device of result.devices) {
     if (device.platform === "ios-simulator" && device.id) {
@@ -1310,6 +1433,22 @@ try {
             key,
             reason: "captured iOS accessibility setting could not be restored",
             stderr: restore.stderr,
+          });
+      }
+      if (device.bootedByHarness) {
+        const shutdown = command("xcrun", ["simctl", "shutdown", device.id]);
+        result.commands.push({
+          command: `xcrun simctl shutdown ${device.id}`,
+          label: "shutdown simulator booted by harness",
+          status: shutdown.status,
+          stderr: shutdown.stderr,
+        });
+        if (shutdown.status !== 0)
+          result.blockers.push({
+            gate: "ios-simulator-cleanup",
+            reason: "simulator booted by harness could not be shut down",
+            command: `xcrun simctl shutdown ${device.id}`,
+            stderr: shutdown.stderr,
           });
       }
     }
@@ -1353,7 +1492,7 @@ try {
       }
     }
   }
-  if (androidId) {
+  if (androidId && androidReverseCreated) {
     const reverseCleanup = command("adb", [
       "-s",
       androidId,

@@ -116,6 +116,15 @@ describe("M7B evidence tooling contract", () => {
     expect(read("scripts/native-accessibility.mjs")).toContain("xcrun");
     expect(read("scripts/native-accessibility.mjs")).toContain("adb");
     expect(read("scripts/native-accessibility.mjs")).toContain('"BLOCKED"');
+    expect(read("scripts/native-accessibility.mjs")).toContain(
+      "M7B_NATIVE_BROWSER_SETTLE_MS",
+    );
+    expect(read("scripts/native-accessibility.mjs")).toContain(
+      "androidEmulatorInventory",
+    );
+    expect(read("scripts/native-accessibility.mjs")).toContain(
+      "skip locked Android browser capture",
+    );
     expect(read("scripts/collect-mobile-performance.mjs")).toContain(
       "PerformanceObserver",
     );
@@ -130,6 +139,9 @@ describe("M7B evidence tooling contract", () => {
     );
     expect(read("docs/m7b-native-accessibility.md")).toContain(
       "speech transcript remains `UNVERIFIED`/`BLOCKED`",
+    );
+    expect(read("docs/m7b-native-accessibility.md")).toContain(
+      "M7B_NATIVE_BROWSER_SETTLE_MS",
     );
     expect(read("docs/m7b-mobile-performance.md")).toContain(
       "battery/thermal sub-gate",
