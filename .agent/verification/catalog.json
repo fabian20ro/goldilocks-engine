@@ -551,6 +551,39 @@
         ".agent/verification/round-111.md"
       ],
       "note": "Unsealed current saves retain uncorroborated hardware, module, ending, and Career progression fields."
+    },
+    {
+      "id": "V-112-001",
+      "match": { "exact": ["V-112-001"] },
+      "status": "active",
+      "requirementId": "M7D-SAVE-002",
+      "regressionEvidence": [
+        "src/simulation/verifierRound112.test.ts",
+        ".agent/verification/round-112.md"
+      ],
+      "note": "Malformed schema-7 legacy-content records fall back to a fresh state but are reported as migrated with preserved-field copy."
+    },
+    {
+      "id": "V-112-002",
+      "match": { "exact": ["V-112-002"] },
+      "status": "active",
+      "requirementId": "M7D-SAVE-002",
+      "regressionEvidence": [
+        "src/simulation/verifierRound112.test.ts",
+        ".agent/verification/round-112.md"
+      ],
+      "note": "Unsealed progression accepts a malformed capital-purchase ledger message by prefix, retaining forged hardware ownership."
+    },
+    {
+      "id": "V-112-003",
+      "match": { "exact": ["V-112-003"] },
+      "status": "active",
+      "requirementId": "M7D-SAVE-002",
+      "regressionEvidence": [
+        "src/simulation/verifierRound112.test.ts",
+        ".agent/verification/round-112.md"
+      ],
+      "note": "Unsealed causal/evaluation counters are reconstructed from the same malformed free-text capital event instead of resetting to safe defaults."
     }
   ],
   "supersededProbes": [
