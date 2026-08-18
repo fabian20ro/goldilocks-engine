@@ -200,6 +200,35 @@ describe("D-046 golden save fixture boundary", () => {
     }
   });
 
+  it("admits only exact audited legacy content pairs", () => {
+    for (const fixture of fixtures.slice(0, 4)) {
+      const payload = record(
+        JSON.parse(JSON.stringify(fixture.payload)) as unknown,
+      );
+      payload.contentVersion = `unknown-${fixture.source.schemaVersion}`;
+      const unknown = restoreSimulationStateWithReport(
+        payload,
+        fixture.expected.seed,
+        true,
+      );
+      expect(unknown.recovery.disposition).toBe("reset");
+      expect(unknown.state).toEqual(createInitialState(fixture.expected.seed));
+
+      const malformed = restoreSimulationStateWithReport(
+        {
+          schemaVersion: fixture.source.schemaVersion,
+          contentVersion: fixture.source.contentVersion,
+        },
+        fixture.expected.seed,
+        true,
+      );
+      expect(malformed.recovery.disposition).toBe("reset");
+      expect(malformed.state).toEqual(
+        createInitialState(fixture.expected.seed),
+      );
+    }
+  });
+
   it.each(boundaryFixtures.map((fixture) => [fixture.id, fixture] as const))(
     "%s has provenance/checksum and resolves its explicit adversarial boundary",
     (_id, fixture) => {
@@ -231,11 +260,24 @@ describe("D-046 golden save fixture boundary", () => {
     const source = createInitialState(46_100);
     const stale = JSON.parse(JSON.stringify(source)) as Record<string, unknown>;
     const staleResources = stale.resources as Record<string, unknown>;
+    const staleCareer = stale.career as Record<string, unknown>;
     delete stale.integrity;
     staleResources.money = 3;
+    stale.hardwareId = "used-gpu";
+    stale.ownedHardwareIds = ["bedroom-cpu", "used-gpu"];
+    stale.ownedModuleIds = [...source.ownedModuleIds, "precision-cleaner"];
+    (stale.meta as Record<string, unknown>).completedEndingIds = [
+      "honest-foundation",
+    ];
+    staleCareer.savings = 99;
     const result = restoreSimulationStateWithReport(stale, 46_100, true);
     expect(result.recovery.disposition).toBe("recovered");
     expect(result.state.resources.money).toBe(3);
+    expect(result.state.hardwareId).toBe(source.hardwareId);
+    expect(result.state.ownedHardwareIds).toEqual(source.ownedHardwareIds);
+    expect(result.state.ownedModuleIds).toEqual(source.ownedModuleIds);
+    expect(result.state.meta).toEqual(source.meta);
+    expect(result.state.career.savings).toBe(source.career.savings);
     expect(result.state.research).toEqual(source.research);
     expect(result.state.hypeFear).toEqual(source.hypeFear);
     expect(result.state.laboratory).toEqual(source.laboratory);

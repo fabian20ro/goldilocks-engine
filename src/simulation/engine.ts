@@ -119,6 +119,7 @@ import {
   allocateNextLedgerEvent,
   canonicalizeLedgerEventIds,
 } from "./ledgerIdentity";
+import { findSupportedSaveGeneration } from "./saveSupport";
 
 const MAX_LEDGER_EVENTS = 80;
 const MAX_QUEUED_TASKS = 99;
@@ -382,6 +383,23 @@ function hasRecordedFirstSessionPurchase(state: SimulationState): boolean {
     state.ledger.some(
       (event) => event.kind === "success" && messages.includes(event.message),
     )
+  );
+}
+
+function hasRecordedCapitalPurchase(
+  state: Pick<SimulationState, "ledger">,
+  item: { name: string; purchaseCost: number },
+): boolean {
+  const prefixes = [
+    `${item.name} purchased for ${formatExactCurrency(item.purchaseCost)}`,
+    // The first-session ledger predates exact three-decimal currency. Keep
+    // that audited legacy wording as corroboration during stale recovery.
+    `${item.name} purchased for ${formatCurrency(item.purchaseCost, 2)}`,
+  ];
+  return state.ledger.some(
+    (event) =>
+      event.kind === "success" &&
+      prefixes.some((prefix) => event.message.startsWith(prefix)),
   );
 }
 
@@ -6437,6 +6455,100 @@ function normalizeUntrustedLedgerState(
   };
 }
 
+/**
+ * An unsealed snapshot can retain work/accounting history, but its mutable
+ * ownership and progression projections are not proof of a purchase or
+ * unlock. Keep only ownership backed by the bounded purchase ledger and reset
+ * the remaining progression to the seed-specific safe baseline. This keeps
+ * the normal stale-save path useful without treating a shape-valid forgery as
+ * authoritative.
+ */
+function normalizeUnsealedProgressionState(
+  state: SimulationState,
+  fallback: SimulationState,
+): SimulationState {
+  const ownedHardwareIds = [
+    STARTER_HARDWARE_ID,
+    ...state.ownedHardwareIds.filter((id) => {
+      const item = findHardware(id);
+      return (
+        item !== undefined &&
+        id !== STARTER_HARDWARE_ID &&
+        hasRecordedCapitalPurchase(state, item)
+      );
+    }),
+  ];
+  const ownedModuleIds = [
+    ...starterModuleIds,
+    ...state.ownedModuleIds.filter((id) => {
+      const item = findModule(id);
+      return (
+        item !== undefined &&
+        !starterModuleIds.includes(id) &&
+        hasRecordedCapitalPurchase(state, item)
+      );
+    }),
+  ];
+  const ownedExpansionIds = state.ownedExpansionIds.filter((id) => {
+    const item = findPipelineExpansion(id);
+    return item !== undefined && hasRecordedCapitalPurchase(state, item);
+  });
+  const safeHardwareId = ownedHardwareIds.includes(state.hardwareId)
+    ? state.hardwareId
+    : STARTER_HARDWARE_ID;
+  const safeActiveExpansionId =
+    state.activeExpansionId !== null &&
+    ownedExpansionIds.includes(state.activeExpansionId)
+      ? state.activeExpansionId
+      : null;
+  const safeSlots = state.slots.map((slot) => {
+    const fallbackSlot = fallback.slots.find(
+      (candidate) => candidate.slotId === slot.slotId,
+    );
+    if (slot.moduleId === null || ownedModuleIds.includes(slot.moduleId))
+      return slot;
+    return fallbackSlot ?? { slotId: slot.slotId, moduleId: null };
+  });
+  const sourceCareer = state.career;
+  const safeCareer: CareerState = {
+    ...fallback.career,
+    // These counters are accounting, not unlock authority. Preserve their
+    // values while resetting savings, route progression, and model unlocks;
+    // causal/evaluation fields remain available to the repair checks below.
+    electricityCostsIncurred: sourceCareer.electricityCostsIncurred,
+    operatingCostsIncurred: sourceCareer.operatingCostsIncurred,
+    costsPaid: sourceCareer.costsPaid,
+    unpaidCosts: sourceCareer.unpaidCosts,
+    freelanceHours: sourceCareer.freelanceHours,
+    freelanceGross: sourceCareer.freelanceGross,
+    // The existing causal/evaluation repair below must inspect these fields
+    // before deciding whether retained ledger evidence can clear them.
+    evaluation: sourceCareer.evaluation,
+    runEnding: sourceCareer.runEnding,
+  };
+  return {
+    ...state,
+    hardwareId: safeHardwareId,
+    ownedHardwareIds: [...new Set(ownedHardwareIds)],
+    ownedModuleIds: [...new Set(ownedModuleIds)],
+    ownedExpansionIds: [...new Set(ownedExpansionIds)],
+    activeExpansionId: safeActiveExpansionId,
+    unlockedWorkloadIds: fallback.unlockedWorkloadIds,
+    workloadDemand: fallback.workloadDemand,
+    workloadId: findWorkload(state.workloadId)
+      ? state.workloadId
+      : fallback.workloadId,
+    slots: safeSlots,
+    branchEnabled: fallback.branchEnabled,
+    career: safeCareer,
+    meta: sourceCareer.runEnding === null ? fallback.meta : state.meta,
+    metrics: fallback.metrics,
+    baselineMetrics: null,
+    baselineLabel: null,
+    failedModuleId: null,
+  };
+}
+
 /** Restores current saves or migrates legacy Pipeline Toy/Career saves safely. */
 export function restoreSimulationState(
   value: unknown,
@@ -6445,6 +6557,7 @@ export function restoreSimulationState(
   const fallback = createInitialState(fallbackSeed);
   if (typeof value !== "object" || value === null) return fallback;
   const record = value as Record<string, unknown>;
+  if (!isSupportedRestoreRecord(record)) return fallback;
   if (record.schemaVersion === SCHEMA_VERSION) {
     if (
       record.contentVersion !== CONTENT_VERSION &&
@@ -6556,7 +6669,7 @@ export function restoreSimulationState(
       );
     if (!originalIntegrityValid)
       candidate = normalizeUntrustedLedgerState(candidate);
-    const structurallyValid = isStateStructurallyValid(candidate);
+    let structurallyValid = isStateStructurallyValid(candidate);
     if (
       storedFirstSession !== undefined &&
       !originalIntegrityValid &&
@@ -6564,6 +6677,10 @@ export function restoreSimulationState(
       !hasSafeUnsealedFirstSessionProgress(candidate)
     )
       return fallback;
+    if (!originalIntegrityValid && structurallyValid) {
+      candidate = normalizeUnsealedProgressionState(candidate, fallback);
+      structurallyValid = isStateStructurallyValid(candidate);
+    }
     const career =
       typeof candidate.career === "object" && candidate.career !== null
         ? candidate.career
@@ -6893,16 +7010,11 @@ export function restoreSimulationState(
 }
 
 function isSupportedRestoreRecord(record: Record<string, unknown>): boolean {
-  if (record.schemaVersion === 3 || record.schemaVersion === 4) return true;
-  if (record.schemaVersion === 5 || record.schemaVersion === 6) return true;
   return (
-    record.schemaVersion === SCHEMA_VERSION &&
-    [
-      CONTENT_VERSION,
-      PREVIOUS_CONTENT_VERSION,
-      EARLIER_CONTENT_VERSION,
-      LEGACY_CONTENT_VERSION,
-    ].includes(record.contentVersion as string)
+    typeof record.schemaVersion === "number" &&
+    typeof record.contentVersion === "string" &&
+    findSupportedSaveGeneration(record.schemaVersion, record.contentVersion) !==
+      undefined
   );
 }
 
@@ -6978,6 +7090,15 @@ function recoveryStatusFor(
       reset: ["unsupported schema or content fields"],
       nextAction: "Start a new run on this supported build.",
     };
+  if (isFallbackState(state, fallbackSeed))
+    return {
+      ...base,
+      disposition: "reset",
+      reason: "malformed-or-uncorroborated-save",
+      reset: ["untrusted save fields"],
+      nextAction:
+        "Start a new run; the recovery backup is available for inspection.",
+    };
   if (schemaVersion < SCHEMA_VERSION)
     return {
       ...base,
@@ -7013,15 +7134,6 @@ function recoveryStatusFor(
       preserved: ["the complete sealed run"],
       reset: [],
       nextAction: "Continue playing.",
-    };
-  if (isFallbackState(state, fallbackSeed))
-    return {
-      ...base,
-      disposition: "reset",
-      reason: "malformed-or-uncorroborated-save",
-      reset: ["untrusted save fields"],
-      nextAction:
-        "Start a new run; the recovery backup is available for inspection.",
     };
   return {
     ...base,

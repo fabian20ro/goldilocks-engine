@@ -1,69 +1,66 @@
-# Candidate handoff — Milestone 7D Save Stability
+# Candidate handoff — Round 112 M7D save-stability repair
 
-Implementation base: `321f8e2d33cb4b06efe0e14b3e4970aa70e0f6f1`.
-Implementation candidate before this handoff-only amend:
-`922912a3e49b347bb87f715c9060d86f851fa63f`; the final amended candidate SHA
-is reported after the amend. Role: Implementer. This handoff makes no
-independent-verifier verdict or commercial-release acceptance claim.
+Implementation base: `c7d103624c46c44f15e1673467d4560b7ae353d2` (immutable
+round-111 Verifier commit). Candidate SHA is recorded after the final commit;
+this handoff makes no independent-verifier verdict or commercial-release
+acceptance claim.
 
 ## Implemented behavior summary
 
-- Added D-046's audited support policy in `src/simulation/saveSupport.ts`.
-  Exact source commits are recorded for schema 3 `pipeline-toy-2`, schema 4
-  `pipeline-toy-3`, schema 5 `pipeline-toy-4`, schema 6
-  `bedroom-career-1`, and schema 7 `evaluation-replay-1`, `research-1`,
-  `hype-fear-1`, and `local-lab-1`. Public-deployment tier is limited to the
-  independently evidenced schema-7 evaluation publication and the exact
-  schema-7 Local Laboratory receipt/build `dc97ee41f6dbbc0e29d2`; older
-  generations are explicitly legacy compatibility.
-- Added deterministic, committed golden save fixtures for every supported
-  generation and explicit malformed, stale, unsealed, tampered, future, and
-  unsupported boundaries. Each carries policy/source or boundary derivation,
-  checksum, and semantic expected invariants. Regeneration is
-  `npm run generate:save-fixtures`.
-- Added `restoreSimulationStateWithReport` and deterministic serialization at
-  the existing restore boundary. Valid sealed saves migrate and reseal;
-  supported old content upgrades; stale/unsealed state retains corroborated
-  core/task/accounting/seed/RNG/history only; future/unsupported input is not
-  partially interpreted; malformed input falls back to a valid fresh state.
-- Added one bounded, versioned raw recovery backup with source key, timestamp,
-  parseable schema/content metadata, truncation marker, and checksum. Added
-  concise user-visible recovery status naming preserved fields, reset fields,
-  next action, and backup availability, with dismiss/reload persistence.
-- Added the data-driven fixture/recovery unit harness and committed Playwright
-  coverage for normal migration, malformed/tampered recovery, stale/unsealed
-  recovery, reload/offline PWA resume, and 320/393 portrait operation.
-- Preserved schema 7, Worker-only simulation, economy/accounting, navigation,
-  M7C editorial copy, PWA/update behavior, and parked M7B release boundaries.
+- The existing restore boundary now admits only the exact D-046
+  schema/content pairs through `findSupportedSaveGeneration`. Schema 3–6 no
+  longer accept arbitrary content labels; unknown content, future schema,
+  schema 1/2, and malformed records fail closed.
+- A fallback result is classified as `reset` before any legacy migration status
+  is reported. Minimal records naming a supported legacy generation cannot be
+  described as migrated or as preserving source fields.
+- Structurally valid unsealed current saves retain task/accounting/seed/RNG and
+  bounded ledger history. Ownership is retained only when its purchase record
+  is corroborated (including the audited legacy two-decimal first-session
+  wording); uncorroborated hardware/module/expansion ownership, workload
+  unlocks, Career route/savings, and meta progression return to safe defaults.
+  Existing causal/evaluation repair remains authoritative for retained ending
+  evidence. Structurally malformed records still fall back rather than being
+  normalized into a recovery.
+- Added candidate-owned fixture regressions for exact legacy admission,
+  malformed legacy reset classification, and forged unsealed progression.
+- Preserved immutable `.agent/verification/round-111.md`,
+  `src/simulation/verifierRound111.test.ts`, and verifier catalog changes.
 
 ## Plan requirements covered
 
-- `plan.md` §24.6: save schema/content/migration/integrity metadata remains
-  explicit; supported historical restore paths are fixture-backed and
-  deterministic. `plan.md` was not edited.
-- `plan.md` §§9, 16, 17: malformed/stale recovery preserves only corroborated
-  work and keeps accounting/history identity safe; unsupported/future records
-  fail closed; no duplicate commands, tasks, deductions, rewards, money, or
-  events are introduced.
-- `plan.md` §§20, 23, 27: browser Rule of Three covers normal, adversarial,
-  and lifecycle behavior with representative portrait widths, persistence,
-  offline operation, and PWA update regression.
-- D-046 routing is recorded in `.agent/DECISIONS.md`, `.agent/CURRENT_SCOPE.md`,
-  `.agent/verification/INDEX.md`, `.agent/verification/catalog.json`, and
-  `.agent/RELEASE_ACCEPTANCE.md`.
+- D-046 / `plan.md` §§9, 16, 17, 24.6: exact audited support policy, bounded
+  deterministic migration boundary, truthful malformed/stale/unsealed
+  recovery, no partial future/unsupported interpretation, and no duplicate
+  task/effect/event behavior.
+- Fixture and recovery contract: committed provenance/checksum/invariant
+  corpus remains covered by `npm run test:save-stability`; the new tests close
+  the schema/content and unsealed progression gaps found by round 111.
+- Browser Rule of Three / `plan.md` §§20, 23, 27: the existing pinned lane
+  still covers supported migration, malformed/tampered recovery, reload,
+  offline PWA resume, and 320/393 portraits.
+- Schema 7, Worker simulation, economy/accounting, navigation, M7C copy, and
+  parked M7B boundaries remain unchanged. No cloud sync, accounts, slots,
+  editor/import, encryption, content, or schema bump added.
 
-## Verifier findings resolved / retained
+## Verifier findings addressed
 
-- No immutable verifier report was edited. No new verifier finding exists for
-  this Implementer turn; the D-046 candidate-owned fixture and recovery seams
-  are mapped in the routing catalog for independent assessment.
-- Active M7B OIV findings and round-109 infrastructure blockers remain
-  retained and parked under D-044. This candidate does not relabel, weaken, or
-  close those findings.
+- `V-111-001`: production restore and recovery status use the audited exact
+  schema/content lookup; unknown legacy content returns the fallback and
+  `reset` status.
+- `V-111-002`: fallback detection precedes legacy migration classification;
+  malformed supported legacy records report reset copy naming the reset and
+  next action.
+- `V-111-003`: the unsealed normalizer clears uncorroborated ownership and
+  progression while retaining only bounded corroborated purchase/history and
+  core task/accounting state; the causal repair path remains compatible with
+  prior saturated-ending protections.
+
+Independent verification remains required; this handoff does not issue PASS.
 
 ## Setup, startup, and verification commands
 
-Dependency and browser caches are ignored and repository-local:
+Repository-local caches:
 
 ```sh
 export npm_config_cache="$PWD/.cache/npm"
@@ -72,80 +69,69 @@ export PLAYWRIGHT_BROWSERS_PATH="$PWD/.cache/ms-playwright"
 ./scripts/run
 ```
 
-`./scripts/run` starts Vite on deterministic loopback `127.0.0.1:4173`.
-Playwright's managed server uses `./scripts/run-e2e`, builds first, waits for
-the same loopback URL, and cleans up after each run. `@playwright/test` is
-pinned in `package.json` and the browser installation is project-cache based.
+`./scripts/run` serves Vite on `127.0.0.1:4173`. Playwright-managed e2e uses
+`./scripts/run-e2e`, waits for loopback readiness, and cleans up its process.
+`@playwright/test` is pinned in `package.json`; browser binaries stay in the
+ignored repository cache.
 
 Focused commands:
 
 ```sh
-npm run generate:save-fixtures
 npm run test:save-stability
 npm test
-npm run build
+npm run typecheck -- --pretty false
+npm run lint
+npm run format:check
 npm run validate:verification-catalog
 npm run test:e2e -- tests/e2e/save-stability.spec.ts
 ```
 
-Canonical candidate command:
+Canonical command attempted once after the initial executable edits:
 
 ```sh
-VERIFY_EVIDENCE_DIR=.cache/verification/round-111-development \
+VERIFY_EVIDENCE_DIR=.cache/verification/round-112-development \
   ./scripts/verify --profile=development
 ```
 
-Final canonical result: exit `0`; catalog, setup, format, lint, typecheck,
-unit (`71 files`, `346 tests`), balance, build, production audit (`0
-vulnerabilities`), root Chromium/PWA (`242 passed`), and Pages/offline (`2
-passed`) passed. The summary records
-`m7b-commercial-gate=blocked (parked under D-044; run --profile full-release)`
-and `verification=development-candidate` at
-`.cache/verification/round-111-development/summary.txt`.
+That invocation stopped in the unit lane on two compatibility regressions
+(`capitalLedgerCurrency.test.ts` legacy purchase wording and
+`verifierRound035.test.ts` saturated causal-repair metadata). Both were fixed.
+The complete post-fix unit lane is `72 files / 360 tests`; focused fixture and
+adversarial lanes are `53/53`; the focused browser lane is `4/4`; typecheck,
+lint, format, and catalog validation are clean. The canonical command was not
+looped after those fixes to respect the one-final-gate rule; an independent
+Verifier must rerun it for the committed candidate.
 
-Full release remains the separate strict command:
-`./scripts/verify --profile=full-release`.
+The first sandboxed browser attempt failed before execution on macOS Chromium
+MachPort permission; the same pinned command with scoped host permission passed
+all four tests. This is recorded infrastructure evidence, not a test waiver.
 
 ## Important architectural decisions
 
-- `saveSupport.ts` is policy/provenance data only; it does not guess public
-  deployment history or create a second restore path.
-- `restoreSimulationStateWithReport` wraps the established engine restore
-  function rather than duplicating migration logic. Recovery classification is
-  derived from the source record, restored state, schema/content support, and
-  integrity result at that single boundary.
-- Backup persistence uses two fixed localStorage keys and a hard raw-length
-  bound. Backup/status failure cannot prevent the in-memory simulation from
-  starting. No cloud, account, slot, editor/import, encryption, or schema bump
-  was added.
-- React recovery status is presentation-only and does not dispatch simulation
-  commands. Worker publication still owns durable state; recovery storage is a
-  bounded diagnostic handoff for the next user action.
+- `saveSupport.ts` remains the sole audited policy/provenance table; the engine
+  consumes its exact lookup rather than maintaining a second permissive list.
+- Unsealed normalization runs only after structural validation and before
+  causal checks. Purchase messages are bounded ledger corroboration, not
+  arbitrary import authority. Invalid structural records still return the
+  seed-specific fresh state.
+- Recovery backup/status behavior, Worker publication, and all M7C/M7B
+  contracts remain unchanged.
 
 ## Known limitations and risks
 
-- Commercial release remains blocked by the parked M7B physical/native/WebKit
-  evidence under D-044: VoiceOver/TalkBack speech, unlocked physical Android,
-  battery/thermal measurement, authenticated frozen baseline, and known WebKit
-  offline top-level reload evidence. The full-release script remains strict.
-- Historical schema 3–6 and intermediate schema-7 fixtures are deterministic
-  reconstructions from audited source/migration history, not byte captures of
-  surviving deployed storage. Their metadata explicitly records that
-  derivation and compatibility tier.
-- Raw recovery backup is best-effort if browser storage itself is unavailable;
-  the UI reports when no backup could be preserved and keeps the run operable.
-- Independent Verifier must assess the exact committed candidate SHA. This
-  handoff does not issue PASS or release acceptance.
+- The parked M7B commercial/native/WebKit/device evidence and deployment gates
+  remain outside this repair; no full-release profile was run.
+- Schema 3–6 and intermediate schema-7 fixtures are audited reconstructions,
+  not surviving byte captures; provenance and derivation remain explicit.
+- Raw recovery backup remains best-effort under storage quota/unavailability;
+  the UI reports when no backup was preserved and keeps the run operable.
 
-## Checks not run / final evidence
+## Checks not run
 
-- The canonical development profile completed successfully; exact summary and
-  lane results are recorded above.
-- Full-release/default profile, WebKit/native/device-performance lanes, hosted
-  exact-SHA verification, and deployment were not run: required M7B
-  infrastructure and release-owner authority remain out of scope/parked under
-  D-044.
-- A first sandboxed focused browser attempt failed before test execution with
-  macOS Chromium MachPort permission denial; the same pinned test was rerun
-  with scoped host browser permission and passed. This is retained as
-  infrastructure evidence, not hidden.
+- Full-release / M7B physical, native, WebKit, device-performance, hosted
+  exact-SHA, deployment, and release-owner checks: explicitly parked/out of
+  scope under D-044.
+- A second canonical development invocation after the repaired executable
+  delta: intentionally not run under the protocol's one-final-gate rule; the
+  post-fix complete unit and focused browser evidence above is available for
+  the fresh independent Verifier.
