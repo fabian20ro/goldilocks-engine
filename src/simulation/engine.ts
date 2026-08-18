@@ -388,20 +388,53 @@ function hasRecordedFirstSessionPurchase(state: SimulationState): boolean {
 
 function hasRecordedCapitalPurchase(
   state: Pick<SimulationState, "ledger">,
-  item: { name: string; purchaseCost: number },
+  messages: readonly (string | null)[],
 ): boolean {
-  const prefixes = [
-    `${item.name} purchased for ${formatExactCurrency(item.purchaseCost)}`,
-    // The first-session ledger predates exact three-decimal currency. Keep
-    // that audited legacy wording as corroboration during stale recovery.
-    `${item.name} purchased for ${formatCurrency(item.purchaseCost, 2)}`,
-  ];
+  const exactMessages = messages.filter(
+    (message): message is string => message !== null,
+  );
   return state.ledger.some(
     (event) =>
-      event.kind === "success" &&
-      prefixes.some((prefix) => event.message.startsWith(prefix)),
+      event.kind === "success" && exactMessages.includes(event.message),
   );
 }
+
+function hardwarePurchaseLedgerMessage(hardwareId: string): string | null {
+  const item = findHardware(hardwareId);
+  if (!item || item.purchaseCost <= 0) return null;
+  return `${item.name} purchased for ${formatExactCurrency(item.purchaseCost)} and is now owned. Equip it to apply its constraints; purchase deducted exactly once.`;
+}
+
+function expansionPurchaseLedgerMessage(expansionId: string): string | null {
+  const item = findPipelineExpansion(expansionId);
+  if (!item || item.purchaseCost <= 0) return null;
+  return `${item.name} purchased for ${formatExactCurrency(item.purchaseCost)} and is now owned. Activate it explicitly; its three new positions start empty and no module was bought or filled automatically.`;
+}
+
+function allExactCapitalPurchaseLedgerMessages(): readonly string[] {
+  const messages: string[] = [];
+  for (const item of hardware) {
+    const message = hardwarePurchaseLedgerMessage(item.id);
+    if (message) messages.push(message);
+  }
+  for (const item of modules) {
+    const current = modulePurchaseLedgerMessage(item.id);
+    const legacy = modulePurchaseLedgerMessage(item.id, (amount) =>
+      formatCurrency(amount, 2),
+    );
+    if (current) messages.push(current);
+    if (legacy) messages.push(legacy);
+  }
+  for (const item of pipelineExpansions) {
+    const message = expansionPurchaseLedgerMessage(item.id);
+    if (message) messages.push(message);
+  }
+  return messages;
+}
+
+const EXACT_CAPITAL_PURCHASE_LEDGER_MESSAGES = new Set(
+  allExactCapitalPurchaseLedgerMessages(),
+);
 
 /**
  * Settlement events retain the accepted task ID, unlike lastSettlement, which
@@ -5901,7 +5934,8 @@ function hasRetainedCausalLedgerEvidence(
 
   const capitalCommitmentEvents = ledger.filter(
     (event) =>
-      event.kind === "success" && event.message.includes(" purchased for $"),
+      event.kind === "success" &&
+      EXACT_CAPITAL_PURCHASE_LEDGER_MESSAGES.has(event.message),
   ).length;
   if (evaluation.capitalCommitments > capitalCommitmentEvents) return false;
 
@@ -6474,7 +6508,9 @@ function normalizeUnsealedProgressionState(
       return (
         item !== undefined &&
         id !== STARTER_HARDWARE_ID &&
-        hasRecordedCapitalPurchase(state, item)
+        hasRecordedCapitalPurchase(state, [
+          hardwarePurchaseLedgerMessage(item.id),
+        ])
       );
     }),
   ];
@@ -6485,13 +6521,23 @@ function normalizeUnsealedProgressionState(
       return (
         item !== undefined &&
         !starterModuleIds.includes(id) &&
-        hasRecordedCapitalPurchase(state, item)
+        hasRecordedCapitalPurchase(state, [
+          modulePurchaseLedgerMessage(item.id),
+          modulePurchaseLedgerMessage(item.id, (amount) =>
+            formatCurrency(amount, 2),
+          ),
+        ])
       );
     }),
   ];
   const ownedExpansionIds = state.ownedExpansionIds.filter((id) => {
     const item = findPipelineExpansion(id);
-    return item !== undefined && hasRecordedCapitalPurchase(state, item);
+    return (
+      item !== undefined &&
+      hasRecordedCapitalPurchase(state, [
+        expansionPurchaseLedgerMessage(item.id),
+      ])
+    );
   });
   const safeHardwareId = ownedHardwareIds.includes(state.hardwareId)
     ? state.hardwareId
@@ -7114,7 +7160,16 @@ function recoveryStatusFor(
       nextAction: "Continue the migrated run and make one normal save.",
     };
   }
-  if (record.contentVersion !== CONTENT_VERSION)
+  if (record.contentVersion !== CONTENT_VERSION) {
+    if (isFallbackState(state, fallbackSeed))
+      return {
+        ...base,
+        disposition: "reset",
+        reason: "malformed-or-uncorroborated-save",
+        reset: ["untrusted save fields"],
+        nextAction:
+          "Start a new run; the recovery backup is available for inspection.",
+      };
     return {
       ...base,
       disposition: "migrated",
@@ -7127,6 +7182,7 @@ function recoveryStatusFor(
       reset: ["content-only additions absent from the source generation"],
       nextAction: "Continue the upgraded run and make one normal save.",
     };
+  }
   if (hasValidStateIntegrity(record as unknown as SimulationState))
     return {
       ...base,

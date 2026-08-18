@@ -1,7 +1,7 @@
-# Candidate handoff — Round 112 M7D save-stability repair
+# Candidate handoff — Round 113 M7D save-stability repair
 
-Implementation base: `c7d103624c46c44f15e1673467d4560b7ae353d2` (immutable
-round-111 Verifier commit). Candidate SHA is recorded after the final commit;
+Implementation base: `5d691392dd35c2d2138c4af5d6ee4c98149daeb6` (immutable
+round-112 Verifier commit). Candidate SHA is recorded after the final commit;
 this handoff makes no independent-verifier verdict or commercial-release
 acceptance claim.
 
@@ -14,18 +14,24 @@ acceptance claim.
 - A fallback result is classified as `reset` before any legacy migration status
   is reported. Minimal records naming a supported legacy generation cannot be
   described as migrated or as preserving source fields.
+- Supported schema-7 legacy-content records are classified as `migrated` only
+  when the restore produced a non-fallback migrated state; malformed records
+  now receive reset/next-action copy.
 - Structurally valid unsealed current saves retain task/accounting/seed/RNG and
-  bounded ledger history. Ownership is retained only when its purchase record
-  is corroborated (including the audited legacy two-decimal first-session
-  wording); uncorroborated hardware/module/expansion ownership, workload
-  unlocks, Career route/savings, and meta progression return to safe defaults.
-  Existing causal/evaluation repair remains authoritative for retained ending
-  evidence. Structurally malformed records still fall back rather than being
-  normalized into a recovery.
+  bounded ledger history. Ownership is retained only when a complete,
+  engine-authored purchase message matches the audited item-specific message
+  (including the audited legacy two-decimal first-session wording); malformed
+  free-text suffixes do not corroborate ownership. Causal capital counters use
+  the same exact message set. Uncorroborated hardware/module/expansion
+  ownership, workload unlocks, Career route/savings, and meta progression
+  return to safe defaults. Existing causal/evaluation repair remains
+  authoritative for retained ending evidence. Structurally malformed records
+  still fall back rather than being normalized into a recovery.
 - Added candidate-owned fixture regressions for exact legacy admission,
   malformed legacy reset classification, and forged unsealed progression.
 - Preserved immutable `.agent/verification/round-111.md`,
-  `src/simulation/verifierRound111.test.ts`, and verifier catalog changes.
+  `.agent/verification/round-112.md`, both verifier-owned regression tests,
+  and verifier catalog changes.
 
 ## Plan requirements covered
 
@@ -34,8 +40,9 @@ acceptance claim.
   recovery, no partial future/unsupported interpretation, and no duplicate
   task/effect/event behavior.
 - Fixture and recovery contract: committed provenance/checksum/invariant
-  corpus remains covered by `npm run test:save-stability`; the new tests close
-  the schema/content and unsealed progression gaps found by round 111.
+  corpus remains covered by `npm run test:save-stability`; the implementation
+  closes the schema/content and unsealed progression gaps found by rounds 111
+  and 112.
 - Browser Rule of Three / `plan.md` §§20, 23, 27: the existing pinned lane
   still covers supported migration, malformed/tampered recovery, reload,
   offline PWA resume, and 320/393 portraits.
@@ -55,6 +62,12 @@ acceptance claim.
   progression while retaining only bounded corroborated purchase/history and
   core task/accounting state; the causal repair path remains compatible with
   prior saturated-ending protections.
+- `V-112-001`: schema-7 legacy-content status now checks fallback after restore
+  before claiming content migration.
+- `V-112-002`: ownership corroboration requires exact full engine-authored
+  hardware/module/expansion purchase text; a tampered suffix is rejected.
+- `V-112-003`: causal capital-commitment evidence uses the same exact purchase
+  message set, so malformed free text cannot preserve forged counters.
 
 Independent verification remains required; this handoff does not issue PASS.
 
@@ -86,21 +99,22 @@ npm run validate:verification-catalog
 npm run test:e2e -- tests/e2e/save-stability.spec.ts
 ```
 
-Canonical command attempted once after the initial executable edits:
+Canonical command for this candidate:
 
 ```sh
-VERIFY_EVIDENCE_DIR=.cache/verification/round-112-development \
+VERIFY_EVIDENCE_DIR=.cache/verification/round-113-development \
   ./scripts/verify --profile=development
 ```
 
-That invocation stopped in the unit lane on two compatibility regressions
-(`capitalLedgerCurrency.test.ts` legacy purchase wording and
-`verifierRound035.test.ts` saturated causal-repair metadata). Both were fixed.
-The complete post-fix unit lane is `72 files / 361 tests`; focused fixture and
-adversarial lanes are `54/54`; the focused browser lane is `4/4`; typecheck,
-lint, format, and catalog validation are clean. The canonical command was not
-looped after those fixes to respect the one-final-gate rule; an independent
-Verifier must rerun it for the committed candidate.
+Pre-canonical focused evidence: complete unit lane `73 files / 366 tests`,
+Round-111/112 adversarial and adjacent suites `59/59`, save-stability lane
+`29/29`, focused browser lifecycle `4/4`, typecheck, lint, format, and catalog
+validation clean. The single canonical development invocation completed with
+exit 0 and recorded `verification=development-candidate`. Its lanes reported
+verification-catalog, setup, format, lint, typecheck, unit, balance, build,
+production-audit, root-browser-pwa, and pages-offline as passed; the output
+also records `m7b-commercial-gate=blocked` as parked under D-044, with no
+full-release profile run.
 
 The first sandboxed browser attempt failed before execution on macOS Chromium
 MachPort permission; the same pinned command with scoped host permission passed
@@ -131,7 +145,3 @@ all four tests. This is recorded infrastructure evidence, not a test waiver.
 - Full-release / M7B physical, native, WebKit, device-performance, hosted
   exact-SHA, deployment, and release-owner checks: explicitly parked/out of
   scope under D-044.
-- A second canonical development invocation after the repaired executable
-  delta: intentionally not run under the protocol's one-final-gate rule; the
-  post-fix complete unit and focused browser evidence above is available for
-  the fresh independent Verifier.
