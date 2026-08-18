@@ -385,6 +385,31 @@
         "scripts/collect-mobile-performance.mjs"
       ],
       "note": "Broad WebKit-marker filters remove matching page/console errors before the zero-error and performance gates, even though structured Playwright marker collisions classify as FAILED."
+    },
+    {
+      "id": "V-106-001",
+      "match": { "exact": ["V-106-001"] },
+      "status": "active",
+      "requirementId": "M7B-WEBKIT-001",
+      "regressionEvidence": [
+        ".agent/verification/round-106-adversarial.mjs",
+        "tests/e2e/m7b-webkit.spec.ts",
+        "scripts/collect-mobile-performance.mjs",
+        "scripts/webkit-result-classifier.mjs"
+      ],
+      "note": "The known structured WebKit offline-reload blocker also emits a correlated console error; unqualified error assertions make the browser and baseline lanes FAILED instead of BLOCKED, while preserving a way to distinguish unrelated page errors."
+    },
+    {
+      "id": "V-106-002",
+      "match": { "exact": ["V-106-002"] },
+      "status": "active",
+      "requirementId": "M7B-NATIVE-001",
+      "regressionEvidence": [
+        ".agent/verification/round-106-adversarial.mjs",
+        "scripts/native-accessibility.mjs",
+        "docs/m7b-native-accessibility.md"
+      ],
+      "note": "Native capture blocker instructions tell the operator to edit checklist.json, but validation consumes operator-submission.json; the recovery instruction points at the wrong input artifact."
     }
   ],
   "supersededProbes": [
