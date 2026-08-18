@@ -2,7 +2,7 @@
 
 Candidate SHA: see the exact full SHA returned with this handoff. Implementation
 started from verifier commit
-`b125c18a1b784747177c06eb346d89952fb464af`.
+`df4a33c405dd4602fd2437bb6f0c716ee3264f7e`.
 
 ## Implemented behavior summary
 
@@ -25,10 +25,18 @@ started from verifier commit
   and optional Android Chrome CDP lane using adb reverse/forward. INP is
   populated only from Event Timing evidence; missing evidence is BLOCKED.
 - Reworked `scripts/capture-frozen-baseline.mjs` into an internal accepted-Git
-  capture child. A parent-generated nonce authenticates its direct stdout
-  envelope; accepted object/tree/build/device/browser/settings and all artifact
-  digests are revalidated before a digest-addressed output copy is retained.
-  Persisted/caller-supplied receipts have no comparison path.
+  capture child. It archives/builds/serves the accepted app bytes, verifies the
+  live build-info object/tree/build identity, then invokes the current
+  collector through an absolute path in capture-only target-URL mode. A
+  parent-generated nonce authenticates its direct stdout envelope; accepted
+  object/tree/build/device/browser/settings and all artifact digests are
+  revalidated before a digest-addressed output copy is retained. Persisted or
+  caller-supplied receipts have no comparison path, and capture-only mode
+  cannot recurse into baseline capture.
+- WebKit and performance page/console errors are retained verbatim and fail
+  zero-error gates. Only the offline `page.reload` operation is caught into a
+  structured `{source, operation, message}` `offlineNavigationError`; its
+  structured blocker is separate from page/console error evidence.
 - Reworked `scripts/webkit-result-classifier.mjs`: any structured unexpected,
   failed, timed-out, interrupted, or flaky test is FAILED regardless of marker;
   structured infrastructure BLOCKED is possible only after successful tests;
@@ -72,8 +80,12 @@ started from verifier commit
 - Round-104 findings V-104-001 through V-104-003 are addressed: persisted
   baseline receipts are disabled as trust roots, marker collisions cannot mask
   structured failures, and wall-clock interaction duration cannot become INP.
-- The exact round-102, round-103, and round-104 adversarial probes returned no
-  findings.
+- Round-105 findings V-105-001 and V-105-002 are addressed: accepted app bytes
+  are served while the current collector measures through a nonce-bound
+  capture-only channel, and marker-containing page/console errors are never
+  filtered or relabeled as infrastructure.
+- The exact round-102, round-103, round-104, and round-105 adversarial probes
+  returned no findings.
   Independent verification remains required; this handoff issues no verdict.
 
 ## Setup, startup, and verification commands
@@ -105,6 +117,7 @@ node --check scripts/run-webkit-e2e.mjs
 node --input-type=module -e 'import { classifyWebKitReport } from "./scripts/webkit-result-classifier.mjs"; const valid={stats:{unexpected:0,flaky:0},suites:[{specs:[{tests:[{status:"expected",results:[{status:"passed"}]}]}]}]}; const mixed={stats:{unexpected:1,flaky:0},suites:[{specs:[{tests:[{status:"unexpected",annotations:[{type:"infrastructure",description:"offline"}],results:[{status:"failed",error:{message:"assertion"}}]}]}]}]}; if (classifyWebKitReport(valid,0).result!=="PASS" || classifyWebKitReport(mixed,1).result!=="FAILED") process.exit(1)'
 node .agent/verification/round-103-adversarial.mjs
 node .agent/verification/round-104-adversarial.mjs
+node .agent/verification/round-105-adversarial.mjs
 git diff --check
 M7B_NATIVE_ALLOW_BLOCKED=1 M7B_NATIVE_EVIDENCE_DIR=.cache/m7b/native/focused \
   npm run test:native-a11y
@@ -139,7 +152,9 @@ artifacts. The native validator writes only
   no product redesign or speculative abstraction was introduced.
 - WebKit's known offline top-level navigation error is preserved as a
   concrete `BLOCKED` finding while service-worker/controller/cache proof is
-  retained. Other page/console errors fail the lane.
+  retained. Every other page/console error remains in the zero-error list and
+  fails the lane, including errors whose text contains an infrastructure
+  marker.
 - Renderer-wide timing is not treated as Worker attribution. The collector
   instruments the shipped Dedicated Worker only in the test page, records
   request/response evidence at 1×/64×, and returns BLOCKED if that attribution
@@ -173,9 +188,10 @@ artifacts. The native validator writes only
 - The managed macOS browser sandbox may require scoped host authority for
   pinned browser launch. No chrome-devtools MCP or global cache is used.
 - The final canonical run for this candidate is recorded below. The pinned
-  accepted object lacks the M7B collector source, so the fresh baseline child
-  capture is expected to remain an explicit `BLOCKED` infrastructure gate;
-  canonical output must not claim PASS.
+  accepted object lacks the M7B collector source; the fresh baseline child now
+  serves that object and runs the current collector, but remains explicitly
+  `BLOCKED` when physical/browser evidence is unavailable. Canonical output
+  must not claim PASS.
 - Deferred M7 work remains out of scope: writing/density, save fixtures and
   support policy, localization, audio, packaging/distribution, telemetry,
   startup/workforce/government/remote content, native wrappers, and new game
@@ -185,15 +201,16 @@ artifacts. The native validator writes only
 
 - Passed: focused evidence test without coverage, format, lint, typecheck,
   syntax checks, `git diff --check`, classifier valid/infra/no-test/launch
-  checks, and the exact round-102/103/104 adversarial probes.
+  checks, the exact round-102/103/104/105 adversarial probes, and a wrong
+  capture-only target probe that returned `BLOCKED` before collecting cells.
 - Focused evidence remains available in ignored `.cache/m7b/` directories;
-  round-102/103/104 probes are reproducible and returned no findings. The
+  round-102/103/104/105 probes are reproducible and returned no findings. The
   final canonical retained evidence is
-  `.cache/verification/round-105-final/`; its root-browser log records the
-  managed Chromium Mach-port launch blocker above, and later lanes were not
-  silently treated as passed.
+  `.cache/verification/round-106-final/`; its root-browser log records the
+  managed Chromium Mach-port launch blocker above, and later M7B lanes were
+  not silently treated as passed.
 - Final canonical command:
-  `VERIFY_EVIDENCE_DIR=.cache/verification/round-105-final ./scripts/verify`.
+  `VERIFY_EVIDENCE_DIR=.cache/verification/round-106-final ./scripts/verify`.
   Catalog, setup, format, lint, typecheck, 67-file/312-test unit suite, all
   balance lanes, build, and production audit passed. Root-browser Playwright
   stopped at 0/238 because the managed browser sandbox denied Chromium's

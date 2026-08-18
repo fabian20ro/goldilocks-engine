@@ -25,7 +25,6 @@ const port = Number(process.env.M7B_PERFORMANCE_PORT ?? "4176");
 const androidCdpPort = Number(
   process.env.M7B_PERFORMANCE_ANDROID_CDP_PORT ?? "9223",
 );
-const loopbackUrl = `http://127.0.0.1:${port}/`;
 const runs = Number(process.env.M7B_PERFORMANCE_RUNS ?? "5");
 const widths = [320, 393];
 const browsers = (process.env.M7B_PERFORMANCE_BROWSERS ?? "chromium,webkit")
@@ -38,6 +37,10 @@ const allowBlocked =
 const captureFrozenBaseline = process.argv.includes(
   "--capture-frozen-baseline",
 );
+const captureOnly =
+  process.env.M7B_PERFORMANCE_CAPTURE_ONLY === "1" ||
+  process.argv.includes("--capture-only");
+const captureMode = captureFrozenBaseline || captureOnly;
 // These values are the release-owner trust root for the frozen M7A receipt.
 // Environment variables may request a capture, but never redefine the object
 // against which candidate evidence is compared.
@@ -59,6 +62,7 @@ const callerBaselineOverride =
   process.argv.find((value) => value.startsWith("--baseline=")) ??
   process.env.M7B_PERFORMANCE_BASELINE;
 const summaryArg = process.argv.find((value) => value.startsWith("--output="));
+const targetUrl = process.env.M7B_PERFORMANCE_TARGET_URL?.trim() || null;
 const summaryPath = path.resolve(
   root,
   summaryArg?.slice("--output=".length) ??
@@ -74,6 +78,10 @@ const measurementSettings = {
   widths,
 };
 const measurementSettingsFingerprint = settingsFingerprint(measurementSettings);
+const targetLoopbackUrl = targetUrl
+  ? new URL(targetUrl).toString()
+  : `http://127.0.0.1:${port}/`;
+const loopbackUrl = targetLoopbackUrl;
 
 if (!Number.isInteger(runs) || runs < 5) {
   console.error(
@@ -142,7 +150,7 @@ function existingArtifact(filePath) {
 
 function gitSha() {
   if (
-    captureFrozenBaseline &&
+    captureMode &&
     process.env.M7B_FROZEN_CAPTURE_AUTH &&
     process.env.M7B_FROZEN_CAPTURE_AUTH ===
       process.env.M7B_FROZEN_CAPTURE_NONCE &&
@@ -163,7 +171,7 @@ function gitTreeSha(commitSha) {
   if (typeof commitSha !== "string" || !/^[a-f0-9]{40}$/.test(commitSha))
     return "unknown";
   if (
-    captureFrozenBaseline &&
+    captureMode &&
     commitSha === frozenAcceptedCandidateSha &&
     process.env.M7B_FROZEN_CAPTURE_AUTH &&
     process.env.M7B_FROZEN_CAPTURE_AUTH ===
@@ -490,12 +498,7 @@ async function runBrowserSample(browserName, width, runIndex, browser) {
       offlineStartupMs,
       actualCssViewport: metrics.viewport,
       supportedEntryTypes: metrics.supportedEntryTypes,
-      errors: errors.filter(
-        (error) => !/WebKit encountered an internal error/i.test(error),
-      ),
-      infrastructureErrors: errors.filter((error) =>
-        /WebKit encountered an internal error/i.test(error),
-      ),
+      errors,
       offlineNavigationError,
     };
   } finally {
@@ -524,13 +527,17 @@ async function expectOfflineReload(page, context, browserName) {
     )
     .toBe(true);
   await context.setOffline(true);
-  let navigationError = null;
+  let offlineNavigationError = null;
   try {
     try {
       await page.reload({ waitUntil: "domcontentloaded" });
     } catch (error) {
       if (browserName !== "webkit") throw error;
-      navigationError = String(error);
+      offlineNavigationError = {
+        source: "page.reload",
+        operation: "offline-reload",
+        message: String(error),
+      };
     }
     await waitForApp(page);
     const cacheProof = await page.evaluate(async () => {
@@ -550,7 +557,7 @@ async function expectOfflineReload(page, context, browserName) {
   } finally {
     await context.setOffline(false);
   }
-  return navigationError;
+  return offlineNavigationError;
 }
 
 async function collectAdbDevice() {
@@ -716,7 +723,11 @@ async function runAndroidChromeSample(
       try {
         await page.reload({ waitUntil: "domcontentloaded" });
       } catch (error) {
-        offlineNavigationError = String(error);
+        offlineNavigationError = {
+          source: "page.reload",
+          operation: "offline-reload",
+          message: String(error),
+        };
       }
       await waitForApp(page);
       const cacheProof = await page.evaluate(async () => {
@@ -1490,7 +1501,7 @@ function captureFrozenBaselineThroughChannel(currentContext) {
 const summary = {
   schemaVersion: 1,
   kind: "m7b-mobile-performance",
-  mode: captureFrozenBaseline ? "frozen-baseline" : "candidate",
+  mode: captureMode ? "frozen-baseline" : "candidate",
   candidateSha: gitSha(),
   gitTreeSha: gitTreeSha(gitSha()),
   buildInfo: null,
@@ -1504,7 +1515,10 @@ const summary = {
   loopback: {
     url: loopbackUrl,
     port,
-    startup: `E2E_PORT=${port} ./scripts/run-e2e`,
+    startup: targetUrl
+      ? "caller-served frozen app target (capture-only mode)"
+      : `E2E_PORT=${port} ./scripts/run-e2e`,
+    targetMode: Boolean(targetUrl),
     cleanup:
       "terminate preview process group and close every Playwright context/browser",
   },
@@ -1552,15 +1566,18 @@ if (
 summary.findings.push(...legacyBaselineReceiptFindings());
 
 let server;
+let targetBuildValid = true;
 try {
-  server = spawn("./scripts/run-e2e", [], {
-    cwd: root,
-    detached: true,
-    env: { ...process.env, E2E_PORT: String(port) },
-    stdio: "ignore",
-  });
   const deadline = Date.now() + 60_000;
   let ready = false;
+  if (!targetUrl) {
+    server = spawn("./scripts/run-e2e", [], {
+      cwd: root,
+      detached: true,
+      env: { ...process.env, E2E_PORT: String(port) },
+      stdio: "ignore",
+    });
+  }
   while (Date.now() < deadline) {
     try {
       const response = await fetch(loopbackUrl);
@@ -1588,82 +1605,111 @@ try {
       summary.buildInfo = await buildResponse.json();
       if (typeof summary.buildInfo?.version !== "string")
         throw new Error("build-info.json has no version");
+      if (captureOnly) {
+        const expectedTarget = {
+          candidateSha: process.env.M7B_FROZEN_CAPTURE_SHA,
+          gitTreeSha: process.env.M7B_FROZEN_CAPTURE_TREE_SHA,
+          buildId: process.env.M7B_FROZEN_BUILD_ID,
+        };
+        const actualTarget = {
+          candidateSha: summary.buildInfo?.candidateSha,
+          gitTreeSha: summary.buildInfo?.gitTreeSha,
+          buildId: summary.buildInfo?.version,
+        };
+        if (
+          actualTarget.candidateSha !== expectedTarget.candidateSha ||
+          actualTarget.gitTreeSha !== expectedTarget.gitTreeSha ||
+          actualTarget.buildId !== expectedTarget.buildId
+        ) {
+          targetBuildValid = false;
+          summary.findings.push({
+            gate: "frozen-target-build",
+            reason:
+              "capture-only target build-info identity does not match the pinned accepted Git object/tree/build",
+            expected: expectedTarget,
+            actual: actualTarget,
+            result: "BLOCKED",
+          });
+        }
+      }
     } catch (error) {
+      targetBuildValid = false;
       summary.findings.push({
-        gate: "build-identity",
+        gate: captureOnly ? "frozen-target-build" : "build-identity",
         reason: `deterministic loopback build-info.json unavailable: ${String(error)}`,
         result: "BLOCKED",
       });
     }
-    for (const browserName of browsers) {
-      const launcher = { chromium, webkit }[browserName];
-      if (!launcher) {
-        summary.findings.push({
-          gate: "browser",
-          browser: browserName,
-          reason: "unknown browser",
-          result: "BLOCKED",
-        });
-        continue;
-      }
-      let browser;
-      try {
-        browser = await launcher.launch({ headless: true });
-        for (const width of widths) {
-          const cellSamples = [];
-          for (let runIndex = 1; runIndex <= runs; runIndex += 1) {
-            try {
-              const output = await runBrowserSample(
-                browserName,
-                width,
-                runIndex,
-                browser,
-              );
-              cellSamples.push(output.sample);
-              summary.artifacts.push(output.trace, output.sampleArtifact);
-            } catch (error) {
-              summary.findings.push({
-                gate: "sample",
-                browser: browserName,
-                width,
-                run: runIndex,
-                reason: String(error),
-                result: "BLOCKED",
-              });
-            }
-          }
-          summary.cells.push({
+    if (targetBuildValid)
+      for (const browserName of browsers) {
+        const launcher = { chromium, webkit }[browserName];
+        if (!launcher) {
+          summary.findings.push({
+            gate: "browser",
             browser: browserName,
-            width,
-            height: width === 320 ? 693 : 742,
-            identity: {
-              candidateSha: summary.candidateSha,
-              buildId: summary.buildInfo?.version ?? null,
-              deviceId: performanceDeviceId,
+            reason: "unknown browser",
+            result: "BLOCKED",
+          });
+          continue;
+        }
+        let browser;
+        try {
+          browser = await launcher.launch({ headless: true });
+          for (const width of widths) {
+            const cellSamples = [];
+            for (let runIndex = 1; runIndex <= runs; runIndex += 1) {
+              try {
+                const output = await runBrowserSample(
+                  browserName,
+                  width,
+                  runIndex,
+                  browser,
+                );
+                cellSamples.push(output.sample);
+                summary.artifacts.push(output.trace, output.sampleArtifact);
+              } catch (error) {
+                summary.findings.push({
+                  gate: "sample",
+                  browser: browserName,
+                  width,
+                  run: runIndex,
+                  reason: String(error),
+                  result: "BLOCKED",
+                });
+              }
+            }
+            summary.cells.push({
               browser: browserName,
               width,
-              settingsFingerprint: measurementSettingsFingerprint,
-            },
-            summary: summarizeCell(cellSamples),
-            samples: cellSamples,
+              height: width === 320 ? 693 : 742,
+              identity: {
+                candidateSha: summary.candidateSha,
+                buildId: summary.buildInfo?.version ?? null,
+                deviceId: performanceDeviceId,
+                browser: browserName,
+                width,
+                settingsFingerprint: measurementSettingsFingerprint,
+              },
+              summary: summarizeCell(cellSamples),
+              samples: cellSamples,
+            });
+          }
+        } catch (error) {
+          summary.findings.push({
+            gate: "browser-launch",
+            browser: browserName,
+            reason: String(error),
+            result: "BLOCKED",
           });
+        } finally {
+          await browser?.close().catch(() => undefined);
         }
-      } catch (error) {
-        summary.findings.push({
-          gate: "browser-launch",
-          browser: browserName,
-          reason: String(error),
-          result: "BLOCKED",
-        });
-      } finally {
-        await browser?.close().catch(() => undefined);
       }
-    }
   }
   summary.physicalDevice = await collectAdbDevice();
   if (summary.physicalDevice.status !== "OBSERVED")
     summary.findings.push(summary.physicalDevice);
-  if (ready) {
+  if (ready && targetBuildValid) {
     summary.androidBrowser = await collectAndroidChrome(summary.physicalDevice);
     if (summary.androidBrowser.status === "OBSERVED") {
       const samples = summary.androidBrowser.samples.map((sample) => ({
@@ -1700,13 +1746,15 @@ try {
     summary.androidBrowser = {
       gate: "android-chrome-performance",
       status: "BLOCKED",
-      reason: "loopback preview was unavailable",
+      reason: ready
+        ? "target build identity was unavailable or invalid"
+        : "loopback preview was unavailable",
       result: "BLOCKED",
     };
     summary.findings.push(summary.androidBrowser);
   }
   summary.findings.push(...budgetFindings(summary.cells));
-  if (!captureFrozenBaseline) {
+  if (!captureMode) {
     const baselineCapture = captureFrozenBaselineThroughChannel({
       candidateSha: summary.candidateSha,
       buildInfo: summary.buildInfo,

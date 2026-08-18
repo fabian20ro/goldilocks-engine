@@ -54,17 +54,23 @@ The installed WebKit build may report `WebKit encountered an internal error`
 for a top-level offline reload even when the service-worker controller and
 cached shell are usable. The collector retains that exact navigation error as
 an `offline-navigation` `BLOCKED` finding alongside the cache proof; it is not
-silently converted into a passing offline navigation.
+silently converted into a passing offline navigation. All page and console
+errors remain in the zero-error list, including marker-containing errors;
+only the offline reload operation is represented separately as structured
+`offlineNavigationError` evidence.
 
 ## Frozen-build baseline and physical Android evidence
 
 The accepted-build baseline is captured by every candidate collector
 invocation; the current candidate is never used as its own baseline. The
-collector creates an unpredictable nonce, asks the internal helper to extract
-the exact frozen SHA (`d25e80e6781de89e80fc3b3c240a922ada53d978` /
-`dc97ee41f6dbbc0e29d2`), installs it with the repository-local caches, and
-consumes only the helper's nonce-authenticated stdout envelope. The helper and
-parent validate the Git object/tree/build, explicit device ID, browser matrix,
+collector creates an unpredictable nonce, asks the internal helper to archive
+and build the exact frozen SHA (`d25e80e6781de89e80fc3b3c240a922ada53d978` /
+`dc97ee41f6dbbc0e29d2`), serves that app on a deterministic target URL, and
+verifies the live build-info object/tree/build identity. It then invokes the
+current collector through an absolute script path in capture-only target-URL
+mode and consumes only the helper's nonce-authenticated stdout envelope.
+Capture-only mode prevents recursive baseline capture. The helper and parent
+validate the Git object/tree/build, explicit device ID, browser matrix,
 settings fingerprint, result, and every retained `{path,sha256}` artifact
 before comparing metrics. A digest-addressed copy is written as output
 evidence after validation; no persisted JSON receipt is read as authority.

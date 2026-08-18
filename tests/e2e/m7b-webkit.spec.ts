@@ -99,7 +99,13 @@ async function assertOfflineRecovery(
   page: Page,
   context: BrowserContext,
   testInfo: TestInfo,
-) {
+): Promise<{
+  offlineNavigationError: {
+    source: "page.reload";
+    operation: "offline-reload";
+    message: string;
+  } | null;
+}> {
   await page.evaluate(() => {
     localStorage.setItem("m7b-webkit-recovery", "before-reload");
     localStorage.setItem("goldilocks-simulation-save-v4", "{malformed");
@@ -119,10 +125,13 @@ async function assertOfflineRecovery(
       },
     )
     .toBe(true);
+  let offlineNavigationError: {
+    source: "page.reload";
+    operation: "offline-reload";
+    message: string;
+  } | null = null;
   await context.setOffline(true);
   try {
-    let offlineNavigationError = "";
-    let result = "PASS";
     try {
       await page.reload({ waitUntil: "commit" });
     } catch (error) {
@@ -130,8 +139,11 @@ async function assertOfflineRecovery(
       // navigation error even while the installed service worker/cache remain
       // usable. Preserve this concrete limitation in the test artifact and
       // prove the cached shell directly instead of hiding the failed attempt.
-      offlineNavigationError = String(error);
-      result = "BLOCKED";
+      offlineNavigationError = {
+        source: "page.reload",
+        operation: "offline-reload",
+        message: String(error),
+      };
     }
     await expect(
       page.locator("h1", { hasText: "Goldilocks Engine" }),
@@ -158,18 +170,15 @@ async function assertOfflineRecovery(
     });
     expect(cacheProof.controller).toBe(true);
     expect(cacheProof.shellCached).toBe(true);
-    if (result === "BLOCKED")
+    if (offlineNavigationError)
       testInfo.annotations.push({
         type: "infrastructure",
-        description: `WebKit offline reload reported: ${offlineNavigationError}`,
+        description: JSON.stringify(offlineNavigationError),
       });
-    if (result === "BLOCKED")
-      expect(offlineNavigationError).toMatch(
-        /internal error|Blocked by Web Inspector/i,
-      );
   } finally {
     await context.setOffline(false);
   }
+  return { offlineNavigationError };
 }
 
 test.describe("M7B pinned WebKit OIV matrix", () => {
@@ -206,11 +215,7 @@ test.describe("M7B pinned WebKit OIV matrix", () => {
           .toBe(true);
         await assertNavigation(page, viewport.width);
         await assertOfflineRecovery(page, context, test.info());
-        expect(
-          errors.filter(
-            (error) => !/WebKit encountered an internal error/i.test(error),
-          ),
-        ).toEqual([]);
+        expect(errors).toEqual([]);
       } finally {
         await context.close();
       }
