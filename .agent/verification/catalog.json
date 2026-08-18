@@ -294,6 +294,39 @@
         "tests/e2e/m7b-webkit.spec.ts"
       ],
       "note": "WebKit offline reload errors are annotated and then accepted by the test rather than failing or producing a blocked lane result."
+    },
+    {
+      "id": "V-103-001",
+      "match": { "exact": ["V-103-001"] },
+      "status": "active",
+      "requirementId": "M7B-PERF-001",
+      "regressionEvidence": [
+        ".agent/verification/round-103-adversarial.mjs",
+        "scripts/collect-mobile-performance.mjs"
+      ],
+      "note": "The baseline comparator trusts a caller-supplied summary's frozen SHA/build/device/settings metadata without authenticating its provenance."
+    },
+    {
+      "id": "V-103-002",
+      "match": { "exact": ["V-103-002"] },
+      "status": "active",
+      "requirementId": "M7B-NATIVE-001",
+      "regressionEvidence": [
+        ".agent/verification/round-103-adversarial.mjs",
+        "scripts/native-accessibility.mjs"
+      ],
+      "note": "Native operator validation checks only the viewport width and finite height, accepting a malformed finite height at the 320x693 boundary."
+    },
+    {
+      "id": "V-103-003",
+      "match": { "exact": ["V-103-003"] },
+      "status": "active",
+      "requirementId": "M7B-WEBKIT-001",
+      "regressionEvidence": [
+        ".agent/verification/round-103-adversarial.mjs",
+        "scripts/run-webkit-e2e.mjs"
+      ],
+      "note": "The WebKit wrapper maps any offline annotation in runner output to BLOCKED even when the Playwright run has an unrelated assertion failure."
     }
   ],
   "supersededProbes": [
