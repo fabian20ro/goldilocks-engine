@@ -220,14 +220,15 @@
     {
       "id": "V-100-001",
       "match": { "exact": ["V-100-001"] },
-      "status": "active",
+      "status": "resolved",
+      "resolutionReport": ".agent/verification/round-101.md",
       "requirementId": "M7A-ROUTING-001",
       "regressionEvidence": [
         "src/test/agentWorkflowRouting.test.ts",
         "src/test/verifierRound083Workflow.test.ts",
         "scripts/verify"
       ],
-      "note": "The M7B routing documentation is internally consistent, but two implementation-authored routing assertions still require the replaced M7A headings and stop the canonical unit gate."
+      "note": "Round 101 PASS repaired the stale M7A heading assertions while retaining the historical-boundary, catalog, non-volatile, and fail-fast routing invariants."
     },
     {
       "id": "V-102-001",
@@ -327,6 +328,39 @@
         "scripts/run-webkit-e2e.mjs"
       ],
       "note": "The WebKit wrapper maps any offline annotation in runner output to BLOCKED even when the Playwright run has an unrelated assertion failure."
+    },
+    {
+      "id": "V-104-001",
+      "match": { "exact": ["V-104-001"] },
+      "status": "active",
+      "requirementId": "M7B-PERF-001",
+      "regressionEvidence": [
+        ".agent/verification/round-104-adversarial.mjs",
+        "scripts/collect-mobile-performance.mjs"
+      ],
+      "note": "The canonical baseline and provenance JSON can be rewritten together with matching accepted metadata and digests; no authenticity boundary binds them to an actual frozen capture."
+    },
+    {
+      "id": "V-104-002",
+      "match": { "exact": ["V-104-002"] },
+      "status": "active",
+      "requirementId": "M7B-WEBKIT-001",
+      "regressionEvidence": [
+        ".agent/verification/round-104-adversarial.mjs",
+        "scripts/webkit-result-classifier.mjs"
+      ],
+      "note": "The WebKit classifier treats a real failed assertion as infrastructure when its error message contains a recognized browser marker."
+    },
+    {
+      "id": "V-104-003",
+      "match": { "exact": ["V-104-003"] },
+      "status": "active",
+      "requirementId": "M7B-PERF-001",
+      "regressionEvidence": [
+        ".agent/verification/round-104-adversarial.mjs",
+        "scripts/collect-mobile-performance.mjs"
+      ],
+      "note": "The performance collector reports interaction wall-clock duration as INP when Event Timing is absent instead of retaining an unsupported metric as null or BLOCKED."
     }
   ],
   "supersededProbes": [
