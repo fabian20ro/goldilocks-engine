@@ -361,6 +361,30 @@
         "scripts/collect-mobile-performance.mjs"
       ],
       "note": "The performance collector reports interaction wall-clock duration as INP when Event Timing is absent instead of retaining an unsupported metric as null or BLOCKED."
+    },
+    {
+      "id": "V-105-001",
+      "match": { "exact": ["V-105-001"] },
+      "status": "active",
+      "requirementId": "M7B-PERF-001",
+      "regressionEvidence": [
+        ".agent/verification/round-105-adversarial.mjs",
+        "scripts/capture-frozen-baseline.mjs",
+        "scripts/collect-mobile-performance.mjs"
+      ],
+      "note": "Same-invocation frozen baseline capture extracts an accepted tree that does not contain the collector it then invokes, so no authenticated accepted-build baseline envelope can be produced."
+    },
+    {
+      "id": "V-105-002",
+      "match": { "exact": ["V-105-002"] },
+      "status": "active",
+      "requirementId": "M7B-WEBKIT-001",
+      "regressionEvidence": [
+        ".agent/verification/round-105-adversarial.mjs",
+        "tests/e2e/m7b-webkit.spec.ts",
+        "scripts/collect-mobile-performance.mjs"
+      ],
+      "note": "Broad WebKit-marker filters remove matching page/console errors before the zero-error and performance gates, even though structured Playwright marker collisions classify as FAILED."
     }
   ],
   "supersededProbes": [
