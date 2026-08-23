@@ -169,8 +169,24 @@ PLAYWRIGHT_BROWSERS_PATH="$PWD/.cache/ms-playwright" \
 completed setup, format, lint, typecheck, unit (`77` files / `400` tests),
 balance, build, production audit, root browser/PWA, and Pages/offline lanes;
 the immutable Round-115 report records that evidence. No executable
-production save semantics changed in Round 116, so the canonical gate is
-intentionally skipped here.
+production save semantics changed in Round 116, so that prior gate was
+intentionally skipped for that round.
+
+Round 117's one final canonical candidate gate was:
+
+```sh
+VERIFY_EVIDENCE_DIR=.cache/verification/round-117-development-final \
+npm_config_cache="$PWD/.cache/npm" \
+PLAYWRIGHT_BROWSERS_PATH="$PWD/.cache/ms-playwright" \
+./scripts/verify --profile=development
+```
+
+It passed: catalog/setup/format/lint/typecheck, unit (`77` files / `401`
+tests), all balance lanes, build, production audit (`0` vulnerabilities),
+root browser/PWA (`244/244`), and Pages/offline (`2/2`). The summary recorded
+`m7b-commercial-gate=blocked (parked under D-044)` and
+`verification=development-candidate`. Browser/cache processes were cleaned up
+by the canonical harness.
 
 ## Important architectural decisions
 
@@ -206,10 +222,8 @@ intentionally skipped here.
 
 - `./scripts/verify --profile=full-release`: not run; M7B remains parked under
   D-044 and this candidate does not close the required native/physical gates.
-- `./scripts/verify --profile=development`: final run pending after the
-  receipt/status documentation and tests are complete; prior Round-116
-  development PASS remains the product baseline and this candidate changes no
-  production behavior.
+- `./scripts/verify --profile=development`: passed once as the final Round-117
+  canonical gate with the exact command and results recorded above.
 - Native preflight ran with a new ignored evidence directory and returned
   `BLOCKED`: CoreSimulatorService was unavailable to `xcrun simctl`, and
   `adb devices -l` returned no authorized device. No Pixel unlock is assumed.
