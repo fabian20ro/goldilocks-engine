@@ -44,6 +44,17 @@ The exact accepted M7A release receipt is recorded in D-043 and
 and the hosted/deployment evidence. This is frozen historical routing, not a
 claim about the live HEAD or a future gate.
 
+## Completed M7D exact-SHA receipt (frozen routing)
+
+The Round 116 M7D deployment receipt is retained at
+`.agent/release-receipts/round-116.md` and summarized in D-048 and
+`.agent/RELEASE_ACCEPTANCE.md`. It records candidate
+`caa334945f5b0a89bc1452609e9b118ba042df01`, hosted Verify run `32582068882`,
+Pages deployment run `32582472823`, remote `main`, live build identity, and the
+320×693 smoke. This is durable historical release evidence only; live Git/report
+state and the next gate continue to come from `./scripts/agent-status`, and the
+receipt does not close the parked M7B commercial gate.
+
 ## Parked commercial-release gate: Milestone 7B OIV evidence
 
 D-043 and `.agent/RELEASE_ACCEPTANCE.md` route this bounded next slice:
@@ -154,6 +165,7 @@ contracts remain regression boundaries.
 | M7D restore/recovery implementation              | `src/simulation/engine.ts`; `src/simulation/saveRecovery.ts`; `src/ui/useSimulation.ts`; `src/ui/App.tsx`                               |
 | M7D executable evidence                          | `src/simulation/saveFixtures.test.ts`; `src/simulation/saveRecovery.test.ts`; `tests/e2e/save-stability.spec.ts`                        |
 | Live Git/report facts                            | `./scripts/agent-status` only                                                                                                           |
+| M7D exact deployment receipt                     | `.agent/release-receipts/round-116.md`; D-048; `.agent/RELEASE_ACCEPTANCE.md`                                                           |
 
 ## Rule-of-Three retained M7A navigation map
 

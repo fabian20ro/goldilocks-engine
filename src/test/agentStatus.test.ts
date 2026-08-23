@@ -54,6 +54,16 @@ function writeReport(
   return commit(root, `verify: record round ${round}`);
 }
 
+function writeReleaseReceipt(root: string, candidate: string): string {
+  const directory = join(root, ".agent", "release-receipts");
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(
+    join(directory, "round-001.md"),
+    `# Release receipt\n\nReceipt status: DEPLOYED\nCandidate SHA: \`${candidate}\`\nHosted Verify head SHA: \`${candidate}\`\nPages deployment head SHA: \`${candidate}\`\nRemote main SHA: \`${candidate}\`\nLive build-info version: \`test-build\`\nLive service-worker build ID: \`test-build\`\nLive HTTP status: \`200\`\nLive smoke: PASS — test\n`,
+  );
+  return commit(root, "release: record exact deployment receipt");
+}
+
 function createAcceptedPassFixture() {
   const root = createRepository();
   writeFileSync(join(root, "candidate.txt"), "candidate\n");
@@ -120,6 +130,27 @@ describe("agent-status", () => {
       verification_state: "unverified-later-changes",
       next_gate: "fresh-independent-verifier",
       next_gate_target_sha: head,
+    });
+  });
+
+  it("exposes a committed exact deployment receipt without treating later metadata as verified", () => {
+    const { candidate, reportCommit, root } = createAcceptedPassFixture();
+    const receiptCommit = writeReleaseReceipt(root, candidate);
+    const status = runStatus(root);
+
+    expect(status.status).toBe(0);
+    expect(JSON.parse(status.stdout)).toMatchObject({
+      head: receiptCommit,
+      accepted_candidate_sha: candidate,
+      accepted_verifier_commit: reportCommit,
+      deployment_state: "recorded",
+      deployment_receipt_path: ".agent/release-receipts/round-001.md",
+      deployment_receipt_commit: receiptCommit,
+      deployed_candidate_sha: candidate,
+      deployed_build_id: "test-build",
+      verification_state: "unverified-later-changes",
+      next_gate: "fresh-independent-verifier",
+      next_gate_target_sha: receiptCommit,
     });
   });
 

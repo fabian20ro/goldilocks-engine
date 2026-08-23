@@ -91,6 +91,89 @@ validate_report_commit() {
     die "$report_relative: changed after its immutable report commit"
 }
 
+parse_release_receipt() {
+  receipt=$1
+  receipt_status_lines=$(grep -E '^Receipt status:' "$receipt" || true)
+  receipt_status_count=$(count_nonempty_lines "$receipt_status_lines")
+  [ "$receipt_status_count" -eq 1 ] ||
+    die "$receipt: expected exactly one Receipt status line"
+  case $receipt_status_lines in
+    'Receipt status: DEPLOYED') ;;
+    *) die "$receipt: unsupported Receipt status; expected DEPLOYED" ;;
+  esac
+
+  receipt_candidate_lines=$(grep -E '^Candidate SHA:' "$receipt" || true)
+  receipt_candidate_count=$(count_nonempty_lines "$receipt_candidate_lines")
+  [ "$receipt_candidate_count" -eq 1 ] ||
+    die "$receipt: expected exactly one Candidate SHA line"
+  printf '%s\n' "$receipt_candidate_lines" |
+    grep -Eq '^Candidate SHA:[[:space:]]*`?[0-9A-Fa-f]{40}`?[[:space:]]*$' ||
+    die "$receipt: malformed Candidate SHA; expected 40 hexadecimal characters"
+  PARSED_RECEIPT_CANDIDATE=$(printf '%s\n' "$receipt_candidate_lines" |
+    sed -E 's/^Candidate SHA:[[:space:]]*`?([0-9A-Fa-f]{40})`?[[:space:]]*$/\1/')
+
+  receipt_verify_lines=$(grep -E '^Hosted Verify head SHA:' "$receipt" || true)
+  [ "$(count_nonempty_lines "$receipt_verify_lines")" -eq 1 ] ||
+    die "$receipt: expected exactly one Hosted Verify head SHA line"
+  printf '%s\n' "$receipt_verify_lines" |
+    grep -Eq '^Hosted Verify head SHA:[[:space:]]*`?[0-9A-Fa-f]{40}`?[[:space:]]*$' ||
+    die "$receipt: malformed Hosted Verify head SHA"
+  PARSED_RECEIPT_VERIFY_SHA=$(printf '%s\n' "$receipt_verify_lines" |
+    sed -E 's/^Hosted Verify head SHA:[[:space:]]*`?([0-9A-Fa-f]{40})`?[[:space:]]*$/\1/')
+
+  receipt_pages_lines=$(grep -E '^Pages deployment head SHA:' "$receipt" || true)
+  [ "$(count_nonempty_lines "$receipt_pages_lines")" -eq 1 ] ||
+    die "$receipt: expected exactly one Pages deployment head SHA line"
+  printf '%s\n' "$receipt_pages_lines" |
+    grep -Eq '^Pages deployment head SHA:[[:space:]]*`?[0-9A-Fa-f]{40}`?[[:space:]]*$' ||
+    die "$receipt: malformed Pages deployment head SHA"
+  PARSED_RECEIPT_PAGES_SHA=$(printf '%s\n' "$receipt_pages_lines" |
+    sed -E 's/^Pages deployment head SHA:[[:space:]]*`?([0-9A-Fa-f]{40})`?[[:space:]]*$/\1/')
+
+  receipt_main_lines=$(grep -E '^Remote main SHA:' "$receipt" || true)
+  [ "$(count_nonempty_lines "$receipt_main_lines")" -eq 1 ] ||
+    die "$receipt: expected exactly one Remote main SHA line"
+  printf '%s\n' "$receipt_main_lines" |
+    grep -Eq '^Remote main SHA:[[:space:]]*`?[0-9A-Fa-f]{40}`?[[:space:]]*$' ||
+    die "$receipt: malformed Remote main SHA"
+  PARSED_RECEIPT_MAIN_SHA=$(printf '%s\n' "$receipt_main_lines" |
+    sed -E 's/^Remote main SHA:[[:space:]]*`?([0-9A-Fa-f]{40})`?[[:space:]]*$/\1/')
+
+  [ "$PARSED_RECEIPT_VERIFY_SHA" = "$PARSED_RECEIPT_CANDIDATE" ] ||
+    die "$receipt: Hosted Verify head SHA does not match Candidate SHA"
+  [ "$PARSED_RECEIPT_PAGES_SHA" = "$PARSED_RECEIPT_CANDIDATE" ] ||
+    die "$receipt: Pages deployment head SHA does not match Candidate SHA"
+  [ "$PARSED_RECEIPT_MAIN_SHA" = "$PARSED_RECEIPT_CANDIDATE" ] ||
+    die "$receipt: Remote main SHA does not match Candidate SHA"
+
+  receipt_build_lines=$(grep -E '^Live build-info version:' "$receipt" || true)
+  [ "$(count_nonempty_lines "$receipt_build_lines")" -eq 1 ] ||
+    die "$receipt: expected exactly one Live build-info version line"
+  PARSED_RECEIPT_BUILD_ID=$(printf '%s\n' "$receipt_build_lines" |
+    sed -E 's/^Live build-info version:[[:space:]]*`?([^`[:space:]]+)`?[[:space:]]*$/\1/')
+  [ -n "$PARSED_RECEIPT_BUILD_ID" ] ||
+    die "$receipt: Live build-info version is empty"
+
+  receipt_worker_lines=$(grep -E '^Live service-worker build ID:' "$receipt" || true)
+  [ "$(count_nonempty_lines "$receipt_worker_lines")" -eq 1 ] ||
+    die "$receipt: expected exactly one Live service-worker build ID line"
+  PARSED_RECEIPT_WORKER_ID=$(printf '%s\n' "$receipt_worker_lines" |
+    sed -E 's/^Live service-worker build ID:[[:space:]]*`?([^`[:space:]]+)`?[[:space:]]*$/\1/')
+  [ "$PARSED_RECEIPT_WORKER_ID" = "$PARSED_RECEIPT_BUILD_ID" ] ||
+    die "$receipt: live service-worker build ID does not match build-info version"
+
+  receipt_http_lines=$(grep -E '^Live HTTP status:' "$receipt" || true)
+  [ "$(count_nonempty_lines "$receipt_http_lines")" -eq 1 ] ||
+    die "$receipt: expected exactly one Live HTTP status line"
+  printf '%s\n' "$receipt_http_lines" |
+    grep -Eq '^Live HTTP status:[[:space:]]*`?200`?[[:space:]]*$' ||
+    die "$receipt: live HTTP status must be 200"
+
+  receipt_smoke_lines=$(grep -E '^Live smoke: PASS([[:space:]]|$)' "$receipt" || true)
+  [ "$(count_nonempty_lines "$receipt_smoke_lines")" -eq 1 ] ||
+    die "$receipt: expected one Live smoke: PASS line"
+}
+
 MODE=human
 case $# in
   0) ;;
@@ -119,6 +202,7 @@ cd "$ROOT"
 
 REPORTS_DIR="$ROOT/.agent/verification"
 [ -d "$REPORTS_DIR" ] || die "missing .agent/verification"
+RECEIPTS_DIR="$ROOT/.agent/release-receipts"
 
 HEAD_SHA=$(git rev-parse --verify 'HEAD^{commit}' 2>/dev/null) ||
   die "HEAD is not a commit"
@@ -181,6 +265,42 @@ if [ -n "$ACCEPTED_REPORT" ]; then
   ACCEPTED_REPORT_COMMIT=$(report_commit_for "$ACCEPTED_REPORT")
   validate_report_commit \
     "$ACCEPTED_REPORT" "$ACCEPTED_CANDIDATE" "$ACCEPTED_REPORT_COMMIT"
+fi
+
+DEPLOYMENT_RECEIPT_PATH=
+DEPLOYMENT_RECEIPT_COMMIT=
+DEPLOYED_CANDIDATE=
+DEPLOYED_BUILD_ID=
+if [ -d "$RECEIPTS_DIR" ]; then
+  for RECEIPT in "$RECEIPTS_DIR"/round-*.md; do
+    [ -f "$RECEIPT" ] || continue
+    RECEIPT_BASE=${RECEIPT##*/}
+    RECEIPT_ROUND=${RECEIPT_BASE#round-}
+    RECEIPT_ROUND=${RECEIPT_ROUND%.md}
+    case $RECEIPT_ROUND in
+      ''|*[!0-9]*) die "$RECEIPT: malformed release-receipt filename" ;;
+    esac
+    RECEIPT_RELATIVE=${RECEIPT#"$ROOT"/}
+    parse_release_receipt "$RECEIPT"
+    RECEIPT_COMMIT=$(report_commit_for "$RECEIPT_RELATIVE")
+    validate_report_commit \
+      "$RECEIPT_RELATIVE" "$PARSED_RECEIPT_CANDIDATE" "$RECEIPT_COMMIT"
+    if [ "$PARSED_RECEIPT_CANDIDATE" = "$ACCEPTED_CANDIDATE" ]; then
+      [ -z "$DEPLOYMENT_RECEIPT_PATH" ] ||
+        die "multiple deployment receipts match accepted candidate"
+      DEPLOYMENT_RECEIPT_PATH=$RECEIPT_RELATIVE
+      DEPLOYMENT_RECEIPT_COMMIT=$RECEIPT_COMMIT
+      DEPLOYED_CANDIDATE=$PARSED_RECEIPT_CANDIDATE
+      DEPLOYED_BUILD_ID=$PARSED_RECEIPT_BUILD_ID
+    fi
+  done
+fi
+
+DEPLOYMENT_STATE=none
+if [ -n "$DEPLOYMENT_RECEIPT_PATH" ]; then
+  git merge-base --is-ancestor "$DEPLOYMENT_RECEIPT_COMMIT" "$HEAD_SHA" ||
+    die "$DEPLOYMENT_RECEIPT_PATH: receipt commit is not an ancestor of HEAD"
+  DEPLOYMENT_STATE=recorded
 fi
 
 HEAD_RELATION=none
@@ -254,6 +374,11 @@ if [ "$MODE" = json ]; then
   "head_relation_to_accepted_verifier": "$HEAD_RELATION",
   "head_equals_or_descends_accepted_verifier": $HEAD_EQUALS_OR_DESCENDS,
   "unverified_later_changes": $UNVERIFIED_LATER_CHANGES,
+  "deployment_state": "$DEPLOYMENT_STATE",
+  "deployment_receipt_path": $(json_or_null "$DEPLOYMENT_RECEIPT_PATH"),
+  "deployment_receipt_commit": $(json_or_null "$DEPLOYMENT_RECEIPT_COMMIT"),
+  "deployed_candidate_sha": $(json_or_null "$DEPLOYED_CANDIDATE"),
+  "deployed_build_id": $(json_or_null "$DEPLOYED_BUILD_ID"),
   "verification_state": "$VERIFICATION_STATE",
   "next_gate": "$NEXT_GATE",
   "next_gate_target_sha": $(json_or_null "$NEXT_GATE_TARGET"),
@@ -278,6 +403,10 @@ printf 'accepted verifier commit: %s\n' "$(display_or_none "$ACCEPTED_REPORT_COM
 printf 'HEAD relation to accepted verifier: %s\n' "$HEAD_RELATION"
 printf 'HEAD equals or descends accepted verifier: %s\n' "$HEAD_EQUALS_OR_DESCENDS"
 printf 'unverified later changes: %s\n' "$UNVERIFIED_LATER_CHANGES"
+printf 'deployment state: %s\n' "$DEPLOYMENT_STATE"
+printf 'deployment receipt: %s\n' "$(display_or_none "$DEPLOYMENT_RECEIPT_PATH")"
+printf 'deployed candidate SHA: %s\n' "$(display_or_none "$DEPLOYED_CANDIDATE")"
+printf 'deployed build ID: %s\n' "$(display_or_none "$DEPLOYED_BUILD_ID")"
 printf 'verification state: %s\n' "$VERIFICATION_STATE"
 printf 'next gate: %s (%s)\n' "$NEXT_GATE" "$(display_or_none "$NEXT_GATE_TARGET")"
 printf 'next action: %s\n' "$NEXT_ACTION"

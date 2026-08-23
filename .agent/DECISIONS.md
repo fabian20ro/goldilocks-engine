@@ -1190,3 +1190,35 @@
   bound, or supported generation only through a new explicit decision backed by
   audited source/deployment evidence and independent fixture, adversarial,
   lifecycle, and browser verification.
+
+## D-048 — M7D exact deployment receipt and M7B infrastructure preflight
+
+- **Decision:** Record the completed M7D exact-SHA release-owner action as a
+  durable receipt, and keep M7B advancement evidence-bound. Candidate
+  `caa334945f5b0a89bc1452609e9b118ba042df01` was independently accepted by
+  Round 116 (`.agent/verification/round-116.md`, verifier commit
+  `2012dcddf6a25fc781fbd7efe0b6b133f148ad2b`), passed hosted Verify run
+  `32582068882`, was fast-forwarded to `main`, and passed exact-SHA Pages
+  deployment run `32582472823`. The complete receipt is
+  `.agent/release-receipts/round-116.md`.
+- **Live identity:** The fetched Pages target returned HTTP 200 and
+  `build-info.json` version `45330c2e3a0014a55b93`, scope
+  `/goldilocks-engine/`, and cache name
+  `goldilocks-shell:/goldilocks-engine/:45330c2e3a0014a55b93`. The generated
+  service worker exposes the same build ID. The recorded 320×693 smoke had no
+  document overflow and zero console errors/warnings. This receipt identifies
+  the deployed M7D candidate; it does not close M7B or the commercial release.
+- **M7B preflight:** Existing WebKit/native/performance tooling remains the
+  canonical path; no product or speculative tooling change is authorized by
+  this preflight. On 2026-08-23 the isolated native capture command recorded
+  `xcrun simctl list devices available --json` blocked by an unavailable
+  CoreSimulatorService and `adb devices -l` with no authorized device row.
+  The Pixel must therefore remain treated as locked/unavailable until an
+  operator is physically present and unlocks/authorizes it. The exact unblock
+  commands and required artifact contract remain in
+  `docs/m7b-native-accessibility.md` and `.agent/HANDOFF.md`.
+- **Reversal condition:** Do not relabel M7B `BLOCKED` as `PASS`, substitute
+  Chromium/AX-tree evidence for native speech, or alter the physical baseline
+  requirement. Re-run the existing native/performance lanes after an
+  interactive iOS Simulator session and an unlocked authorized USB Android
+  session; update the receipt only with new exact candidate evidence.

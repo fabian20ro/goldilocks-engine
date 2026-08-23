@@ -49,6 +49,13 @@ M7A's exact accepted release receipt is frozen in D-043 and
 `.agent/RELEASE_ACCEPTANCE.md`; it is historical routing, not a live status
 claim. These navigation/PWA checks remain regression requirements for M7B.
 
+Round 116's exact M7D deployment receipt is frozen in
+`.agent/release-receipts/round-116.md` and D-048. It identifies the accepted
+candidate, hosted Verify/Pages runs, remote `main`, live build identity, and
+post-deploy 320×693 smoke. It is historical evidence for that exact candidate,
+not a live HEAD or commercial-release claim; `./scripts/agent-status` remains
+the live Git/report source and M7B remains parked under D-044.
+
 ## Parked Milestone 7B OIV route
 
 | Requirement | Source | Candidate evidence | Canonical lane |
